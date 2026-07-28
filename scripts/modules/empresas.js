@@ -375,14 +375,7 @@ var _fornecedoresArr = (function(){
   var saved = localStorage.getItem('milatec-fornecedores');
   if (saved) return JSON.parse(saved);
  } catch(e){}
- return [
-  { id:'forn-1', nome:'Aço Premium Ltda', setor:'Aço e Metais', cidade:'São Paulo', estado:'SP',
-    endereco:'Rua das Indústrias, 450 — Brás', telefone:'(11) 3456-7890', email:'contato@acopremium.com.br',
-    produtos:[{nome:'Chapa Z275 0,95mm', preco:2850},{nome:'Chapa AZM150 0,43mm', preco:1920}] },
-  { id:'forn-2', nome:'Parafus Total', setor:'Fixadores e Parafusos', cidade:'Diadema', estado:'SP',
-    endereco:'Av. Industrial, 1200 — Centro', telefone:'(11) 4401-3300', email:'vendas@parafustotal.com.br',
-    produtos:[{nome:'Parafuso Tek 4,2x13mm (cx 1000)', preco:86},{nome:'Parafuso Tek 5,5x25mm (cx 500)', preco:112}] }
- ];
+ return [];
 })();
 var _fornProdutoCount = 0;
 var _editingFornId    = null;

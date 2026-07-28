@@ -3,108 +3,11 @@
 // (documentos, abas, salvar, empresa/contato inline), Calculadora Modular.
 // ═══════════════════════════════════════════════════════════════════════════════
 function _spObras(row, tds) {
- const id = row.dataset.id;
- if (id) {
-  // Linha carregada do banco — abre painel rico via Supabase
-  _spObraById(id);
-  return;
- }
- // Fallback: linha estática (banco ainda não carregou) — usa dados do DOM
- const tipo   = row.dataset.tipo || '';
- const etapa  = row.dataset.etapa || '';
- const emp    = row.dataset.empresa || '';
- const cidade = row.dataset.cidade || '';
- const estado = row.dataset.estado || '';
- const temProj = row.dataset.projeto !== 'nao';
- const nome   = tds[0]?.querySelector('div')?.innerText?.trim() || tds[0]?.innerText?.trim() || '';
- const data   = tds[4]?.innerText?.trim() || '';
-
- // Monta etapas sem template literal aninhado
- const _etapas = ['Análise inicial','Pré-projeto','Follow-up','Em Andamento','Projeto aprovado','Concluído','Perdido'];
- const _canais  = ['Indicação','Google Ads','Instagram','LinkedIn','Email marketing','Outro'];
- const _etapOpts = _etapas.map(function(e){ return '<option'+(etapa===e?' selected':'')+'>'+e+'</option>'; }).join('');
- const _canalOpts = _canais.map(function(c){ return '<option>'+c+'</option>'; }).join('');
-
- const _nomeEsc = nome.replace(/"/g,'&quot;');
- const _projCor = temProj ? 'var(--green)' : 'var(--muted)';
- const _projTxt = temProj ? 'Projeto vinculado' : 'Sem projeto vinculado';
- const _selTel  = tipo==='Telhados'?' selected':'';
- const _selSF   = tipo==='Steel Frame'?' selected':'';
- const _selMod  = tipo==='Modular'?' selected':'';
- const _selSol  = tipo==='Solar'?' selected':'';
-
- let html = '<div style="background:var(--yellow-dim);border:1px solid var(--yellow);border-radius:7px;padding:9px 12px;margin-bottom:14px;font-size:11px;color:var(--yellow)">Banco carregando — dados locais</div>'
-  + '<div class="sp-field"><div class="sp-label">Nome da obra</div>'
-  + '<input class="sp-inp" id="sp-nome" value="'+_nomeEsc+'" placeholder="Nome da obra..."></div>'
-  + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Empresa</div><input class="sp-inp" id="sp-emp" value="'+emp+'"></div>'
-  + '<div class="sp-field"><div class="sp-label">Tipo</div><select class="sp-inp" id="sp-tipo">'
-  + '<option'+_selTel+'>Telhados</option><option'+_selSF+'>Steel Frame</option>'
-  + '<option'+_selMod+'>Modular</option><option'+_selSol+'>Solar</option>'
-  + '</select></div></div>'
-  + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Etapa</div><select class="sp-inp" id="sp-etapa">'+_etapOpts+'</select></div>'
-  + '<div class="sp-field"><div class="sp-label">Data do orçamento</div><input class="sp-inp" value="'+data+'" readonly style="color:var(--muted)"></div>'
-  + '</div>'
-  + '<div class="sp-g3">'
-  + '<div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-cidade" value="'+cidade+'"></div>'
-  + '<div class="sp-field"><div class="sp-label">UF</div><input class="sp-inp" id="sp-uf" value="'+estado+'" maxlength="2"></div>'
-  + '<div class="sp-field"><div class="sp-label">Canal</div><select class="sp-inp" id="sp-canal"><option value="">—</option>'+_canalOpts+'</select></div>'
-  + '</div>'
-  + '<div class="sp-field"><div class="sp-label">Projeto vinculado</div>'
-  + '<div style="font-size:12px;color:'+_projCor+'">'+_projTxt+'</div></div>';
-
- if (tipo === 'Modular') {
-  const obraId = nome.replace(/\s+/g,'_').substring(0,30);
-  html += '<div class="sp-stitle">Orçamento Modular</div><div id="mc-container">'+_mcBuild(obraId)+'</div>';
- }
-
- _spSet('Obra', nome.split('—')[0]?.trim() || nome, html,
-  '<button class="btn btn-secondary" onclick="_spSaveObra()">Salvar</button> <button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
-
- if (tipo === 'Modular') {
-  const obraId = nome.replace(/\s+/g,'_').substring(0,30);
-  _mcLoad(obraId);
- }
-}
-
-
-function _spSaveObra() {
- // Persist to Supabase if connected
- if (_dbOk && _spRow) {
-  const payload = {
-   id: _spRow.dataset.id || undefined,
-   nome: document.getElementById('sp-nome')?.value || '',
-   empresa_id: null, // TODO: resolve empresa_id from name
-   etapa_negocio: document.getElementById('sp-etapa')?.value || '',
-   tipo_orcamento: [document.getElementById('sp-tipo')?.value || ''],
-   cidade: (document.getElementById('sp-emp')?.value||'').split(',')[0]?.trim() || '',
-   updated_at: new Date().toISOString(),
-  };
-  _dbSaveObra(payload);
- }
- if (!_spRow) return;
- const nome = document.getElementById('sp-nome')?.value || '';
- const emp  = document.getElementById('sp-emp')?.value || '';
- const tipo = document.getElementById('sp-tipo')?.value || '';
- const cidade = document.getElementById('sp-cidade')?.value || '';
- const uf   = document.getElementById('sp-uf')?.value || '';
- const data = document.getElementById('sp-data')?.value || '';
- // Atualizar data-* do row
- _spRow.dataset.tipo = tipo;
- _spRow.dataset.empresa = emp;
- _spRow.dataset.cidade = cidade;
- _spRow.dataset.estado = uf;
- _spRow.dataset.etapa = _spRow.dataset.etapa;
- // Atualizar células
- const tds = [..._spRow.querySelectorAll('td')];
- if (tds[0]) { const d = tds[0].querySelector('div'); if (d) d.textContent = nome; }
- if (tds[1]) tds[1].textContent = emp;
- if (tds[4]) tds[4].textContent = data;
- document.getElementById('sp-title').textContent = nome.split('—')[0]?.trim() || nome;
- // Feedback visual
- const btn = document.querySelector('#sp-actions .btn-primary');
- if (btn) { const orig = btn.textContent; btn.textContent = 'Salvo!'; btn.style.background='var(--green)'; setTimeout(() => { btn.textContent=orig; btn.style.background=''; }, 1500); }
+ // A tabela/kanban de Obras sempre grava data-id nas linhas reais
+ // (_dbLoadObras/_dbLoadObrasKanban) — a única linha sem id é o placeholder
+ // estático "Carregando obras..." (index.html), que não tem onclick, então
+ // este caminho nunca via um fallback sem id na prática.
+ _spObraById(row.dataset.id);
 }
 
 // ── Calculadora Modular ──────────────────────────────────────────────────
@@ -654,7 +557,6 @@ async function _spObraById(id) {
   projetos.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
   const entregas  = entregasRes.data || [];
   const instalacoes = instRes.data || [];
-  console.log('[MilaTec] Obra:', obraRes.data?.nome, '| Proj:', projetos.length, '| Ent:', entregas.length, '| Inst:', instalacoes.length);
 
   _obraAtiva = _normObraAssoc(obraRes.data);
   _obraAtiva.projetos = projetos;
@@ -1725,18 +1627,6 @@ async function _spCriarContato() {
  _spToggleNovoContato();
 }
 
-async function _dbSaveObra(payload) {
- if (!_dbOk) return;
- const id = payload.id;
- delete payload.id;
- if (id) {
-  await _sb.from('obras').update(payload).eq('id', id);
- } else {
-  const { data } = await _sb.from('obras').insert(payload).select().single();
-  return data?.id;
- }
-}
-
 // Estado das condições ativas
 var _obrasConditions = []; // [{id, field, op, value}]
 var _obrasCondId = 0;
@@ -1847,8 +1737,6 @@ function _renderConditions() {
  }).join('');
 }
 
-
-var _selStyle = 'font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);cursor:pointer;height:30px';
 
 // Delegated handlers using data attributes (avoids inline quote conflicts)
 // AI-style natural language filter parser

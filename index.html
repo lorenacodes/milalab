@@ -2682,25 +2682,6 @@
 
 </main>
 
-<!-- MODAL PREVIEW DOCUMENTO -->
-<div id="preview-modal" class="preview-modal" onclick="if(event.target===this)closePreviewModal()">
- <div class="preview-box">
- <div class="preview-box-header">
- <div>
- <div class="preview-box-title" id="prev-modal-title">Documento</div>
- <div class="preview-box-dest" id="prev-modal-dest"></div>
- </div>
- <div class="preview-box-actions">
- <button class="btn btn-primary btn-sm" id="prev-modal-print">
- <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Imprimir PDF
- </button>
- <button class="btn btn-ghost btn-sm" onclick="closePreviewModal()"> Fechar</button>
- </div>
- </div>
- <div class="preview-body" id="prev-modal-body"></div>
- </div>
-</div>
-
 <script src="scripts/app.js"></script>
 <script src="scripts/modules/side-panel.js"></script>
 <script src="scripts/lib/atividades-vinculos.js"></script>
@@ -3124,23 +3105,6 @@
    <button class="btn btn-primary" id="task-drw-submit-btn" onclick="_submitNewTask()">Criar atividade</button>
   </div>
  </div>
-
- <!-- AUDIT DRAWER -->
- <div class="audit-backdrop" id="audit-backdrop" onclick="closeAudit()"></div>
- <div class="audit-drawer" id="audit-drawer">
-  <div class="audit-drawer-hd">
-   <span class="audit-drawer-title">Histórico de alterações</span>
-   <button onclick="closeAudit()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:18px;padding:0 4px">&times;</button>
-  </div>
-  <div class="audit-drawer-body" id="audit-drawer-body"></div>
- </div>
-
- <!-- FAB AUDIT (page-level, mantido para compatibilidade) -->
- <button class="audit-fab" id="audit-fab" onclick="openAudit()" style="display:none">
-  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 3H3v10h10V3z"/><path d="M6 6h4M6 9h4M6 12h2"/></svg>
-  Histórico
-  <span class="audit-fab-badge" id="audit-fab-count"></span>
- </button>
 
  <!-- ══ HISTÓRICO PESSOAL — FAB global ══ -->
  <button class="hist-fab" id="hist-fab" onclick="_histOpen()" style="display:none" title="Meu histórico de alterações">

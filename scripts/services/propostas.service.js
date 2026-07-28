@@ -474,7 +474,6 @@ async function _spGerarProposta() {
   if (_dbOk && registrar) {
    const cont = await _sb.from('propostas').select('id', { count: 'exact', head: true }).eq('obra_id', o.id || null);
    if (!cont.error && typeof cont.count === 'number') versao = cont.count + 1;
-   console.log('[MilaTec] Registrando proposta V' + versao + ' para obra', o.id);
 
    const ins = await _sb.from('propostas').insert({
     numero: numero, obra_id: o.id || null, projeto_id: projSolar?.id || null,
@@ -490,7 +489,6 @@ async function _spGerarProposta() {
     _showToast('Erro ao registrar proposta: ' + _supaErrPt(ins.error.message), 'erro');
    } else {
     const propostaId = ins.data?.id || null;
-    console.log('[MilaTec] Proposta inserida:', propostaId, '— inserindo em documentos...');
 
     const docIns = await _sb.from('documentos').insert({
      obra_id: o.id || null,
@@ -509,7 +507,6 @@ async function _spGerarProposta() {
      console.error('[MilaTec] Erro ao inserir documento:', docIns.error);
      _showToast('Proposta registrada, mas erro no registro de documentos: ' + _supaErrPt(docIns.error.message), 'erro');
     } else {
-     console.log('[MilaTec] Documento registrado com sucesso.');
      if (atualizarObra && novaEtapa && o.id) {
       await updateObraEtapa(o.id, novaEtapa, 'proposta');
      }

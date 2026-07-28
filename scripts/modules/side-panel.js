@@ -66,34 +66,14 @@ function _spSet(tag, title, bodyHTML, actionsHTML) {
  document.getElementById('sp-actions').innerHTML = actionsHTML || '';
 }
 
-function _spField(label, val, id, type) {
- const t = type || 'text';
- return `<div class="sp-field"><div class="sp-label">${label}</div>`
-  + `<input class="sp-inp" id="${id}" type="${t}" value="${String(val).replace(/"/g,'&quot;')}"></div>`;
-}
-
 function _spRender(section, row) {
  const tds = [...row.querySelectorAll('td')];
- const get = i => tds[i]?.innerText?.trim() || '';
  if (section === 'obras') _spObras(row, tds);
  else if (section === 'projetos') _spProjetos(row, tds);
  else if (section === 'entregas') _spEntregas(row, tds);
  else if (section === 'instalacoes') _spInstalacoes(row, tds);
- else if (section === 'tarefas') _spTarefas(row, tds);
  else if (section === 'empresas') _spEmpresas(row, tds);
  else if (section === 'contatos') _spContatos(row, tds);
-}
-
-function _spGeneric(tag, row, tds) {
- const nome = tds[0]?.innerText?.trim() || 'Item';
- const labels = ['Nome','Descrição','Status','Tipo','Data','Responsável','Valor','Observação'];
- let html = '';
- tds.forEach((td, i) => {
-  const v = td.innerText?.trim();
-  if (v) html += `<div class="sp-field"><div class="sp-label">${labels[i]||'Campo '+(i+1)}</div><input class="sp-inp" value="${v.replace(/"/g,'&quot;')}"></div>`;
- });
- _spSet(tag, nome, html,
-  '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 }
 
 // ── Renderer: Empresas ──────────────────────────────────────────────────

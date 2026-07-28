@@ -18,7 +18,6 @@ function _loginSuccess(user) {
  var ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'none';
  if (!localStorage.getItem('pp-name')) localStorage.setItem('pp-name', metaNome || firstName);
  localStorage.setItem('milatec-user-email', email);
- var gEl = document.getElementById('greeting-name'); if (gEl) gEl.textContent = firstName;
  var tu  = document.getElementById('topbar-user');   if (tu)  tu.style.display  = 'flex';
  var tn  = document.getElementById('topbar-user-name'); if (tn) tn.textContent  = email;
  var isAdmin  = _ALLOWED_EMAILS.indexOf(email) !== -1;

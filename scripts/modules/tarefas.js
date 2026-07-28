@@ -9,8 +9,6 @@ var _gestorView     = 'grid';   // 'grid' | 'timeline' | 'metricas'
 var _gestorCollapsed    = {};   // { groupKey: true } = colapsado
 var _gestorWeekExpanded = {};   // { 'YYYY-MM-DD': true } = semana expandida
 var _gestorPeriodo  = { ini: null, fim: null, preset: 'semana' };
-var _gestorCalYear  = new Date().getFullYear();
-var _gestorCalMonth = new Date().getMonth();
 var _gestorTimelineAnchor = new Date(); _gestorTimelineAnchor.setHours(0,0,0,0); // data-base de navegacao da Timeline
 // Lookups para enriquecer vínculos (id → nome)
 var _gestorObrasMap = {};    // { obraId: 'Nome da Obra' }

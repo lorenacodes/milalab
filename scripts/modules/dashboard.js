@@ -454,9 +454,7 @@ async function _remDelete(id) {
 }
 
 // ── Alias para compatibilidade (corrige bug: função inexistente) ──────────
-function _dashDelReminder(id) { _remDelete(id); }
 function _dashRenderInbox()   { _remLoadInbox(); }
-function _dashRenderSent()    { _remLoadSent(); }
 
 
 
@@ -540,10 +538,6 @@ function _colabReqGetAll(email) {
 }
 function _colabReqSave(email, arr) {
  try { localStorage.setItem(_COLAB_REQ_KEY(email), JSON.stringify(arr)); } catch(e) {}
-}
-function _colabReqGetCurrent() {
- var u = window._authUser || {};
- return _colabReqGetAll(u.email || '');
 }
 
 /* Cria uma solicitação de colaboração (task drawer → Comunicação) */
@@ -894,9 +888,8 @@ async function _remSendSupabase() {
  if (_remCurrentTab === 'sent') _remLoadSent();
 }
 
-// Aliases para compatibilidade com botões HTML existentes
+// Alias para compatibilidade com botão HTML existente
 function _remSend()           { _remSendSupabase(); }  // FIX: função que faltava
-function _dashSendReminder()  { _remSendSupabase(); }
 
 
 /* ── DASHBOARD — TAREFAS (localStorage por usuário) ─────────────────── */
@@ -926,10 +919,6 @@ function _dashTasksFiltered() {
   return true;
  });
 }
-// Seed removido — sistema usa exclusivamente dados reais do Supabase.
-// Fallback é array vazio: sem dados fictícios exibidos ao usuário.
-var _dashTasksSeed = [];
-
 // IDs dos seeds fictícios removidos — usados para limpeza única do localStorage
 var _SEED_IDS_MOCK = [1, 2, 3, 4];
 
@@ -1714,16 +1703,6 @@ function _taskDelete() {
   .catch(function(e) { _showToast('Erro: ' + e.message, 'erro'); });
 }
 
-/* Aliases para compatibilidade com código antigo */
-function _openNewTaskModal()  { _taskDrawerOpen(); }
-function _closeNewTaskModal() { _taskDrawerClose(); }
-function _dashTaskAdd()       { _taskDrawerOpen(); }
-
-function _taskAcc(id) {
- var el = document.getElementById(id);
- if (el) el.classList.toggle('open');
-}
-
 function _taskRecorrenciaChange() {
  var recorre = 'nao';
  document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ if (r.checked) recorre = r.value; });
@@ -1770,14 +1749,9 @@ function _drwTab(name, btn) {
 /* ── SUBTAREFAS NO DRAWER ────────────────────────────────────────────────── */
 var _drwSubItems = []; // [{_id, titulo, done}]
 
-// ── Cor nos <select> de status/etapa (estavam sem cor nenhuma, baixa
-// legibilidade) — aplica borda + fundo levemente tingido com a cor da opção
-// selecionada, no mesmo espírito dos badges coloridos já usados nos cards.
-var _SEL_ETAPA_NEGOCIO_COR = {
- 'Análise inicial':'var(--muted)', 'Pré-projeto':'var(--muted)',
- 'Follow-up':'var(--yellow)', 'Em Andamento':'var(--blue)',
- 'Projeto aprovado':'var(--blue)', 'Concluído':'var(--green)'
-};
+// ── Cor no <select> de status (estava sem cor nenhuma, baixa legibilidade) —
+// aplica borda + fundo levemente tingido com a cor da opção selecionada, no
+// mesmo espírito dos badges coloridos já usados nos cards.
 var _SEL_TASK_STATUS_COR = {
  'Backlog':'var(--muted)', 'A fazer':'var(--navy)', 'Em progresso':'var(--yellow)',
  'Aguardando feedback':'rgba(139,92,246,1)', 'Feito':'var(--green)', 'Obsoleto':'var(--red)'
@@ -1921,8 +1895,6 @@ function _drwConfirmarConclusao() {
  if (banner) banner.remove();
  _showToast('Atividade marcada como Feita. Salve para confirmar.', 'ok');
 }
-
-function _ntPopulateObras() { _ntPopulateVinculos(); } // alias de compatibilidade
 
 /* ── Dados do searchable-select de obras ── */
 var _obrasAll = []; // [{id, nome, empresa}] — lista completa para filtrar
@@ -2516,45 +2488,6 @@ function _submitNewTask() {
   console.error('[MilaTec] Erro ao salvar atividade:', e);
   _showToast('Erro ao salvar: ' + e.message, 'erro');
  }
-}
-
-// ── Sincronização de tarefa com Airtable ─────────────────────────────────────
-// Motivo: chamada REST direta ao Airtable — sem backend intermediário no protótipo.
-// Em produção (NestJS), isso deve ser feito via API própria com auth server-side.
-var _AIRTABLE_BASE  = 'appRSDcFPHxcrYt9f';
-var _AIRTABLE_TABLE = 'tbl81kgInpQoorK14';
-// Token: adicione o Personal Access Token do Airtable no campo abaixo
-// Obtenha em: https://airtable.com/create/tokens → escopo: data.records:write
-var _AIRTABLE_TOKEN = localStorage.getItem('milatec-airtable-token') || '';
-
-function _syncTaskToAirtable(task) {
- // ⚠️ PROTÓTIPO — escrita no Airtable desabilitada para proteger dados operacionais reais.
- // Habilitar apenas em produção, após validação completa do sistema.
- // Para reativar: remover a linha abaixo e garantir que _AIRTABLE_TOKEN esteja configurado.
- return; // BLOQUEIO DE PROTEÇÃO
- if (!_AIRTABLE_TOKEN) return; // sem token configurado, skip silencioso
- var fields = {
-  'Name':            task.titulo       || '',
-  'Status':          task.status       || 'A fazer',
-  'Prioridade':      task.prioridade   || 'Média',
-  'Área':            task.area         || '',
-  'Responsável':     task.responsavel  || '',
-  'Tipo de atividade': task.tipo_atividade || '',
-  'Data de início':  task.data_inicio  || null,
-  'Data de fim':     task.data_fim     || null,
-  'Descrição':       task.descricao    || '',
-  'Recorrência':     task.recorrencia  === 'sim' ? 'Sim' : 'Não',
-  'Tags':            task.tags         || '',
-  'Observações':     task.observacoes  || ''
- };
- // Remove campos null/vazios para não gerar erro de validação
- Object.keys(fields).forEach(function(k){ if (fields[k] === null || fields[k] === '') delete fields[k]; });
- fetch('https://api.airtable.com/v0/' + _AIRTABLE_BASE + '/' + _AIRTABLE_TABLE, {
-  method: 'POST',
-  headers: { 'Authorization': 'Bearer ' + _AIRTABLE_TOKEN, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ records: [{ fields: fields }] })
- }).then(function(r){ if(!r.ok) console.warn('[Airtable] Sync falhou:', r.status); })
-   .catch(function(e){ console.warn('[Airtable] Erro de rede:', e.message); });
 }
 
 function _dashUpdateProgress() {
@@ -4237,16 +4170,6 @@ function _ccRenderPanel(tab) {
    + '</div>';
  }).join('');
 }
-
-// Mantém função legada para não quebrar código antigo
-function _ccRender() { _ccRenderPanel(_ccCurrentTab === 'recv' ? 'cr' : _ccCurrentTab === 'sent' ? 'cs' : 'done'); }
-function _ccTab(tab, btn) {
- var map = { recv: 'cr', sent: 'cs', done: 'done' };
- var t = map[tab] || 'cr';
- var newBtn = document.getElementById('comm-t-' + t);
- _commTab(t, newBtn || btn);
-}
-
 
 function _dashUpdateKPIsFromDB(atividades) {
  if(!atividades) return;
