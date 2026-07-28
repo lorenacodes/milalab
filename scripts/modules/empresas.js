@@ -6,31 +6,33 @@
 async function _spEmpresas(row, tds) {
  var d = row.dataset;
  var empId = d.id || '';
- var nomeEl = tds[1] ? tds[1].querySelector('.nt-avatar ~ div div') || tds[1].querySelector('div > div') : null;
- var nome = (nomeEl ? nomeEl.innerText : (tds[1] ? tds[1].innerText : '')).trim() || d.nome || '';
- var cnpj = '';
- if (tds[1]) { var divs = tds[1].querySelectorAll('div'); for(var i=0;i<divs.length;i++){ var t=divs[i].innerText.trim(); if(t.match(/\d{2}\.\d{3}/)){cnpj=t;break;} } }
- var estado = d.estado || '';
- var fase   = d.fase   || '';
- var cats   = d.setor  || '';
+ // Fonte de verdade: cache carregado do Supabase (_empresasArr), não o dataset
+ // da linha (que fica em minúsculas, só para filtro) nem o DOM renderizado.
+ var emp = (_empresasArr || []).find(function(e){ return String(e.id) === String(empId); }) || {};
+ var nome = emp.nome || d.nome || '';
+ var cnpj = emp.cnpj || '';
+ var estado = emp.estado || '';
+ var fase   = emp.fase_ciclo_vida || '';
+ var cats   = (emp.categoria || []).join(', ');
 
  _spSet('Empresa', nome,
   '<div class="sp-field"><div class="sp-label">Razão Social</div>'
-  + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/\x22/g,'&quot;')+'">  </div>'
+  + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/"/g,'&quot;')+'"></div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" value="'+(cnpj||'—')+'">' + '</div>'
-  + '<div class="sp-field"><div class="sp-label">Estado</div><input class="sp-inp" value="'+estado.toUpperCase()+'" readonly style="opacity:.6">' + '</div>'
+  + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-emp-cnpj" value="'+cnpj.replace(/"/g,'&quot;')+'"></div>'
+  + '<div class="sp-field"><div class="sp-label">Estado</div><input class="sp-inp" id="sp-emp-estado" maxlength="2" style="text-transform:uppercase" value="'+estado.toUpperCase()+'"></div>'
   + '</div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Categoria</div><input class="sp-inp" value="'+cats+'" readonly style="opacity:.6">' + '</div>'
-  + '<div class="sp-field"><div class="sp-label">Fase</div><input class="sp-inp" value="'+fase+'" readonly style="opacity:.6">' + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Categoria (separe por vírgula)</div><input class="sp-inp" id="sp-emp-categoria" value="'+cats.replace(/"/g,'&quot;')+'"></div>'
+  + '<div class="sp-field"><div class="sp-label">Fase</div><input class="sp-inp" id="sp-emp-fase" value="'+fase.replace(/"/g,'&quot;')+'"></div>'
   + '</div>'
+  + '<input type="hidden" id="sp-emp-id" value="'+empId+'">'
   + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
   + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Contatos vinculados</div>'
   + '<div id="sp-emp-contatos" style="display:flex;flex-direction:column;gap:8px">'
   + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando contatos...</div>'
   + '</div></div>',
-  '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
+  '<button class="btn btn-primary" id="sp-emp-save-btn" onclick="_spSaveEmpresa()">Salvar</button> <button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
  );
 
  if (!_sb || !empId) return;
@@ -309,10 +311,36 @@ async function _dbLoadContatos() {
  }).join('');
 }
 
-// ── Load Obras → Kanban dinâmico ──────────────────────────────────────────────
+// ── Salvar Empresa (painel lateral) ────────────────────────────────────────────
+async function _spSaveEmpresa() {
+ var id = (document.getElementById('sp-emp-id') || {}).value;
+ if (!_sb || !id) return;
+ var payload = {
+  nome:            (document.getElementById('sp-emp-nome')    || {}).value.trim() || '',
+  cnpj:            (document.getElementById('sp-emp-cnpj')    || {}).value.trim() || null,
+  estado:          ((document.getElementById('sp-emp-estado') || {}).value || '').trim().toUpperCase() || null,
+  fase_ciclo_vida: (document.getElementById('sp-emp-fase')    || {}).value.trim() || null,
+  categoria:       ((document.getElementById('sp-emp-categoria') || {}).value || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean),
+  ultima_alteracao_por: (_currentUser && _currentUser.email) || null,
+  ultima_modificacao: new Date().toISOString(),
+ };
+ if (!payload.nome) { _showToast('Informe a Razão Social.', 'erro'); return; }
 
-// ── Abre painel de obra pelo ID (usado pelo kanban e pela tabela) ──────────────
-
+ var btn = document.getElementById('sp-emp-save-btn');
+ var { error } = await _sb.from('empresas').update(payload).eq('id', id);
+ if (btn) {
+  btn.textContent = error ? 'Erro!' : 'Salvo!';
+  setTimeout(function(){ btn.textContent = 'Salvar'; }, 1800);
+ }
+ if (error) {
+  _showToast('Erro ao salvar empresa: ' + _supaErrPt(error.message), 'erro');
+  return;
+ }
+ var titleEl = document.getElementById('sp-title');
+ if (titleEl) titleEl.textContent = payload.nome;
+ _showToast('Empresa salva com sucesso!', 'ok');
+ _dbLoadEmpresas();
+}
 
 function switchEmpTab(tab) {
  var tabs = ['empresas', 'contatos', 'fornecedores'];
