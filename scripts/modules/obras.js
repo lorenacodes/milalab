@@ -11,8 +11,6 @@ function _spObras(row, tds) {
 }
 
 // ── Calculadora Modular ──────────────────────────────────────────────────
-var _mcDbSeed = [{"g":"MATERIAL LSF","sg":"Fixadores","cod":"2544","d":"PARAFUSO FIXAD METALIC 18X1'' PHS2 TCP2","vl":0.18},{"g":"MATERIAL LSF","sg":"Fixadores","cod":"4681","d":"PARAFUSO FIXAD PB 18X1/2 K-LATH PHS2 CP2","vl":0.18},{"g":"MATERIAL LSF","sg":"Aço","cod":"5598","d":"CHAPA 3,00 X 1.200","vl":5.74},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5622","d":"CHAPA GLASROC X 1200 X 2400 MM","vl":74.9},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5623","d":"CHAPA GESSO ST 12,5 X 1200 X 1800 MM PLA","vl":18.19},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5648","d":"PLACACA CIMENTICIA 1.200 X 2.400","vl":144.88},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5649","d":"MASSA BASCOAT PROFORT 20K","vl":70.9},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5670","d":"PLACA DE ISOPOR 3,00 X 1,00 X 5 CM","vl":90.0},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5671","d":"PERFIL PINGADEIRA GRX BASE INF 2,5M","vl":19.96},{"g":"MATERIAL LSF","sg":"Fixadores","cod":"5685","d":"PARAFUSO CIMENTICIA 4,2 X 32","vl":0.13},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5689","d":"FITA TELA AZUL","vl":13.64},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5690","d":"FITA WALPAPER","vl":21.91},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5691","d":"FITA WALCORNER FLEX","vl":49.07},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5692","d":"TELA PARA REFORSO WALTEX 4 X 4","vl":204.57},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5693","d":"MANTA HIDROFUGA 52,5M2","vl":244.38},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5694","d":"CANTONEIRA PVC COM TELA D EFIBRA","vl":16.42},{"g":"MATERIAL LSF","sg":"Fixadores","cod":"5695","d":"PINO LISO 1/4 X 27 P HP CLIP","vl":0.21},{"g":"MATERIAL LSF","sg":"Fixadores","cod":"5696","d":"PINO LISO 1/4 X 28 P HP AR","vl":0.17},{"g":"MATERIAL LSF","sg":"Fixadores","cod":"5697","d":"FINCAPINO CAL 27 MAG AM BLUE","vl":0.35},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5725","d":"FITA ADES. VEDAÇÃO 3,0 X90 X10M","vl":48.83},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5767","d":"FITA DUPLA FACE","vl":33.0},{"g":"MATERIAL LSF","sg":"Fechamento","cod":"5772","d":"OSB 12MM 1220 X 2200 MM","vl":141.0},{"g":"MATERIAL LSF","sg":"Piso","cod":"5777","d":"PISO LAMINADO PRIME (2,36M)","vl":85.86},{"g":"MATERIAL LSF","sg":"","cod":"5813","d":"PARAFUSO PONTA AGULHA","vl":0.03},{"g":"MATERIAL LSF","sg":"","cod":"5814","d":"MONTANTE STEEL FRAME SF 90 X 0,95 MM - 3","vl":86.0},{"g":"MATERIAL LSF","sg":"","cod":"5974","d":"REVESTIMENTO CEREJEIRA 3M²","vl":233.7},{"g":"MATERIAL LSF","sg":"","cod":"5975","d":"REVESTIMENTO CEREJEIRA 1M²","vl":77.9},{"g":"MADEIRA","sg":"","cod":"172","d":"COMPENSADO 2200 X 1600X 10MM","vl":118.48},{"g":"MADEIRA","sg":"","cod":"3727","d":"MDF PLACAS FREIJO 15MM","vl":352.65},{"g":"MADEIRA","sg":"","cod":"4971","d":"COMPENSADO 1.220 X 1.440 X 15MM","vl":139.0},{"g":"ESTRUTURA — AÇO","sg":"","cod":"2628","d":"CANTONEIRA 3X1/4 6M","vl":59.78},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"1255","d":"PARAFUSO FIXAD 12 14X3/4'' HWH 5/16 TCP1","vl":0.29},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"1256","d":"PARAFUSO FIXAD 18X1/2'' HWH 1/4 PHS2 TCP","vl":0.13},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"1257","d":"PARAFUSO FIXAD TITECON M6X45MM SEXT.5/16","vl":0.44},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"1631","d":"REBITE REPUXO 408","vl":0.05},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"1914","d":"PARAFUSO FIXAD TITECON M6X70MM SEXT.5/16","vl":0.55},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"2186","d":"PARAFUSO FIXAD PB12 14 X1'' 5/16","vl":0.29},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"2611","d":"CHUMBADOR PARABOLT 1/2X4''","vl":1.99},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"2824","d":"PARAFUSO FIXAD DURS PB 12-1/4 14X4''","vl":0.95},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"4109","d":"PARAFUSO FIXAD 12 14X3/4'' HWH 5/16 TCP3","vl":0.27},{"g":"ESTRUTURA — FIXAÇÃO","sg":"","cod":"4198","d":"BUCHA PLASTICA 8MM TIJOLO VAZADO","vl":0.09},{"g":"VEDAÇÃO","sg":"","cod":"1603","d":"COLA VEDA CALHA PU 400G","vl":14.49},{"g":"VEDAÇÃO","sg":"","cod":"1679","d":"COLA VEDA CALHA PU SACHE 800G","vl":25.0},{"g":"VEDAÇÃO","sg":"","cod":"1769","d":"GALVANIZAÇÃO A FRIO","vl":785.73},{"g":"VEDAÇÃO","sg":"","cod":"2147","d":"SPRAY GALVANICO EXPRESS ALUM.","vl":49.5},{"g":"VEDAÇÃO","sg":"","cod":"3265","d":"FITA ADES.VEDAÇÃO 3,0X55X10M","vl":26.18},{"g":"VEDAÇÃO","sg":"","cod":"5914","d":"MANTA ASFÁLTICA 10 X10","vl":21.55},{"g":"VEDAÇÃO","sg":"","cod":"5925","d":"MANTA ASFALTICA 20 X 10","vl":39.4},{"g":"MATERIAL LSF","sg":"","cod":"5778","d":"CONDUITE TRAMONTINA 3/4 25MM","vl":1.49},{"g":"MATERIAL LSF","sg":"","cod":"5779","d":"CABO FLEX 2,5 MM 750V VERDE","vl":2.3},{"g":"MATERIAL LSF","sg":"","cod":"5780","d":"CABO FLEX 1,5 MM 750V DIVERSAS CORES","vl":1.46},{"g":"MATERIAL LSF","sg":"","cod":"5781","d":"FITA ISOLANTE 3M IMPERIAL 20 MT","vl":8.1},{"g":"MATERIAL LSF","sg":"","cod":"5782","d":"TOMADA ARIA 2S 2P+T 10A","vl":12.45},{"g":"MATERIAL LSF","sg":"","cod":"5783","d":"INT. ARIA 3S SIMPLES 6A","vl":17.1},{"g":"MATERIAL LSF","sg":"","cod":"5784","d":"CABO FLEX 6MM 750V AZUL","vl":5.76},{"g":"MATERIAL LSF","sg":"","cod":"5785","d":"CENTRO DIST. S/BARR. P/08 EMB. PVC FAME","vl":59.4},{"g":"MATERIAL LSF","sg":"","cod":"5799","d":"ARQUI ALIZ RODAPE 2.40M 50910 ENG SLIM","vl":58.45},{"g":"MATERIAL LSF","sg":"","cod":"5800","d":"ARQUI COLA RODAPE BR 420G","vl":38.06},{"g":"MATERIAL LSF","sg":"","cod":"5801","d":"3M LIXA PAREDE 220 230U","vl":1.12},{"g":"MATERIAL LSF","sg":"","cod":"5802","d":"ATL 2321 SR CJ CAB SR+ROLO ANTI-GOTA","vl":41.45},{"g":"MATERIAL LSF","sg":"","cod":"5803","d":"ATL 321 9 ROLO LA ANTIGOTAS 9C","vl":17.37},{"g":"MATERIAL LSF","sg":"","cod":"5804","d":"CR MASSA CORRIDA BD 25KG","vl":59.84},{"g":"MATERIAL LSF","sg":"","cod":"5805","d":"CR RENDE MT BR GELO 16L","vl":259.89},{"g":"MATERIAL LSF","sg":"","cod":"5806","d":"MASSA P EFEITO T DA TERRA 5KG C.ALARJ SU","vl":299.0},{"g":"MATERIAL LSF","sg":"","cod":"5807","d":"TEXTURA GRANFFINO PLS 20KG CZ.CLA HYDRON","vl":312.9},{"g":"MATERIAL LSF","sg":"","cod":"5808","d":"0,40M ECOFIBER WALL COMPACTADO - 525 G/M","vl":13.12},{"g":"MATERIAL LSF","sg":"","cod":"5812","d":"MASSA PARA DRYWALL 25 KG","vl":64.6},{"g":"MATERIAL LSF","sg":"","cod":"5829","d":"SELADOR ACR.INT/EXT 3,6L 3002 IQUINE","vl":115.5},{"g":"MATERIAL LSF","sg":"","cod":"5830","d":"FUNDO PREP.PAREDE 3,6L INCOLOR HYDRONORT","vl":83.9},{"g":"MATERIAL LSF","sg":"","cod":"5856","d":"REVESTIMENTO NATURAIS HIDRONORTH P PARED","vl":221.44},{"g":"MATERIAL LSF","sg":"","cod":"5858","d":"PAINELESYFRIGO 50 X 1120","vl":149.49},{"g":"MATERIAL LSF","sg":"","cod":"5859","d":"LIXA MASSA 120","vl":1.67},{"g":"MATERIAL LSF","sg":"","cod":"5860","d":"LIXA MASSA 180","vl":1.67},{"g":"MATERIAL LSF","sg":"","cod":"5861","d":"MASSA ACRILICA PREMIUM","vl":51.7},{"g":"MATERIAL LSF","sg":"","cod":"5879","d":"MANTA POLIETILENO EXPANDIDO","vl":119.99},{"g":"MATERIAL LSF","sg":"","cod":"5881","d":"FORRO CANAL 8MM X 6,0M X 2,0CM","vl":26.18},{"g":"MATERIAL LSF","sg":"","cod":"5882","d":"COLONIAL 6,00M 35 X 50MM","vl":21.86},{"g":"MATERIAL LSF","sg":"","cod":"5883","d":"PLASTILON LARGO 20 X 40 6M","vl":28.0},{"g":"MATERIAL LSF","sg":"","cod":"5891","d":"PLAFON BOX PAR 20 PRETO MOON","vl":55.17},{"g":"MATERIAL LSF","sg":"","cod":"5892","d":"LAMPADA LED PAR 20 7W 3000K PIX","vl":12.99},{"g":"MATERIAL LSF","sg":"","cod":"5909","d":"TEKHA TERMICA SEMI- SANDUICHE","vl":119.9},{"g":"MATERIAL LSF","sg":"","cod":"5919","d":"BARRAMENTO BIFASICO 80A","vl":32.95},{"g":"MATERIAL LSF","sg":"","cod":"5920","d":"BARRAMENTO NEUTRO 11 TERMINAIS","vl":27.3},{"g":"MATERIAL LSF","sg":"","cod":"5921","d":"BARRAMENTO TERRA 11 TERMINAIS","vl":26.1},{"g":"MATERIAL LSF","sg":"","cod":"5922","d":"CONDUITE AMANCO 32MM","vl":34.8},{"g":"MATERIAL LSF","sg":"","cod":"5923","d":"DISJUNTOR 40A","vl":43.4},{"g":"MATERIAL LSF","sg":"","cod":"5924","d":"PLACA LIZ 4X2 CEGA","vl":4.9},{"g":"MATERIAL LSF","sg":"","cod":"5932","d":"LUMINARIA PENDENTE TETO RETANGULAR","vl":145.0},{"g":"MATERIAL LSF","sg":"","cod":"5945","d":"VIDRO INCOLOR DE 6,00MM TEMPERADO","vl":85.8},{"g":"MATERIAL LSF","sg":"","cod":"5949","d":"PLUG IND. 2P+T 32A 8H AZUL","vl":24.66},{"g":"MATERIAL LSF","sg":"","cod":"5950","d":"TOMADA IND. 2P+T 32A 8H AZUL","vl":27.84},{"g":"MATERIAL LSF","sg":"","cod":"5958","d":"PISO LAMINADO EUCAFLOOR","vl":324.98},{"g":"MATERIAL LSF","sg":"","cod":"5959","d":"TRILHO PRETO 1M","vl":30.0},{"g":"MATERIAL LSF","sg":"","cod":"5960","d":"EMENDA CONECTOR RETO PRETO","vl":10.0},{"g":"MATERIAL LSF","sg":"","cod":"5961","d":"SPORT GLST 10W PRETO 3000K","vl":10.54},{"g":"MODULAR","sg":"","cod":"","d":"CHAPA GESSO RU BR 15,0/1200 - KNAUF","vl":26.33},{"g":"MODULAR","sg":"","cod":"","d":"CHAPA GESSO ST BR 12,5/1200 - KNAUF","vl":13.68},{"g":"MODULAR","sg":"","cod":"","d":"AQUAPANEL CH. RESIDÊNCIA 8 (1200×2400) - KNAUF","vl":53.45},{"g":"MODULAR","sg":"","cod":"","d":"KONTRAPISO ACÚSTICO 8,0 (1200×900) - KNAUF","vl":184.7},{"g":"MODULAR","sg":"","cod":"","d":"CHAPA GESSO ST BR 12,5/1200 HARD - KNAUF","vl":34.94},{"g":"MODULAR","sg":"","cod":"","d":"FORROLEVE 12,5 1200×2400 - KNAUF","vl":14.36},{"g":"MODULAR","sg":"","cod":"","d":"Massa Readyfix Balde 25 kg - KNAUF","vl":2.59},{"g":"MODULAR","sg":"","cod":"","d":"MASSA FASTFIX BR 20 kg - KNAUF","vl":46.93},{"g":"MODULAR","sg":"","cod":"","d":"CANTONEIRA PERF. 23/23 - KNAUF","vl":2.71},{"g":"MODULAR","sg":"","cod":"","d":"AQUAPANEL BARREIRA DE ÁGUA 1,5×50 m - KNAUF","vl":1234.41},{"g":"MODULAR","sg":"","cod":"","d":"CANTONEIRA PERF. 23/23 (unitário) - KNAUF","vl":2.71},{"g":"MODULAR","sg":"","cod":"","d":"FITA P/ JUNTA AQUAPANEL 10 cm - KNAUF","vl":120.96},{"g":"MODULAR","sg":"","cod":"","d":"FITA DE ISOLAMENTO 30 m × 95 mm - KNAUF","vl":68.1},{"g":"MODULAR","sg":"","cod":"","d":"FITA PARA CANTOS 30×50 - KNAUF","vl":39.99},{"g":"MODULAR","sg":"","cod":"","d":"FITA TELADA KNAUF 90 m - KNAUF","vl":18.42},{"g":"MODULAR","sg":"","cod":"","d":"AQUAPANEL MASSA BASECOAT BR CINZA 20KG","vl":5.92},{"g":"MODULAR","sg":"","cod":"","d":"Forro em Teto Laminado Plus","vl":201.86},{"g":"MODULAR","sg":"","cod":"","d":"forro lambril de angelim pedra","vl":145.0},{"g":"MODULAR","sg":"","cod":"","d":"Deck de WPC (MACHETO)","vl":460.1},{"g":"MODULAR","sg":"","cod":"","d":"Revestimento em Chapa de ACM 3mm (Branco Brilho ) (Alucomaxx)","vl":110.0},{"g":"MODULAR","sg":"","cod":"","d":"Revestimento Painel Ripado (Linha Elegance -Cinza Ref.: 700 Laminado) (MACHETO)","vl":187.14},{"g":"MODULAR","sg":"","cod":"","d":"Revestimento Vinílico Teto Laminado Plus (MACHETO)","vl":201.86},{"g":"MODULAR","sg":"","cod":"","d":"Revestimento em Thermo Siding (Lambri Triplo - Acácia ) (MACHETO)","vl":178.0},{"g":"MODULAR","sg":"","cod":"","d":"Revestimento em Thermo Siding  (Overline - Cinza) (MACHETO)","vl":178.0},{"g":"MODULAR","sg":"","cod":"","d":"Acabamento Perfil H - Preto Macheto","vl":129.0},{"g":"MODULAR","sg":"","cod":"","d":"Acabamento Perfil L- Externo - Preto Macheto","vl":99.0},{"g":"MODULAR","sg":"","cod":"","d":"Ar condicionado 9000 btu","vl":1990.0}];
-var _mcTplSeed = [{"g":"Estrutura","d":"Estrutura 100% LSF","un":"kg","qtd":700.0,"vl":7.5,"sup":"estoque"},{"g":"Isolamento","d":"Manta Hidrófuga Walwrap - 52,5 m² (1,05 x 50 m)","un":"PC","qtd":1.5,"vl":229.0,"sup":"estoque"},{"g":"Isolamento","d":"Parafuso panqueca","un":"PC","qtd":400.0,"vl":0.12,"sup":"estoque"},{"g":"Isolamento","d":"Lã de pet","un":"m²","qtd":39.0,"vl":13.12,"sup":"estoque"},{"g":"Revestimento externo","d":"Revestimento em Thermo Siding (Lambri Triplo - Acácia ) (MACHETO)","un":"m²","qtd":42.0,"vl":50.0,"sup":"comprar"},{"g":"Revestimento externo","d":"Acabamento Perfil H - Preto Macheto","un":"","qtd":null,"vl":0,"sup":""},{"g":"Revestimento externo","d":"Acabamento Perfil L- Externo - Preto Macheto","un":"","qtd":null,"vl":0,"sup":""},{"g":"Revestimento externo","d":"Fixadores","un":"PC","qtd":null,"vl":0,"sup":"estoque"},{"g":"Revestimento externo","d":"Veda calha","un":"un","qtd":null,"vl":0,"sup":"estoque"},{"g":"Revestimento interno","d":"Painel Sol PVC","un":"m²","qtd":52.0,"vl":87.5,"sup":"comprar"},{"g":"Revestimento interno","d":"Fixadores","un":"PC","qtd":null,"vl":0,"sup":"estoque"},{"g":"Piso","d":"ETERNIT ETERPISO 15MM","un":"m²","qtd":13.0,"vl":90.28,"sup":"comprar"},{"g":"Piso","d":"Fixadores","un":"PC","qtd":null,"vl":0,"sup":"estoque"},{"g":"Piso","d":"FITA TELA AZUL","un":"","qtd":1.0,"vl":13.64,"sup":""},{"g":"Piso","d":"MASSA BASCOAT PROFORT 20K","un":"","qtd":1.0,"vl":70.9,"sup":""},{"g":"Piso","d":"MANTA POLIETILENO EXPANDIDO (16,67 x 1,2 x 0,002 m)","un":"un","qtd":1.0,"vl":119.99,"sup":"comprar"},{"g":"Piso","d":"REVESTIMENTO CEREJEIRA 1M²","un":"m²","qtd":14.0,"vl":77.9,"sup":"comprar"},{"g":"Piso","d":"Rodapé em Poliestireno na Cor Preta","un":"ML","qtd":14.8,"vl":71.5,"sup":"comprar"},{"g":"Piso","d":"Cola PU Fixa Tudo","un":"un","qtd":4.0,"vl":8.57,"sup":"estoque"},{"g":"Piso","d":"Soleira porta","un":"sc","qtd":1.0,"vl":20.0,"sup":"estoque"},{"g":"Portas e janelas","d":"Porta","un":"un","qtd":1.0,"vl":1500.0,"sup":"comprar"},{"g":"Ar condicionado","d":"Ar condicionado 9000 btu","un":"sc","qtd":1.0,"vl":1990.0,"sup":"comprar"},{"g":"Ar condicionado","d":"Instalação ar-condicionad","un":"sc","qtd":1.0,"vl":650.0,"sup":"comprar"},{"g":"Hidroelétrica","d":"Elétrica parte 1","un":"un","qtd":null,"vl":0,"sup":"comprar"},{"g":"Hidroelétrica","d":"Elétroduto rigido preto3/4 - m","un":"un","qtd":8.0,"vl":13.0,"sup":"comprar"},{"g":"Hidroelétrica","d":"Joelho para eletroduto rigido 3/4","un":"un","qtd":7.0,"vl":2.7,"sup":"comprar"},{"g":"Hidroelétrica","d":"Luva para eletroduto rigido 3/4","un":"un","qtd":20.0,"vl":1.25,"sup":"comprar"},{"g":"Hidroelétrica","d":"Cabo flexivel 1,5 mm","un":"ML","qtd":50.0,"vl":1.59,"sup":"comprar"},{"g":"Hidroelétrica","d":"Cabo flexivel 2,5 mm","un":"ML","qtd":85.0,"vl":2.59,"sup":"comprar"},{"g":"Hidroelétrica","d":"Cabo flexivel 6 mm","un":"ML","qtd":20.0,"vl":6.4,"sup":"comprar"},{"g":"Hidroelétrica","d":"Interruptor de sobrepor","un":"un","qtd":1.0,"vl":6.1,"sup":"comprar"},{"g":"Hidroelétrica","d":"Tomada de Sobrepor","un":"un","qtd":7.0,"vl":7.2,"sup":"comprar"},{"g":"Hidroelétrica","d":"Quadro geral de sobrepor","un":"un","qtd":1.0,"vl":46.95,"sup":"comprar"},{"g":"Hidroelétrica","d":"Barramento neutro","un":"un","qtd":1.0,"vl":27.6,"sup":"comprar"},{"g":"Hidroelétrica","d":"Barramento terrra","un":"un","qtd":1.0,"vl":27.6,"sup":"comprar"},{"g":"Hidroelétrica","d":"Pente bifasico","un":"un","qtd":1.0,"vl":32.95,"sup":"comprar"},{"g":"Hidroelétrica","d":"Disjuntor bi 32A","un":"un","qtd":1.0,"vl":31.2,"sup":"comprar"},{"g":"Hidroelétrica","d":"Disjuntor bi 10 A","un":"un","qtd":1.0,"vl":31.2,"sup":"comprar"},{"g":"Hidroelétrica","d":"Disjuntor un 10 A","un":"un","qtd":1.0,"vl":7.95,"sup":"comprar"},{"g":"Hidroelétrica","d":"Disjuntor un 20A","un":"un","qtd":1.0,"vl":7.95,"sup":"comprar"},{"g":"Hidroelétrica","d":"Elétrica parte 2","un":"un","qtd":null,"vl":0,"sup":"comprar"},{"g":"Hidroelétrica","d":"Luminária","un":"un","qtd":4.0,"vl":16.0,"sup":"comprar"},{"g":"Hidroelétrica","d":"TRILHO PRETO 1M","un":"un","qtd":2.0,"vl":150.0,"sup":"comprar"},{"g":"Hidroelétrica","d":"PLUG IND. 2P+T 32A 8H AZUL","un":"un","qtd":1.0,"vl":24.66,"sup":"comprar"},{"g":"Hidroelétrica","d":"TOMADA IND. 2P+T 32A 8H AZUL","un":"un","qtd":1.0,"vl":27.84,"sup":"comprar"},{"g":"Cobertura","d":"Telha Semi-sanduíche","un":"m²","qtd":16.0,"vl":119.9,"sup":"comprar"}];
 
 var _mcGrupos = ['Estrutura','Isolamento','Revestimento externo','Revestimento interno','Piso','Portas e janelas','Ar condicionado','Hidroelétrica','Cobertura'];
 
@@ -105,53 +103,96 @@ function _mcCalc(obraId) {
  if (tot) tot.textContent = grandTotal.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 }
 
-function _mcSave(obraId) {
- const data = { dims: {}, grupos: {} };
- ['mc-pext','mc-pint','mc-piso','mc-cob'].forEach(id => {
-  data.dims[id] = document.getElementById(id)?.value || '0';
- });
- _mcGrupos.forEach(g => {
-  const itens = _mcTpl.filter(it => it.g === g);
-  const gid = 'mc-g-' + g.replace(/\s+/g,'_');
-  data.grupos[g] = itens.map((it, idx) => ({
-   d: it.d,
-   qtd: document.getElementById(gid+'_'+idx+'-qtd')?.value || '',
-   vl:  document.getElementById(gid+'_'+idx+'-vl')?.value || '',
-  }));
- });
- localStorage.setItem('mc_' + obraId, JSON.stringify(data));
- // Feedback
+async function _mcSave(obraId) {
  const btn = document.querySelector('.mc-save-btn');
+ if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
+
+ const dims = {
+  parede_externa_m2: parseFloat(document.getElementById('mc-pext')?.value) || 0,
+  parede_interna_m2: parseFloat(document.getElementById('mc-pint')?.value) || 0,
+  piso_m2:           parseFloat(document.getElementById('mc-piso')?.value) || 0,
+  cobertura_m2:      parseFloat(document.getElementById('mc-cob')?.value)  || 0,
+ };
+
+ // Upsert do cabeçalho (dimensões) — memorial_calculo_obras.obra_id é UNIQUE
+ const up = await _sb.from('memorial_calculo_obras').upsert(
+  Object.assign({ obra_id: obraId }, dims), { onConflict: 'obra_id' }
+ ).select('id').single();
+ if (up.error) { _showToast('Erro ao salvar orçamento: ' + _supaErrPt(up.error.message), 'erro'); return; }
+ const memorialId = up.data.id;
+
+ // Itens: substitui tudo (delete-then-insert), mesmo padrão de outras
+ // relações N:1 editadas em bloco neste sistema (_syncAtividadeVinculos).
+ const itens = [];
+ _mcGrupos.forEach(g => {
+  const grupoItens = _mcTpl.filter(it => it.g === g);
+  const gid = 'mc-g-' + g.replace(/\s+/g,'_');
+  grupoItens.forEach((it, idx) => {
+   const qtd = document.getElementById(gid+'_'+idx+'-qtd')?.value;
+   const vl  = document.getElementById(gid+'_'+idx+'-vl')?.value;
+   itens.push({
+    memorial_id: memorialId, template_item_id: it.id || null, grupo: g,
+    descricao: it.d, posicao_no_grupo: idx,
+    quantidade: parseFloat(qtd) || 0, valor_unitario: parseFloat(vl) || 0,
+   });
+  });
+ });
+ const delItens = await _sb.from('memorial_calculo_itens').delete().eq('memorial_id', memorialId);
+ if (delItens.error) { _showToast('Dimensões salvas, mas houve erro ao atualizar os itens: ' + _supaErrPt(delItens.error.message), 'erro'); return; }
+ if (itens.length) {
+  const insItens = await _sb.from('memorial_calculo_itens').insert(itens);
+  if (insItens.error) { _showToast('Dimensões salvas, mas houve erro ao gravar os itens: ' + _supaErrPt(insItens.error.message), 'erro'); return; }
+ }
+
  if (btn) { btn.textContent = 'Salvo!'; btn.style.background='var(--navy)'; setTimeout(() => { btn.textContent='Salvar orçamento'; btn.style.background=''; }, 1800); }
 }
 
-function _mcLoad(obraId) {
- const raw = localStorage.getItem('mc_' + obraId);
- if (!raw) { _mcCalc(obraId); return; }
- try {
-  const data = JSON.parse(raw);
-  Object.entries(data.dims||{}).forEach(([id,v]) => { const el = document.getElementById(id); if (el) el.value = v; });
-  _mcGrupos.forEach(g => {
-   const gid = 'mc-g-' + g.replace(/\s+/g,'_');
-   (data.grupos?.[g]||[]).forEach((item, idx) => {
-    const qtdEl = document.getElementById(gid+'_'+idx+'-qtd');
-    const vlEl  = document.getElementById(gid+'_'+idx+'-vl');
-    if (qtdEl) qtdEl.value = item.qtd;
-    if (vlEl)  vlEl.value  = item.vl;
-   });
+async function _mcLoad(obraId) {
+ if (!_sb) { _mcCalc(obraId); return; }
+ const memRes = await _sb.from('memorial_calculo_obras').select('*').eq('obra_id', obraId).maybeSingle();
+ if (memRes.error || !memRes.data) { _mcCalc(obraId); return; }
+ const mem = memRes.data;
+ const dimMap = { 'mc-pext': mem.parede_externa_m2, 'mc-pint': mem.parede_interna_m2, 'mc-piso': mem.piso_m2, 'mc-cob': mem.cobertura_m2 };
+ Object.entries(dimMap).forEach(([id, v]) => { const el = document.getElementById(id); if (el && v != null) el.value = v; });
+
+ const itensRes = await _sb.from('memorial_calculo_itens').select('*').eq('memorial_id', mem.id);
+ if (!itensRes.error && itensRes.data) {
+  itensRes.data.forEach(function(item) {
+   const gid = 'mc-g-' + item.grupo.replace(/\s+/g,'_');
+   const qtdEl = document.getElementById(gid+'_'+item.posicao_no_grupo+'-qtd');
+   const vlEl  = document.getElementById(gid+'_'+item.posicao_no_grupo+'-vl');
+   if (qtdEl && item.quantidade != null) qtdEl.value = item.quantidade;
+   if (vlEl  && item.valor_unitario != null) vlEl.value = item.valor_unitario;
   });
-  _mcCalc(obraId);
- } catch(e) { _mcCalc(obraId); }
+ }
+ _mcCalc(obraId);
 }
 
-// ── MC Database init ─────────────────────────────────────────────
+// ── MC Database init — catálogo de materiais e template padrão vêm do
+// Supabase (materiais_catalogo / memorial_calculo_template), não mais de
+// localStorage. Mantém os nomes curtos (g/sg/cod/d/vl/un/qtd/sup) usados por
+// todo o resto deste arquivo — só a carga/persistência mudou de lugar.
 var _mcDb  = null;
 var _mcTpl = null;
+var _mcTplDeletedIds = []; // ids removidos do template desde o último "Salvar alterações"
+var _mcDbInitPromise = null;
+function _mcCatalogoToShort(r)  { return { id: r.id, g: r.grupo, sg: r.subgrupo || '', cod: r.codigo || '', d: r.descricao, vl: r.valor_unitario }; }
+function _mcTemplateToShort(r)  { return { id: r.id, g: r.grupo, d: r.descricao, un: r.unidade || '', qtd: r.quantidade_padrao, vl: r.valor_unitario || 0, sup: r.fornecimento || '' }; }
 function _mcDbInit() {
- try { _mcDb  = JSON.parse(localStorage.getItem('milatec_db'))  || _mcDbSeed.map(x=>({...x})); } catch(e) { _mcDb  = _mcDbSeed.map(x=>({...x})); }
- try { _mcTpl = JSON.parse(localStorage.getItem('milatec_tpl')) || _mcTplSeed.map(x=>({...x})); } catch(e) { _mcTpl = _mcTplSeed.map(x=>({...x})); }
+ if (_mcDbInitPromise) return _mcDbInitPromise;
+ _mcDbInitPromise = (async function() {
+  if (!_sb) { _mcDb = []; _mcTpl = []; return; }
+  var [catRes, tplRes] = await Promise.all([
+   _sb.from('materiais_catalogo').select('*').order('grupo'),
+   _sb.from('memorial_calculo_template').select('*').order('ordem'),
+  ]);
+  _mcDb  = catRes.error ? [] : catRes.data.map(_mcCatalogoToShort);
+  _mcTpl = tplRes.error ? [] : tplRes.data.map(_mcTemplateToShort);
+  if (catRes.error) console.error('[MC] erro ao carregar catálogo de materiais:', catRes.error);
+  if (tplRes.error) console.error('[MC] erro ao carregar template do memorial:', tplRes.error);
+ })();
+ return _mcDbInitPromise;
 }
-document.addEventListener('DOMContentLoaded', _mcDbInit);
 
 // ── Database Modal ────────────────────────────────────────────────
 var _mcDbTab = 'template';
@@ -214,7 +255,8 @@ function _mcDbEdit(idx, field, val) {
 }
 function _mcDbDelete(idx) {
  if (!confirm('Remover este item do template?')) return;
- _mcTpl.splice(idx, 1);
+ var removed = _mcTpl.splice(idx, 1)[0];
+ if (removed && removed.id) _mcTplDeletedIds.push(removed.id);
  _mcDbRender();
 }
 function _mcDbAddToTpl(catalogIdx) {
@@ -232,10 +274,42 @@ function _mcDbAddRow() {
  const body = document.getElementById('mc-db-body');
  if (body) body.scrollTop = body.scrollHeight;
 }
-function _mcDbPersist() {
- localStorage.setItem('milatec_db',  JSON.stringify(_mcDb));
- localStorage.setItem('milatec_tpl', JSON.stringify(_mcTpl));
+async function _mcDbPersist() {
  const btn = event.target;
+ if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
+ var erro = null;
+
+ // Catálogo (materiais_catalogo) — só edição de itens já existentes (a UI não
+ // permite adicionar/remover linhas na aba Catálogo, só na aba Template).
+ for (var i = 0; i < _mcDb.length && !erro; i++) {
+  var c = _mcDb[i];
+  if (!c.id) continue;
+  var upC = await _sb.from('materiais_catalogo').update({ grupo: c.g, subgrupo: c.sg || null, codigo: c.cod || null, descricao: c.d, valor_unitario: c.vl }).eq('id', c.id);
+  if (upC.error) erro = upC.error;
+ }
+
+ // Template — remove os apagados, atualiza os existentes, insere os novos
+ // (linhas adicionadas via "+ tpl" ou "Adicionar item" ainda não têm id).
+ if (!erro && _mcTplDeletedIds.length) {
+  var delT = await _sb.from('memorial_calculo_template').delete().in('id', _mcTplDeletedIds);
+  if (delT.error) erro = delT.error; else _mcTplDeletedIds = [];
+ }
+ for (var j = 0; j < _mcTpl.length && !erro; j++) {
+  var t = _mcTpl[j];
+  var payload = { grupo: t.g, descricao: t.d, unidade: t.un || null, quantidade_padrao: t.qtd, valor_unitario: t.vl || 0, fornecimento: t.sup || null, ordem: j };
+  if (t.id) {
+   var upT = await _sb.from('memorial_calculo_template').update(payload).eq('id', t.id);
+   if (upT.error) erro = upT.error;
+  } else {
+   var insT = await _sb.from('memorial_calculo_template').insert(payload).select('id').single();
+   if (insT.error) erro = insT.error; else t.id = insT.data.id;
+  }
+ }
+
+ if (erro) {
+  _showToast('Erro ao salvar alterações: ' + _supaErrPt(erro.message), 'erro');
+  return;
+ }
  btn.textContent = 'Salvo!'; btn.style.background='var(--green)';
  setTimeout(() => { btn.textContent='Salvar alterações'; btn.style.background=''; }, 1800);
 }
@@ -560,7 +634,7 @@ async function _spObraById(id) {
 
   _obraAtiva = _normObraAssoc(obraRes.data);
   _obraAtiva.projetos = projetos;
-  _spObrasRender(_obraAtiva, projetos, entregas, instalacoes);
+  await _spObrasRender(_obraAtiva, projetos, entregas, instalacoes);
  } catch(err) {
   console.error('[MilaTec] Erro ao carregar obra:', err);
   _spSet('Obra', 'Erro interno', '<div style="color:var(--red);padding:20px">Erro inesperado: ' + err.message + '</div>', '');
@@ -1055,7 +1129,7 @@ async function _spAtualizarStatusDoc(id, status) {
 }
 
 // ── Renderer principal do painel de obra (com abas) ───────────────────────────
-function _spObrasRender(o, projetos, entregas, instalacoes) {
+async function _spObrasRender(o, projetos, entregas, instalacoes) {
  entregas    = entregas    || [];
  instalacoes = instalacoes || [];
  try {
@@ -1476,9 +1550,12 @@ function _spObrasRender(o, projetos, entregas, instalacoes) {
  );
 
  if (tipo === 'Modular') {
-  var obraId = (o.nome||'').replace(/\s+/g,'_').substring(0,30);
-  document.getElementById('mc-container').innerHTML = _mcBuild(obraId);
-  _mcLoad(obraId);
+  // Usa o id real da obra (antes era um slug do nome — colidia entre obras
+  // com nomes parecidos e perdia o memorial salvo se a obra fosse renomeada;
+  // agora também é a FK real de memorial_calculo_obras.obra_id).
+  await _mcDbInit();
+  document.getElementById('mc-container').innerHTML = _mcBuild(o.id);
+  _mcLoad(o.id);
  }
 
  if (mostrarPropostaSolar) _spCheckSolarBtn();

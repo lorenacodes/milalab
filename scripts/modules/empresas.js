@@ -366,22 +366,37 @@ function switchEmpTab(tab) {
  document.getElementById('btn-novo-contato').style.display    = (tab === 'contatos')    ? 'inline-flex' : 'none';
  document.getElementById('btn-novo-fornecedor').style.display = (tab === 'fornecedores') ? 'inline-flex' : 'none';
 
- if (tab === 'fornecedores') _renderFornecedores();
+ if (tab === 'fornecedores') _dbLoadFornecedores();
 }
 
-// ── Fornecedores (estado local + localStorage) ────────────────────────────────
-var _fornecedoresArr = (function(){
- try {
-  var saved = localStorage.getItem('milatec-fornecedores');
-  if (saved) return JSON.parse(saved);
- } catch(e){}
- return [];
-})();
+// ── Fornecedores (Supabase: fornecedores + fornecedores_produtos) ─────────────
+var _fornecedoresArr = [];
+var _fornBusca       = '';
 var _fornProdutoCount = 0;
 var _editingFornId    = null;
 
-function _saveFornecedores() {
- try { localStorage.setItem('milatec-fornecedores', JSON.stringify(_fornecedoresArr)); } catch(e){}
+async function _dbLoadFornecedores() {
+ var tbody = document.getElementById('forn-tbody');
+ if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
+ if (!_sb) return;
+ var res = await _sb.from('fornecedores')
+  .select('id, nome, setor, cidade, estado, endereco, telefone, email, fornecedores_produtos(id, nome, preco)')
+  .order('nome');
+ if (res.error) {
+  if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar fornecedores: ' + _supaErrPt(res.error.message) + '</td></tr>';
+  return;
+ }
+ _fornecedoresArr = (res.data || []).map(function(f) {
+  return { id: f.id, nome: f.nome, setor: f.setor, cidade: f.cidade, estado: f.estado,
+   endereco: f.endereco, telefone: f.telefone, email: f.email,
+   produtos: (f.fornecedores_produtos || []).map(function(p){ return { id: p.id, nome: p.nome, preco: p.preco }; }) };
+ });
+ _renderFornecedores();
+}
+
+function searchFornecedores(q) {
+ _fornBusca = q;
+ _renderFornecedores();
 }
 
 function _renderFornecedores() {
@@ -390,14 +405,22 @@ function _renderFornecedores() {
  var badge = document.getElementById('badge-forn');
  if (!tbody) return;
  if (badge) badge.textContent = _fornecedoresArr.length;
- if (count) count.textContent = _fornecedoresArr.length + ' fornecedor' + (_fornecedoresArr.length !== 1 ? 'es' : '');
 
- if (_fornecedoresArr.length === 0) {
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Nenhum fornecedor cadastrado. Use o botão acima para adicionar.</td></tr>';
+ var qn = _fornBusca.toLowerCase().trim();
+ var lista = qn
+  ? _fornecedoresArr.filter(function(f){
+     return (f.nome||'').toLowerCase().includes(qn) || (f.setor||'').toLowerCase().includes(qn) || (f.cidade||'').toLowerCase().includes(qn);
+    })
+  : _fornecedoresArr;
+
+ if (count) count.textContent = lista.length + ' fornecedor' + (lista.length !== 1 ? 'es' : '');
+
+ if (lista.length === 0) {
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">' + (qn ? 'Nenhum fornecedor encontrado para essa busca.' : 'Nenhum fornecedor cadastrado. Use o botão acima para adicionar.') + '</td></tr>';
   return;
  }
 
- tbody.innerHTML = _fornecedoresArr.map(function(f, idx) {
+ tbody.innerHTML = lista.map(function(f, idx) {
   var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
   var bgColors = ['#6366f1','#0891b2','#059669','#d97706','#dc2626'];
   var bg = bgColors[idx % bgColors.length];
@@ -417,7 +440,10 @@ function _renderFornecedores() {
         + (f.produtos.length > 2 ? '<span style="font-size:11px;color:var(--muted)">+' + (f.produtos.length-2) + ' mais</span>' : '')
       : '<span style="color:var(--muted);font-size:12px">Nenhum produto</span>')
    + '</td>'
-   + '<td><button class="nt-open-btn" onclick="editFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500;opacity:0;transition:opacity .12s">Editar</button></td>'
+   + '<td style="display:flex;gap:4px">'
+   + '<button class="nt-open-btn" onclick="editFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Editar</button>'
+   + '<button class="nt-open-btn" onclick="excluirFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--red);background:rgba(207,34,46,.08);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Excluir</button>'
+   + '</td>'
    + '</tr>';
  }).join('');
 }
@@ -459,6 +485,15 @@ function closeNovoFornecedor() {
  document.getElementById('modal-novo-fornecedor').classList.remove('open');
 }
 
+async function excluirFornecedor(id) {
+ if (!confirm('Excluir este fornecedor e todos os produtos vinculados a ele?')) return;
+ if (!_sb) return;
+ var res = await _sb.from('fornecedores').delete().eq('id', id);
+ if (res.error) { _showToast('Erro ao excluir fornecedor: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ _showToast('Fornecedor excluído.', 'ok');
+ _dbLoadFornecedores();
+}
+
 function addFornProdutoLinha(nome, preco) {
  _fornProdutoCount++;
  var id = _fornProdutoCount;
@@ -473,9 +508,10 @@ function addFornProdutoLinha(nome, preco) {
  line.querySelector('input[type="text"]').focus();
 }
 
-function submitNovoFornecedor() {
+async function submitNovoFornecedor() {
  var nome = (document.getElementById('fn-nome').value || '').trim();
  if (!nome) { document.getElementById('fn-nome').focus(); return; }
+ if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
  // Coleta produtos
  var produtos = [];
@@ -489,27 +525,40 @@ function submitNovoFornecedor() {
  });
 
  var payload = {
-  id:       _editingFornId || ('forn-' + Date.now()),
   nome:     nome,
-  setor:    document.getElementById('fn-setor').value.trim(),
-  cidade:   document.getElementById('fn-cidade').value.trim(),
-  estado:   document.getElementById('fn-estado').value.trim().toUpperCase(),
-  endereco: document.getElementById('fn-endereco').value.trim(),
-  telefone: document.getElementById('fn-tel').value.trim(),
-  email:    document.getElementById('fn-email').value.trim(),
-  produtos: produtos
+  setor:    document.getElementById('fn-setor').value.trim() || null,
+  cidade:   document.getElementById('fn-cidade').value.trim() || null,
+  estado:   document.getElementById('fn-estado').value.trim().toUpperCase() || null,
+  endereco: document.getElementById('fn-endereco').value.trim() || null,
+  telefone: document.getElementById('fn-tel').value.trim() || null,
+  email:    document.getElementById('fn-email').value.trim() || null,
+  criado_por: (_currentUser && _currentUser.email) || null,
  };
 
- if (_editingFornId) {
-  var idx = _fornecedoresArr.findIndex(function(x){return x.id === _editingFornId;});
-  if (idx >= 0) _fornecedoresArr[idx] = payload;
+ var fornecedorId = _editingFornId;
+ if (fornecedorId) {
+  var upd = await _sb.from('fornecedores').update(payload).eq('id', fornecedorId);
+  if (upd.error) { _showToast('Erro ao salvar fornecedor: ' + _supaErrPt(upd.error.message), 'erro'); return; }
  } else {
-  _fornecedoresArr.push(payload);
+  var ins = await _sb.from('fornecedores').insert(payload).select('id').single();
+  if (ins.error) { _showToast('Erro ao criar fornecedor: ' + _supaErrPt(ins.error.message), 'erro'); return; }
+  fornecedorId = ins.data.id;
  }
 
- _saveFornecedores();
- _renderFornecedores();
+ // Substitui os produtos do fornecedor pelos atuais (delete-then-insert, mesmo
+ // padrão usado em _syncAtividadeVinculos para relações N:1 editadas em bloco).
+ var delProd = await _sb.from('fornecedores_produtos').delete().eq('fornecedor_id', fornecedorId);
+ if (delProd.error) { _showToast('Fornecedor salvo, mas houve erro ao atualizar produtos: ' + _supaErrPt(delProd.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
+ if (produtos.length) {
+  var insProd = await _sb.from('fornecedores_produtos').insert(
+   produtos.map(function(p){ return { fornecedor_id: fornecedorId, nome: p.nome, preco: p.preco }; })
+  );
+  if (insProd.error) { _showToast('Fornecedor salvo, mas houve erro ao gravar produtos: ' + _supaErrPt(insProd.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
+ }
+
+ _showToast('Fornecedor salvo com sucesso!', 'ok');
  closeNovoFornecedor();
+ _dbLoadFornecedores();
 }
 
 /* --- EMPRESAS FILTER --- */
