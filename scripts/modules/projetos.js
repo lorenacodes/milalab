@@ -1,16 +1,30 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// PROJETOS — modal "Novo Projeto" (mock, não persiste — criação real de projeto
-// acontece no wizard Nova Obra), kanban por etapa, renderer do painel lateral,
-// filtro de tipo, cache/loader de projetos.
+// PROJETOS — modal "Novo Projeto" (cria um projeto avulso vinculado a uma obra já
+// existente; para criar Obra+Projetos juntos, use o wizard Nova Obra), kanban por
+// etapa, renderer do painel lateral, filtro de tipo, cache/loader de projetos.
 // ═══════════════════════════════════════════════════════════════════════════════
+async function _npPopularObras() {
+ var sel = document.getElementById('np-obra');
+ if (!sel) return;
+ var lista = Object.keys(_obraIdMap || {}).map(function(id){ return { id: id, nome: _obraIdMap[id].nome }; });
+ if (!lista.length && _sb) {
+  var res = await _sb.from('obras').select('id, nome').order('nome');
+  if (!res.error && res.data) lista = res.data;
+ }
+ lista.sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
+ sel.innerHTML = '<option value="">Selecione a obra...</option>'
+  + lista.map(function(o){ return '<option value="' + o.id + '">' + (o.nome||'(sem nome)').replace(/</g,'&lt;') + '</option>'; }).join('');
+}
+
 function openNovoProjeto() {
  // Resetar campos
- ['np-obra','np-tipo','np-produto','np-etapa'].forEach(id => {
+ ['np-tipo','np-produto','np-etapa'].forEach(id => {
  const el = document.getElementById(id); if(el) el.selectedIndex = 0;
  });
- ['np-qtd','np-val-uni','np-peso-uni','np-m2arq','np-m2estr','np-desc'].forEach(id => {
+ ['np-qtd','np-val-uni','np-peso-uni','np-m2arq','np-m2estr','np-desc','np-responsavel'].forEach(id => {
  const el = document.getElementById(id); if(el) el.value = '';
  });
+ _npPopularObras();
  calcProjetoTotais();
  document.getElementById('modal-novo-projeto').classList.add('open');
  document.body.style.overflow = 'hidden';
@@ -53,50 +67,50 @@ function calcProjetoTotais() {
  : '—';
 }
 
-function submitNovoProjeto() {
- const obra = document.getElementById('np-obra').value;
- const tipo = document.getElementById('np-tipo').value;
- if (!obra) { document.getElementById('np-obra').style.borderColor = 'var(--red)'; return; }
- if (!tipo) { document.getElementById('np-tipo').style.borderColor = 'var(--red)'; return; }
+async function submitNovoProjeto() {
+ const obraId = document.getElementById('np-obra').value;
+ const tipo   = document.getElementById('np-tipo').value;
+ if (!obraId) { document.getElementById('np-obra').style.borderColor = 'var(--red)'; return; }
+ if (!tipo)   { document.getElementById('np-tipo').style.borderColor = 'var(--red)'; return; }
+ if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
- // Adicionar linha na tabela (mock)
- const tbody = document.getElementById('revit-proj-tbody');
- const qtd   = document.getElementById('np-qtd').value   || '0';
- const vUnit  = document.getElementById('np-val-uni').value || '0';
- const vTotal = parseFloat(qtd) * parseFloat(vUnit);
- const pUnit = parseFloat(document.getElementById('np-peso-uni').value) || 0;
- const pTotal = parseFloat(qtd) * pUnit;
- const etapa = document.getElementById('np-etapa').value;
- const comp = document.getElementById('np-complexidade').value;
- const prod = document.getElementById('np-produto').value || '—';
- const n = tbody.querySelectorAll('tr').length + 1;
+ const qtd    = parseFloat(document.getElementById('np-qtd').value) || null;
+ const vUnit  = parseFloat(document.getElementById('np-val-uni').value) || null;
+ const pUnit  = parseFloat(document.getElementById('np-peso-uni').value) || null;
+ const m2arq  = parseFloat(document.getElementById('np-m2arq').value) || null;
+ const m2estr = parseFloat(document.getElementById('np-m2estr').value) || null;
+ const etapa  = document.getElementById('np-etapa').value;
+ const comp   = document.getElementById('np-complexidade').value;
+ const prod   = document.getElementById('np-produto').value || null;
+ const resp   = (document.getElementById('np-responsavel').value || '').trim();
+ const desc   = (document.getElementById('np-desc').value || '').trim();
+ const obraNome = (document.getElementById('np-obra').selectedOptions[0] || {}).textContent || '';
 
- const tipoCor = {
- 'Telhados': 'var(--green-dim);color:var(--green)',
- 'Steel Frame': 'rgba(137,87,229,.15);color:var(--purple)',
- 'Modular': 'var(--blue-dim);color:var(--blue)',
- 'Misto (LSF + A36)':'var(--yellow-dim);color:var(--yellow)',
- 'Solar': 'var(--yellow-dim);color:var(--yellow)',
- }[tipo] || 'var(--surface2);color:var(--muted)';
+ const payload = {
+  nome: obraNome + ' — ' + tipo,
+  obra_id: obraId,
+  tipo_orcamento: tipo,
+  etapa_projeto: etapa || null,
+  produto: prod ? [prod] : null,
+  complexidade: comp || null,
+  m2_arquitetura: m2arq,
+  m2_estrutura: m2estr,
+  peso_kg: (qtd && pUnit) ? qtd * pUnit : null,
+  quantidade: qtd,
+  valor_unitario: vUnit,
+  responsavel: resp ? [resp] : null,
+  descritivo: desc || null,
+ };
 
- const compCor = { 'Alta': 'var(--red)', 'Média': 'var(--yellow)', 'Baixa': 'var(--green)' }[comp] || 'var(--muted)';
-
- const tr = document.createElement('tr');
- tr.setAttribute('data-tipo', tipo);
- tr.innerHTML = `
- <td style="font-weight:600;color:var(--navy)">PRJ-00${n}</td>
- <td>${obra}</td>
- <td><span class="badge" style="background:${tipoCor}">${tipo}</span></td>
- <td>${prod}</td>
- <td style="text-align:right">${parseInt(qtd)}</td>
- <td style="text-align:right">${parseFloat(vUnit).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</td>
- <td style="text-align:right;font-weight:600;color:var(--green)">${vTotal.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</td>
- <td style="text-align:right">${pUnit.toLocaleString('pt-BR',{minimumFractionDigits:1})}</td>
- <td style="text-align:right">${pTotal.toLocaleString('pt-BR',{minimumFractionDigits:1})}</td>
- <td><span class="badge by">${etapa}</span></td>
- <td><span class="badge" style="background:${compCor === 'var(--red)' ? 'var(--red-dim)' : compCor === 'var(--yellow)' ? 'var(--yellow-dim)' : 'var(--green-dim)'};color:${compCor}">${comp}</span></td>`;
- tbody.appendChild(tr);
+ const btn = document.querySelector('#modal-novo-projeto .btn-primary');
+ const { error } = await _sb.from('projetos').insert(payload);
+ if (error) {
+  _showToast('Erro ao criar projeto: ' + _supaErrPt(error.message), 'erro');
+  return;
+ }
+ _showToast('Projeto criado com sucesso!', 'ok');
  closeNovoProjeto();
+ _dbLoadProjetos();
 }
 
 var _projetosKanbanEtapaOrder = [
