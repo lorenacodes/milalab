@@ -459,16 +459,16 @@ async function _dbLoadObras() {
   _obraIdMap[o.id] = { nome: o.nome || '', empresa: emp };
  });
  var tbody=document.getElementById('obras-tbody'); if(!tbody)return;
- var podGerarOrc=['Telhados','Steel Frame','Modular'];
  tbody.innerHTML=allObras.map(function(o){
   var tipos=o.tipo_obra||[]; var etapa=o.etapa_negocio||''; var eCls=_etapaClsBd[etapa]||'bm';
   var empNome=(o.empresa&&o.empresa.nome)||(_empresasArr&&o.empresa_id?((_empresasArr.find(function(e){return e.id===o.empresa_id;})||{}).nome||''):'')||'';
   var loc=[o.cidade,o.estado].filter(Boolean).join(' - ');
-  var podOrc=tipos.some(function(t){return podGerarOrc.includes(t);});
   var catBadges=tipos.map(function(t){return '<span class="badge '+(_tipoClsBd[t]||'bm')+'" style="font-size:10px">'+t+'</span>';}).join(' ')||'<span style="color:var(--muted)">—</span>';
   var dataEnvio=o.data_envio_proposta?new Date(o.data_envio_proposta+'T00:00:00').toLocaleDateString('pt-BR'):'—';
   var valor=(o.valor!=null)?'R$ '+Number(o.valor).toLocaleString('pt-BR',{minimumFractionDigits:0}):'—';
   var qtd=(o.quantidade!=null)?o.quantidade:'—';
+  // "Gerar Orçamento" vive só dentro do painel da Obra (Calculadora Modular
+  // para Modular, Proposta Comercial para Solar) — aqui só abre o painel.
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'obras\',this)"'
    +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'" data-projeto="sim">'
    +'<td><div style="font-weight:500">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
@@ -478,7 +478,7 @@ async function _dbLoadObras() {
    +'<td><span class="badge '+eCls+'">'+(etapa||'—')+'</span></td>'
    +'<td style="color:var(--muted);font-size:12px">'+dataEnvio+'</td>'
    +'<td style="font-weight:600">'+valor+'</td>'
-   +'<td>'+(podOrc?'<button class="btn btn-primary btn-sm" onclick="openObraDetalhe(\''+o.id+'\')">Gerar Orçamento</button>':'<button class="btn btn-ghost btn-sm" onclick="openObraDetalhe(\''+o.id+'\')">Abrir</button>')+'</td></tr>';
+   +'<td><button class="btn btn-ghost btn-sm" onclick="_spObraById(\''+o.id+'\')">Abrir</button></td></tr>';
  }).join('');
  var nb=document.getElementById('nav-badge-obras'); if(nb)nb.textContent=allObras.length;
 }
@@ -500,8 +500,6 @@ async function _dbLoadObrasKanban() {
   if (col) { const body = col.querySelector('.kc-body'); if (body) body.innerHTML = ''; }
  });
 
- const podGerarOrc = ['Telhados','Steel Frame','Modular'];
-
  allObras.forEach(o => {
   const colId = _etapaKcId[o.etapa_negocio];
   const col   = colId && document.getElementById(colId);
@@ -514,7 +512,6 @@ async function _dbLoadObrasKanban() {
   const valorTxt = (o.valor != null) ? 'R$ ' + Number(o.valor).toLocaleString('pt-BR',{minimumFractionDigits:0}) : '—';
   const qtdTxt = (o.quantidade != null) ? o.quantidade : '—';
   const dataTxt = o.data_envio_proposta ? new Date(o.data_envio_proposta+'T00:00:00').toLocaleDateString('pt-BR') : '—';
-  const podOrc = tipos.some(t => podGerarOrc.includes(t));
   const criadoTxt = o.created_at ? new Date(o.created_at).toLocaleDateString('pt-BR') : '';
   const card  = document.createElement('div');
   card.className = 'obra-card';
@@ -534,7 +531,6 @@ async function _dbLoadObrasKanban() {
    <div class="oc-row"><span>Qtd.</span><span class="oc-val">${qtdTxt}</span></div>
    <div class="oc-row"><span>Valor</span><span class="oc-val">${valorTxt}</span></div>
    <div class="oc-meta"><span class="oc-date">${dataTxt}</span>${criadoTxt ? `<span style="color:var(--muted);font-size:10px">Criado ${criadoTxt}</span>` : ''}</div>
-   ${podOrc ? `<div class="oc-actions"><button class="btn btn-primary btn-sm" style="width:100%;justify-content:center" onclick="event.stopPropagation();openObraDetalhe('${o.id}')">Gerar Orçamento</button></div>` : ''}
   `;
   card.onclick = () => _spObraById(o.id);
   body.appendChild(card);

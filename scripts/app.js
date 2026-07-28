@@ -17,8 +17,6 @@ var routes = {
  'empresas': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Empresas &amp; Contatos</span>`, nav: 'empresas', btn: { label: '+ Nova Empresa', fn: 'openNovaEmpresa' } },
  'obras': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Obras</span>`, nav: 'obras', btn: { label: '+ Nova Obra', fn: 'openNovaObra' } },
  'projetos': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Projetos</span>`, nav: 'projetos', btn: { label: '+ Novo Projeto', fn: 'openNovoProjeto' } },
- 'obra-detalhe': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <a class="bc-link" onclick="go('obras')">Obras</a> / <span>Residencial Alphaville</span>`, nav: 'obras', btn: { label: '+ Novo Orçamento', fn: 'openNovoOrcamento' } },
- 'orcamento': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <a class="bc-link" onclick="go('obras')">Obras</a> / <a class="bc-link" onclick="go('obra-detalhe')">Alphaville</a> / <span>Orçamento</span>`, nav: 'obras', btn: null },
  'entregas': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Entregas</span>`, nav: 'entregas', btn: { label: '+ Nova Entrega', fn: 'openNovaEntrega' } },
  'instalacoes': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Instalações</span>`, nav: 'instalacoes', btn: { label: '+ Nova Instalação', fn: 'openNovaInstalacao' } },
  'catalogo': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Catálogo</span>`, nav: 'catalogo', btn: { label: '+ Novo Perfil', fn: 'openNovoPerfil' } },
@@ -105,8 +103,6 @@ function topbarAction() {
 }
 
 /* Stubs para páginas sem modal implementado ainda */
-function openNovoOrcamento() { go('orcamento'); }
-
 function openNovoPerfil() {
  ['np-cod','np-desc','np-medidas','np-trat','np-obs'].forEach(id => {
  const el = document.getElementById(id); if(el) el.value = '';
