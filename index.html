@@ -2680,9 +2680,12 @@
  <div id="page-instalacoes" class="page">
  <div class="ph"><h1>Instalações</h1><p>Acompanhamento das montagens em campo</p></div>
  <div class="filter-bar">
- <div class="search"><input type="text" placeholder="Buscar instalação..."></div>
- <span class="chip active">Todas</span><span class="chip">Programadas</span><span class="chip">Em andamento</span><span class="chip">Concluídas</span>
- <button class="btn btn-primary btn-sm" style="margin-left:auto">Nova Instalação</button>
+ <div class="search"><input type="text" placeholder="Buscar instalação..." oninput="searchInstalacoes(this.value)"></div>
+ <span id="inst-chip-all" class="chip active" onclick="filterInstalacoes('all')" style="cursor:pointer">Todas</span>
+ <span id="inst-chip-prog" class="chip" onclick="filterInstalacoes('prog')" style="cursor:pointer">Programadas</span>
+ <span id="inst-chip-and" class="chip" onclick="filterInstalacoes('and')" style="cursor:pointer">Em andamento</span>
+ <span id="inst-chip-conc" class="chip" onclick="filterInstalacoes('conc')" style="cursor:pointer">Concluídas</span>
+ <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openNovaInstalacao()">Nova Instalação</button>
  </div>
  <div class="tbl-box"><table>
  <thead><tr><th>Instalação</th><th>Cliente</th><th>Tipo</th><th>Equipe</th><th>Início</th><th>Fim</th><th>Dias</th><th>Status</th><th></th></tr></thead>

@@ -36,28 +36,38 @@ function setEntView(v) {
   if (v === 'calendario') renderEntCal();
 }
 
+// Chip de status e busca por texto combinam (AND) sobre as mesmas linhas —
+// antes cada função sobrescrevia sozinha o style.display, então aplicar um
+// filtro desfazia o outro já ativo.
+var _entChipAtivo = 'all';
+var _entBusca = '';
+
+function _entAplicarFiltros() {
+  var qn = _entBusca.toLowerCase().trim();
+  var rows = document.querySelectorAll('#ent-tbody tr');
+  rows.forEach(function(tr) {
+    var st = tr.getAttribute('data-status') || '';
+    var showChip = _entChipAtivo === 'all'
+      || (_entChipAtivo === 'prod'   && (st === 'producao' || st === 'aguardando'))
+      || (_entChipAtivo === 'transp' && st === 'transporte')
+      || (_entChipAtivo === 'ent'    && st === 'entregue');
+    var showBusca = !qn || tr.textContent.toLowerCase().includes(qn);
+    tr.style.display = (showChip && showBusca) ? '' : 'none';
+  });
+}
+
 function filterEntregas(f) {
+  _entChipAtivo = f;
   ['all','prod','transp','ent'].forEach(function(k) {
     var el = document.getElementById('ent-chip-' + k);
     if (el) el.className = 'chip' + (k === f ? ' active' : '');
   });
-  var rows = document.querySelectorAll('#ent-tbody tr');
-  rows.forEach(function(tr) {
-    var st = tr.getAttribute('data-status') || '';
-    var show = f === 'all'
-      || (f === 'prod'   && (st === 'producao' || st === 'aguardando'))
-      || (f === 'transp' && st === 'transporte')
-      || (f === 'ent'    && st === 'entregue');
-    tr.style.display = show ? '' : 'none';
-  });
+  _entAplicarFiltros();
 }
 
 function searchEntregas(q) {
-  var qn = q.toLowerCase().trim();
-  var rows = document.querySelectorAll('#ent-tbody tr');
-  rows.forEach(function(tr) {
-    tr.style.display = tr.textContent.toLowerCase().includes(qn) ? '' : 'none';
-  });
+  _entBusca = q;
+  _entAplicarFiltros();
 }
 
 function entCalNav(dir) {

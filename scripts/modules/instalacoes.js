@@ -3,6 +3,36 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 function openNovaInstalacao() { alert('Modal "Nova Instalação" será implementado em breve.'); }
 
+// Chip de status e busca por texto combinam (AND) — mesmo padrão de entregas.js.
+var _instChipAtivo = 'all';
+var _instBusca = '';
+
+function _instAplicarFiltros() {
+ var qn = _instBusca.toLowerCase().trim();
+ var rows = document.querySelectorAll('#inst-tbody tr[data-id]');
+ rows.forEach(function(tr) {
+  var funil = tr.getAttribute('data-funil') || '';
+  var showChip = _instChipAtivo === 'all'
+   || (_instChipAtivo === 'prog' && (funil === 'Programado' || funil === 'Planejado'))
+   || (_instChipAtivo === 'and'  && funil === 'Em andamento')
+   || (_instChipAtivo === 'conc' && funil === 'Finalizado');
+  var showBusca = !qn || tr.textContent.toLowerCase().includes(qn);
+  tr.style.display = (showChip && showBusca) ? '' : 'none';
+ });
+}
+function filterInstalacoes(f) {
+ _instChipAtivo = f;
+ ['all','prog','and','conc'].forEach(function(k) {
+  var el = document.getElementById('inst-chip-' + k);
+  if (el) el.className = 'chip' + (k === f ? ' active' : '');
+ });
+ _instAplicarFiltros();
+}
+function searchInstalacoes(q) {
+ _instBusca = q;
+ _instAplicarFiltros();
+}
+
 function _spInstalacoes(row, tds) {
  const nome   = tds[0]?.innerText?.trim() || '';
  const cli    = tds[1]?.innerText?.trim() || '';
@@ -68,7 +98,7 @@ async function _dbLoadInstalacoes() {
     var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2);
    };
    var dias = inst.dias_executados != null ? inst.dias_executados : (inst.data_inicio && inst.data_fim ? Math.round((new Date(inst.data_fim)-new Date(inst.data_inicio))/86400000) : '—');
-   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'instalacoes\',this)" data-id="'+inst.id+'">'
+   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'instalacoes\',this)" data-id="'+inst.id+'" data-funil="'+funil+'">'
     + '<td style="font-weight:500">' + obraNome + '</td>'
     + '<td style="color:var(--muted);font-size:12px">' + clienteNome + '</td>'
     + '<td>' + (tipo !== '—' ? '<span class="badge bg">'+tipo+'</span>' : '<span style="color:var(--border)">—</span>') + '</td>'
