@@ -64,7 +64,6 @@ function go(id) {
  if (id === 'dashboard' && _prevRoute !== 'dashboard') {
   buildGreeting();
   _dashTasksInit();
-  _dashTasksRender();
   _dashLoadNotes();
   _dashRenderInbox();
   if (typeof _dashLoad === 'function' && _dbOk) _dashLoad();
@@ -726,7 +725,6 @@ function _histInit() {
 }
 
 _dashTasksInit();
-_dashTasksRender();
 _dashLoadNotes();
 _dashRenderInbox();
 _dashLoad();

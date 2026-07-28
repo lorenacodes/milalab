@@ -30,97 +30,14 @@ function buildGreeting() {
  if (dateLine) dateLine.textContent =
   dias[now.getDay()] + ', ' + now.getDate() + ' de ' + meses[now.getMonth()] + ' de ' + now.getFullYear();
 
- // badges básicos de prazo — atualizados também por _dashBuildAlerts()
- _dashBuildAlerts();
+ // Recalcula os alertas comportamentais (prazo/atraso mudam com o tempo) usando
+ // o último snapshot real do Supabase — NUNCA a lista local legada _dashTasks
+ // (bug corrigido: isso zerava os alertas reais a cada 60s, já que _dashTasks
+ // está sempre vazia para qualquer usuário sem dados legados no navegador).
+ _dashBuildAlertsFromDB(window._dashAlertsData || []);
 }
 buildGreeting();
 setInterval(buildGreeting, 60000);
-
-/* ── CENTRAL DE ALERTAS INTELIGENTES (comportamentais + prazo) ──────────── */
-// Chamada após carregar tarefas (_dashUpdateKpis chama esta função)
-function _dashBuildAlerts() {
- var alertWrap = document.getElementById('dash-alert-wrap');
- if (!alertWrap) return;
-
- var atrCount  = parseInt((document.getElementById('dash-kpi-atr')  || {}).textContent || '0', 10);
- var hojeCount = parseInt((document.getElementById('dash-kpi-hoje') || {}).textContent || '0', 10);
- var agora     = Date.now();
- var DIA       = 86400000;
-
- // Coleta alertas comportamentais a partir de _dashTasks
- var alertas = [];
-
- if (Array.isArray(_dashTasks)) {
-  _dashTasks.forEach(function(t) {
-   if (t.done) return;
-   var titulo = (t.titulo || 'Sem título').substring(0, 40);
-
-   // 1. Sem atualização há N dias
-   var updAt = t.updated_at ? new Date(t.updated_at).getTime() : null;
-   if (updAt) {
-    var diasSemUpd = Math.floor((agora - updAt) / DIA);
-    if (diasSemUpd >= 15) {
-     alertas.push({ tipo:'sem-atualizacao', cor:'#f59e0b', msg: '"' + titulo + '" sem atualização há ' + diasSemUpd + ' dias', id: t.id });
-    }
-   }
-
-   // 2. Tarefa parada em andamento há muito tempo
-   var criadaEm = t.created_at ? new Date(t.created_at).getTime() : null;
-   var status   = (t.status || '').toLowerCase();
-   if (criadaEm && (status === 'em andamento' || status === 'em progresso')) {
-    var diasAberta = Math.floor((agora - criadaEm) / DIA);
-    if (diasAberta >= 20) {
-     alertas.push({ tipo:'parada', cor:'#a78bfa', msg: '"' + titulo + '" em andamento há ' + diasAberta + ' dias', id: t.id });
-    }
-   }
-
-   // 3. Prazo expirado e status não concluído
-   var fim = t.data_fim ? new Date(t.data_fim).getTime() : null;
-   if (fim && fim < agora && status !== 'concluído' && status !== 'feito' && status !== 'cancelado') {
-    // só alerta se não já capturado nos KPIs básicos (evita duplicidade visual)
-    alertas.push({ tipo:'prazo-vencido', cor:'#ef4444', msg: '"' + titulo + '" com prazo vencido', id: t.id });
-   }
-
-   // 4. Status inconsistente: prazo vencido mas continua "em andamento"
-   if (fim && fim < agora && (status === 'em andamento' || status === 'em progresso')) {
-    alertas.push({ tipo:'inconsistente', cor:'#ef4444', msg: '"' + titulo + '" vencida e ainda em andamento', id: t.id });
-   }
-
-   // 5. Subtarefas bloqueadas impedindo avanço
-   var subs = Array.isArray(t.subtasks) ? t.subtasks : [];
-   var bloqueadas = subs.filter(function(s){ return (s.status || '').toLowerCase() === 'bloqueada'; });
-   if (bloqueadas.length > 0) {
-    alertas.push({ tipo:'subtarefa-bloqueada', cor:'#ef4444', msg: '"' + titulo + '" tem ' + bloqueadas.length + ' subtarefa' + (bloqueadas.length > 1 ? 's' : '') + ' bloqueada' + (bloqueadas.length > 1 ? 's' : ''), id: t.id });
-   }
-  });
- }
-
- // Remove duplicatas por tarefa (mantém primeiro por ID)
- var vistos = {};
- alertas = alertas.filter(function(a) {
-  // prazo-vencido e inconsistente podem coexistir — evitar prazo-vencido quando já há inconsistente
-  var chave = a.id + '-' + (a.tipo === 'prazo-vencido' ? 'prazo' : a.tipo);
-  if (vistos[chave]) return false;
-  vistos[chave] = true;
-  return true;
- });
- // Limita a 5 alertas comportamentais para não poluir o header
- alertas = alertas.slice(0, 5);
-
- var badges = '';
- // Badges de prazo fixos primeiro
- if (atrCount > 0)  badges += '<span onclick="_kpiDrawerOpen(\'atr\')" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--red);background:var(--red-dim);border:1px solid rgba(207,34,46,.3);border-radius:6px;padding:3px 10px"><span style="width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0"></span>' + atrCount + ' atrasada' + (atrCount > 1 ? 's' : '') + '</span>';
- if (hojeCount > 0) badges += '<span onclick="_kpiDrawerOpen(\'hoje\')" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--yellow);background:var(--yellow-dim);border:1px solid rgba(212,160,23,.3);border-radius:6px;padding:3px 10px"><span style="width:6px;height:6px;border-radius:50%;background:var(--yellow);flex-shrink:0"></span>' + hojeCount + ' pra hoje</span>';
-
- // Alertas comportamentais — clicáveis
- alertas.forEach(function(a) {
-  if (!a.id) return;
-  var dotColor = a.cor;
-  badges += '<span onclick="_alertaAbrirTarefa(' + a.id + ')" title="Clique para abrir a atividade" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:' + dotColor + ';background:transparent;border:1px solid rgba(139,148,158,.25);border-radius:6px;padding:3px 10px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:' + dotColor + ';flex-shrink:0"></span>' + a.msg + '</span>';
- });
-
- alertWrap.innerHTML = badges;
-}
 
 // Abre o drawer de edição da tarefa a partir de um alerta clicável
 function _alertaAbrirTarefa(taskId) {
@@ -497,31 +414,6 @@ function _colabRegistrar(task, sub) {
  });
 }
 
-// Atualizar status de uma subtarefa via aba Colaboração (sem abrir drawer)
-function _colabAtualizarStatus(taskId, subId, novoStatus) {
- var tasks = Array.isArray(_dashTasks) ? _dashTasks : [];
- var idx = tasks.findIndex(function(t){ return t.id === taskId; });
- if (idx === -1) { _showToast('Atividade não encontrada', 'erro'); return; }
- var subs = Array.isArray(tasks[idx].subtasks) ? tasks[idx].subtasks : [];
- var si = subs.findIndex(function(s){ return (s.id || s._id) === subId; });
- if (si === -1) { _showToast('Subtarefa não encontrada', 'erro'); return; }
- subs[si].status = novoStatus;
- subs[si].done   = novoStatus === 'Concluído';
- if (novoStatus === 'Concluído' && !subs[si].dt_conclusao) subs[si].dt_conclusao = new Date().toISOString().slice(0,10);
- tasks[idx].subtasks = subs;
- tasks[idx].updated_at = new Date().toISOString();
- _dashAutoStatus(tasks[idx]);
- _dashTasksSave();
- _dashTasksRender();
- // Atualizar registro de colaboração local
- var arr = _colabGetAll();
- arr.forEach(function(r){ if (r.task_id === taskId && r.sub_id === subId) r.status = novoStatus; });
- _colabSave(arr);
- _remLoadColab();
- // ── Histórico pessoal ──
- _histLogAdd('status', tasks[idx].titulo, 'Subtarefa "' + (subs[si].titulo || '') + '" → ' + novoStatus);
- _showToast('Status atualizado para "' + novoStatus + '"', 'ok');
-}
 
 function _remLoadColab() { _remLoadColabReqs(); }
 
@@ -765,30 +657,7 @@ function _remLoadColabReqs() {
    + '</div>'
    + '</div>';
  }).join('');
- // Manter subtarefas atribuídas abaixo (sistema legado)
- var statusOpts = ['Não iniciado','Em progresso','Bloqueado','Concluído'];
- var corMap = { 'Não iniciado':'#64748b','Em progresso':'#3b82f6','Bloqueado':'#ef4444','Concluído':'#22c55e' };
- var subsHtml = '';
- if (all.length) {
-  subsHtml = '<div style="padding:6px 12px 2px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)">Subtarefas atribuídas</div>'
-   + all.map(function(r) {
-    var cor = corMap[r.status] || '#64748b';
-    var prazoStr = r.prazo ? new Date(r.prazo + 'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '—';
-    var vencida  = r.prazo && r.status !== 'Concluído' && new Date(r.prazo + 'T23:59:59') < new Date();
-    return '<div style="padding:8px 12px;border-bottom:1px solid var(--border)">'
-     + '<div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">' + r.sub_titulo + '</div>'
-     + '<div style="font-size:10px;color:var(--muted);margin-bottom:4px">' + r.task_titulo + '</div>'
-     + '<div style="display:flex;align-items:center;gap:6px">'
-     + '<span style="font-size:10px;color:' + (vencida?'#ef4444':'var(--muted)') + '">Prazo: ' + prazoStr + '</span>'
-     + '<div style="margin-left:auto;display:flex;align-items:center;gap:3px">'
-     + '<div style="width:7px;height:7px;border-radius:50%;background:' + cor + '"></div>'
-     + '<select onchange="_colabAtualizarStatus(\'' + r.task_id + '\',\'' + r.sub_id + '\',this.value)" style="font-size:10px;padding:2px 4px;border:1px solid var(--border);border-radius:5px;background:var(--surface2);color:var(--text);cursor:pointer;font-family:inherit">'
-     + statusOpts.map(function(st){ return '<option value="' + st + '"' + (r.status===st?' selected':'') + '>' + st + '</option>'; }).join('')
-     + '</select>'
-     + '</div></div></div>';
-   }).join('');
- }
- listEl.innerHTML = reqsHtml + subsHtml || '<div style="padding:14px 12px;font-size:11px;color:var(--muted);text-align:center">Nenhuma colaboração.</div>';
+ listEl.innerHTML = reqsHtml || '<div style="padding:14px 12px;font-size:11px;color:var(--muted);text-align:center">Nenhuma colaboração.</div>';
 }
 
 /* Ação rápida sobre solicitação via painel Lembretes */
@@ -897,54 +766,19 @@ var _dashTasksKey    = '';
 var _dashTasks       = [];
 var _dashTaskFilter  = 'all'; // estado do filtro ativo: all | hoje | atr | alta | feito
 
-// Motivo: externaliza a lógica de filtro para que _dashTasksRender possa aplicar
-// sem duplicar código — e o botão de chip só precisa chamar _taskFilterSet()
-function _taskFilterSet(btn, filter) {
- _dashTaskFilter = filter;
- document.querySelectorAll('#dash-task-filters .chip').forEach(function(c){ c.classList.remove('active'); });
- if (btn) btn.classList.add('active');
- _dashTasksRender();
-}
 
-function _dashTasksFiltered() {
- var f = _dashTaskFilter;
- if (f === 'all')  return _dashTasks;
- if (f === 'feito') return _dashTasks.filter(function(t){ return t.done; });
- return _dashTasks.filter(function(t){
-  if (t.done) return false;
-  if (f === 'alta')  return (t.prioridade || '').toLowerCase().replace('é','e').replace('á','a') === 'alta';
-  var p = _dashTaskPrazo(t);
-  if (f === 'hoje')  return p && p.cls === 'prazo-hoje';
-  if (f === 'atr')   return p && p.cls === 'prazo-atrasado';
-  return true;
- });
-}
-// IDs dos seeds fictícios removidos — usados para limpeza única do localStorage
-var _SEED_IDS_MOCK = [1, 2, 3, 4];
-
+// Widget legado de "tarefas pessoais" em localStorage (pré-Supabase) — sem
+// nenhuma tela própria hoje (a lista real de atividades vem de `atividades`
+// no Supabase; a criação/edição de tarefas em Meu Painel já grava lá desde
+// que este widget foi aposentado). Mantido só para APAGAR, uma única vez,
+// qualquer resíduo de sessões antigas — nenhum dado real é perdido, porque
+// nada grava mais neste array há muito tempo (ver criação/edição de
+// atividades em _submitNewTask, que já é 100% Supabase).
 function _dashTasksInit() {
  var user = (localStorage.getItem('pp-name') || 'Lorena').split(' ')[0].toLowerCase();
  _dashTasksKey = 'milatec-tasks-' + user;
- try {
-  var saved = localStorage.getItem(_dashTasksKey);
-  var parsed = saved ? JSON.parse(saved) : null;
-  var arr = Array.isArray(parsed) ? parsed : [];
-  // Remover seeds mockados que possam ter sido salvos em versões anteriores
-  arr = arr.filter(function(t) {
-   return _SEED_IDS_MOCK.indexOf(t.id) === -1;
-  });
-  _dashTasks = arr;
-  // Persistir imediatamente para não recarregar seeds na próxima sessão
-  if (parsed && parsed.length !== arr.length) {
-   try { localStorage.setItem(_dashTasksKey, JSON.stringify(arr)); } catch(e) {}
-  }
- } catch(e) {
-  _dashTasks = [];
- }
-}
-
-function _dashTasksSave() {
- try { localStorage.setItem(_dashTasksKey, JSON.stringify(_dashTasks)); } catch(e) {}
+ try { localStorage.removeItem(_dashTasksKey); } catch(e) {}
+ _dashTasks = [];
 }
 
 function _dashTaskPrazo(t) {
@@ -965,250 +799,6 @@ function _dashTaskPrazo(t) {
  return { label: raw, cls:'prazo-semana' };
 }
 
-function _dashTasksRender() {
- var list = document.getElementById('dash-tasks-list');
- if (!list) return;
- if (!_dashTasks.length) {
-  list.innerHTML = '<div style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Nenhuma atividade. Clique em "Nova atividade" para comecar.</div>';
-  _dashUpdateProgress();
-  _dashRenderAgenda();
-  return;
- }
- // Ordenacao: nao-concluidas primeiro (por prioridade), concluidas por ultimo
- // Normaliza prioridade para chave minúscula sem acento (suporta 'Alta'/'Média'/'Baixa' e 'alta'/'media'/'baixa')
- function _normPrio(p) {
-  return (p||'').toLowerCase().replace('é','e').replace('á','a');
- }
- var ord = { alta:0, media:1, baixa:2 };
- // Motivo: aplica filtro ativo ANTES de ordenar para não renderizar itens que não pertencem ao chip selecionado
- var filtered = _dashTasksFiltered();
- var sorted = filtered.slice().sort(function(a, b) {
-  if (a.done !== b.done) return a.done ? 1 : -1;
-  return (ord[_normPrio(a.prioridade)] || 2) - (ord[_normPrio(b.prioridade)] || 2);
- });
- if (!sorted.length) {
-  var labels = { hoje:'para hoje', atr:'atrasadas', alta:'com alta prioridade', feito:'concluídas' };
-  list.innerHTML = '<div style="padding:14px 0;color:var(--muted);font-size:12px;text-align:center">Nenhuma tarefa ' + (labels[_dashTaskFilter] || '') + '.</div>';
-  _dashUpdateProgress(); _dashRenderAgenda(); return;
- }
- var prioBarColor = { alta:'var(--red)', media:'var(--yellow)', baixa:'var(--navy)' };
- var prioLabel    = { alta:'Alta', media:'Média', baixa:'Baixa' };
- var prioTxtColor = { alta:'var(--red)', media:'var(--yellow)', baixa:'var(--muted)' };
- // Status: suporta valores antigos (pendente/em_andamento) e novos do Airtable (A fazer/Em progresso/Feito…)
- var statusMap = {
-  'pendente':            { cls:'task-b-pendente',  label:'Pendente'      },
-  'em_andamento':        { cls:'task-b-andamento', label:'Em andamento'  },
-  'concluida':           { cls:'task-b-concluida', label:'Feito'         },
-  'cancelada':           { cls:'task-b-cancelada', label:'Cancelada'     },
-  'Backlog':             { cls:'task-b-pendente',  label:'Backlog'       },
-  'A fazer':             { cls:'task-b-pendente',  label:'A fazer'       },
-  'Em progresso':        { cls:'task-b-andamento', label:'Em progresso'  },
-  'Aguardando feedback': { cls:'task-b-andamento', label:'Aguardando'    },
-  'Feito':               { cls:'task-b-concluida', label:'Feito'         },
-  'Obsoleto':            { cls:'task-b-cancelada', label:'Obsoleto'      }
- };
- list.innerHTML = sorted.map(function(t) {
-  var prazo  = _dashTaskPrazo(t);
-  var stInfo = statusMap[t.status] || { cls:'task-b-pendente', label: t.status || 'Pendente' };
-  var pk     = _normPrio(t.prioridade);
-  var pBar   = !t.done ? (prioBarColor[pk] || 'var(--border)') : 'var(--border)';
-
-  // linha de metadados
-  var metaParts = [];
-  if (t.status && !t.done) metaParts.push('<span class="task-badge ' + stInfo.cls + '">' + stInfo.label + '</span>');
-  if (t.prioridade && !t.done) metaParts.push('<span style="font-size:10px;font-weight:600;color:' + (prioTxtColor[pk]||'var(--muted)') + '">' + (prioLabel[pk]||t.prioridade) + '</span>');
-  if (t.area)            metaParts.push('<span style="font-size:10px;color:var(--muted)">' + t.area + '</span>');
-  // tipo_atividade (novo campo) ou tipo (campo antigo)
-  var tipoVal = t.tipo_atividade || t.tipo || '';
-  if (tipoVal) metaParts.push('<span style="font-size:10px;color:var(--muted)">' + tipoVal + '</span>');
-  if (t.responsavel && t.responsavel !== (localStorage.getItem('pp-name')||'Lorena').split(' ')[0]) {
-   metaParts.push('<span style="font-size:10px;color:var(--muted)">' + t.responsavel + '</span>');
-  }
-  var _feedObraNome = t._obraNome || t.obra_nome || (t.obra_id && _gestorObrasMap ? (_gestorObrasMap[String(t.obra_id)] || '') : '');
-  var _feedProjNome = t._projNome || t.projeto_nome || (t.projeto_id && _gestorProjMap ? (_gestorProjMap[String(t.projeto_id)] || '') : '');
-  if (_feedObraNome) metaParts.push('<span style="font-size:10px;color:var(--navy);background:var(--blue-dim);border-radius:4px;padding:1px 5px">' + _feedObraNome + '</span>');
-  if (_feedProjNome) metaParts.push('<span style="font-size:10px;color:var(--navy);background:var(--blue-dim);border-radius:4px;padding:1px 5px">' + _feedProjNome + '</span>');
-  // Recorrência: campo novo usa 'sim'/'nao'
-  if (t.recorrencia === 'sim') {
-   var freqStr = t.freq_val && t.freq_unit ? 'a cada ' + t.freq_val + ' ' + t.freq_unit : 'Recorrente';
-   metaParts.push('<span style="font-size:10px;color:var(--purple);background:rgba(137,87,229,.12);border-radius:4px;padding:1px 5px">' + (t.is_mae ? 'Mae · ' : 'Recorre ') + freqStr + '</span>');
-  }
-
-  // prazo badge
-  var prazoBadge = '';
-  if (t.done) {
-   prazoBadge = '<span class="tc-prazo tc-prazo-feito">Feito</span>';
-  } else if (prazo) {
-   var cls = prazo.cls === 'prazo-atrasado' ? 'tc-prazo-atr' : prazo.cls === 'prazo-hoje' ? 'tc-prazo-hoje' : 'tc-prazo-ok';
-   prazoBadge = '<span class="tc-prazo ' + cls + '">' + prazo.label + '</span>';
-  }
-
-  // checkbox SVG
-  var cbContent = t.done
-   ? '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="1.8"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>'
-   : '';
-
-  // subtarefas: barra de progresso e contagem
-  var subs     = Array.isArray(t.subtasks) ? t.subtasks : [];
-  var subTotal = subs.length;
-  var subDone  = subs.filter(function(s){ return s.done; }).length;
-  var subPct   = subTotal > 0 ? Math.round(subDone / subTotal * 100) : 0;
-
-  var progHtml = '';
-  if (subTotal > 0) {
-   progHtml = '<div class="task-prog-label">' + subDone + ' de ' + subTotal + ' subtarefa' + (subTotal > 1 ? 's' : '') + ' concluída' + (subTotal > 1 ? 's' : '') + ' (' + subPct + '%)</div>'
-    + '<div class="task-prog-wrap"><div class="task-prog-fill" style="width:' + subPct + '%"></div></div>';
-  }
-
-  var subsHtml = subs.map(function(s) {
-   var sCb = s.done
-    ? '<div class="subtask-cb done" onclick="_dashToggleSubtask(' + t.id + ',' + s.id + ')"><svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>'
-    : '<div class="subtask-cb" onclick="_dashToggleSubtask(' + t.id + ',' + s.id + ')"></div>';
-   return '<div class="subtask-item">'
-    + sCb
-    + '<span class="subtask-title' + (s.done ? ' done' : '') + '">' + s.titulo + '</span>'
-    + '<button class="subtask-del" onclick="_dashDeleteSubtask(' + t.id + ',' + s.id + ')" title="Remover">&times;</button>'
-    + '</div>';
-  }).join('');
-
-  var expandHtml = '<div class="task-card-expand" id="tcexp-' + t.id + '">'
-   + progHtml
-   + (subsHtml ? '<div class="subtask-list">' + subsHtml + '</div>' : '')
-   + '<div class="subtask-add-row">'
-   + '<input class="subtask-add-inp" id="sub-inp-' + t.id + '" type="text" placeholder="+ nova subtarefa..." maxlength="120"'
-   + ' onkeydown="if(event.key===\'Enter\')_dashAddSubtask(' + t.id + ')">'
-   + '<button class="subtask-add-btn" onclick="_dashAddSubtask(' + t.id + ')">Adicionar</button>'
-   + '</div>'
-   + '</div>';
-
-  var toggleBtn = '<button class="task-card-toggle" onclick="_dashTaskExpand(' + t.id + ')" title="Subtarefas">'
-   + '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2,3.5 5,6.5 8,3.5"/></svg>'
-   + (subTotal > 0 ? ' ' + subDone + '/' + subTotal : '')
-   + '</button>';
-
-  return '<div class="task-card" data-id="' + t.id + '">'
-   + '<div class="task-card-prio" style="background:' + pBar + '"></div>'
-   + '<div class="task-card-inner">'
-   + '<div class="task-card-cb' + (t.done ? ' done' : '') + '" onclick="_dashTaskToggle(' + t.id + ')">' + cbContent + '</div>'
-   + '<div class="task-card-content">'
-   + '<div class="task-card-title' + (t.done ? ' done' : '') + '">' + t.titulo + '</div>'
-   + (metaParts.length ? '<div class="task-card-meta">' + metaParts.join('<span style="color:var(--border)">·</span>') + '</div>' : '')
-   + '</div>'
-   + '</div>'
-   + '<div class="task-card-right">'
-   + prazoBadge
-   + '<button onclick="_taskDrawerOpen(' + t.id + ')" class="task-edit-btn" title="Editar">'
-   + '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M11 2l3 3-9 9H2v-3l9-9z"/></svg>'
-   + '</button>'
-   + '<button onclick="_dashTaskDelete(' + t.id + ')" class="task-del-btn" title="Remover" style="margin-top:auto">&times;</button>'
-   + toggleBtn
-   + '</div>'
-   + '</div>'
-   + expandHtml
-   + '</div>';
- }).join('');
- _dashUpdateProgress();
- _dashRenderAgenda();
-}
-
-function _dashTaskToggle(id) {
- var t = _dashTasks.find(function(x){ return x.id === id; });
- if (t) {
-  t.done   = !t.done;
-  t.status = t.done ? 'concluida' : 'pendente';
-  _dashTasksSave();
-  _dashTasksRender();
-  // ── Histórico pessoal ──
-  if (t.done) _histLogAdd('concluiu', t.titulo, 'Marcada como concluída');
-  else        _histLogAdd('editou',   t.titulo, 'Reaberta (desmarcada)');
- }
-}
-
-function _dashTaskDelete(id) {
- var t = _dashTasks.find(function(x){ return x.id === id; });
- var titulo = t ? t.titulo : 'Atividade';
- _dashTasks = _dashTasks.filter(function(x){ return x.id !== id; });
- _dashTasksSave();
- _dashTasksRender();
- // ── Histórico pessoal ──
- _histLogAdd('excluiu', titulo, 'Atividade removida do dashboard');
-}
-
-/* ── SUBTAREFAS ────────────────────────────────────────────────────── */
-// Motivo: subtarefas ficam embutidas na própria tarefa (subtasks:[]) e
-// persistem no localStorage junto com ela — sem tabela separada no banco.
-// O status da tarefa mãe é atualizado automaticamente com base na proporção
-// de subtarefas concluídas, criando um ciclo de vida progressivo e visual.
-
-function _dashTaskExpand(id) {
- var el = document.getElementById('tcexp-' + id);
- if (el) el.classList.toggle('open');
-}
-
-function _dashAddSubtask(taskId) {
- var inp = document.getElementById('sub-inp-' + taskId);
- if (!inp) return;
- var titulo = inp.value.trim();
- if (!titulo) return;
- var t = _dashTasks.find(function(x){ return x.id === taskId; });
- if (!t) return;
- if (!Array.isArray(t.subtasks)) t.subtasks = [];
- t.subtasks.push({ id: Date.now(), titulo: titulo, done: false });
- _dashAutoStatus(t);
- _dashTasksSave();
- _dashTasksRender();
- // Reabrir o expand após re-render
- setTimeout(function(){
-  var el = document.getElementById('tcexp-' + taskId);
-  if (el) el.classList.add('open');
- }, 20);
-}
-
-function _dashToggleSubtask(taskId, subId) {
- var t = _dashTasks.find(function(x){ return x.id === taskId; });
- if (!t || !Array.isArray(t.subtasks)) return;
- var s = t.subtasks.find(function(x){ return x.id === subId; });
- if (!s) return;
- s.done = !s.done;
- _dashAutoStatus(t);
- _dashTasksSave();
- _dashTasksRender();
- setTimeout(function(){
-  var el = document.getElementById('tcexp-' + taskId);
-  if (el) el.classList.add('open');
- }, 20);
-}
-
-function _dashDeleteSubtask(taskId, subId) {
- var t = _dashTasks.find(function(x){ return x.id === taskId; });
- if (!t || !Array.isArray(t.subtasks)) return;
- t.subtasks = t.subtasks.filter(function(x){ return x.id !== subId; });
- _dashAutoStatus(t);
- _dashTasksSave();
- _dashTasksRender();
- setTimeout(function(){
-  var el = document.getElementById('tcexp-' + taskId);
-  if (el && t.subtasks.length > 0) el.classList.add('open');
- }, 20);
-}
-
-function _dashAutoStatus(t) {
- // Motivo: atualiza o status da tarefa automaticamente baseado nas subtarefas,
- // replicando o padrão de ferramentas como Linear e Jira.
- var subs = Array.isArray(t.subtasks) ? t.subtasks : [];
- if (subs.length === 0) return;
- var done  = subs.filter(function(s){ return s.done; }).length;
- var total = subs.length;
- if (done === 0) {
-  if (t.status === 'Em progresso') t.status = 'A fazer';
- } else if (done < total) {
-  t.status = 'Em progresso';
-  t.done   = false;
- } else {
-  t.status = 'Feito';
-  t.done   = true;
- }
-}
 
 /* ── DRAWER DE NOVA ATIVIDADE ─────────────────────────────────────── */
 // ID da tarefa em edição — null = modo criação, número = modo edição
@@ -1671,19 +1261,6 @@ function _taskDelete() {
  if (!_taskEditId) return;
  var titulo = (document.getElementById('nt-titulo') || {}).value || 'esta atividade';
  if (!confirm('Excluir "' + titulo + '"?\n\nEsta ação não pode ser desfeita.')) return;
-
- // ── Tarefa local (localStorage) ──────────────────────────────────────────
- var idx = (_dashTasks||[]).findIndex(function(x){ return x.id === _taskEditId; });
- if (idx !== -1) {
-  _dashTasks.splice(idx, 1);
-  _dashTasksSave();
-  _taskDrawerClose();
-  _dashTasksRender();
-  _histLogAdd('excluiu', titulo, 'Removida da lista pessoal');
-  _histBadgeUpdate();
-  _showToast('Atividade excluída', 'ok');
-  return;
- }
 
  // ── Atividade Supabase — DELETE no banco ─────────────────────────────────
  var sbId = _taskEditId;
@@ -2344,63 +1921,6 @@ function _submitNewTask() {
      .catch(function(e) { _showToast('Erro: ' + e.message, 'erro'); });
     return;
    }
-
-   // ── Tarefa local (localStorage) + Supabase se tiver ID real ─────
-   var orig = _dashTasks[idx];
-   var respEmails = _nomesStrToEmails(mae.responsavel);
-   var hist = Array.isArray(orig.historico) ? orig.historico : [];
-   hist.push({ usuario: currentUser, acao: 'Editou a atividade', data: new Date().toISOString() });
-   _dashTasks[idx] = Object.assign({}, orig, {
-    titulo:         mae.titulo,       tipo_atividade: mae.tipo_atividade,
-    area:           mae.area,         responsavel:    mae.responsavel,
-    prioridade:     mae.prioridade,   status:         mae.status,
-    data_inicio:    mae.data_inicio,  data_fim:       mae.data_fim,
-    descricao:      mae.descricao,    observacoes:    mae.observacoes,
-    tags:           mae.tags,         comentarios:    mae.comentarios,
-    decisoes:       mae.decisoes,     etapa:          mae.etapa,
-    obra_id:        mae.obra_id,      obra_nome:      mae.obra_nome,
-    projeto_id:     mae.projeto_id,   projeto_nome:   mae.projeto_nome,
-    melhoria_id:    mae.melhoria_id,  melhoria_nome:  mae.melhoria_nome,
-    subtasks:       subtasksParaSalvar,
-    updated_by:     currentUser,
-    updated_at:     new Date().toISOString(),
-    historico:      hist
-   });
-   _dashAutoStatus(_dashTasks[idx]);
-   subtasksParaSalvar.forEach(function(s){ _colabRegistrar(_dashTasks[idx], s); });
-   _dashTasksSave();
-   // Se o ID for um UUID real (atividade salva no Supabase), persiste lá também
-   var isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(_taskEditId));
-   if (isUuid && _sb && _dbOk) {
-    var sbPayload = {
-     titulo:         mae.titulo,
-     status:         mae.status,
-     prioridade:     mae.prioridade,
-     area:           mae.area,
-     tipo_atividade: mae.tipo_atividade,
-     data_inicio:    mae.data_inicio  || null,
-     data_prazo:     mae.data_fim     || null,
-     responsavel:    respEmails,
-     observacoes:    mae.observacoes  || null,
-     subtasks:       subtasksParaSalvar,
-     visibilidade:   privVisibilidade,
-     updated_at:     new Date().toISOString()
-    };
-    _sb.from('atividades').update(sbPayload).eq('id', _taskEditId).then(function(res) {
-     if (!res.error) {
-      _privSaveShares(_taskEditId, privModo, privShares);
-      _syncAtividadeVinculos(_taskEditId, mae.obra_id || null, mae.projeto_id || null, mae.melhoria_id || null);
-      _syncAtividadeResponsaveis(_taskEditId, respEmails);
-     } else {
-      console.error('[Dashboard] erro ao salvar atividade no Supabase:', res.error);
-      _showToast('Atenção: a atividade foi salva localmente, mas não sincronizou com o servidor: ' + _supaErrPt(res.error.message), 'erro');
-     }
-    });
-   }
-   _taskDrawerClose();
-   _dashTasksRender();
-   _remLoadColab();
-   _showToast('Atividade atualizada!', 'ok');
   } else {
    // ── Modo criação — insere atividade real no Supabase (tabela atividades) ──
    // Motivo: antes, novas atividades ficavam só no localStorage do navegador
