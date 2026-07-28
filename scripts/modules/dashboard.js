@@ -1556,12 +1556,18 @@ function _privUpdateBox() {
 // Persiste o compartilhamento explícito da atividade (privacidade "Pessoas específicas")
 function _privSaveShares(atividadeId, modo, sharesArr) {
  if (!_sb || !atividadeId) return Promise.resolve();
- return _sb.from('atividades_compartilhamento').delete().eq('atividade_id', atividadeId).then(function() {
+ return _sb.from('atividades_compartilhamento').delete().eq('atividade_id', atividadeId).then(function(delRes) {
+  if (delRes.error) throw delRes.error;
   if (modo !== 'privada_especificos' || !sharesArr || !sharesArr.length) return;
   var rows = sharesArr.filter(function(u){ return u.id; }).map(function(u){ return { atividade_id: atividadeId, usuario_id: u.id }; });
   if (!rows.length) return;
-  return _sb.from('atividades_compartilhamento').insert(rows);
- }).catch(function(e){ console.error('[Privacidade] erro ao salvar compartilhamento:', e); });
+  return _sb.from('atividades_compartilhamento').insert(rows).then(function(insRes) {
+   if (insRes.error) throw insRes.error;
+  });
+ }).catch(function(e){
+  console.error('[Privacidade] erro ao salvar compartilhamento:', e);
+  if (typeof _showToast === 'function') _showToast('Erro ao salvar quem pode ver esta atividade — o compartilhamento pode não ter sido aplicado.', 'erro');
+ });
 }
 
 // Carrega o compartilhamento existente de uma atividade (para preencher o drawer na edição)
@@ -2413,6 +2419,9 @@ function _submitNewTask() {
       _privSaveShares(_taskEditId, privModo, privShares);
       _syncAtividadeVinculos(_taskEditId, mae.obra_id || null, mae.projeto_id || null, mae.melhoria_id || null);
       _syncAtividadeResponsaveis(_taskEditId, respEmails);
+     } else {
+      console.error('[Dashboard] erro ao salvar atividade no Supabase:', res.error);
+      _showToast('Atenção: a atividade foi salva localmente, mas não sincronizou com o servidor: ' + _supaErrPt(res.error.message), 'erro');
      }
     });
    }
@@ -3133,7 +3142,30 @@ async function _feedConcluir(checkEl, atividadeId) {
 
  // Salva no banco
  if (_dbOk) {
-  await _sb.from('atividades').update({ status: novoStatus }).eq('id', atividadeId);
+  var res = await _sb.from('atividades').update({ status: novoStatus }).eq('id', atividadeId);
+  if (res.error) {
+   console.error('[Dashboard] erro ao atualizar status da atividade:', res.error);
+   _showToast('Erro ao salvar — desfazendo alteração: ' + _supaErrPt(res.error.message), 'erro');
+   // Reverte a UI otimista (sem tentar gravar de novo) já que a gravação falhou
+   var tituloEl = row.querySelector('[style*="font-weight:600"]');
+   if (!isDone) {
+    checkEl.classList.remove('done');
+    checkEl.style.background = 'transparent';
+    checkEl.style.borderColor = 'var(--border)';
+    checkEl.innerHTML = '';
+    checkEl.title = 'Marcar como concluída';
+    if (tituloEl) { tituloEl.style.textDecoration = ''; tituloEl.style.color = 'var(--text)'; }
+    row.style.opacity = '';
+   } else {
+    checkEl.classList.add('done');
+    checkEl.style.background = 'var(--green)';
+    checkEl.style.borderColor = 'var(--green)';
+    checkEl.innerHTML = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.2"><polyline points="2 6 5 9 10 3"/></svg>';
+    checkEl.title = 'Marcar como pendente';
+    if (tituloEl) { tituloEl.style.textDecoration = 'line-through'; tituloEl.style.color = 'var(--muted)'; }
+    row.style.opacity = '.55';
+   }
+  }
  }
 }
 

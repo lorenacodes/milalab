@@ -314,21 +314,6 @@ async function _dbLoadContatos() {
 // ── Abre painel de obra pelo ID (usado pelo kanban e pela tabela) ──────────────
 
 
-// ── Save Obra (side panel) ────────────────────────────────────────────────────
-
-// ── Save Empresa ──────────────────────────────────────────────────────────────
-async function _dbSaveEmpresa(payload) {
- if (!_dbOk) return;
- const id = payload.id;
- delete payload.id;
- if (id) {
-  await _sb.from('empresas').update(payload).eq('id', id);
- } else {
-  const { data } = await _sb.from('empresas').insert(payload).select().single();
-  return data?.id;
- }
-}
-
 function switchEmpTab(tab) {
  var tabs = ['empresas', 'contatos', 'fornecedores'];
  tabs.forEach(function(t) {

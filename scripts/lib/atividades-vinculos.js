@@ -45,14 +45,20 @@ async function _syncAtividadeVinculos(atividadeId, obraId, projetoId, melhoriaId
  projetoId   = safeUuid(projetoId);
  melhoriaId  = safeUuid(melhoriaId);
  if (!atividadeId) return;
+ var erros = [];
+ function chk(r) { if (r && r.error) erros.push(r.error); return r; }
  try {
-  await _sb.from('atividades_obras').delete().eq('atividade_id', atividadeId);
-  if (obraId) await _sb.from('atividades_obras').insert({ atividade_id: atividadeId, obra_id: obraId });
-  await _sb.from('atividades_projetos').delete().eq('atividade_id', atividadeId);
-  if (projetoId) await _sb.from('atividades_projetos').insert({ atividade_id: atividadeId, projeto_id: projetoId });
-  await _sb.from('atividades_melhorias').delete().eq('atividade_id', atividadeId);
-  if (melhoriaId) await _sb.from('atividades_melhorias').insert({ atividade_id: atividadeId, melhoria_id: melhoriaId });
+  chk(await _sb.from('atividades_obras').delete().eq('atividade_id', atividadeId));
+  if (obraId) chk(await _sb.from('atividades_obras').insert({ atividade_id: atividadeId, obra_id: obraId }));
+  chk(await _sb.from('atividades_projetos').delete().eq('atividade_id', atividadeId));
+  if (projetoId) chk(await _sb.from('atividades_projetos').insert({ atividade_id: atividadeId, projeto_id: projetoId }));
+  chk(await _sb.from('atividades_melhorias').delete().eq('atividade_id', atividadeId));
+  if (melhoriaId) chk(await _sb.from('atividades_melhorias').insert({ atividade_id: atividadeId, melhoria_id: melhoriaId }));
   if (_avObraMap) { _avObraMap[atividadeId] = obraId || null; _avProjMap[atividadeId] = projetoId || null; _avMelhMap[atividadeId] = melhoriaId || null; }
+  if (erros.length && typeof _showToast === 'function') {
+   _showToast('Atividade salva, mas houve erro ao vincular obra/projeto/melhoria.', 'erro');
+   console.error('[_syncAtividadeVinculos] erro(s):', erros);
+  }
  } catch(e) { console.error('[_syncAtividadeVinculos] erro:', e); }
 }
 // Grava (upsert) os responsáveis de uma atividade em atividades_responsaveis,
@@ -60,14 +66,18 @@ async function _syncAtividadeVinculos(atividadeId, obraId, projetoId, melhoriaId
 // mas continuam visíveis no array atividades.responsavel).
 async function _syncAtividadeResponsaveis(atividadeId, emails) {
  try {
-  await _sb.from('atividades_responsaveis').delete().eq('atividade_id', atividadeId);
+  var delRes = await _sb.from('atividades_responsaveis').delete().eq('atividade_id', atividadeId);
   var cache = await _loadUsuariosCache();
   var arr = Array.isArray(emails) ? emails : (emails ? [emails] : []);
   var links = arr.map(function(em) {
    var u = cache.find(function(x){ return x.email === em; });
    return u ? { atividade_id: atividadeId, usuario_id: u.id } : null;
   }).filter(Boolean);
-  if (links.length) await _sb.from('atividades_responsaveis').insert(links);
+  var insRes = links.length ? await _sb.from('atividades_responsaveis').insert(links) : null;
+  if ((delRes && delRes.error) || (insRes && insRes.error)) {
+   console.error('[_syncAtividadeResponsaveis] erro:', (delRes && delRes.error) || (insRes && insRes.error));
+   if (typeof _showToast === 'function') _showToast('Erro ao sincronizar responsáveis da atividade.', 'erro');
+  }
  } catch(e) { console.error('[_syncAtividadeResponsaveis] erro:', e); }
 }
 

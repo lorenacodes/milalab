@@ -1625,16 +1625,22 @@ async function _spSaveObraFull() {
   endereco_entrega:  document.getElementById('sp-end-entrega')?.value?.trim() || null,
   updated_at:        new Date().toISOString(),
  };
- const { error } = await _sb.from('obras').update(payload).eq('id', id);
+ var { error } = await _sb.from('obras').update(payload).eq('id', id);
+ var vincErro = null;
  if (!error) {
   // Grava empresa na tabela associativa (substitui a existente)
   if (novaEmpresaId) {
-   await _sb.from('empresas_obras').delete().eq('obra_id', id);
-   await _sb.from('empresas_obras').insert({ obra_id: id, empresa_id: novaEmpresaId });
+   var delEmp = await _sb.from('empresas_obras').delete().eq('obra_id', id);
+   if (delEmp.error) vincErro = delEmp.error;
+   if (!vincErro) {
+    var insEmp = await _sb.from('empresas_obras').insert({ obra_id: id, empresa_id: novaEmpresaId });
+    if (insEmp.error) vincErro = insEmp.error;
+   }
   }
   // Garante que o contato selecionado está vinculado (sem remover outros)
-  if (novoContatoId) {
-   await _sb.from('contatos_obras').upsert({ obra_id: id, contato_id: novoContatoId }, { onConflict: 'obra_id,contato_id', ignoreDuplicates: true });
+  if (novoContatoId && !vincErro) {
+   var upsCtt = await _sb.from('contatos_obras').upsert({ obra_id: id, contato_id: novoContatoId }, { onConflict: 'obra_id,contato_id', ignoreDuplicates: true });
+   if (upsCtt.error) vincErro = upsCtt.error;
   }
  }
  const btn = document.querySelector('#sp-actions .btn-primary');
@@ -1642,6 +1648,11 @@ async function _spSaveObraFull() {
   btn.textContent = error ? 'Erro!' : 'Salvo!';
   btn.style.background = error ? 'var(--red)' : 'var(--green)';
   setTimeout(() => { btn.textContent = 'Salvar'; btn.style.background = ''; }, 1800);
+ }
+ if (error) {
+  _showToast('Erro ao salvar obra: ' + _supaErrPt(error.message), 'erro');
+ } else if (vincErro) {
+  _showToast('Obra salva, mas houve erro ao vincular empresa/contato: ' + _supaErrPt(vincErro.message), 'erro');
  }
  if (!error) {
   _obraAtiva = { ..._obraAtiva, ...payload, empresa_id: novaEmpresaId, contato_id: novoContatoId };

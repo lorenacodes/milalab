@@ -236,13 +236,22 @@ async function _noSalvarNovoContato() {
  }).select('id,nome_completo,cargo').single();
  if (res.error) { _showToast('Erro ao criar contato: ' + res.error.message, 'erro'); return; }
  var empresaId = _noEmpresaIds[0];
- if (empresaId) await _sb.from('contatos_empresas').insert({ contato_id: res.data.id, empresa_id: empresaId });
+ var linkErro = null;
+ if (empresaId) {
+  var linkRes = await _sb.from('contatos_empresas').insert({ contato_id: res.data.id, empresa_id: empresaId });
+  if (linkRes.error) linkErro = linkRes.error;
+ }
  res.data.empresa_id = empresaId;
  _contatosArr = (_contatosArr || []).concat([res.data]);
  _noContatoId = res.data.id;
  document.getElementById('no-novo-contato-box').style.display = 'none';
  _noContatoRender();
- _showToast('Contato criado com sucesso!', 'ok');
+ if (linkErro) {
+  console.error('[Wizard] erro ao vincular contato à empresa:', linkErro);
+  _showToast('Contato criado, mas não foi possível vincular à empresa: ' + _supaErrPt(linkErro.message), 'erro');
+ } else {
+  _showToast('Contato criado com sucesso!', 'ok');
+ }
 }
 function _noCancelarNovoContato() {
  document.getElementById('no-novo-contato-box').style.display = 'none';
@@ -405,11 +414,18 @@ async function submitNovaObra() {
    var path = obraId + '/' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9_\-.]/g, '_');
    var up = await _sb.storage.from('documentos_obras').upload(path, f, { upsert: false });
    if (!up.error) {
-    await _sb.from('documentos').insert({
+    var docRowIns = await _sb.from('documentos').insert({
      obra_id: obraId, nome_arquivo: f.name, nome: f.name, tipo: docsMap[di].tipo,
      categoria: 'Comercial', caminho_storage: path, tamanho_bytes: f.size, mime_type: f.type,
      status: 'Ativo', versao: 1, criado_por: userEmail, origem: 'upload_manual'
     });
+    if (docRowIns.error) {
+     console.error('[Wizard] erro ao registrar documento enviado:', docRowIns.error);
+     _showToast('Arquivo "' + f.name + '" foi enviado, mas não foi registrado no sistema: ' + _supaErrPt(docRowIns.error.message), 'erro');
+    }
+   } else {
+    console.error('[Wizard] erro ao enviar arquivo:', up.error);
+    _showToast('Erro ao enviar o arquivo "' + f.name + '": ' + _supaErrPt(up.error.message), 'erro');
    }
   }
 
@@ -458,12 +474,16 @@ async function _noGerarPropostaSolar(obraId, projetoId, p, userEmail) {
  }).select('id').single();
  if (ins.error) { _showToast('Erro ao gerar proposta: ' + _supaErrPt(ins.error.message), 'erro'); return false; }
 
- await _sb.from('documentos').insert({
+ var docIns = await _sb.from('documentos').insert({
   obra_id: obraId, empresa_id: empresaId, tipo: 'proposta_comercial',
   nome_arquivo: 'Proposta ' + numero + ' — ' + produtoNome, status: 'Gerada', versao: 1,
   criado_por: userEmail, atualizado_por: userEmail, proposta_id: ins.data.id, origem: 'sistema_gerado',
   metadata: { numero: numero, produto: produtoNome, quantidade: qtd, valor_total: vt }
  });
+ if (docIns.error) {
+  console.error('[Wizard] erro ao registrar documento da proposta:', docIns.error);
+  _showToast('Proposta ' + numero + ' gerada, mas o documento não foi registrado: ' + _supaErrPt(docIns.error.message), 'erro');
+ }
  return true;
 }
 
