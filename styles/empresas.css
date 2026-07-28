@@ -1,0 +1,111 @@
+ .nt-page { font-family:'Inter',sans-serif }
+ .nt-title { font-size:28px;font-weight:700;letter-spacing:-.4px;color:var(--text);line-height:1.2 }
+ .nt-desc { font-size:13px;color:var(--muted);margin-top:4px }
+ .nt-view-bar { display:flex;align-items:center;gap:0;margin:16px 0 0;border-bottom:1px solid var(--border) }
+ .nt-view-btn {
+ display:flex;align-items:center;gap:6px;padding:7px 14px;font-size:13px;font-weight:500;
+ border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;
+ margin-bottom:-1px;white-space:nowrap;transition:color .15s
+ }
+ .nt-view-btn.active { color:var(--text);border-bottom-color:var(--text) }
+ .nt-view-btn:hover:not(.active) { color:var(--text);background:rgba(0,0,0,.04) }
+ body.light .nt-view-btn:hover:not(.active) { background:rgba(0,0,0,.04) }
+ .nt-toolbar {
+ display:flex;align-items:center;gap:2px;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:0
+ }
+ .nt-tool-btn {
+ display:flex;align-items:center;gap:5px;padding:4px 8px;font-size:12px;color:var(--muted);
+ background:none;border:none;cursor:pointer;border-radius:4px;font-weight:500;transition:background .12s,color .12s
+ }
+ .nt-tool-btn:hover { background:rgba(0,0,0,.06);color:var(--text) }
+ body.light .nt-tool-btn:hover { background:rgba(0,0,0,.06) }
+ .nt-tool-btn.active { color:var(--navy);background:var(--navy-dim) }
+ .nt-sep { width:1px;height:16px;background:var(--border);margin:0 4px }
+ .nt-search {
+ margin-left:auto;display:flex;align-items:center;gap:6px;
+ border:1px solid var(--border);border-radius:6px;padding:4px 10px;
+ background:var(--surface);min-width:180px
+ }
+ .nt-search input { border:none;outline:none;background:transparent;font-size:12px;color:var(--text);width:100% }
+ .nt-search input::placeholder { color:var(--muted) }
+
+ /* Tabela Notion */
+ .nt-table { width:100%;border-collapse:collapse;font-size:13px }
+ .nt-table thead tr { border-bottom:1px solid var(--border) }
+ .nt-table th {
+ padding:7px 10px;text-align:left;font-size:11px;font-weight:600;
+ color:var(--muted);text-transform:uppercase;letter-spacing:.4px;
+ background:transparent;white-space:nowrap
+ }
+ .nt-table th:first-child { padding-left:6px;width:28px }
+ .nt-table td { padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle }
+ .nt-table td:first-child { padding-left:6px }
+ .nt-table tbody tr { transition:background .1s }
+ .nt-table tbody tr:hover { background:rgba(0,0,0,.03) }
+ body.light .nt-table tbody tr:hover { background:#F7F6F3 }
+ .nt-table tbody tr:hover .nt-row-acts { opacity:1!important }
+ .nt-table tbody tr:hover .nt-open-btn { opacity:1!important }
+
+ /* Tags estilo Notion */
+ .nt-tag { display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap }
+ .nt-tag-blue { background:#dbeafe;color:#1d4ed8 }
+ .nt-tag-green { background:#dcfce7;color:#15803d }
+ .nt-tag-yellow { background:#fef9c3;color:#a16207 }
+ .nt-tag-red { background:#fee2e2;color:#b91c1c }
+ .nt-tag-purple { background:#ede9fe;color:#7c3aed }
+ .nt-tag-orange { background:#ffedd5;color:#c2410c }
+ .nt-tag-gray { background:rgba(0,0,0,.06);color:var(--muted) }
+ .nt-tag-teal { background:#ccfbf1;color:#0f766e }
+ body.light .nt-tag-blue { background:#dbeafe;color:#1d4ed8 }
+
+ /* Avatar */
+ .nt-avatar { width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0 }
+ .nt-avatar-circle { border-radius:50% }
+
+ /* Inline stats */
+ .nt-stats { display:flex;gap:16px;padding:10px 0;font-size:12px;color:var(--muted) }
+ .nt-stats span b { color:var(--text);font-weight:600 }
+
+ /* New row button */
+ .nt-new-row {
+ display:flex;align-items:center;gap:6px;padding:8px 10px;font-size:13px;
+ color:var(--muted);background:none;border:none;border-bottom:1px solid var(--border);
+ width:100%;cursor:pointer;text-align:left;transition:color .12s,background .12s
+ }
+ .nt-new-row:hover { color:var(--text);background:rgba(0,0,0,.03) }
+ body.light .nt-new-row:hover { background:#F7F6F3 }
+ .nt-count { font-size:12px;color:var(--muted);padding:8px 10px }
+ /* Nome de contato clicável */
+ #ctt-tbody tr td:nth-child(2) div[style*="font-weight:500"] {
+ cursor:pointer;
+ }
+ #ctt-tbody tr:hover td:nth-child(2) div[style*="font-weight:500"] {
+ text-decoration:underline;text-underline-offset:2px;
+ }
+ /* Nome de empresa clicável */
+ #emp-tbody tr td:nth-child(2) div[style*="font-weight:500"] {
+ cursor:pointer;
+ }
+ #emp-tbody tr:hover td:nth-child(2) div[style*="font-weight:500"] {
+ text-decoration:underline;text-underline-offset:2px;
+ }
+
+ /* Filter panel herdado */
+ .nt-filter-panel {
+ display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:200;
+ background:var(--surface);border:1px solid var(--border);border-radius:10px;
+ box-shadow:0 8px 32px rgba(0,0,0,.18);width:520px;padding:16px
+ }
+
+ /* Célula de contato com ações hover (telefone / e-mail) */
+ .ctt-contact-cell { display:flex;align-items:center;gap:6px;min-width:0 }
+ .ctt-val { font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px }
+ .ctt-acts { display:flex;gap:2px;opacity:0;transition:opacity .12s;flex-shrink:0 }
+ #ctt-tbody tr:hover .ctt-acts { opacity:1 }
+ .ctt-act-btn {
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:4px;border:none;background:rgba(0,0,0,.06);
+  color:var(--muted);cursor:pointer;text-decoration:none;transition:background .1s,color .1s
+ }
+ .ctt-act-btn:hover { background:var(--navy-dim);color:var(--navy) }
+ .ctt-act-btn.wa:hover { background:rgba(37,211,102,.15);color:#128c0a }

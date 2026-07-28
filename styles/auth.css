@@ -1,0 +1,222 @@
+/* ═══════════════════════════════════════════════════════════════════
+   MILATEC AUTH SYSTEM v4.0 — Split Panel Design
+   Referências: Linear, Stripe, HubSpot, Notion
+   Tema: Claro (fundo branco) · Azul como destaque, não como fundo
+═══════════════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Base */
+.auth-screen {
+  position:fixed;inset:0;z-index:99999;
+  display:flex;align-items:stretch;
+  font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  background:#F6F7F8;
+}
+
+/* ── Painel esquerdo: branding ─────────────────────────────────── */
+.auth-left {
+  width:44%;flex-shrink:0;
+  background:#050866;
+  display:flex;flex-direction:column;justify-content:space-between;
+  padding:48px 44px;
+  position:relative;overflow:hidden;
+}
+/* Padrão estrutural SVG no fundo */
+.auth-left::before {
+  content:'';
+  position:absolute;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23004AE8' fill-opacity='0.08'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  pointer-events:none;
+}
+.auth-left::after {
+  content:'';
+  position:absolute;
+  bottom:-80px;right:-80px;
+  width:360px;height:360px;
+  background:radial-gradient(circle,rgba(0,74,232,.25) 0%,transparent 70%);
+  pointer-events:none;
+}
+
+/* Logo no painel esquerdo */
+.auth-brand-logo {
+  position:relative;z-index:1;
+  display:flex;align-items:center;gap:12px;
+}
+.auth-brand-logo svg { width:160px; }
+
+/* Conteúdo central do painel esquerdo */
+.auth-brand-content {
+  position:relative;z-index:1;flex:1;
+  display:flex;flex-direction:column;justify-content:center;
+  padding:40px 0;
+}
+.auth-brand-title {
+  font-size:30px;font-weight:700;
+  color:#F6F7F8;line-height:1.25;letter-spacing:-.5px;
+  margin-bottom:16px;
+}
+.auth-brand-title span { color:#00A34A; }
+.auth-brand-desc {
+  font-size:15px;color:rgba(246,247,248,.55);
+  line-height:1.65;max-width:300px;
+}
+
+/* Pills de módulos */
+.auth-modules {
+  position:relative;z-index:1;
+  display:flex;flex-wrap:wrap;gap:8px;margin-top:32px;
+}
+.auth-module-pill {
+  font-size:11px;font-weight:600;letter-spacing:.3px;
+  padding:5px 12px;border-radius:100px;
+  border:1px solid rgba(255,255,255,.15);
+  color:rgba(246,247,248,.7);
+}
+
+/* Rodapé do painel esquerdo */
+.auth-brand-footer {
+  position:relative;z-index:1;
+  font-size:11px;color:rgba(246,247,248,.3);
+}
+
+/* ── Painel direito: formulário ────────────────────────────────── */
+.auth-right {
+  flex:1;
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 48px;
+  background:#fff;
+  overflow-y:auto;
+}
+.auth-form-wrap {
+  width:100%;max-width:360px;
+}
+
+/* Cabeçalho do formulário */
+.auth-form-header { margin-bottom:32px; }
+.auth-form-eyebrow {
+  font-size:11px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;
+  color:#004AE8;margin-bottom:8px;
+}
+.auth-form-title {
+  font-size:24px;font-weight:700;color:#0a0f1e;
+  letter-spacing:-.4px;margin-bottom:6px;
+}
+.auth-form-subtitle { font-size:14px;color:#6b7280;line-height:1.5; }
+
+/* Inputs */
+.auth-field { margin-bottom:18px; }
+.auth-field-label {
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:7px;
+}
+.auth-field-label span {
+  font-size:13px;font-weight:500;color:#374151;
+}
+.auth-field-link {
+  font-size:12px;color:#004AE8;background:none;border:none;
+  cursor:pointer;font-family:inherit;padding:0;
+  text-decoration:underline;text-underline-offset:2px;
+}
+.auth-field-link:hover { color:#0044cc; }
+.auth-input-wrap { position:relative; }
+.auth-inp {
+  width:100%;box-sizing:border-box;
+  padding:11px 14px;
+  border:1.5px solid #e5e7eb;
+  border-radius:10px;
+  font-size:14px;font-family:inherit;color:#0a0f1e;
+  background:#fff;outline:none;
+  transition:border-color .18s,box-shadow .18s;
+}
+.auth-inp:focus {
+  border-color:#004AE8;
+  box-shadow:0 0 0 3px rgba(0,74,232,.1);
+}
+.auth-inp.error { border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.1); }
+.auth-inp.success { border-color:#00A34A;box-shadow:0 0 0 3px rgba(0,163,74,.1); }
+.auth-inp::placeholder { color:#9ca3af; }
+/* Toggle mostrar senha */
+.auth-pwd-toggle {
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;color:#9ca3af;
+  padding:4px;display:flex;align-items:center;transition:color .15s;
+}
+.auth-pwd-toggle:hover { color:#6b7280; }
+.auth-inp-pwd { padding-right:40px; }
+
+/* Botão primário */
+.auth-btn {
+  width:100%;padding:13px 20px;
+  background:#004AE8;color:#fff;
+  border:none;border-radius:10px;
+  font-size:14px;font-weight:600;font-family:inherit;
+  cursor:pointer;transition:all .18s;
+  box-shadow:0 2px 8px rgba(0,74,232,.25);
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.auth-btn:hover { background:#0055ff;box-shadow:0 4px 16px rgba(0,74,232,.35);transform:translateY(-1px); }
+.auth-btn:active { transform:translateY(0); }
+.auth-btn:disabled { opacity:.6;cursor:not-allowed;transform:none; }
+
+/* Alert */
+.auth-alert {
+  display:none;padding:11px 14px;border-radius:8px;
+  font-size:13px;margin-bottom:16px;
+}
+.auth-alert.err { background:#fef2f2;border:1px solid #fecaca;color:#dc2626; }
+.auth-alert.ok  { background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a; }
+.auth-alert.info{ background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8; }
+
+/* Divisor */
+.auth-sep {
+  display:flex;align-items:center;gap:12px;
+  margin:22px 0;color:#d1d5db;font-size:12px;
+}
+.auth-sep::before,.auth-sep::after {
+  content:'';flex:1;height:1px;background:#e5e7eb;
+}
+
+/* Links secundários */
+.auth-links {
+  display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+  margin-top:20px;
+}
+.auth-sec-link {
+  font-size:13px;color:#6b7280;background:none;border:none;
+  cursor:pointer;font-family:inherit;padding:4px 6px;
+  text-decoration:none;transition:color .15s;border-radius:6px;
+}
+.auth-sec-link:hover { color:#004AE8;background:#eff6ff; }
+
+/* Força da senha */
+.pwd-strength-bars { display:flex;gap:3px;margin-top:8px; }
+.pwd-strength-bar {
+  flex:1;height:3px;border-radius:2px;
+  background:#e5e7eb;transition:background .2s;
+}
+.pwd-reqs { display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px; }
+.pwd-req-item {
+  display:flex;align-items:center;gap:5px;
+  font-size:11px;color:#9ca3af;transition:color .2s;
+}
+.pwd-req-item svg { flex-shrink:0;transition:all .2s; }
+.pwd-req-item.met { color:#16a34a; }
+
+/* ── Spinner ──────────────────────────────────────────────────── */
+@keyframes spin { to { transform:rotate(360deg); } }
+.spinner {
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.3);
+  border-top-color:white;
+  animation:spin .7s linear infinite;
+  display:none;
+}
+
+/* ── Responsivo ───────────────────────────────────────────────── */
+@media(max-width:800px){
+  .auth-left { display:none; }
+  .auth-right { padding:32px 24px; }
+}
+@media(max-width:480px){
+  .auth-right { padding:24px 20px;align-items:flex-start;padding-top:40px; }
+}
