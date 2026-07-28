@@ -531,7 +531,6 @@
  <div class="dash-tabbar">
   <button class="dash-tab-btn active" id="dash-tab-btn-geral" onclick="_dashTabSwitch('geral')">Visão Geral</button>
   <button class="dash-tab-btn" id="dash-tab-btn-privadas" onclick="_dashTabSwitch('privadas')" style="display:flex;align-items:center;gap:5px"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg> Só para Mim</button>
-  <button class="dash-tab-btn" id="dash-tab-btn-decisoes" onclick="_dashTabSwitch('decisoes')">Histórico de Decisões</button>
  </div>
 
  <div id="dash-tab-geral">
@@ -614,6 +613,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)">
      <span style="font-size:12px;font-weight:700;color:var(--text)">Minhas Atividades</span>
      <div style="display:flex;align-items:center;gap:8px">
+      <button id="dash-feed-somente-eu" onclick="_dashToggleSomenteEu()" title="Mostrar só atividades onde você é o único responsável" style="font-size:10px;padding:3px 10px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-weight:600">Somente para mim</button>
       <span id="dash-feed-count" style="font-size:10px;color:var(--muted)"></span>
       <button onclick="_taskDrawerOpen()" style="font-size:10px;padding:3px 10px;background:var(--green);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">+ Nova</button>
      </div>
@@ -778,23 +778,6 @@
   </div>
  </div>
 
- <!-- ── Sub-aba: Histórico de Decisões ──────────────────────────── -->
- <div id="dash-tab-decisoes" style="display:none">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:14px">
-   <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Registrar nova decisão</div>
-   <div class="tf-r2" style="margin-bottom:10px">
-    <div>
-     <label class="tf-lbl">Atividade</label>
-     <select id="dec-ativ-select" class="tf-sel">
-      <option value="">Selecione uma atividade...</option>
-     </select>
-    </div>
-   </div>
-   <textarea id="dec-texto" class="tf-ta" placeholder="Descreva a decisão tomada e o motivo..." style="min-height:60px;margin-bottom:10px"></textarea>
-   <button class="btn btn-primary btn-sm" onclick="_decisaoAdd()">Registrar decisão</button>
-  </div>
-  <div id="dec-list" style="display:flex;flex-direction:column;gap:10px"></div>
- </div>
 
 </div>
 

@@ -2795,13 +2795,12 @@ function _projDrawerRender() {
 
 /* ── SUB-ABAS DO MEU PAINEL ───────────────────────────────────────────────── */
 function _dashTabSwitch(tab) {
- var btns  = { geral: document.getElementById('dash-tab-btn-geral'), privadas: document.getElementById('dash-tab-btn-privadas'), decisoes: document.getElementById('dash-tab-btn-decisoes') };
- var panes = { geral: document.getElementById('dash-tab-geral'), privadas: document.getElementById('dash-tab-privadas'), decisoes: document.getElementById('dash-tab-decisoes') };
+ var btns  = { geral: document.getElementById('dash-tab-btn-geral'), privadas: document.getElementById('dash-tab-btn-privadas') };
+ var panes = { geral: document.getElementById('dash-tab-geral'), privadas: document.getElementById('dash-tab-privadas') };
  Object.keys(btns).forEach(function(k) {
   if (btns[k]) btns[k].classList.toggle('active', k === tab);
   if (panes[k]) panes[k].style.display = (k === tab) ? '' : 'none';
  });
- if (tab === 'decisoes') _decisoesLoad();
  if (tab === 'privadas') _dashRenderPrivadas();
 }
 
@@ -2815,7 +2814,7 @@ async function _dashRenderPrivadas() {
   return;
  }
  var userEmail = _currentUser.email || '';
- var userName  = _currentUser.nome  || '';
+ var userName  = _currentUser.name  || '';
  // Busca atividades privadas onde o usuário é responsável
  var { data, error } = await _sb.from('atividades')
   .select('*')
@@ -2860,62 +2859,6 @@ async function _dashRenderPrivadas() {
    + '</div>'
    + '</div>';
  }).join('');
-}
-
-/* ── HISTÓRICO DE DECISÕES ────────────────────────────────────────────────── */
-function _decisoesPopularSelect() {
- var sel = document.getElementById('dec-ativ-select');
- if (!sel) return;
- var atividades = (_dashAllAtRaw || []).slice(0, 300);
- sel.innerHTML = '<option value="">Selecione uma atividade...</option>'
-  + atividades.map(function(a){ return '<option value="' + a.id + '">' + (a.titulo || '(sem título)').replace(/"/g,'&quot;') + '</option>'; }).join('');
-}
-
-async function _decisoesLoad() {
- var list = document.getElementById('dec-list');
- if (!list || !_sb) return;
- _decisoesPopularSelect();
- list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">Carregando...</div>';
- try {
-  var res = await _sb.from('atividades_decisoes')
-   .select('id, atividade_id, autor_nome, texto, created_at, atividades(titulo)')
-   .order('created_at', { ascending: false })
-   .limit(100);
-  if (res.error) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--red);font-size:12px">Erro ao carregar: ' + res.error.message + '</div>'; return; }
-  var rows = res.data || [];
-  if (!rows.length) { list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px">Nenhuma decisão registrada ainda.</div>'; return; }
-  list.innerHTML = rows.map(function(d) {
-   var dt = new Date(d.created_at);
-   var dtFmt = dt.toLocaleDateString('pt-BR') + ' às ' + dt.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
-   var nomeAtividade = (d.atividades && d.atividades.titulo) || 'Atividade removida';
-   return '<div class="dec-item">'
-    + '<div class="dec-item-ativ">' + nomeAtividade + '</div>'
-    + '<div class="dec-item-texto">' + (d.texto || '').replace(/</g,'&lt;') + '</div>'
-    + '<div class="dec-item-meta">' + (d.autor_nome || 'Sistema') + ' · ' + dtFmt + '</div>'
-    + '</div>';
-  }).join('');
- } catch(e) { list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--red);font-size:12px">Erro: ' + e.message + '</div>'; }
-}
-
-function _decisaoAdd() {
- var ativId = (document.getElementById('dec-ativ-select') || {}).value;
- var texto = ((document.getElementById('dec-texto') || {}).value || '').trim();
- if (!ativId) { _showToast('Selecione a atividade relacionada à decisão.', 'erro'); return; }
- if (!texto) { _showToast('Descreva a decisão.', 'erro'); return; }
- if (!_sb) return;
- var autorNome = localStorage.getItem('pp-name') || 'Usuário';
- _sb.from('atividades_decisoes').insert({
-  atividade_id: ativId,
-  autor_id: (_currentUser && _currentUser.id) || null,
-  autor_nome: autorNome,
-  texto: texto
- }).then(function(res) {
-  if (res.error) { _showToast('Erro ao registrar decisão: ' + _supaErrPt(res.error.message), 'erro'); return; }
-  document.getElementById('dec-texto').value = '';
-  document.getElementById('dec-ativ-select').value = '';
-  _showToast('Decisão registrada.', 'ok');
-  _decisoesLoad();
- });
 }
 
 function _projDrawerGoDetail(projId) {
@@ -3236,6 +3179,30 @@ function _dashRenderMelhorias(melhorias) {
 /* ── Globals para chart interativo ─────────────────────────────────────────── */
 var _dashSemanasRaw  = [];   // cache de atividades concluídas (12 meses)
 var _dashAllAtRaw    = [];   // cache de todas as atividades (para re-render Status)
+var _dashFeedRaw      = [];   // cache do feed antes do filtro "Somente para mim"
+var _dashSomenteEu    = localStorage.getItem('milatec-dash-somente-eu') === '1';
+
+// "Somente para mim" — dentro do feed (já restrito a atividades onde o usuário
+// é responsável), mantém só as que não são compartilhadas com mais ninguém.
+function _dashToggleSomenteEu() {
+ _dashSomenteEu = !_dashSomenteEu;
+ localStorage.setItem('milatec-dash-somente-eu', _dashSomenteEu ? '1' : '0');
+ var btn = document.getElementById('dash-feed-somente-eu');
+ if (btn) {
+  btn.style.background = _dashSomenteEu ? 'var(--navy)' : 'var(--surface2)';
+  btn.style.color = _dashSomenteEu ? '#fff' : 'var(--muted)';
+  btn.style.borderColor = _dashSomenteEu ? 'var(--navy)' : 'var(--border)';
+ }
+ _dashRenderFeed(_dashApplySomenteEu(_dashFeedRaw));
+}
+function _dashApplySomenteEu(atividades) {
+ if (!_dashSomenteEu) return atividades || [];
+ return (atividades || []).filter(function(a) {
+  var respRaw = (a.responsavel || '').trim();
+  var respList = respRaw ? respRaw.split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean) : [];
+  return respList.length <= 1;
+ });
+}
 var _dashChartCfg    = (function(){
  try { return JSON.parse(localStorage.getItem('milatec-chart-cfg') || '{}'); } catch(e) { return {}; }
 })();
@@ -3380,7 +3347,14 @@ async function _dashLoad() {
  // resto (KPIs, gráficos, alertas) falhar por algum motivo abaixo.
  try {
   await _dashEnrichVinculos(feedData || []);
-  _dashRenderFeed(feedData || []);
+  _dashFeedRaw = feedData || [];
+  var btnSe = document.getElementById('dash-feed-somente-eu');
+  if (btnSe) {
+   btnSe.style.background = _dashSomenteEu ? 'var(--navy)' : 'var(--surface2)';
+   btnSe.style.color = _dashSomenteEu ? '#fff' : 'var(--muted)';
+   btnSe.style.borderColor = _dashSomenteEu ? 'var(--navy)' : 'var(--border)';
+  }
+  _dashRenderFeed(_dashApplySomenteEu(_dashFeedRaw));
  } catch(errFeed) {
   console.error('[Dashboard] Erro ao renderizar feed:', errFeed);
  }
