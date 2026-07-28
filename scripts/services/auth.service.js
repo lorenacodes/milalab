@@ -268,7 +268,7 @@ async function _loginSubmit() {
   return;
  }
  _loginSuccess(r.data.user);
-};
+}
 
 // ── Esqueci minha senha (com loading state e alertas visuais) ─────────────────
 async function _forgotPwdSubmit() {
@@ -283,7 +283,7 @@ async function _forgotPwdSubmit() {
  if (res.error) { _authAlert('forgot-alert', _supaErrPt(res.error.message)); return; }
  _authAlert('forgot-ok','Link enviado! Verifique sua caixa de entrada. Válido por 1 hora.','ok');
  document.getElementById('forgot-btn').style.display = 'none';
-};
+}
 
 // ── Troca de senha (primeiro acesso / convite / reset / voluntária) ───────────
 async function _changePwdSubmit() {
@@ -330,7 +330,7 @@ async function _changePwdSubmit() {
 
  _authShow(''); // esconde tudo
  _loginSuccessOriginal(updateRes.data.user || _cpwdUser);
-};
+}
 
 // ── Indicador de força de senha (novos IDs de barra) ──────────────────────────
 function _cpwdStrength(val) {
@@ -357,5 +357,5 @@ function _cpwdStrength(val) {
  }).join('');}
  var inp=document.getElementById('cpwd-new');
  if(inp&&val.length>0){inp.className='auth-inp auth-inp-pwd'+(met>=3?' success':' error');}
-};
+}
 
