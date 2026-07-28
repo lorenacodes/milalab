@@ -828,6 +828,15 @@
 .gestor-search-box input::placeholder{color:var(--muted)}
 .gestor-sel{border:1px solid var(--border);border-radius:6px;padding:4px 8px;background:var(--surface2);color:var(--text);font-size:11px;outline:none;cursor:pointer;font-family:inherit;height:30px}
 .gestor-sel.active{border-color:var(--navy);color:var(--navy)}
+/* Filtro multi-select (dropdown de checkboxes) — usado por status/área/tipo/obra/melhoria/responsável */
+.gestor-msel{position:relative;display:inline-block}
+.gestor-msel-count{display:inline-block;min-width:14px;padding:0 3px;margin-left:4px;border-radius:8px;background:var(--navy);color:#fff;font-size:9px;font-weight:700;line-height:14px;text-align:center}
+.gestor-msel-panel{position:absolute;top:calc(100% + 4px);left:0;z-index:40;min-width:180px;max-height:260px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:6px}
+.gestor-msel-panel label{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;font-size:12px;color:var(--text);cursor:pointer;white-space:nowrap}
+.gestor-msel-panel label:hover{background:var(--surface2)}
+.gestor-msel-panel input[type="checkbox"]{margin:0;cursor:pointer}
+.gestor-msel-clear{width:100%;text-align:center;font-size:10px;color:var(--muted);background:none;border:none;border-top:1px solid var(--border);margin-top:4px;padding-top:6px;cursor:pointer}
+.gestor-msel-clear:hover{color:var(--text)}
 /* Stats summary bar */
 .gestor-stats-bar{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
 .gestor-stat-pill{flex:1;padding:8px 14px;border-right:1px solid var(--border);text-align:center;cursor:default}
