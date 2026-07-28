@@ -4241,46 +4241,6 @@ function _ccTab(tab, btn) {
  _commTab(t, newBtn || btn);
 }
 
-/* EMPRESAS & CONTATOS */
-
-/* --- Estado dos filtros --- */
-var _empCampos = {
- 'nome': { label: 'Empresa', type: 'text' },
- 'setor': { label: 'Setor', type: 'select', opts: ['Construtoras','Incorporadoras','Indústria','Governo','Arquitetura'] },
- 'tipo': { label: 'Tipo', type: 'select', opts: ['Cliente','Parceiro','Fornecedor','Lead'] },
- 'fase': { label: 'Fase', type: 'select', opts: ['Prospect','Qualificado','Proposta','Negociação','Fechado'] },
- 'cidade': { label: 'Cidade', type: 'text' },
- 'estado': { label: 'Estado', type: 'select', opts: ['SP','DF','GO','MG','PR','RJ'] }
-};
-var _cttCampos = {
- 'nome': { label: 'Nome', type: 'text' },
- 'cargo': { label: 'Cargo', type: 'text' },
- 'perfil': { label: 'Perfil', type: 'select', opts: ['Decisor','Técnico','Financeiro','Operacional'] },
- 'empresa': { label: 'Empresa', type: 'text' }
-};
-var _empCttOps = {
- 'select': [
- { val: 'contains', label: 'contém...' },
- { val: 'not_contains', label: 'não contém...' },
- { val: 'is', label: 'é...' },
- { val: 'is_not', label: 'não é...' },
- { val: 'is_empty', label: 'está vazio' },
- { val: 'is_not_empty', label: 'não está vazio' }
- ],
- 'text': [
- { val: 'contains', label: 'contém...' },
- { val: 'not_contains', label: 'não contém...' },
- { val: 'is', label: 'é...' },
- { val: 'is_not', label: 'não é...' },
- { val: 'is_empty', label: 'está vazio' },
- { val: 'is_not_empty', label: 'não está vazio' }
- ]
-};
-var _empConditions = []; var _empCondId = 0;
-var _cttConditions = []; var _cttCondId = 0;
-var _empPanelOpen = false; var _cttPanelOpen = false;
-
-/* --- Tab switch --- */
 
 function _dashUpdateKPIsFromDB(atividades) {
  if(!atividades) return;
