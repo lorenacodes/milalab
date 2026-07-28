@@ -10,3 +10,7 @@ function _showToast(msg, tipo) {
  document.body.appendChild(t);
  setTimeout(function(){ t.style.opacity = '0'; setTimeout(function(){ t.remove(); }, 380); }, 2600);
 }
+
+function _badge(cls, txt) {
+ return `<span class="badge ${cls}">${txt}</span>`;
+}
