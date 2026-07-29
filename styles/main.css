@@ -72,24 +72,32 @@ body.light .dash-panel{
 }
  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
  h1,h2,h3,h4,.modal-title,.kpi-val,.gestor-hd-title{font-family:'Sora',sans-serif;font-weight:700;letter-spacing:-.2px}
- /* SIDEBAR */
- .sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:10;overflow-y:auto;transition:width .22s cubic-bezier(.4,0,.2,1)}
+ /* SIDEBAR — MilaLab Design System: painel permanentemente escuro (indigo-900),
+    igual nos dois temas do app (claro/escuro só trocam o conteúdo principal,
+    a marca na lateral não muda). */
+ .sidebar{width:var(--sidebar-w);background:#141838;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:10;overflow-y:auto;transition:width .22s cubic-bezier(.4,0,.2,1)}
  .sidebar.collapsed{width:0!important;border-right:none;overflow:hidden}
  /* Handle fora do sidebar para não ser bloqueado pelo scrollbar */
  .sidebar-resize{position:fixed;top:0;left:var(--sidebar-w);width:8px;height:100vh;cursor:col-resize;z-index:20;transform:translateX(-4px);background:transparent;transition:background .12s}
  .sidebar-resize:hover,.sidebar-resize.dragging{background:var(--navy);opacity:.25}
  .sidebar-toggle{width:30px;height:30px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;color:var(--muted)}
  .sidebar-toggle:hover{border-color:var(--navy);color:var(--navy);background:var(--blue-dim)}
- .sb-logo{padding:18px 16px;border-bottom:1px solid var(--border)}
- .sb-nav{flex:1;padding:6px 0}
- .nav-sec{padding:14px 16px 4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600}
- .nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;color:var(--muted);cursor:pointer;transition:all .15s;font-size:13px;border-left:2px solid transparent;user-select:none}
- .nav-item:hover{color:var(--text);background:var(--surface2)}
- .nav-item.active{color:var(--navy);background:var(--navy-dim);border-left-color:transparent;font-weight:500;position:relative}
- .nav-item.active::before{content:'';position:absolute;left:-2px;top:0;bottom:0;width:2px;background:var(--silver-line,var(--navy))}
- .nav-badge{margin-left:auto;background:var(--surface2);color:var(--muted);font-size:10px;padding:1px 6px;border-radius:var(--r-lg);border:1px solid var(--border)}
- .nav-item.active .nav-badge{background:var(--navy-dim);color:var(--navy);border-color:transparent}
- .sb-user{padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px}
+ .sb-logo{padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
+ .sb-theme-btn{display:flex;align-items:center;justify-content:center;gap:8px;margin:14px 16px 4px;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-md);color:rgba(246,247,248,.85);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:background .15s}
+ .sb-theme-btn:hover{background:rgba(255,255,255,.1)}
+ .sb-nav{flex:1;padding:6px 8px}
+ .nav-sec{padding:16px 8px 6px;font-size:10px;color:rgba(198,201,224,.5);text-transform:uppercase;letter-spacing:.8px;font-weight:700}
+ .nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;color:rgba(246,247,248,.62);cursor:pointer;transition:all .15s;font-size:13px;border-radius:var(--r-md);user-select:none;position:relative}
+ .nav-item:hover{color:#fff;background:rgba(255,255,255,.06)}
+ .nav-item.active{color:#fff;background:rgba(255,255,255,.07);font-weight:500}
+ .nav-item.active::before{content:'';position:absolute;left:-8px;top:2px;bottom:2px;width:2px;background:var(--silver-line)}
+ .nav-badge{margin-left:auto;background:rgba(255,255,255,.08);color:rgba(246,247,248,.7);font-size:10px;padding:1px 6px;border-radius:var(--r-lg);border:1px solid rgba(255,255,255,.08)}
+ .nav-item.active .nav-badge{background:rgba(255,255,255,.12);color:#fff;border-color:transparent}
+ .nav-icon{color:currentColor}
+ .sb-user{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:8px;color:#fff}
+ .sb-user #sb-name{color:#F6F7F8!important}
+ .sb-user #sb-cargo{color:rgba(198,201,224,.6)!important}
+ .sb-user-chevron{color:rgba(198,201,224,.6)}
  .avatar{width:30px;height:30px;background:var(--silver-grad);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--silver-ink);overflow:hidden;position:relative;flex-shrink:0}
  .avatar img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:50%}
  /* MAIN */
