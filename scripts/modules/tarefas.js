@@ -668,9 +668,9 @@ function _gestorRenderRow(a, rowNum, hoje) {
  }).join('');
  if (respArr.length > 2) respHtml += '<span style="font-size:9px;color:var(--muted)">+' + (respArr.length-2) + '</span>';
 
- // Prioridade
- var prioColors = { 'Alta':'#D6433C','Média':'#B8790A','Baixa':'#7D8199' };
- var prioClr = prioColors[a.prioridade] || '#9ca3af';
+ // Prioridade — mesma decisão de sempre (Alta/Média/Baixa), só a classe de cor mudou
+ var prioClasses = { 'Alta':'tag-priority-high','Média':'tag-priority-med','Baixa':'tag-priority-low' };
+ var prioCls = prioClasses[a.prioridade] || '';
 
  // Data início formatada
  var inicioHtml = '';
@@ -728,7 +728,7 @@ function _gestorRenderRow(a, rowNum, hoje) {
   + '<td><span class="gs-badge ' + (late ? 'gs-atrasado' : sc.cls) + '">' + statusLbl + '</span></td>'
   + '<td>' + prazoHtml + '</td>'
   + '<td>' + inicioHtml + '</td>'
-  + '<td><span style="font-size:10px;font-weight:700;color:' + prioClr + '">' + (a.prioridade || '—') + '</span></td>'
+  + '<td>' + (a.prioridade ? '<span class="' + prioCls + '">' + a.prioridade + '</span>' : '<span style="color:var(--border)">—</span>') + '</td>'
   + '<td>' + (a.area ? '<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:' + _setorCor(a.area) + '22;color:' + _setorCor(a.area) + '">' + a.area + '</span>' : '<span style="color:var(--border)">—</span>') + '</td>'
   + '<td>' + (tipoNome ? '<span style="font-size:10px;font-weight:600;color:var(--text)">' + tipoNome + '</span>' : '<span style="color:var(--border)">—</span>') + '</td>'
   + '</tr>';
@@ -989,7 +989,7 @@ function _gestorTimelineTip(evt, id) {
   '<div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--text);max-width:220px;word-break:break-word">' + (a.titulo||'—') + '</div>'
   + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
   + '<span class="gs-badge ' + sc.cls + '">' + (late?'Atrasado':a.status) + '</span>'
-  + (a.prioridade ? '<span style="font-size:10px;font-weight:700;color:' + ({'Alta':'#D6433C','Média':'#B8790A','Baixa':'#7D8199'}[a.prioridade]||'#7D8199') + '">' + a.prioridade + '</span>' : '')
+  + (a.prioridade ? '<span class="' + ({'Alta':'tag-priority-high','Média':'tag-priority-med','Baixa':'tag-priority-low'}[a.prioridade]||'') + '">' + a.prioridade + '</span>' : '')
   + '</div>'
   + '<div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;margin-bottom:6px">'
   + '<span style="color:var(--muted)">Início</span><b>' + inicio + '</b>'

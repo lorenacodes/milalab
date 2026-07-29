@@ -25,8 +25,53 @@
  }
  body.light tr:hover td{background:rgba(0,0,0,0.03)}
  *{box-sizing:border-box;margin:0;padding:0}
+
+/* ── Vidro sutil (frosted) — cards/painéis do "Meu Painel" e do Kanban de
+   Obras, MilaLab Design System, passo 4. O documento usa vidro branco
+   (rgba(255,255,255,.7)) pensando num fundo claro; no tema escuro (preto
+   puro, decisão já tomada antes) um vidro branco deixaria o texto claro
+   ilegível — por isso a versão escura usa o mesmo princípio (translúcido +
+   blur) tingido de --surface em vez de branco. A versão clara segue o
+   documento à risca. ── */
+.page-bg{
+  background:
+    radial-gradient(circle at 15% 0%, rgba(61,79,209,.06) 0%, transparent 45%),
+    radial-gradient(circle at 90% 100%, rgba(63,191,180,.06) 0%, transparent 45%),
+    var(--bg);
+}
+.frosted-card{
+  background: rgba(20,22,30,.66);
+  -webkit-backdrop-filter: blur(6px) saturate(1.1);
+  backdrop-filter: blur(6px) saturate(1.1);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+}
+body.light .frosted-card{
+  background: rgba(255,255,255,.7);
+  border-color: rgba(255,255,255,.6);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .frosted-card{ background: var(--surface); }
+}
+/* Painéis do "Meu Painel" (Minhas Atividades, Meus Projetos, gráficos, Saúde
+   das Atividades, Central de Comunicação) — mesmo tratamento de vidro. */
+.dash-panel{
+  background: rgba(20,22,30,.66);
+  -webkit-backdrop-filter: blur(6px) saturate(1.1);
+  backdrop-filter: blur(6px) saturate(1.1);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: var(--r-lg);
+}
+body.light .dash-panel{
+  background: rgba(255,255,255,.7);
+  border-color: rgba(255,255,255,.6);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dash-panel{ background: var(--surface); }
+}
  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
- h1,h2,h3,.modal-title,.kpi-val,.gestor-hd-title{font-family:'Sora',sans-serif;font-weight:700;letter-spacing:-.2px}
+ h1,h2,h3,h4,.modal-title,.kpi-val,.gestor-hd-title{font-family:'Sora',sans-serif;font-weight:700;letter-spacing:-.2px}
  /* SIDEBAR */
  .sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:10;overflow-y:auto;transition:width .22s cubic-bezier(.4,0,.2,1)}
  .sidebar.collapsed{width:0!important;border-right:none;overflow:hidden}
@@ -55,6 +100,7 @@
  .breadcrumb span{color:var(--text);font-weight:500}
  .topbar-right{margin-left:auto;display:flex;gap:8px}
  .page{display:none!important;padding:24px;flex:1}.page.active{display:block!important}.page.active.page-flex{display:flex!important}
+ .page.active{background:radial-gradient(circle at 15% 0%, rgba(61,79,209,.06) 0%, transparent 45%),radial-gradient(circle at 90% 100%, rgba(63,191,180,.06) 0%, transparent 45%),var(--bg)}
  /* BUTTONS */
  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r-sm);font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;font-family:inherit;white-space:nowrap}
  .btn-primary{background:var(--navy);color:#fff}.btn-primary:hover{filter:brightness(.88)}
@@ -144,7 +190,8 @@
  .kc-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
  .kc-count{font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1px 7px}
  .kc-dot{width:7px;height:7px;border-radius:50%;margin-right:5px;display:inline-block;flex-shrink:0}
- .obra-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,opacity .15s;position:relative}
+ .obra-card{background:rgba(20,22,30,.66);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-sm);padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,opacity .15s;position:relative}
+ body.light .obra-card{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.6)}
  .obra-card:hover{border-color:var(--green)}
  .obra-card:last-child{margin-bottom:0}
  .obra-card.dragging{opacity:.4}
@@ -279,7 +326,8 @@
  .dash-tab-btn.active{color:var(--navy);border-bottom-color:var(--navy)}
  
 /* ── KPI CARDS — estilo Linear/Stripe: zero decoração, número é o único herói */
-.dash-kpi-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
+.dash-kpi-card{background:rgba(20,22,30,.66);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-sm);padding:12px 14px;cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
+body.light .dash-kpi-card{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.6)}
 .dash-kpi-card:hover{background:var(--surface);border-color:rgba(139,148,158,.4)}
 .dash-kpi-card:active{opacity:.85}
 .dash-kpi-card .kpi-header{margin-bottom:8px}
@@ -645,11 +693,28 @@
 .gestor-kpi-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
 /* Status badges */
 .gs-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:var(--r-sm);font-size:10px;font-weight:700;white-space:nowrap}
-.gs-afazer  {background:rgba(139,148,158,.14);color:#6b7280}
-.gs-progresso{background:rgba(59,130,246,.14);color:#2563eb}
-.gs-feito   {background:rgba(40,181,72,.14);color:#16a34a}
-.gs-atrasado{background:rgba(207,34,46,.14);color:#dc2626}
-.gs-bloqueado{background:rgba(180,83,9,.14);color:#b45309}
+.gs-afazer  {background:var(--gray-100);color:var(--gray-600)}
+.gs-progresso{background:#E9EEFC;color:#2E5FD9}
+.gs-feito   {background:#E6F5EB;color:#1F8A4C}
+.gs-atrasado{background:#FCEAE8;color:#D6433C}
+.gs-bloqueado{background:#FDF0DA;color:#B8790A}
+body:not(.light) .gs-afazer{background:rgba(125,129,153,.16);color:var(--gray-400)}
+body:not(.light) .gs-progresso{background:rgba(46,95,217,.20);color:#AFC6FB}
+body:not(.light) .gs-feito{background:rgba(31,138,76,.20);color:#8FE3B4}
+body:not(.light) .gs-atrasado{background:rgba(214,67,60,.20);color:#F5A39D}
+body:not(.light) .gs-bloqueado{background:rgba(184,121,10,.20);color:#F3C978}
+
+/* ── Tags de prioridade e status — MilaLab Design System, passo 5.
+   Aplicadas nas mesmas tags que já existem (Alta/Média/Baixa, Em progresso);
+   a lógica que decide qual prioridade/status usar não muda, só a cor. ── */
+.tag-priority-high{background:#FCEAE8;color:#D6433C;padding:2px 8px;border-radius:var(--r-full);font-weight:700;font-size:10px;white-space:nowrap}
+.tag-priority-med{background:#FDF0DA;color:#B8790A;padding:2px 8px;border-radius:var(--r-full);font-weight:700;font-size:10px;white-space:nowrap}
+.tag-priority-low{background:#E6F5EB;color:#1F8A4C;padding:2px 8px;border-radius:var(--r-full);font-weight:700;font-size:10px;white-space:nowrap}
+.tag-status-info{background:#E9EEFC;color:#2E5FD9;padding:2px 8px;border-radius:var(--r-full);font-weight:700;font-size:10px;white-space:nowrap}
+body:not(.light) .tag-priority-high{background:rgba(214,67,60,.20);color:#F5A39D}
+body:not(.light) .tag-priority-med{background:rgba(184,121,10,.20);color:#F3C978}
+body:not(.light) .tag-priority-low{background:rgba(31,138,76,.20);color:#8FE3B4}
+body:not(.light) .tag-status-info{background:rgba(46,95,217,.20);color:#AFC6FB}
 /* hist-fab (original, não mover) */
  .hist-fab{position:fixed;bottom:24px;right:24px;z-index:110;display:flex;align-items:center;gap:7px;padding:9px 16px 9px 12px;background:var(--navy);border:none;border-radius:var(--r-full);font-size:12px;font-weight:600;color:#fff;cursor:pointer;box-shadow:0 4px 16px rgba(5,8,102,.35);transition:box-shadow .14s,transform .14s;user-select:none}
  .hist-fab:hover{box-shadow:0 6px 24px rgba(5,8,102,.48);transform:translateY(-1px)}

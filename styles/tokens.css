@@ -9,6 +9,14 @@
   --indigo-500:#5768E0; --indigo-100:#EBEDFB;
   --violet-500:#8B6FE8; --teal-400:#3FBFB4;
 
+  /* neutros do documento (utilitários — o app usa --bg/--surface/--text
+     próprios para preservar o preto puro do tema escuro; estes ficam
+     disponíveis para badges/tags/textos que quiserem a escala exata) */
+  --white:#FFFFFF;
+  --gray-25:#FAFAFC; --gray-50:#F5F6F9; --gray-100:#EDEEF3; --gray-200:#E2E4EC;
+  --gray-300:#CBCEDB; --gray-400:#A7ABBD; --gray-500:#7D8199; --gray-600:#5B5F73;
+  --gray-700:#3F4256; --gray-800:#282A3A; --gray-900:#15161F;
+
   /* prata (uso estratégico, ver seção 6 do Design System) */
   --silver-grad:linear-gradient(135deg,#EDEFF3 0%,#C9CDD8 28%,#F5F6F8 50%,#B9BEC9 72%,#E7E9ED 100%);
   --silver-line:linear-gradient(90deg, transparent, #C9CDD8, #F5F6F8, #C9CDD8, transparent);
