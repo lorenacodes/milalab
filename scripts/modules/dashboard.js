@@ -112,8 +112,8 @@ function _dashBuildAlertsFromDB(allAt) {
  var alertas = [];
 
  // Alertas de prazo (vindos dos KPIs já calculados)
- if (atrCount > 0) alertas.push({ tipo:'atr', cor:'#ef4444', msg: atrCount + ' atividade' + (atrCount > 1 ? 's' : '') + ' com prazo vencido', id: null, acao: function(){ _kpiDrawerOpen('atr'); } });
- if (hojeCount > 0) alertas.push({ tipo:'hoje', cor:'#f59e0b', msg: hojeCount + ' atividade' + (hojeCount > 1 ? 's' : '') + ' vence' + (hojeCount > 1 ? 'm' : '') + ' hoje', id: null, acao: function(){ _kpiDrawerOpen('hoje'); } });
+ if (atrCount > 0) alertas.push({ tipo:'atr', cor:'#D6433C', msg: atrCount + ' atividade' + (atrCount > 1 ? 's' : '') + ' com prazo vencido', id: null, acao: function(){ _kpiDrawerOpen('atr'); } });
+ if (hojeCount > 0) alertas.push({ tipo:'hoje', cor:'#B8790A', msg: hojeCount + ' atividade' + (hojeCount > 1 ? 's' : '') + ' vence' + (hojeCount > 1 ? 'm' : '') + ' hoje', id: null, acao: function(){ _kpiDrawerOpen('hoje'); } });
 
  // Alertas comportamentais por tarefa
  (allAt || []).forEach(function(t) {
@@ -124,12 +124,12 @@ function _dashBuildAlertsFromDB(allAt) {
   var prazo  = t.data_prazo ? new Date(t.data_prazo + 'T00:00:00').getTime() : null;
 
   if (prazo && prazo < hoje.getTime() && (stNorm === 'em andamento' || stNorm === 'em progresso')) {
-   alertas.push({ tipo:'inconsistente', cor:'#ef4444', msg: titulo + ' — prazo vencido e ainda em andamento', id: t.id });
+   alertas.push({ tipo:'inconsistente', cor:'#D6433C', msg: titulo + ' — prazo vencido e ainda em andamento', id: t.id });
    return;
   }
   var updAt = t.updated_at ? new Date(t.updated_at).getTime() : null;
   if (updAt && Math.floor((agora - updAt) / DIA) >= 15) {
-   alertas.push({ tipo:'sem-atualizacao', cor:'#f59e0b', msg: titulo + ' — sem atualização há ' + Math.floor((agora - updAt) / DIA) + ' dias', id: t.id });
+   alertas.push({ tipo:'sem-atualizacao', cor:'#B8790A', msg: titulo + ' — sem atualização há ' + Math.floor((agora - updAt) / DIA) + ' dias', id: t.id });
    return;
   }
   var criado = t.created_at ? new Date(t.created_at).getTime() : null;
@@ -157,7 +157,7 @@ function _dashBuildAlertsFromDB(allAt) {
   if (total > 0) {
    badge.style.display = 'flex';
    badge.textContent = total > 9 ? '9+' : String(total);
-   if (bellBtn) bellBtn.style.borderColor = '#ef4444';
+   if (bellBtn) bellBtn.style.borderColor = '#D6433C';
   } else {
    badge.style.display = 'none';
    if (bellBtn) bellBtn.style.borderColor = '';
@@ -291,7 +291,7 @@ function _remStartRealtime() {
 
 // ── Render de card ────────────────────────────────────────────────────────
 function _remAvatarColor(name) {
- var colors = ['#1B1B8F','#28B548','#e07b00','#8957E5','#1f7ec4','#c44b1f'];
+ var colors = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f'];
  var i = 0;
  if (name) for (var j = 0; j < name.length; j++) i += name.charCodeAt(j);
  return colors[i % colors.length];
@@ -1391,9 +1391,9 @@ function _drwAutoStatusFromSubs() {
    banner = document.createElement('div');
    banner.id = 'drw-sub-conclusao-banner';
    banner.style.cssText = 'background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);border-radius:7px;padding:8px 12px;font-size:11px;color:var(--text);display:flex;align-items:center;gap:10px;margin-bottom:6px';
-   banner.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>'
+   banner.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1F8A4C" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>'
     + '<span style="flex:1">Todas as subtarefas concluídas. Marcar a atividade como <strong>Feita</strong>?</span>'
-    + '<button onclick="_drwConfirmarConclusao()" style="font-size:10px;padding:3px 10px;background:#22c55e;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">Confirmar</button>'
+    + '<button onclick="_drwConfirmarConclusao()" style="font-size:10px;padding:3px 10px;background:#1F8A4C;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">Confirmar</button>'
     + '<button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:0 2px">&times;</button>';
    var subList = document.getElementById('drw-sub-list');
    if (subList && subList.parentNode) subList.parentNode.insertBefore(banner, subList);
@@ -2240,8 +2240,8 @@ async function _dashRenderPrivadas() {
   var d = new Date(s + 'T00:00:00');
   if (isNaN(d)) return null;
   var dd = d.getDate() + '/' + (d.getMonth()+1) + '/' + String(d.getFullYear()).slice(2);
-  if (d < hoje) return { txt: 'ATRASADA · ' + dd, clr: '#ef4444', bg: 'rgba(239,68,68,.08)' };
-  if (d.toDateString() === hoje.toDateString()) return { txt: 'HOJE · ' + dd, clr: '#f59e0b', bg: 'rgba(245,158,11,.08)' };
+  if (d < hoje) return { txt: 'ATRASADA · ' + dd, clr: '#D6433C', bg: 'rgba(239,68,68,.08)' };
+  if (d.toDateString() === hoje.toDateString()) return { txt: 'HOJE · ' + dd, clr: '#B8790A', bg: 'rgba(245,158,11,.08)' };
   return { txt: 'Prazo: ' + dd, clr: 'var(--muted)', bg: '' };
  }
  list.innerHTML = ativs.map(function(a) {
@@ -2432,8 +2432,8 @@ function _dashRenderFeed(atividades) {
   if (!s) return null;
   var d = new Date(s + 'T00:00:00');
   if (isNaN(d)) return null;
-  if (d < hoje) return { label: 'ATRASADA · ' + fmtDate(s), clr: '#ef4444', bg: 'rgba(239,68,68,.1)', bold: true };
-  if (d.toDateString() === hoje.toDateString()) return { label: 'HOJE · ' + fmtDate(s), clr: '#f59e0b', bg: 'rgba(245,158,11,.1)', bold: true };
+  if (d < hoje) return { label: 'ATRASADA · ' + fmtDate(s), clr: '#D6433C', bg: 'rgba(239,68,68,.1)', bold: true };
+  if (d.toDateString() === hoje.toDateString()) return { label: 'HOJE · ' + fmtDate(s), clr: '#B8790A', bg: 'rgba(245,158,11,.1)', bold: true };
   return { label: fmtDate(s), clr: 'var(--muted)', bg: '', bold: false };
  }
 
@@ -3004,7 +3004,7 @@ function _dashRenderChartSemanas(dados) {
  var _tSumA = buckets.slice(0, _tmid).reduce(function(s,b){ return s + b.count; }, 0);
  var _tSumB = buckets.slice(_tmid).reduce(function(s,b){ return s + b.count; }, 0);
  var trendDir   = (_tSumB > _tSumA) ? 'up' : (_tSumB < _tSumA) ? 'down' : 'neutral';
- var trendColor = trendDir === 'up' ? '#28b548' : trendDir === 'down' ? '#cf222e' : '#6366f1';
+ var trendColor = trendDir === 'up' ? '#1F8A4C' : trendDir === 'down' ? '#cf222e' : '#6366f1';
 
  // ── MODO LINHA ────────────────────────────────────────────────────────────
  if (tipo === 'line') {
@@ -3065,8 +3065,8 @@ function _dashRenderChartSemanas(dados) {
    if (pt.count === 0 && !isLast) return ''; // omite zeros (exceto último)
    var isPeak = pt.isMax && pt.count > 0;
    var dotSz  = isPeak ? 8 : isLast ? 7 : 5;
-   var dotClr = isPeak ? '#28b548' : isLast ? 'var(--navy)' : '#6366f1';
-   var lblClr = isPeak ? '#28b548' : 'var(--navy)';
+   var dotClr = isPeak ? '#1F8A4C' : isLast ? 'var(--navy)' : '#6366f1';
+   var lblClr = isPeak ? '#1F8A4C' : 'var(--navy)';
    var showLbl = pt.count > 0 && (isPeak || isLast || n <= 7);
    var dot = '<div style="position:absolute;left:' + pt.x + '%;top:' + pt.y + '%;transform:translate(-50%,-50%);'
     + 'width:' + dotSz + 'px;height:' + dotSz + 'px;border-radius:50%;'
@@ -3204,7 +3204,7 @@ function _dashRenderChartSemanas(dados) {
   var trendPct = sumFirst > 0 ? Math.round(((sumSecond - sumFirst) / sumFirst) * 100) : 0;
   // Reutiliza trendDir calculado no início (ou recalcula para o footer)
   var tFDir = sumSecond > sumFirst ? 'up' : sumSecond < sumFirst ? 'down' : 'neutral';
-  var tFClr = tFDir === 'up' ? '#28b548' : tFDir === 'down' ? '#cf222e' : '#8b949e';
+  var tFClr = tFDir === 'up' ? '#1F8A4C' : tFDir === 'down' ? '#cf222e' : '#8b949e';
   var tFBg  = tFDir === 'up' ? 'rgba(40,181,72,.12)' : tFDir === 'down' ? 'rgba(207,34,46,.1)' : 'var(--surface2)';
   var tFBrd = tFDir === 'up' ? 'rgba(40,181,72,.3)'  : tFDir === 'down' ? 'rgba(207,34,46,.25)' : 'var(--border)';
   var tFWord= tFDir === 'up' ? 'Crescimento' : tFDir === 'down' ? 'Queda' : 'Estável';
@@ -3330,7 +3330,7 @@ function _dashRenderChartStatus(dados) {
 
  // Itens do donut (excluindo zeros)
  var items = [
-  { label: 'Concluídas',   count: cats.concluidas, hex: '#28b548', cssVar: 'var(--green)' },
+  { label: 'Concluídas',   count: cats.concluidas, hex: '#1F8A4C', cssVar: 'var(--green)' },
   { label: 'Em andamento', count: cats.andamento,  hex: '#050866', cssVar: 'var(--navy)'  },
   { label: 'A fazer',      count: cats.afazer,     hex: '#8b949e', cssVar: 'var(--muted)' },
   { label: 'Atrasadas',    count: cats.atrasadas,  hex: '#cf222e', cssVar: 'var(--red)'   },
@@ -3467,8 +3467,8 @@ function _dashRenderChartStatus(dados) {
 
  var vencHtml = '<hr class="hp-divider">'
   + '<div class="hp-section-lbl">Próximos Vencimentos</div>'
-  + _hpRow('#ef4444', 'Vencem hoje', vencemHoje, 'hoje', vencemHoje > 0)
-  + _hpRow('#f59e0b', 'Vencem esta semana', vencemSemana, 'prox7', vencemSemana > 0);
+  + _hpRow('#D6433C', 'Vencem hoje', vencemHoje, 'hoje', vencemHoje > 0)
+  + _hpRow('#B8790A', 'Vencem esta semana', vencemSemana, 'prox7', vencemSemana > 0);
 
  var alertasHtml = '<hr class="hp-divider">'
   + '<div class="hp-section-lbl">Alertas</div>'
@@ -3477,7 +3477,7 @@ function _dashRenderChartStatus(dados) {
 
  // ── Seção: Execução ──────────────────────────────────────────────────────
  var pctBar = Math.min(100, pctDone);
- var barColor = pctDone >= 75 ? '#28b548' : pctDone >= 50 ? '#050866' : '#b45309';
+ var barColor = pctDone >= 75 ? '#1F8A4C' : pctDone >= 50 ? '#050866' : '#b45309';
 
  var execHtml = '<hr class="hp-divider">'
   + '<div class="hp-section-lbl">Execução do Período</div>'
@@ -3489,7 +3489,7 @@ function _dashRenderChartStatus(dados) {
   + '</div>'
   + '</div>'
   + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
-  + '<span style="font-size:10px;color:var(--muted)"><span style="font-weight:700;color:#28b548">' + cats.concluidas + '</span> concluídas</span>'
+  + '<span style="font-size:10px;color:var(--muted)"><span style="font-weight:700;color:#1F8A4C">' + cats.concluidas + '</span> concluídas</span>'
   + '<span style="font-size:10px;color:var(--muted)"><span style="font-weight:700;color:#8b949e">' + (cats.afazer + cats.andamento) + '</span> abertas</span>'
   + (cats.atrasadas > 0 ? '<span style="font-size:10px;color:var(--muted)"><span style="font-weight:700;color:#cf222e">' + cats.atrasadas + '</span> atrasadas</span>' : '')
   + '<span onclick="_kpiDrawerOpen(\'abertas\')" style="font-size:10px;color:var(--navy);cursor:pointer;text-decoration:underline;text-underline-offset:2px;margin-left:auto">ver todas</span>'
@@ -3695,7 +3695,7 @@ function _kpiDrawerRender(filter) {
   return dA - dB;
  });
 
- var priorClr = { 'Alta':'#ef4444', 'Média':'#f59e0b', 'Baixa':'var(--muted)' };
+ var priorClr = { 'Alta':'var(--red)', 'Média':'var(--yellow)', 'Baixa':'var(--muted)' };
  var statusClr = { 'Feito':'var(--green)', 'Concluído':'var(--green)', 'Em progresso':'var(--navy)', 'A fazer':'var(--muted)' };
 
  body.innerHTML = filtered.map(function(a) {
@@ -3704,8 +3704,8 @@ function _kpiDrawerRender(filter) {
   if (dp) {
    var d = new Date(dp+'T00:00:00');
    var diff = Math.floor((d - hoje) / 86400000);
-   if (diff < 0)     prazoStr = '<span style="color:#ef4444;font-weight:600">' + Math.abs(diff) + 'd atraso</span>';
-   else if (diff===0) prazoStr = '<span style="color:#f59e0b;font-weight:600">Hoje</span>';
+   if (diff < 0)     prazoStr = '<span style="color:#D6433C;font-weight:600">' + Math.abs(diff) + 'd atraso</span>';
+   else if (diff===0) prazoStr = '<span style="color:#B8790A;font-weight:600">Hoje</span>';
    else               prazoStr = '<span style="color:var(--muted)">Em ' + diff + 'd</span>';
   }
   var dotColor = priorClr[a.prioridade] || 'var(--muted)';

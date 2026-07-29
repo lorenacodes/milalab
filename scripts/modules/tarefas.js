@@ -71,11 +71,11 @@ function _gestorToggleWeek(key) { _gestorWeekExpanded[key]=!_gestorWeekExpanded[
 // ── Cores por status ─────────────────────────────────────────────────────────
 var _gStatusStyle = {
  'A fazer':           { cls:'gs-afazer',   dot:'#9ca3af' },
- 'Em progresso':      { cls:'gs-progresso', dot:'#3b82f6' },
- 'Em andamento':      { cls:'gs-progresso', dot:'#3b82f6' },
- 'Feito':             { cls:'gs-feito',    dot:'#28b548' },
- 'Concluído':         { cls:'gs-feito',    dot:'#28b548' },
- 'Concluida':         { cls:'gs-feito',    dot:'#28b548' },
+ 'Em progresso':      { cls:'gs-progresso', dot:'#2E5FD9' },
+ 'Em andamento':      { cls:'gs-progresso', dot:'#2E5FD9' },
+ 'Feito':             { cls:'gs-feito',    dot:'#1F8A4C' },
+ 'Concluído':         { cls:'gs-feito',    dot:'#1F8A4C' },
+ 'Concluida':         { cls:'gs-feito',    dot:'#1F8A4C' },
  'Bloqueado':         { cls:'gs-bloqueado',dot:'#b45309' },
  'Bloqueada':         { cls:'gs-bloqueado',dot:'#b45309' },
  'Impedida':          { cls:'gs-bloqueado',dot:'#b45309' },
@@ -433,10 +433,10 @@ function _gestorApplyFilters() {
 
 // ── Troca de aba ──────────────────────────────────────────────────────────
 var _SETOR_CORES = {
- 'Projetos':   '#3b82f6',
- 'Comercial':  '#22c55e',
+ 'Projetos':   '#2E5FD9',
+ 'Comercial':  '#1F8A4C',
  'TI':         '#8957e5',
- 'Produção':   '#f59e0b',
+ 'Produção':   '#B8790A',
  'Equipe P&D': '#ec4899',
  'Logística':  '#06b6d4',
  'Dados':      '#6366f1',
@@ -446,7 +446,7 @@ var _SETOR_CORES = {
 };
 
 function _setorCor(area) {
- return _SETOR_CORES[area] || '#94a3b8';
+ return _SETOR_CORES[area] || '#7D8199';
 }
 
 function _gestorRenderSetor() {
@@ -669,7 +669,7 @@ function _gestorRenderRow(a, rowNum, hoje) {
  if (respArr.length > 2) respHtml += '<span style="font-size:9px;color:var(--muted)">+' + (respArr.length-2) + '</span>';
 
  // Prioridade
- var prioColors = { 'Alta':'#ef4444','Média':'#f59e0b','Baixa':'#9ca3af' };
+ var prioColors = { 'Alta':'#D6433C','Média':'#B8790A','Baixa':'#7D8199' };
  var prioClr = prioColors[a.prioridade] || '#9ca3af';
 
  // Data início formatada
@@ -884,13 +884,13 @@ function _gestorRenderTimeline() {
  // Cores com opacidade/contraste reforcados para leitura imediata sobre o tema escuro.
  function tColor(a) {
   var late = _gIsLate(a), s = a.status||'', p = a.prioridade||'';
-  if (late)  return { bg:'rgba(239,68,68,.22)',  tx:'#fca5a5', bdr:'#ef4444' };
-  if (_gIsDone(s)) return { bg:'rgba(34,197,94,.20)', tx:'#86efac', bdr:'#22c55e' };
-  if (s==='Em progresso'||s==='Em andamento') return { bg:'rgba(59,130,246,.22)', tx:'#93c5fd', bdr:'#3b82f6' };
-  if (s==='Bloqueado'||s==='Bloqueada'||s==='Impedida'||s==='Aguardando feedback') return { bg:'rgba(245,158,11,.22)', tx:'#fcd34d', bdr:'#f59e0b' };
-  if (p==='Alta')  return { bg:'rgba(239,68,68,.14)', tx:'#fca5a5', bdr:'#ef4444' };
-  if (p==='Média'||p==='Media') return { bg:'rgba(245,158,11,.14)', tx:'#fcd34d', bdr:'#f59e0b' };
-  return { bg:'rgba(148,163,184,.16)', tx:'#cbd5e1', bdr:'#94a3b8' };
+  if (late)  return { bg:'rgba(239,68,68,.22)',  tx:'#fca5a5', bdr:'#D6433C' };
+  if (_gIsDone(s)) return { bg:'rgba(34,197,94,.20)', tx:'#86efac', bdr:'#1F8A4C' };
+  if (s==='Em progresso'||s==='Em andamento') return { bg:'rgba(59,130,246,.22)', tx:'#93c5fd', bdr:'#2E5FD9' };
+  if (s==='Bloqueado'||s==='Bloqueada'||s==='Impedida'||s==='Aguardando feedback') return { bg:'rgba(245,158,11,.22)', tx:'#fcd34d', bdr:'#B8790A' };
+  if (p==='Alta')  return { bg:'rgba(239,68,68,.14)', tx:'#fca5a5', bdr:'#D6433C' };
+  if (p==='Média'||p==='Media') return { bg:'rgba(245,158,11,.14)', tx:'#fcd34d', bdr:'#B8790A' };
+  return { bg:'rgba(148,163,184,.16)', tx:'#cbd5e1', bdr:'#7D8199' };
  }
 
  var fmtCurto = function(d){ return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}); };
@@ -951,7 +951,7 @@ function _gestorRenderTimeline() {
   + '<button style="'+btnSt+';padding:4px 12px;font-size:12px" onclick="_gestorCalToday()">Hoje</button>'
   + '<span style="font-size:10px;color:var(--muted);margin-left:4px">'+tRanges.length+' atividades'+(tSemData.length?' &middot; '+tSemData.length+' sem data':'')+'</span>'
   + '<div style="margin-left:auto;display:flex;gap:8px;align-items:center;font-size:10px;flex-wrap:wrap">'
-  + [['Concluido','#22c55e'],['Em andamento','#3b82f6'],['A fazer','#94a3b8'],['Bloqueado','#f59e0b'],['Atrasado','#ef4444']].map(function(l){
+  + [['Concluido','#1F8A4C'],['Em andamento','#2E5FD9'],['A fazer','#7D8199'],['Bloqueado','#B8790A'],['Atrasado','#D6433C']].map(function(l){
     return '<span style="display:flex;align-items:center;gap:3px"><span style="width:10px;height:10px;border-radius:2px;background:'+l[1]+';opacity:.25;border:1px solid '+l[1]+';flex-shrink:0;display:inline-block"></span><span style="color:var(--muted)">'+l[0]+'</span></span>';
    }).join('')
   + '</div></div>'
@@ -989,7 +989,7 @@ function _gestorTimelineTip(evt, id) {
   '<div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--text);max-width:220px;word-break:break-word">' + (a.titulo||'—') + '</div>'
   + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
   + '<span class="gs-badge ' + sc.cls + '">' + (late?'Atrasado':a.status) + '</span>'
-  + (a.prioridade ? '<span style="font-size:10px;font-weight:700;color:' + ({'Alta':'#ef4444','Média':'#f59e0b','Baixa':'#9ca3af'}[a.prioridade]||'#9ca3af') + '">' + a.prioridade + '</span>' : '')
+  + (a.prioridade ? '<span style="font-size:10px;font-weight:700;color:' + ({'Alta':'#D6433C','Média':'#B8790A','Baixa':'#7D8199'}[a.prioridade]||'#7D8199') + '">' + a.prioridade + '</span>' : '')
   + '</div>'
   + '<div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;margin-bottom:6px">'
   + '<span style="color:var(--muted)">Início</span><b>' + inicio + '</b>'
@@ -1068,7 +1068,7 @@ function _gestorRenderMetricas() {
   rs.forEach(function(r){ if(!userMap[r])userMap[r]={total:0,done:0,late:0,prog:0}; userMap[r].total++; if(_gIsDone(a.status))userMap[r].done++; else if(_gIsLate(a))userMap[r].late++; else if(a.status==='Em progresso'||a.status==='Em andamento')userMap[r].prog++; });
  });
  var topUsers=Object.keys(userMap).sort(function(a,b){return userMap[b].total-userMap[a].total;}).slice(0,8);
- var avColors=['#1B1B8F','#28b548','#e07b00','#8957E5','#1f7ec4','#c44b1f','#cf222e','#6366f1'];
+ var avColors=['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#cf222e','#6366f1'];
 
  // Tipo map
  var tipoMap={};
@@ -1113,15 +1113,15 @@ function _gestorRenderMetricas() {
 
  // ==========================================================================
  // PALETA SEMANTICA UNICA (alinhada a Timeline v2.52):
- //  verde   #22c55e = concluido / positivo
- //  azul    #3b82f6 = em andamento
- //  cinza   #94a3b8 = neutro / a fazer / sem dado
- //  vermelho#ef4444 = atraso / critico (excecao)
- //  ambar   #f59e0b = bloqueio / atencao (excecao)
- //  navy    #1B1B8F = marca / indicador neutro principal
+ //  verde   #1F8A4C = concluido / positivo
+ //  azul    #2E5FD9 = em andamento
+ //  cinza   #7D8199 = neutro / a fazer / sem dado
+ //  vermelho#D6433C = atraso / critico (excecao)
+ //  ambar   #B8790A = bloqueio / atencao (excecao)
+ //  navy    #3D4FD1 = marca / indicador neutro principal
  // Cor so e usada para sinalizar status, prioridade ou excecao — nunca decorativa.
  // ==========================================================================
- var COL = {ok:'#22c55e', prog:'#3b82f6', neutral:'#94a3b8', crit:'#ef4444', warn:'#f59e0b', brand:'#1B1B8F'};
+ var COL = {ok:'#1F8A4C', prog:'#2E5FD9', neutral:'#7D8199', crit:'#D6433C', warn:'#B8790A', brand:'#3D4FD1'};
 
  // ── NIVEL 1 — KPIs ESTRATEGICOS ──────────────────────────────────────────
  // Origem: _gestorFiltered (mesma base da grade/listagem). Recalculado a cada filtro.

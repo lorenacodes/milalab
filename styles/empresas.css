@@ -15,7 +15,7 @@
  }
  .nt-tool-btn {
  display:flex;align-items:center;gap:5px;padding:4px 8px;font-size:12px;color:var(--muted);
- background:none;border:none;cursor:pointer;border-radius:4px;font-weight:500;transition:background .12s,color .12s
+ background:none;border:none;cursor:pointer;border-radius:var(--r-xs);font-weight:500;transition:background .12s,color .12s
  }
  .nt-tool-btn:hover { background:rgba(0,0,0,.06);color:var(--text) }
  body.light .nt-tool-btn:hover { background:rgba(0,0,0,.06) }
@@ -23,7 +23,7 @@
  .nt-sep { width:1px;height:16px;background:var(--border);margin:0 4px }
  .nt-search {
  margin-left:auto;display:flex;align-items:center;gap:6px;
- border:1px solid var(--border);border-radius:6px;padding:4px 10px;
+ border:1px solid var(--border);border-radius:var(--r-sm);padding:4px 10px;
  background:var(--surface);min-width:180px
  }
  .nt-search input { border:none;outline:none;background:transparent;font-size:12px;color:var(--text);width:100% }
@@ -47,7 +47,7 @@
  .nt-table tbody tr:hover .nt-open-btn { opacity:1!important }
 
  /* Tags estilo Notion */
- .nt-tag { display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap }
+ .nt-tag { display:inline-flex;align-items:center;padding:2px 8px;border-radius:var(--r-xs);font-size:11px;font-weight:500;white-space:nowrap }
  .nt-tag-blue { background:#dbeafe;color:#1d4ed8 }
  .nt-tag-green { background:#dcfce7;color:#15803d }
  .nt-tag-yellow { background:#fef9c3;color:#a16207 }
@@ -59,7 +59,7 @@
  body.light .nt-tag-blue { background:#dbeafe;color:#1d4ed8 }
 
  /* Avatar */
- .nt-avatar { width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0 }
+ .nt-avatar { width:28px;height:28px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0 }
  .nt-avatar-circle { border-radius:50% }
 
  /* Inline stats */
@@ -93,7 +93,7 @@
  /* Filter panel herdado */
  .nt-filter-panel {
  display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:200;
- background:var(--surface);border:1px solid var(--border);border-radius:10px;
+ background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
  box-shadow:0 8px 32px rgba(0,0,0,.18);width:520px;padding:16px
  }
 
@@ -104,7 +104,7 @@
  #ctt-tbody tr:hover .ctt-acts { opacity:1 }
  .ctt-act-btn {
   display:inline-flex;align-items:center;justify-content:center;
-  width:22px;height:22px;border-radius:4px;border:none;background:rgba(0,0,0,.06);
+  width:22px;height:22px;border-radius:var(--r-xs);border:none;background:rgba(0,0,0,.06);
   color:var(--muted);cursor:pointer;text-decoration:none;transition:background .1s,color .1s
  }
  .ctt-act-btn:hover { background:var(--navy-dim);color:var(--navy) }

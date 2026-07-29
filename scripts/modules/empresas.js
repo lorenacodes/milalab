@@ -49,7 +49,7 @@ async function _spEmpresas(row, tds) {
   return;
  }
 
- var colors = ['#1B1B8F','#28b548','#e07b00','#8957E5','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
+ var colors = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
  function _cttColorSp(name) {
   var c = 0; for (var j = 0; j < (name||'').length; j++) c += name.charCodeAt(j);
   return colors[c % colors.length];
@@ -167,7 +167,7 @@ async function _dbLoadEmpresas() {
  var tbody = document.getElementById('emp-tbody');
  if (!tbody) return;
 
- var colors = ['#1B1B8F','#28b548','#e07b00','#8957E5','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
+ var colors = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
  function _empColor(name) {
   var c = 0; for (var j = 0; j < (name||'').length; j++) c += name.charCodeAt(j);
   return colors[c % colors.length];
@@ -252,7 +252,7 @@ async function _dbLoadContatos() {
  var tbody = document.getElementById('ctt-tbody');
  if (!tbody) return;
 
- var colors = ['#1B1B8F','#28b548','#e07b00','#8957E5','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
+ var colors = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
  function _cttColor(name) {
   var c = 0; for (var j = 0; j < (name||'').length; j++) c += name.charCodeAt(j);
   return colors[c % colors.length];
@@ -422,7 +422,7 @@ function _renderFornecedores() {
 
  tbody.innerHTML = lista.map(function(f, idx) {
   var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
-  var bgColors = ['#6366f1','#0891b2','#059669','#d97706','#dc2626'];
+  var bgColors = ['#6366f1','#2E5FD9','#059669','#d97706','#dc2626'];
   var bg = bgColors[idx % bgColors.length];
   return '<tr>'
    + '<td><div class="nt-avatar" style="background:' + bg + ';font-size:10px;width:26px;height:26px;border-radius:6px">' + initials + '</div></td>'

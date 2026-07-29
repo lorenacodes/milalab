@@ -335,10 +335,10 @@ async function _changePwdSubmit() {
 function _cpwdStrength(val) {
  var met = _cpwdReqs.filter(function(r){ return r.test(val); }).length;
  _cpwdScore = met;
- var colors=['','#ef4444','#f97316','#eab308','#22c55e','#16a34a'];
+ var colors=['','#D6433C','#f97316','#eab308','#1F8A4C','#16a34a'];
  var labels=['','Muito fraca','Fraca','Média','Forte','Muito forte'];
- var lColors=['','#ef4444','#f97316','#ca8a04','#16a34a','#15803d'];
- var fills=[[],[['#ef4444'],['','','','']],[['#f97316','#f97316'],['','','']],[['#eab308','#eab308','#eab308'],['','']],[['#22c55e','#22c55e','#22c55e','#22c55e'],['']],[['#16a34a','#16a34a','#16a34a','#16a34a','#16a34a'],[]]];
+ var lColors=['','#D6433C','#f97316','#ca8a04','#16a34a','#15803d'];
+ var fills=[[],[['#D6433C'],['','','','']],[['#f97316','#f97316'],['','','']],[['#eab308','#eab308','#eab308'],['','']],[['#1F8A4C','#1F8A4C','#1F8A4C','#1F8A4C'],['']],[['#16a34a','#16a34a','#16a34a','#16a34a','#16a34a'],[]]];
  var bClrs = val.length === 0 ? ['#e5e7eb','#e5e7eb','#e5e7eb','#e5e7eb','#e5e7eb'] : [
   met>=1?colors[Math.min(met,5)]:'#e5e7eb',
   met>=2?colors[Math.min(met,5)]:'#e5e7eb',

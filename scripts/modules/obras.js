@@ -929,7 +929,7 @@ async function _spEnviarDocObra() {
 }
 
 function _spRenderDocList(docs, tipo, obraId) {
- var sColors = { 'Gerada':'#6b6b82','Enviada':'#3B7CF0','Em negociação':'#9a7000','Aceita':'#28B548','Recusada':'#d32f2f','Ativo':'#28B548','ativo':'#28B548','Rascunho':'#9a7000','Cancelado':'#d32f2f','Realizada':'#28B548' };
+ var sColors = { 'Gerada':'#6b6b82','Enviada':'#3B7CF0','Em negociação':'#9a7000','Aceita':'#1F8A4C','Recusada':'#d32f2f','Ativo':'#1F8A4C','ativo':'#1F8A4C','Rascunho':'#9a7000','Cancelado':'#d32f2f','Realizada':'#1F8A4C' };
  var sOpts   = tipo === 'Proposta Comercial'
   ? ['Gerada','Enviada','Em negociação','Aceita','Recusada','Realizada']
   : ['Ativo','Rascunho','Cancelado'];
@@ -1084,7 +1084,7 @@ async function _spDocHistorico(obraId, produto) {
  var res = await _sb.from('propostas').select('*').eq('obra_id', obraId).eq('produto', produto).order('versao', { ascending: true });
  if (res.error || !res.data) { _showToast('Erro ao carregar histórico', 'erro'); return; }
  var rows = res.data;
- var sColors = { 'Gerada':'#6b6b82','Enviada':'#1B1B8F','Em negociação':'#9a7000','Aceita':'#28B548','Recusada':'#d32f2f' };
+ var sColors = { 'Gerada':'#6b6b82','Enviada':'#3D4FD1','Em negociação':'#9a7000','Aceita':'#1F8A4C','Recusada':'#d32f2f' };
  var inner = rows.map(function(p) {
   var dt    = new Date(p.created_at);
   var dtFmt = dt.toLocaleDateString('pt-BR') + ' às ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});

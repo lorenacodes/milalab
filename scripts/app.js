@@ -874,7 +874,7 @@ var _kpiDrawerCache  = null; // cache das atividades do último _dashLoad
 var _kpiConfig = {
  atr: {
   title: 'Atrasadas',
-  color: '#ef4444',
+  color: '#D6433C',
   icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 1L1 14h14L8 1z"/><path d="M8 6v4M8 11v1" stroke-linecap="round"/></svg>',
   desc:  'Tarefas com prazo vencido e não concluídas',
   filter: function(a, hoje) {
@@ -884,7 +884,7 @@ var _kpiConfig = {
  },
  hoje: {
   title: 'Para Hoje',
-  color: '#f59e0b',
+  color: '#B8790A',
   icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2" stroke-linecap="round"/></svg>',
   desc:  'Tarefas com prazo para hoje',
   filter: function(a, hoje) {
@@ -935,7 +935,7 @@ var _kpiConfig = {
  },
  prox7: {
   title: 'Vencem esta semana',
-  color: '#f59e0b',
+  color: '#B8790A',
   icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="12" height="13" rx="2"/><path d="M5 1v2M11 1v2M2 6h12" stroke-linecap="round"/></svg>',
   desc:  'Atividades com prazo nos próximos 7 dias',
   filter: function(a, hoje) {

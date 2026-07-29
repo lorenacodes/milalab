@@ -201,7 +201,7 @@ async function _dbLoadEntregas() {
  };
  tbody.innerHTML = data.map(e => {
   const st = stMap[e.etapa] || 'aguardando';
-  const stCor = {'aguardando':'#f59e0b','producao':'#3b82f6','transporte':'#8b5cf6','entregue':'#22c55e'}[st];
+  const stCor = {'aguardando':'#B8790A','producao':'#2E5FD9','transporte':'#8b5cf6','entregue':'#1F8A4C'}[st];
   const obraNome = e.obra?.nome || '—';
   const empNome  = e.obra?.empresas_obras?.[0]?.empresa?.nome || '—';
   return `<tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('entregas',this)"

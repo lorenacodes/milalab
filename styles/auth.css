@@ -123,7 +123,7 @@
   width:100%;box-sizing:border-box;
   padding:11px 14px;
   border:1.5px solid #e5e7eb;
-  border-radius:10px;
+  border-radius:var(--r-lg);
   font-size:14px;font-family:inherit;color:#0a0f1e;
   background:#fff;outline:none;
   transition:border-color .18s,box-shadow .18s;
@@ -148,7 +148,7 @@
 .auth-btn {
   width:100%;padding:13px 20px;
   background:#004AE8;color:#fff;
-  border:none;border-radius:10px;
+  border:none;border-radius:var(--r-lg);
   font-size:14px;font-weight:600;font-family:inherit;
   cursor:pointer;transition:all .18s;
   box-shadow:0 2px 8px rgba(0,74,232,.25);
@@ -160,7 +160,7 @@
 
 /* Alert */
 .auth-alert {
-  display:none;padding:11px 14px;border-radius:8px;
+  display:none;padding:11px 14px;border-radius:var(--r-md);
   font-size:13px;margin-bottom:16px;
 }
 .auth-alert.err { background:#fef2f2;border:1px solid #fecaca;color:#dc2626; }
@@ -184,7 +184,7 @@
 .auth-sec-link {
   font-size:13px;color:#6b7280;background:none;border:none;
   cursor:pointer;font-family:inherit;padding:4px 6px;
-  text-decoration:none;transition:color .15s;border-radius:6px;
+  text-decoration:none;transition:color .15s;border-radius:var(--r-sm);
 }
 .auth-sec-link:hover { color:#004AE8;background:#eff6ff; }
 

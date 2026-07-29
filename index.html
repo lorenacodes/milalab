@@ -3346,5 +3346,21 @@
   </div>
 </div>
 
+<script>
+// Barra superior vira vidro só depois que a página rola (MilaLab Design System,
+// seção "Transparência"). Só troca uma classe CSS — nenhuma lógica existente é tocada.
+(function(){
+  var lastState = false;
+  function onScroll(){
+    var scrolled = (window.scrollY || document.documentElement.scrollTop || 0) > 8;
+    if (scrolled === lastState) return;
+    lastState = scrolled;
+    document.querySelectorAll('.topbar').forEach(function(tb){
+      tb.classList.toggle('tb-glass', scrolled);
+    });
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+})();
+</script>
 </body>
 </html>
