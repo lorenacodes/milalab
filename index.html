@@ -10,8 +10,8 @@
  <meta http-equiv="Expires" content="0">
  <title>MilaTec — Sistema Interno</title>
  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles/tokens.css">
-<link rel="stylesheet" href="styles/main.css">
+<link rel="stylesheet" href="styles/tokens.css?v=mldsv1">
+<link rel="stylesheet" href="styles/main.css?v=mldsv1">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="scripts/lib/supabase-client.js"></script>
 <script src="scripts/lib/ui-helpers.js"></script>
@@ -267,7 +267,7 @@
 <!-- Design system unificado dos campos do wizard Nova Obra: todo select/input/checklist
      do modal usa a mesma geometria de .mf input,.mf select (padding 9px 12px, radius 7px,
      borda var(--border), foco navy com ring) para não ter dois estilos de campo coexistindo. -->
-<link rel="stylesheet" href="styles/wizard-nova-obra.css">
+<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv1">
 <!-- MODAL NOVA OBRA — wizard 4 etapas (fluxo único, sem gate de tipo) -->
 <div class="modal-backdrop" id="modal-nova-obra" onclick="handleModalBackdrop(event)">
  <div class="modal" id="modal-obra-box" style="max-width:900px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh">
@@ -999,7 +999,7 @@
 <div id="page-empresas" class="page" style="padding-top:8px">
 
  <!-- Estilos Notion para esta página -->
-<link rel="stylesheet" href="styles/empresas.css">
+<link rel="stylesheet" href="styles/empresas.css?v=mldsv1">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -2059,7 +2059,7 @@
  <!-- ENTREGAS -->
  <div id="page-entregas" class="page">
 
-<link rel="stylesheet" href="styles/entregas.css">
+<link rel="stylesheet" href="styles/entregas.css?v=mldsv1">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -3151,7 +3151,7 @@
 <!-- SISTEMA DE AUTENTICAÇÃO MILATEC v3.04 — Identidade Visual Grupo Mila      -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<link rel="stylesheet" href="styles/auth.css">
+<link rel="stylesheet" href="styles/auth.css?v=mldsv1">
 
 <!-- ═══════════════════════════════════════════════════════════════
      TELA 1 — LOGIN
@@ -3159,7 +3159,7 @@
 ═══════════════════════════════════════════════════════════════════ -->
 <div id="login-screen" class="auth-screen">
   <!-- Painel esquerdo: branding -->
-  <div class="auth-left">
+  <div class="auth-left"><div class="auth-silver-hairline"></div>
     <div class="auth-brand-logo">
       <img src="__LOGO_WHITE__" alt="MilaTec" class="auth-logo-img" style="height:36px;width:auto;display:block">
     </div>
@@ -3233,7 +3233,7 @@
      Aparece APENAS em: primeiro acesso de admin OU clique em link de reset
 ═══════════════════════════════════════════════════════════════════ -->
 <div id="change-pwd-screen" class="auth-screen" style="display:none">
-  <div class="auth-left">
+  <div class="auth-left"><div class="auth-silver-hairline"></div>
     <div class="auth-brand-logo">
       <img src="__LOGO_WHITE__" alt="MilaTec" style="height:38px;width:auto;display:block;max-width:200px">
     </div>
@@ -3307,7 +3307,7 @@
      TELA 3 — ESQUECI MINHA SENHA
 ═══════════════════════════════════════════════════════════════════ -->
 <div id="forgot-pwd-screen" class="auth-screen" style="display:none">
-  <div class="auth-left">
+  <div class="auth-left"><div class="auth-silver-hairline"></div>
     <div class="auth-brand-logo">
       <img src="__LOGO_WHITE__" alt="MilaTec" style="height:38px;width:auto;display:block;max-width:200px">
     </div>
