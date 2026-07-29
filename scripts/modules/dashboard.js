@@ -375,110 +375,66 @@ function _dashRenderInbox()   { _remLoadInbox(); }
 
 
 
-/* ── COLABORAÇÃO — storage e render ─────────────────────────────────────── */
-// Chave: 'milatec-colab-{email}' → array de registros de colaboração
-function _colabKey() {
- try { return 'milatec-colab-' + (JSON.parse(atob((localStorage.getItem('sb-auth-token')||'').split('.')[1]||'e30=')||'{}').email || 'anon'); } catch(e) { return 'milatec-colab-anon'; }
-}
-
-function _colabGetAll() {
- try { return JSON.parse(localStorage.getItem(_colabKey()) || '[]'); } catch(e) { return []; }
-}
-
-function _colabSave(arr) {
- try { localStorage.setItem(_colabKey(), JSON.stringify(arr)); } catch(e) {}
-}
-
-// Gravar colaboração para cada responsável da subtarefa
-function _colabRegistrar(task, sub) {
- var resps = Array.isArray(sub.responsaveis) ? sub.responsaveis : [];
- resps.forEach(function(u) {
-  var key = 'milatec-colab-' + u.email;
-  var arr;
-  try { arr = JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { arr = []; }
-  // Evitar duplicata
-  var existe = arr.some(function(r){ return r.task_id === task.id && r.sub_id === sub.id; });
-  if (!existe) {
-   arr.unshift({
-    task_id:            task.id,
-    task_titulo:        task.titulo,
-    sub_id:             sub._id || sub.id,
-    sub_titulo:         sub.titulo,
-    responsavel_principal: task.responsavel,
-    prazo:              sub.prazo || task.data_fim,
-    status:             sub.status,
-    criado_em:          new Date().toISOString()
-   });
-   try { localStorage.setItem(key, JSON.stringify(arr)); } catch(e) {}
-  }
- });
-}
-
-
-function _remLoadColab() { _remLoadColabReqs(); }
-
-
 /* ══════════════════════════════════════════════════════════════════════════
    COLABORAÇÃO FORMAL — solicitações bidirecionais com rastreamento de status
-   Fluxo: Pendente → Aceita|Recusada → Em andamento → Concluída
-   Storage: localStorage['milatec-colab-req-{email}'] = [{...req}]
+   Fluxo: Pendente → Aceita|Recusada → Em andamento → Aguardando retorno →
+   Concluída. Tabela: colaboracao_solicitacoes (Supabase) — uma única linha
+   por solicitação, visível para solicitante e receptor via query, não mais
+   duas cópias em localStorage (uma por usuário, cada uma só no navegador
+   de quem a criou — por isso o receptor nunca via a solicitação).
 ══════════════════════════════════════════════════════════════════════════ */
-var _COLAB_REQ_KEY = function(email) { return 'milatec-colab-req-' + (email || ''); };
+function _remLoadColab() { _remLoadColabReqs(); }
 
-function _colabReqGetAll(email) {
- try { return JSON.parse(localStorage.getItem(_COLAB_REQ_KEY(email)) || '[]'); } catch(e) { return []; }
-}
-function _colabReqSave(email, arr) {
- try { localStorage.setItem(_COLAB_REQ_KEY(email), JSON.stringify(arr)); } catch(e) {}
+async function _colabReqBuscar(filtroFn) {
+ if (!_sb) return [];
+ var res = await _sb.from('colaboracao_solicitacoes').select('*').order('created_at', { ascending: false });
+ if (res.error) { console.error('[Colaboração] erro ao buscar:', res.error); return []; }
+ return filtroFn ? res.data.filter(filtroFn) : res.data;
 }
 
 /* Cria uma solicitação de colaboração (task drawer → Comunicação) */
-function _drwColabReqEnviar() {
+async function _drwColabReqEnviar() {
  var receptorSel = document.getElementById('drw-colab-receptor');
  var motivoSel   = document.getElementById('drw-colab-motivo');
  var msgEl       = document.getElementById('drw-colab-msg');
  var prazoEl     = document.getElementById('drw-colab-prazo');
  if (!receptorSel || !receptorSel.value) { _showToast('Selecione um colaborador', 'erro'); return; }
  if (!motivoSel || !motivoSel.value)     { _showToast('Selecione o motivo da colaboração', 'erro'); return; }
- var u = window._authUser || {};
+ if (!_currentUser) { _showToast('Usuário não identificado', 'erro'); return; }
  var receptor = _respUsuarios.find(function(r){ return r.email === receptorSel.value; });
  if (!receptor) { _showToast('Colaborador inválido', 'erro'); return; }
  if (!window._drwCurrentTask) { _showToast('Salve a atividade antes de solicitar colaboração', 'erro'); return; }
  var task = window._drwCurrentTask;
  var now = new Date().toISOString();
- var req = {
-  id:          'cr-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
-  tipo:        'solicitacao',
-  solicitante: { email: u.email || '', nome: u.nome || u.email || '', iniciais: (u.nome || u.email || '?').charAt(0).toUpperCase() },
-  receptor:    { email: receptor.email, nome: receptor.nome || receptor.email, iniciais: (receptor.nome || receptor.email || '?').charAt(0).toUpperCase() },
-  task_id:     task.id,
-  task_titulo: task.titulo || task.nome || 'Atividade',
-  motivo:      motivoSel.value,
-  mensagem:    (msgEl ? msgEl.value.trim() : ''),
-  prazo:       (prazoEl ? prazoEl.value : ''),
-  status:      'Pendente',
-  criado_em:   now,
-  atualizado_em: now,
-  historico:   [{ status: 'Pendente', por: u.email || '', em: now, label: 'Solicitação criada' }]
+ var payload = {
+  atividade_id:       String(task.id),
+  atividade_titulo:   task.titulo || task.nome || 'Atividade',
+  solicitante_email:  _currentUser.email || '',
+  solicitante_nome:   _currentUser.name || _currentUser.email || '',
+  receptor_email:     receptor.email,
+  receptor_nome:      receptor.nome || receptor.email,
+  motivo:             motivoSel.value,
+  mensagem:           (msgEl ? msgEl.value.trim() : '') || null,
+  prazo:              (prazoEl && prazoEl.value) ? prazoEl.value : null,
+  status:             'Pendente',
+  historico:          [{ status: 'Pendente', por: _currentUser.email || '', em: now, label: 'Solicitação criada' }],
  };
- // Gravar na chave do solicitante (enviado)
- var arrS = _colabReqGetAll(u.email || ''); arrS.unshift(req); _colabReqSave(u.email || '', arrS);
- // Gravar na chave do receptor (recebido)
- var arrR = _colabReqGetAll(receptor.email); arrR.unshift(req); _colabReqSave(receptor.email, arrR);
- // Fechar form e recarregar
+ var ins = await _sb.from('colaboracao_solicitacoes').insert(payload);
+ if (ins.error) { _showToast('Erro ao solicitar colaboração: ' + _supaErrPt(ins.error.message), 'erro'); return; }
  _drwColabReqCancel();
  _drwColabReqRender(task.id);
- _histLogAdd('colab', task.titulo || task.nome || 'Atividade', 'Colaboração solicitada para ' + (receptor.nome || receptor.email) + ' — ' + req.motivo);
- _showToast('Colaboração solicitada para ' + (receptor.nome || receptor.email), 'ok');
+ _histLogAdd('colab', payload.atividade_titulo, 'Colaboração solicitada para ' + payload.receptor_nome + ' — ' + payload.motivo);
+ _showToast('Colaboração solicitada para ' + payload.receptor_nome, 'ok');
 }
 
 /* Renderiza a lista de solicitações de colaboração dentro do drawer */
-function _drwColabReqRender(taskId) {
+async function _drwColabReqRender(taskId) {
  var listEl = document.getElementById('drw-colab-req-list');
- if (!listEl) return;
- var u = window._authUser || {};
- var all = _colabReqGetAll(u.email || '');
- var reqs = all.filter(function(r){ return r.task_id === taskId; });
+ if (!listEl || !_currentUser) return;
+ var me = _currentUser.email || '';
+ var reqs = await _colabReqBuscar(function(r){
+  return String(r.atividade_id) === String(taskId) && (r.solicitante_email === me || r.receptor_email === me);
+ });
  if (!reqs.length) {
   listEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:10px 0;text-align:center">Nenhuma colaboração solicitada para esta atividade.</div>';
   return;
@@ -488,16 +444,17 @@ function _drwColabReqRender(taskId) {
  var today = new Date(); today.setHours(0,0,0,0);
 
  listEl.innerHTML = reqs.map(function(r) {
-  var isSol = r.solicitante && r.solicitante.email === u.email;
-  var isRec = r.receptor && r.receptor.email === u.email;
+  var isSol = r.solicitante_email === me;
+  var isRec = r.receptor_email === me;
   var bc    = 'colab-req-badge ' + 'colab-req-badge-' + (badgeClass[r.status] || 'pendente');
-  var dt    = r.criado_em ? new Date(r.criado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '';
+  var dt    = r.created_at ? new Date(r.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '';
 
   // Avatar e nomes
-  var av     = isSol ? (r.receptor ? r.receptor.iniciais : '?') : (r.solicitante ? r.solicitante.iniciais : '?');
+  var outraNome = isSol ? (r.receptor_nome || r.receptor_email || '?') : (r.solicitante_nome || r.solicitante_email || '?');
+  var av     = (outraNome || '?').charAt(0).toUpperCase();
   var whoLbl = isSol
-   ? '<span style="color:var(--muted)">Para</span> <strong>' + (r.receptor ? r.receptor.nome : '?') + '</strong>'
-   : '<span style="color:var(--muted)">De</span> <strong>' + (r.solicitante ? r.solicitante.nome : '?') + '</strong>';
+   ? '<span style="color:var(--muted)">Para</span> <strong>' + (r.receptor_nome || '?') + '</strong>'
+   : '<span style="color:var(--muted)">De</span> <strong>' + (r.solicitante_nome || '?') + '</strong>';
 
   // Prazo
   var prazoHtml = '';
@@ -543,7 +500,7 @@ function _drwColabReqRender(taskId) {
    + '<div class="colab-card-av" style="background:' + (isSol ? 'var(--navy)' : '#7c3aed') + '">' + av + '</div>'
    + '<div class="colab-card-meta">'
    + '<div class="colab-card-who">' + whoLbl + '</div>'
-   + '<div class="colab-card-task">' + (r.task_titulo || '') + '</div>'
+   + '<div class="colab-card-task">' + (r.atividade_titulo || '') + '</div>'
    + '</div>'
    + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">'
    + '<span class="' + bc + '">' + r.status + '</span>'
@@ -563,33 +520,27 @@ function _drwColabReqRender(taskId) {
  }).join('');
 }
 
-/* Ação sobre solicitação (aceitar, recusar, iniciar, concluir) */
-function _drwColabReqAcao(reqId, novoStatus) {
- var u = window._authUser || {};
- var emails = [u.email || ''];
- // Precisamos atualizar nos dois usuários. Para isso pegamos a req do usuário atual
- var arr = _colabReqGetAll(u.email || '');
- var req = arr.find(function(r){ return r.id === reqId; });
- if (!req) { _showToast('Solicitação não encontrada', 'erro'); return; }
- var outraEmail = u.email === (req.solicitante && req.solicitante.email) ? (req.receptor && req.receptor.email) : (req.solicitante && req.solicitante.email);
- // Atualizar status nos dois keys
+/* Ação sobre solicitação (aceitar, recusar, iniciar, concluir) — compartilhada
+ * entre o drawer da atividade e o painel Lembretes. */
+async function _colabReqAtualizarStatus(reqId, novoStatus) {
+ if (!_sb || !_currentUser) return false;
  var statusLabels = { 'Aceita':'Aceita pelo colaborador', 'Recusada':'Recusada pelo colaborador', 'Em andamento':'Trabalho iniciado', 'Aguardando retorno':'Aguardando retorno do solicitante', 'Concluída':'Colaboração concluída' };
- [u.email || '', outraEmail || ''].forEach(function(em) {
-  if (!em) return;
-  var a = _colabReqGetAll(em);
-  var ri = a.findIndex(function(r){ return r.id === reqId; });
-  if (ri !== -1) {
-   a[ri].status = novoStatus;
-   a[ri].atualizado_em = new Date().toISOString();
-   a[ri].historico = (a[ri].historico || []).concat([{ status: novoStatus, por: u.email, label: statusLabels[novoStatus] || '', em: new Date().toISOString() }]);
-   _colabReqSave(em, a);
-  }
+ var atual = await _sb.from('colaboracao_solicitacoes').select('historico').eq('id', reqId).maybeSingle();
+ if (atual.error || !atual.data) { _showToast('Solicitação não encontrada', 'erro'); return false; }
+ var novoHistorico = (atual.data.historico || []).concat([{ status: novoStatus, por: _currentUser.email || '', label: statusLabels[novoStatus] || '', em: new Date().toISOString() }]);
+ var upd = await _sb.from('colaboracao_solicitacoes').update({ status: novoStatus, historico: novoHistorico }).eq('id', reqId);
+ if (upd.error) { _showToast('Erro ao atualizar colaboração: ' + _supaErrPt(upd.error.message), 'erro'); return false; }
+ return true;
+}
+
+function _drwColabReqAcao(reqId, novoStatus) {
+ _colabReqAtualizarStatus(reqId, novoStatus).then(function(ok) {
+  if (!ok) return;
+  if (window._drwCurrentTask) _drwColabReqRender(window._drwCurrentTask.id);
+  _remLoadColabReqs();
+  var toastMsg = { 'Aceita':'Colaboração aceita', 'Recusada':'Colaboração recusada', 'Em andamento':'Colaboração em andamento', 'Aguardando retorno':'Aguardando retorno do solicitante', 'Concluída':'Colaboração concluída' };
+  _showToast(toastMsg[novoStatus] || ('Colaboração: ' + novoStatus), novoStatus === 'Concluída' ? 'ok' : novoStatus === 'Recusada' ? 'erro' : 'ok');
  });
- if (window._drwCurrentTask) _drwColabReqRender(window._drwCurrentTask.id);
- // Atualizar badge do painel Lembretes Colab
- _remLoadColabReqs();
- var toastMsg = { 'Aceita':'Colaboração aceita', 'Recusada':'Colaboração recusada', 'Em andamento':'Colaboração em andamento', 'Aguardando retorno':'Aguardando retorno do solicitante', 'Concluída':'Colaboração concluída' };
- _showToast(toastMsg[novoStatus] || ('Colaboração: ' + novoStatus), novoStatus === 'Concluída' ? 'ok' : novoStatus === 'Recusada' ? 'erro' : 'ok');
 }
 
 /* Toggle do formulário de nova solicitação */
@@ -602,9 +553,9 @@ function _drwColabReqToggleForm() {
  // Preencher select de receptores
  var sel = document.getElementById('drw-colab-receptor');
  if (sel) {
-  var u = window._authUser || {};
+  var meEmail = (_currentUser && _currentUser.email) || '';
   sel.innerHTML = '<option value="">Selecione o colaborador...</option>'
-   + (_respUsuarios || []).filter(function(r){ return r.email !== (u.email || ''); })
+   + (_respUsuarios || []).filter(function(r){ return r.email !== meEmail; })
      .map(function(r){ return '<option value="' + r.email + '">' + (r.nome || r.email) + '</option>'; }).join('');
   sel.value = '';
  }
@@ -621,21 +572,23 @@ function _drwColabReqCancel() {
 }
 
 /* Carrega solicitações de colaboração no painel Lembretes */
-function _remLoadColabReqs() {
+async function _remLoadColabReqs() {
+ if (!_currentUser) return;
+ var me = _currentUser.email || '';
+ var reqs = await _colabReqBuscar(function(r){ return r.solicitante_email === me || r.receptor_email === me; });
+ var pendentes = reqs.filter(function(r){ return r.status === 'Pendente' && r.receptor_email === me; }).length;
+ window._colabPendCount = pendentes; // usado pelo Painel de Saúde Operacional
  var listEl = document.getElementById('dash-colab-list');
  if (!listEl) return;
- var u = window._authUser || {};
- var all   = _colabGetAll();       // subtarefas atribuídas (sistema antigo)
- var reqs  = _colabReqGetAll(u.email || ''); // solicitações formais
- var pendentes = reqs.filter(function(r){ return r.status === 'Pendente' && r.receptor && r.receptor.email === (u.email || ''); }).length;
  var badge = document.getElementById('rem-colab-badge');
- if (badge) { badge.style.display = (pendentes + all.filter(function(r){ return r.status !== 'Concluído'; }).length) > 0 ? '' : 'none'; badge.textContent = pendentes + all.filter(function(r){ return r.status !== 'Concluído'; }).length; }
+ var abertos = reqs.filter(function(r){ return r.status !== 'Concluída' && r.status !== 'Recusada'; }).length;
+ if (badge) { badge.style.display = abertos > 0 ? '' : 'none'; badge.textContent = abertos; }
  // Renderizar solicitações formais no topo
  var badgeClass = { 'Pendente':'pendente','Aceita':'aceita','Recusada':'recusada','Em andamento':'andamento','Concluída':'concluida' };
  var reqsHtml = reqs.slice(0,10).map(function(r) {
-  var isSol = r.solicitante && r.solicitante.email === (u.email || '');
+  var isSol = r.solicitante_email === me;
   var bc    = 'colab-req-badge-' + (badgeClass[r.status] || 'pendente');
-  var dt    = r.criado_em ? new Date(r.criado_em).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
+  var dt    = r.created_at ? new Date(r.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
   var actions = '';
   if (!isSol && r.status === 'Pendente') {
    actions = '<div style="display:flex;gap:4px;margin-top:4px">'
@@ -646,9 +599,9 @@ function _remLoadColabReqs() {
   return '<div style="padding:8px 12px;border-bottom:1px solid var(--border)">'
    + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">'
    + '<div style="flex:1;min-width:0">'
-   + '<div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">' + (r.task_titulo || 'Atividade') + '</div>'
+   + '<div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">' + (r.atividade_titulo || 'Atividade') + '</div>'
    + '<div style="font-size:10px;color:var(--muted)">'
-   + (isSol ? 'Para ' + (r.receptor ? r.receptor.nome : '?') : 'De ' + (r.solicitante ? r.solicitante.nome : '?'))
+   + (isSol ? 'Para ' + (r.receptor_nome || '?') : 'De ' + (r.solicitante_nome || '?'))
    + ' · ' + dt + '</div>'
    + (r.mensagem ? '<div style="font-size:10px;color:var(--muted);margin-top:2px">' + r.mensagem + '</div>' : '')
    + actions
@@ -662,24 +615,11 @@ function _remLoadColabReqs() {
 
 /* Ação rápida sobre solicitação via painel Lembretes */
 function _remColabReqAcao(reqId, novoStatus) {
- var u = window._authUser || {};
- var arr = _colabReqGetAll(u.email || '');
- var req = arr.find(function(r){ return r.id === reqId; });
- if (!req) return;
- var outraEmail = u.email === (req.solicitante && req.solicitante.email) ? (req.receptor && req.receptor.email) : (req.solicitante && req.solicitante.email);
- [u.email || '', outraEmail || ''].forEach(function(em) {
-  if (!em) return;
-  var a = _colabReqGetAll(em);
-  var ri = a.findIndex(function(r){ return r.id === reqId; });
-  if (ri !== -1) {
-   a[ri].status = novoStatus;
-   a[ri].atualizado_em = new Date().toISOString();
-   a[ri].historico = (a[ri].historico || []).concat([{ status: novoStatus, por: u.email, em: new Date().toISOString() }]);
-   _colabReqSave(em, a);
-  }
+ _colabReqAtualizarStatus(reqId, novoStatus).then(function(ok) {
+  if (!ok) return;
+  _remLoadColabReqs();
+  _showToast('Colaboração ' + novoStatus.toLowerCase(), 'ok');
  });
- _remLoadColabReqs();
- _showToast('Colaboração ' + novoStatus.toLowerCase(), 'ok');
 }
 
 // ── Abrir/fechar formulário ───────────────────────────────────────────────
@@ -3494,12 +3434,10 @@ function _dashRenderChartStatus(dados) {
  // ── Painel de Saúde Operacional ── sem donut, foco em tomada de decisão ──────
 
  // Colaborações pendentes (recebidas pelo usuário atual, ainda não respondidas)
- var colabPend = 0;
- try {
-  var u = window._authUser || {};
-  var colabAll = _colabReqGetAll(u.email || '');
-  colabPend = colabAll.filter(function(r){ return r.status === 'Pendente' && r.receptor && r.receptor.email === (u.email || ''); }).length;
- } catch(e) {}
+ // Nota: preenchido de forma assíncrona por _dashUpdateColabPendCount() e
+ // cacheado em window._colabPendCount — este render em si é síncrono, então
+ // usamos o último valor conhecido (0 antes da primeira carga).
+ var colabPend = window._colabPendCount || 0;
 
  // SVG arrow (→) inline para itens acionáveis
  var arrSvg = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="hp-arrow"><line x1="2" y1="5" x2="8" y2="5"/><polyline points="5.5,2.5 8,5 5.5,7.5"/></svg>';
@@ -3596,59 +3534,35 @@ function _commTab(tab, btn) {
 var _ccCurrentTab = 'recv';
 
 function _ccLoad() {
- try {
-  var u = window._authUser || {};
-  var email = (u.email || '').toLowerCase();
-  if (!email) return;
-  // Pré-renderiza badge
-  _ccRenderPanel('cr');
- } catch(e) {}
+ if (!_currentUser || !_currentUser.email) return;
+ // Pré-renderiza badge
+ _ccRenderPanel('cr');
 }
 
-// Coleta todas as colaborações do localStorage
-function _ccGetAll(email) {
- var allColab = [];
- try {
-  for (var k = 0; k < localStorage.length; k++) {
-   var key = localStorage.key(k);
-   if (!key || key.indexOf('milatec-colab-req-') !== 0) continue;
-   var raw = localStorage.getItem(key);
-   if (!raw) continue;
-   var arr = JSON.parse(raw);
-   if (!Array.isArray(arr)) continue;
-   arr.forEach(function(r) {
-    if (r.id && r.id <= 4) return; // filtra seeds
-    allColab.push(r);
-   });
-  }
- } catch(e) {}
- return allColab;
-}
-
-function _ccRenderPanel(tab) {
+async function _ccRenderPanel(tab) {
  // tab: 'cr' = colab recebidas, 'cs' = colab solicitadas, 'done' = concluídas/recusadas
  var elId = tab === 'cr' ? 'cc-list-cr' : tab === 'cs' ? 'cc-list-cs' : 'cc-list-done';
  var el = document.getElementById(elId);
  if (!el) return;
 
- var u = window._authUser || {};
- var email = (u.email || '').toLowerCase();
+ var email = ((_currentUser && _currentUser.email) || '').toLowerCase();
  if (!email) {
   el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px">Login necessário</div>';
   return;
  }
 
- var allColab = _ccGetAll(email);
+ var allColab = await _colabReqBuscar(function(r){
+  return (r.solicitante_email||'').toLowerCase() === email || (r.receptor_email||'').toLowerCase() === email;
+ });
 
  var recv = allColab.filter(function(r){
-  return r.receptor && (r.receptor.email||'').toLowerCase() === email && r.status !== 'Concluída' && r.status !== 'Recusada';
+  return (r.receptor_email||'').toLowerCase() === email && r.status !== 'Concluída' && r.status !== 'Recusada';
  });
  var sent = allColab.filter(function(r){
-  return r.solicitante && (r.solicitante.email||'').toLowerCase() === email && r.status !== 'Concluída' && r.status !== 'Recusada';
+  return (r.solicitante_email||'').toLowerCase() === email && r.status !== 'Concluída' && r.status !== 'Recusada';
  });
  var done = allColab.filter(function(r){
-  var isParty = (r.receptor && (r.receptor.email||'').toLowerCase() === email) ||
-                (r.solicitante && (r.solicitante.email||'').toLowerCase() === email);
+  var isParty = (r.receptor_email||'').toLowerCase() === email || (r.solicitante_email||'').toLowerCase() === email;
   return isParty && (r.status === 'Concluída' || r.status === 'Recusada');
  });
 
@@ -3673,13 +3587,11 @@ function _ccRenderPanel(tab) {
  var isRecv = tab === 'cr';
 
  el.innerHTML = list.map(function(r) {
-  var outra = isRecv
-   ? (r.solicitante ? (r.solicitante.nome || r.solicitante.email || '?') : '?')
-   : (r.receptor   ? (r.receptor.nome   || r.receptor.email   || '?') : '?');
+  var outra = isRecv ? (r.solicitante_nome || r.solicitante_email || '?') : (r.receptor_nome || r.receptor_email || '?');
   var role = isRecv ? 'De: ' : 'Para: ';
   var sc = statusClass[r.status] || 'ccs-aguardando';
   var prazoTxt = r.prazo ? ' · ' + r.prazo : '';
-  var ativTxt = r.atividade ? (r.atividade.titulo || 'Atividade') : 'Atividade';
+  var ativTxt = r.atividade_titulo || 'Atividade';
   return '<div class="colab-cc-card">'
    + '<div style="display:flex;align-items:center;gap:6px">'
    + '<span style="font-size:11px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + ativTxt + '</span>'

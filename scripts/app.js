@@ -587,8 +587,8 @@ var _histFilterAtivo = 'todos';
 
 function _histKey() {
  try {
-  var u = window._authUser || {};
-  return 'milatec-hist-' + (u.email || 'local');
+  var email = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || 'local';
+  return 'milatec-hist-' + email;
  } catch(e) { return 'milatec-hist-local'; }
 }
 
