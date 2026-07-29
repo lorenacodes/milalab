@@ -26,14 +26,20 @@
  body.light tr:hover td{background:rgba(0,0,0,0.03)}
  *{box-sizing:border-box;margin:0;padding:0}
 
-/* ── Vidro sutil (frosted) — cards/painéis do "Meu Painel" e do Kanban de
-   Obras, MilaLab Design System, passo 4. O documento usa vidro branco
-   (rgba(255,255,255,.7)) pensando num fundo claro; no tema escuro (preto
-   puro) um vidro ESCURO (rgba preto) fica quase idêntico ao fundo da
-   página e o efeito desaparece — por isso a versão escura usa um vidro
-   CLARO (branco translúcido bem sutil, ~5%), o mesmo princípio que macOS/
-   iOS usam em dark mode: vibrância clara sobre fundo escuro, nunca escuro
-   sobre escuro. A versão clara do tema segue o documento à risca. ── */
+/* ── Vidro (frosted) — cards/painéis do "Meu Painel" e do Kanban de Obras,
+   MilaLab Design System, passo 4. Ajuste v3: o vidro anterior (blur 6px,
+   opacidade 6%) era tecnicamente correto mas imperceptível — não havia
+   nada colorido por trás pra borrar (o .page-bg nunca chegou a ser
+   aplicado no container real, só existia como classe solta) e a
+   opacidade era baixa demais para o olho notar. Agora: (1) o gradiente
+   que dá "textura" pro vidro borrar está direto em `.main` — a área de
+   conteúdo logo depois da sidebar; (2) blur subiu para 20px e saturação
+   pra 1.6, o mesmo peso usado em command palette/notificações; (3) opacidade
+   de fundo subiu de 6%→9% (escuro) e 70%→62% (claro, compensando o blur
+   mais forte) e ganhou um highlight interno no topo (inset), como o
+   material "vidro" da Apple. No tema escuro o vidro continua CLARO
+   (translúcido branco) mesmo sobre fundo preto — vidro escuro sobre preto
+   não gera contraste nenhum, é o mesmo princípio do dark mode da Apple. ── */
 .page-bg{
   background:
     radial-gradient(circle at 15% 0%, rgba(61,79,209,.1) 0%, transparent 45%),
@@ -41,16 +47,19 @@
     var(--bg);
 }
 .frosted-card{
-  background: rgba(255,255,255,.06);
-  -webkit-backdrop-filter: blur(6px) saturate(1.1);
-  backdrop-filter: blur(6px) saturate(1.1);
-  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.09);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,.16);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.10);
 }
 body.light .frosted-card{
-  background: rgba(255,255,255,.7);
-  border-color: rgba(255,255,255,.6);
+  background: rgba(255,255,255,.62);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  border-color: rgba(255,255,255,.7);
+  box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.8);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .frosted-card{ background: var(--surface); }
@@ -58,16 +67,19 @@ body.light .frosted-card{
 /* Painéis do "Meu Painel" (Minhas Atividades, Meus Projetos, gráficos, Saúde
    das Atividades, Central de Comunicação) — mesmo tratamento de vidro. */
 .dash-panel{
-  background: rgba(255,255,255,.06);
-  -webkit-backdrop-filter: blur(6px) saturate(1.1);
-  backdrop-filter: blur(6px) saturate(1.1);
-  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.09);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,.16);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.10);
 }
 body.light .dash-panel{
-  background: rgba(255,255,255,.7);
-  border-color: rgba(255,255,255,.6);
+  background: rgba(255,255,255,.62);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  border-color: rgba(255,255,255,.7);
+  box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.8);
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .dash-panel{ background: var(--surface); }
@@ -103,7 +115,7 @@ body.light .dash-panel{
  .avatar{width:30px;height:30px;background:var(--silver-grad);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--silver-ink);overflow:hidden;position:relative;flex-shrink:0}
  .avatar img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:50%}
  /* MAIN */
- .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin-left .22s cubic-bezier(.4,0,.2,1)}
+ .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin-left .22s cubic-bezier(.4,0,.2,1);background:radial-gradient(circle at 15% 0%, rgba(61,79,209,.16) 0%, transparent 45%),radial-gradient(circle at 90% 15%, rgba(63,191,180,.14) 0%, transparent 45%),radial-gradient(circle at 30% 100%, rgba(139,111,232,.10) 0%, transparent 50%),var(--bg)}
  .main.sidebar-collapsed{margin-left:0}
  .topbar{height:52px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px 0 20px;gap:10px;position:sticky;top:0;z-index:5}
  .breadcrumb{font-size:12px;color:var(--muted)} .bc-link{color:var(--muted);cursor:pointer;text-decoration:none;border-bottom:1px dashed var(--border)} .bc-link:hover{color:var(--text);border-bottom-color:var(--text)}
@@ -200,8 +212,8 @@ body.light .dash-panel{
  .kc-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
  .kc-count{font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1px 7px}
  .kc-dot{width:7px;height:7px;border-radius:50%;margin-right:5px;display:inline-block;flex-shrink:0}
- .obra-card{background:rgba(255,255,255,.06);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.14);border-radius:var(--r-md);padding:13px 14px;margin-bottom:8px;box-shadow:var(--shadow-1);cursor:pointer;transition:border-color .15s,opacity .15s;position:relative}
- body.light .obra-card{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.6)}
+ .obra-card{background:rgba(255,255,255,.09);-webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-md);padding:13px 14px;margin-bottom:8px;box-shadow:var(--shadow-1), inset 0 1px 0 rgba(255,255,255,.10);cursor:pointer;transition:border-color .15s,opacity .15s;position:relative}
+ body.light .obra-card{background:rgba(255,255,255,.62);-webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6);border-color:rgba(255,255,255,.7);box-shadow:var(--shadow-1), inset 0 1px 0 rgba(255,255,255,.8)}
  .obra-card:hover{border-color:var(--green)}
  .obra-card:last-child{margin-bottom:0}
  .obra-card.dragging{opacity:.4}
@@ -336,8 +348,8 @@ body.light .dash-panel{
  .dash-tab-btn.active{color:var(--navy);border-bottom-color:var(--navy)}
  
 /* ── KPI CARDS — estilo Linear/Stripe: zero decoração, número é o único herói */
-.dash-kpi-card{background:rgba(255,255,255,.06);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.14);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--shadow-2);cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
-body.light .dash-kpi-card{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.6)}
+.dash-kpi-card{background:rgba(255,255,255,.09);-webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.10);cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
+body.light .dash-kpi-card{background:rgba(255,255,255,.62);-webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6);border-color:rgba(255,255,255,.7);box-shadow:var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.8)}
 .dash-kpi-card:hover{background:var(--surface);border-color:rgba(139,148,158,.4)}
 .dash-kpi-card:active{opacity:.85}
 .dash-kpi-card .kpi-header{margin-bottom:8px}
