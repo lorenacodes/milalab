@@ -859,7 +859,7 @@ function _cttNavigateEmpresa(empNomeKey) {
    if(img.src.includes('__LOGO_COLOR__') || img.getAttribute('src')==='__LOGO_COLOR__') img.src = _LC;
   });
   // auth-right usa logo colorida (fundo branco)
-  document.querySelectorAll('.auth-right img[alt="MilaTec"]').forEach(function(img){ img.src = _LC; });
+  document.querySelectorAll('.auth-right img[alt="MilaLab"]').forEach(function(img){ img.src = _LC; });
  });
 })();
 

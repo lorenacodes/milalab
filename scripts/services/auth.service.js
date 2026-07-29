@@ -97,9 +97,9 @@ function _cpwdSetContext(ctx) {
   'invite': {
    eyebrow: 'Ativação de conta',
    title: 'Defina sua senha',
-   subtitle: 'Você recebeu um convite para o sistema MilaTec. Crie sua senha para ativar o acesso.',
-   leftTitle: 'Bem-vindo à<br><span>MilaTec</span>',
-   leftDesc: 'Você foi convidado(a) para o sistema interno MilaTec. Defina uma senha segura para começar.'
+   subtitle: 'Você recebeu um convite para o sistema MilaLab. Crie sua senha para ativar o acesso.',
+   leftTitle: 'Bem-vindo à<br><span>MilaLab</span>',
+   leftDesc: 'Você foi convidado(a) para o sistema interno MilaLab. Defina uma senha segura para começar.'
   },
   'reset': {
    eyebrow: 'Redefinição de senha',
@@ -113,7 +113,7 @@ function _cpwdSetContext(ctx) {
    title: 'Definir nova senha',
    subtitle: 'Por segurança, defina uma senha pessoal para substituir a senha temporária.',
    leftTitle: 'Sua segurança<br>é <span>prioridade</span>',
-   leftDesc: 'Defina uma senha forte para proteger seu acesso ao sistema interno MilaTec.'
+   leftDesc: 'Defina uma senha forte para proteger seu acesso ao sistema interno MilaLab.'
   },
   'voluntary': {
    eyebrow: 'Meu Perfil',
