@@ -29,21 +29,22 @@
 /* ── Vidro sutil (frosted) — cards/painéis do "Meu Painel" e do Kanban de
    Obras, MilaLab Design System, passo 4. O documento usa vidro branco
    (rgba(255,255,255,.7)) pensando num fundo claro; no tema escuro (preto
-   puro, decisão já tomada antes) um vidro branco deixaria o texto claro
-   ilegível — por isso a versão escura usa o mesmo princípio (translúcido +
-   blur) tingido de --surface em vez de branco. A versão clara segue o
-   documento à risca. ── */
+   puro) um vidro ESCURO (rgba preto) fica quase idêntico ao fundo da
+   página e o efeito desaparece — por isso a versão escura usa um vidro
+   CLARO (branco translúcido bem sutil, ~5%), o mesmo princípio que macOS/
+   iOS usam em dark mode: vibrância clara sobre fundo escuro, nunca escuro
+   sobre escuro. A versão clara do tema segue o documento à risca. ── */
 .page-bg{
   background:
-    radial-gradient(circle at 15% 0%, rgba(61,79,209,.06) 0%, transparent 45%),
-    radial-gradient(circle at 90% 100%, rgba(63,191,180,.06) 0%, transparent 45%),
+    radial-gradient(circle at 15% 0%, rgba(61,79,209,.1) 0%, transparent 45%),
+    radial-gradient(circle at 90% 100%, rgba(63,191,180,.1) 0%, transparent 45%),
     var(--bg);
 }
 .frosted-card{
-  background: rgba(20,22,30,.66);
+  background: rgba(255,255,255,.055);
   -webkit-backdrop-filter: blur(6px) saturate(1.1);
   backdrop-filter: blur(6px) saturate(1.1);
-  border: 1px solid rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.1);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-1);
 }
@@ -57,10 +58,10 @@ body.light .frosted-card{
 /* Painéis do "Meu Painel" (Minhas Atividades, Meus Projetos, gráficos, Saúde
    das Atividades, Central de Comunicação) — mesmo tratamento de vidro. */
 .dash-panel{
-  background: rgba(20,22,30,.66);
+  background: rgba(255,255,255,.055);
   -webkit-backdrop-filter: blur(6px) saturate(1.1);
   backdrop-filter: blur(6px) saturate(1.1);
-  border: 1px solid rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.1);
   border-radius: var(--r-lg);
 }
 body.light .dash-panel{
@@ -198,7 +199,7 @@ body.light .dash-panel{
  .kc-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
  .kc-count{font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1px 7px}
  .kc-dot{width:7px;height:7px;border-radius:50%;margin-right:5px;display:inline-block;flex-shrink:0}
- .obra-card{background:rgba(20,22,30,.66);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-sm);padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,opacity .15s;position:relative}
+ .obra-card{background:rgba(255,255,255,.055);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-sm);padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,opacity .15s;position:relative}
  body.light .obra-card{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.6)}
  .obra-card:hover{border-color:var(--green)}
  .obra-card:last-child{margin-bottom:0}
@@ -334,7 +335,7 @@ body.light .dash-panel{
  .dash-tab-btn.active{color:var(--navy);border-bottom-color:var(--navy)}
  
 /* ── KPI CARDS — estilo Linear/Stripe: zero decoração, número é o único herói */
-.dash-kpi-card{background:rgba(20,22,30,.66);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.08);border-radius:var(--r-sm);padding:12px 14px;cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
+.dash-kpi-card{background:rgba(255,255,255,.055);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-sm);padding:12px 14px;cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
 body.light .dash-kpi-card{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.6)}
 .dash-kpi-card:hover{background:var(--surface);border-color:rgba(139,148,158,.4)}
 .dash-kpi-card:active{opacity:.85}
