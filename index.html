@@ -11,8 +11,8 @@
  <title>MilaLab — Sistema Interno</title>
  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='%233D4FD1'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%239DA3B0'/%3E%3Cstop offset='45%25' stop-color='%23F5F6F8'/%3E%3Cstop offset='100%25' stop-color='%238E94A3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M50 20 L78 35 V65 L50 80 L22 65 V35 Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='10' fill='url(%23g)'/%3E%3C/svg%3E">
  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles/tokens.css?v=mldsv4">
-<link rel="stylesheet" href="styles/main.css?v=mldsv4">
+<link rel="stylesheet" href="styles/tokens.css?v=mldsv5">
+<link rel="stylesheet" href="styles/main.css?v=mldsv5">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="scripts/lib/supabase-client.js"></script>
 <script src="scripts/lib/ui-helpers.js"></script>
@@ -65,7 +65,7 @@
 <!-- MODAL PROPOSTA COMERCIAL -->
 <div id="modal-proposta-comercial" style="display:none;position:fixed;inset:0;z-index:9999;flex-direction:column">
  <!-- Toolbar fixa -->
- <div id="prop-modal-toolbar" style="background:#1B1B8F;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.3)">
+ <div id="prop-modal-toolbar" style="background:#3D4FD1;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;box-shadow:0 2px 10px rgba(0,0,0,.3)">
   <div>
    <div style="color:rgba(255,255,255,.55);font-size:9px;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px">MilaTec · Proposta Comercial</div>
    <div style="color:#fff;font-weight:700;font-size:13px" id="prop-modal-titulo">—</div>
@@ -284,7 +284,7 @@
 <!-- Design system unificado dos campos do wizard Nova Obra: todo select/input/checklist
      do modal usa a mesma geometria de .mf input,.mf select (padding 9px 12px, radius 7px,
      borda var(--border), foco navy com ring) para não ter dois estilos de campo coexistindo. -->
-<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv4">
+<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv5">
 <!-- MODAL NOVA OBRA — wizard 4 etapas (fluxo único, sem gate de tipo) -->
 <div class="modal-backdrop" id="modal-nova-obra" onclick="handleModalBackdrop(event)">
  <div class="modal" id="modal-obra-box" style="max-width:900px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh">
@@ -529,7 +529,7 @@
   <div style="display:flex;align-items:center;gap:12px">
    <div class="avatar" id="dash-avatar-wrap" onclick="openProfile()" title="Meu Perfil" style="cursor:pointer;width:40px;height:40px;font-size:16px;flex-shrink:0"><span id="dash-avatar-letter">L</span><img id="dash-avatar-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:none"></div>
    <div>
-    <div style="font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.2px" id="dash-greeting">Olá —</div>
+    <div style="font-family:'Sora',sans-serif;font-size:20px;font-weight:700;color:var(--text);letter-spacing:-.2px" id="dash-greeting">Olá —</div>
     <div style="font-size:11px;color:var(--muted);margin-top:2px" id="dash-date-line"></div>
    </div>
   </div>
@@ -854,7 +854,7 @@
    <span><b id="gst-total" style="font-weight:800;color:var(--text)">—</b> <span style="color:var(--muted)">total</span></span>
    <span><b id="gst-done" style="font-weight:800;color:#28b548">—</b> <span style="color:var(--muted)">concluídas</span></span>
    <span><b id="gst-prog" style="font-weight:800;color:#3b82f6">—</b> <span style="color:var(--muted)">em progresso</span></span>
-   <span><b id="gst-late" style="font-weight:800;color:#dc2626">—</b> <span style="color:var(--muted)">atrasadas</span></span>
+   <span><b id="gst-late" style="font-weight:800;color:#D6433C">—</b> <span style="color:var(--muted)">atrasadas</span></span>
   </div>
  </div>
 
@@ -1016,7 +1016,7 @@
 <div id="page-empresas" class="page" style="padding-top:8px">
 
  <!-- Estilos Notion para esta página -->
-<link rel="stylesheet" href="styles/empresas.css?v=mldsv4">
+<link rel="stylesheet" href="styles/empresas.css?v=mldsv5">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -1068,7 +1068,7 @@
  <button id="btn-emp-filter" class="nt-tool-btn" onclick="toggleEmpFilterPanel()">
  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="2" y1="4" x2="14" y2="4"/><line x1="4" y1="8" x2="12" y2="8"/><line x1="6" y1="12" x2="10" y2="12"/></svg>
  Filtrar
- <span id="emp-filter-badge" style="display:none;background:#1B1B8F;color:#fff;border-radius:4px;padding:0 5px;font-size:11px;font-weight:600"></span>
+ <span id="emp-filter-badge" style="display:none;background:#3D4FD1;color:#fff;border-radius:4px;padding:0 5px;font-size:11px;font-weight:600"></span>
  </button>
  <!-- Painel filtro -->
  <div id="emp-filter-panel" class="nt-filter-panel">
@@ -1080,7 +1080,7 @@
  </button>
  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
  <button onclick="limparEmpFiltros()" style="font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--muted);cursor:pointer">Limpar</button>
- <button onclick="filterEmpresas();toggleEmpFilterPanel()" style="font-size:12px;padding:5px 14px;border:none;border-radius:6px;background:#1B1B8F;color:#fff;cursor:pointer;font-weight:500">Aplicar</button>
+ <button onclick="filterEmpresas();toggleEmpFilterPanel()" style="font-size:12px;padding:5px 14px;border:none;border-radius:6px;background:#3D4FD1;color:#fff;cursor:pointer;font-weight:500">Aplicar</button>
  </div>
  </div>
  </div>
@@ -1130,7 +1130,7 @@
  <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
  <td>
  <div style="display:flex;align-items:center;gap:10px">
- <div class="nt-avatar" style="background:#1B1B8F">CV</div>
+ <div class="nt-avatar" style="background:#3D4FD1">CV</div>
  <div>
  <div style="font-weight:500;font-size:13px">Construtora Vega</div>
  <div style="font-size:11px;color:var(--muted)">12.345.678/0001-90</div>
@@ -1307,7 +1307,7 @@
  <button id="btn-ctt-filter" class="nt-tool-btn" onclick="toggleCttFilterPanel()">
  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="2" y1="4" x2="14" y2="4"/><line x1="4" y1="8" x2="12" y2="8"/><line x1="6" y1="12" x2="10" y2="12"/></svg>
  Filtrar
- <span id="ctt-filter-badge" style="display:none;background:#1B1B8F;color:#fff;border-radius:4px;padding:0 5px;font-size:11px;font-weight:600"></span>
+ <span id="ctt-filter-badge" style="display:none;background:#3D4FD1;color:#fff;border-radius:4px;padding:0 5px;font-size:11px;font-weight:600"></span>
  </button>
  <div id="ctt-filter-panel" class="nt-filter-panel">
  <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">Filtrar por</div>
@@ -1318,7 +1318,7 @@
  </button>
  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
  <button onclick="limparCttFiltros()" style="font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--muted);cursor:pointer">Limpar</button>
- <button onclick="filterContatos();toggleCttFilterPanel()" style="font-size:12px;padding:5px 14px;border:none;border-radius:6px;background:#1B1B8F;color:#fff;cursor:pointer;font-weight:500">Aplicar</button>
+ <button onclick="filterContatos();toggleCttFilterPanel()" style="font-size:12px;padding:5px 14px;border:none;border-radius:6px;background:#3D4FD1;color:#fff;cursor:pointer;font-weight:500">Aplicar</button>
  </div>
  </div>
  </div>
@@ -1366,7 +1366,7 @@
  <tbody id="ctt-tbody" data-sp="contatos">
  <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('contatos',this)" data-nome="ricardo costa" data-cargo="diretor de obras" data-perfil="decisor" data-empresa="construtora vega" data-ult="0">
  <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#1B1B8F">RC</div><div style="font-weight:500">Ricardo Costa</div></div></td>
+ <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#3D4FD1">RC</div><div style="font-weight:500">Ricardo Costa</div></div></td>
  <td style="color:var(--muted);font-size:12px">Diretor de Obras</td>
  <td><span class="nt-tag nt-tag-red">Decisor</span></td>
  <td style="font-size:12px">Construtora Vega</td>
@@ -1592,7 +1592,7 @@
  <button id="btn-obras-filter" onclick="toggleFilterPanel()" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;height:34px">
  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="2" y1="4" x2="14" y2="4"/><line x1="4" y1="8" x2="12" y2="8"/><line x1="6" y1="12" x2="10" y2="12"/></svg>
  Filtro
- <span id="filter-badge" style="display:none;background:#1B1B8F;color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:600"></span>
+ <span id="filter-badge" style="display:none;background:#3D4FD1;color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:600"></span>
  </button>
 
  <!-- Painel de filtros estilo Airtable -->
@@ -1619,7 +1619,7 @@
 
  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
  <button onclick="limparFiltrosObras()" style="font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--muted);cursor:pointer">Limpar tudo</button>
- <button onclick="toggleFilterPanel()" style="font-size:12px;padding:5px 14px;border:none;border-radius:6px;background:#1B1B8F;color:#fff;cursor:pointer;font-weight:500">Aplicar</button>
+ <button onclick="toggleFilterPanel()" style="font-size:12px;padding:5px 14px;border:none;border-radius:6px;background:#3D4FD1;color:#fff;cursor:pointer;font-weight:500">Aplicar</button>
  </div>
  </div>
  </div>
@@ -2076,7 +2076,7 @@
  <!-- ENTREGAS -->
  <div id="page-entregas" class="page">
 
-<link rel="stylesheet" href="styles/entregas.css?v=mldsv4">
+<link rel="stylesheet" href="styles/entregas.css?v=mldsv5">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -3168,7 +3168,7 @@
 <!-- SISTEMA DE AUTENTICAÇÃO MILATEC v3.04 — Identidade Visual Grupo Mila      -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<link rel="stylesheet" href="styles/auth.css?v=mldsv4">
+<link rel="stylesheet" href="styles/auth.css?v=mldsv5">
 
 <!-- ═══════════════════════════════════════════════════════════════
      TELA 1 — LOGIN

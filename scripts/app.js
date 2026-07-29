@@ -924,7 +924,7 @@ var _kpiConfig = {
  },
  prox3: {
   title: 'Vencem em até 3 dias',
-  color: '#b45309',
+  color: '#B8790A',
   icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l2 2" stroke-linecap="round"/></svg>',
   desc:  'Atividades com prazo nos próximos 3 dias',
   filter: function(a, hoje) {

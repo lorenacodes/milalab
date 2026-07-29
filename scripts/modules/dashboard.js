@@ -2459,9 +2459,9 @@ function _dashRenderFeed(atividades) {
     + '<span style="font-size:9px;color:var(--muted);margin-right:1px">Resp.:</span>'
     + respList.map(function(r) {
      var short = r.indexOf('@') > -1 ? r.split('@')[0] : r.split(' ')[0];
-     return '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:' + (isMultiResp ? 'rgba(99,102,241,.1)' : 'var(--surface2)') + ';color:' + (isMultiResp ? '#6366f1' : 'var(--muted)') + ';font-weight:600" title="' + r + '">' + short + '</span>';
+     return '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:' + (isMultiResp ? 'rgba(99,102,241,.1)' : 'var(--surface2)') + ';color:' + (isMultiResp ? '#3D4FD1' : 'var(--muted)') + ';font-weight:600" title="' + r + '">' + short + '</span>';
     }).join('')
-    + (isMultiResp ? '<span style="font-size:9px;color:#6366f1;font-weight:600"> · compartilhada</span>' : '')
+    + (isMultiResp ? '<span style="font-size:9px;color:#3D4FD1;font-weight:600"> · compartilhada</span>' : '')
     + '</div>';
   }
 
@@ -3004,7 +3004,7 @@ function _dashRenderChartSemanas(dados) {
  var _tSumA = buckets.slice(0, _tmid).reduce(function(s,b){ return s + b.count; }, 0);
  var _tSumB = buckets.slice(_tmid).reduce(function(s,b){ return s + b.count; }, 0);
  var trendDir   = (_tSumB > _tSumA) ? 'up' : (_tSumB < _tSumA) ? 'down' : 'neutral';
- var trendColor = trendDir === 'up' ? '#1F8A4C' : trendDir === 'down' ? '#cf222e' : '#6366f1';
+ var trendColor = trendDir === 'up' ? '#1F8A4C' : trendDir === 'down' ? '#D6433C' : '#3D4FD1';
 
  // ── MODO LINHA ────────────────────────────────────────────────────────────
  if (tipo === 'line') {
@@ -3055,7 +3055,7 @@ function _dashRenderChartSemanas(dados) {
   if (avgVal > 0 && avgVal < maxVal) {
    var avgY = (padT + (1 - avgVal / maxVal) * useH).toFixed(1);
    avgSvg = '<line x1="' + padL + '" y1="' + avgY + '" x2="' + (100 - padR) + '" y2="' + avgY
-    + '" stroke="#6366f1" stroke-opacity=".45" stroke-width="0.6" stroke-dasharray="2.5 2"/>';
+    + '" stroke="#3D4FD1" stroke-opacity=".45" stroke-width="0.6" stroke-dasharray="2.5 2"/>';
   }
 
   // Dots HTML: apenas pontos com valor > 0, máximo e último destacados
@@ -3065,7 +3065,7 @@ function _dashRenderChartSemanas(dados) {
    if (pt.count === 0 && !isLast) return ''; // omite zeros (exceto último)
    var isPeak = pt.isMax && pt.count > 0;
    var dotSz  = isPeak ? 8 : isLast ? 7 : 5;
-   var dotClr = isPeak ? '#1F8A4C' : isLast ? 'var(--navy)' : '#6366f1';
+   var dotClr = isPeak ? '#1F8A4C' : isLast ? 'var(--navy)' : '#3D4FD1';
    var lblClr = isPeak ? '#1F8A4C' : 'var(--navy)';
    var showLbl = pt.count > 0 && (isPeak || isLast || n <= 7);
    var dot = '<div style="position:absolute;left:' + pt.x + '%;top:' + pt.y + '%;transform:translate(-50%,-50%);'
@@ -3083,7 +3083,7 @@ function _dashRenderChartSemanas(dados) {
 
   // "Média" label no fim da linha de média (posicionado como div absoluto)
   var avgLabel = (avgVal > 0 && avgVal < maxVal)
-   ? '<div style="position:absolute;right:' + padR + '%;top:' + (padT + (1 - avgVal / maxVal) * useH - 8) + '%;font-size:7px;color:#6366f1;opacity:.7;white-space:nowrap;pointer-events:none">med</div>'
+   ? '<div style="position:absolute;right:' + padR + '%;top:' + (padT + (1 - avgVal / maxVal) * useH - 8) + '%;font-size:7px;color:#3D4FD1;opacity:.7;white-space:nowrap;pointer-events:none">med</div>'
    : '';
 
   // Dots: pico em trendColor, último em navy, demais em trendColor mais claro
@@ -3162,7 +3162,7 @@ function _dashRenderChartSemanas(dados) {
     var h = barHeights[i];
     var isLast = i === totalBuckets - 1;
     var isPeak = i === maxIdx && s.count > 0 && !isLast;
-    var clr = isLast ? 'var(--navy)' : isPeak ? trendColor : (s.count > 0 ? '#6366f1' : 'var(--border)');
+    var clr = isLast ? 'var(--navy)' : isPeak ? trendColor : (s.count > 0 ? 'var(--navy)' : 'var(--border)');
     var opacity = s.count === 0 ? '.3' : '1';
     var lblClr = isPeak ? trendColor : isLast ? 'var(--navy)' : 'var(--muted)';
     var showLbl = s.count > 0 && (isPeak || isLast || totalBuckets <= 8);
@@ -3204,7 +3204,7 @@ function _dashRenderChartSemanas(dados) {
   var trendPct = sumFirst > 0 ? Math.round(((sumSecond - sumFirst) / sumFirst) * 100) : 0;
   // Reutiliza trendDir calculado no início (ou recalcula para o footer)
   var tFDir = sumSecond > sumFirst ? 'up' : sumSecond < sumFirst ? 'down' : 'neutral';
-  var tFClr = tFDir === 'up' ? '#1F8A4C' : tFDir === 'down' ? '#cf222e' : '#8b949e';
+  var tFClr = tFDir === 'up' ? '#1F8A4C' : tFDir === 'down' ? '#D6433C' : '#8b949e';
   var tFBg  = tFDir === 'up' ? 'rgba(40,181,72,.12)' : tFDir === 'down' ? 'rgba(207,34,46,.1)' : 'var(--surface2)';
   var tFBrd = tFDir === 'up' ? 'rgba(40,181,72,.3)'  : tFDir === 'down' ? 'rgba(207,34,46,.25)' : 'var(--border)';
   var tFWord= tFDir === 'up' ? 'Crescimento' : tFDir === 'down' ? 'Queda' : 'Estável';
@@ -3331,10 +3331,10 @@ function _dashRenderChartStatus(dados) {
  // Itens do donut (excluindo zeros)
  var items = [
   { label: 'Concluídas',   count: cats.concluidas, hex: '#1F8A4C', cssVar: 'var(--green)' },
-  { label: 'Em andamento', count: cats.andamento,  hex: '#050866', cssVar: 'var(--navy)'  },
+  { label: 'Em andamento', count: cats.andamento,  hex: '#3D4FD1', cssVar: 'var(--navy)'  },
   { label: 'A fazer',      count: cats.afazer,     hex: '#8b949e', cssVar: 'var(--muted)' },
-  { label: 'Atrasadas',    count: cats.atrasadas,  hex: '#cf222e', cssVar: 'var(--red)'   },
-  { label: 'Bloqueadas',   count: cats.bloqueadas, hex: '#b45309', cssVar: 'var(--yellow)'}
+  { label: 'Atrasadas',    count: cats.atrasadas,  hex: '#D6433C', cssVar: 'var(--red)'   },
+  { label: 'Bloqueadas',   count: cats.bloqueadas, hex: '#B8790A', cssVar: 'var(--yellow)'}
  ].filter(function(x){ return x.count > 0; });
 
  // ── Donut SVG ──────────────────────────────────────────────
@@ -3444,7 +3444,7 @@ function _dashRenderChartStatus(dados) {
 
  // ── Seção: Requer Atenção ─────────────────────────────────────────────────
  function _hpRow(dotColor, label, count, filter, urgent) {
-  var bg   = urgent && count > 0 ? (dotColor === '#cf222e' ? 'rgba(207,34,46,.06)' : dotColor === '#b45309' ? 'rgba(180,83,9,.06)' : 'transparent') : 'transparent';
+  var bg   = urgent && count > 0 ? (dotColor === '#D6433C' ? 'rgba(207,34,46,.06)' : dotColor === '#B8790A' ? 'rgba(180,83,9,.06)' : 'transparent') : 'transparent';
   var clr  = urgent && count > 0 ? dotColor : 'var(--text)';
   var cnt  = count > 0 ? count : '—';
   var cntClr = count > 0 ? clr : 'var(--muted)';
@@ -3459,9 +3459,9 @@ function _dashRenderChartStatus(dados) {
  }
 
  var atencaoHtml = '<div class="hp-section-lbl">Requer Atenção</div>'
-  + _hpRow('#cf222e', 'Atrasadas', cats.atrasadas, 'atr', true)
-  + _hpRow('#b45309', 'Vencem em até 3 dias', proximas, 'prox3', proximas > 0)
-  + _hpRow('#6366f1', 'Colaborações pendentes', colabPend, null, colabPend > 0)
+  + _hpRow('#D6433C', 'Atrasadas', cats.atrasadas, 'atr', true)
+  + _hpRow('#B8790A', 'Vencem em até 3 dias', proximas, 'prox3', proximas > 0)
+  + _hpRow('#3D4FD1', 'Colaborações pendentes', colabPend, null, colabPend > 0)
   + _hpRow('#8b949e', 'Sem atualização há +7d', semAtualizacao, null, false)
   + _hpRow('#8b949e', 'Sem prazo definido', semPrazo, 'abertas', false);
 
@@ -3473,11 +3473,11 @@ function _dashRenderChartStatus(dados) {
  var alertasHtml = '<hr class="hp-divider">'
   + '<div class="hp-section-lbl">Alertas</div>'
   + _hpRow('#8b949e', 'Sem responsável', semResponsavel, null, semResponsavel > 0)
-  + _hpRow('#b45309', 'Bloqueadas', cats.bloqueadas, null, cats.bloqueadas > 0);
+  + _hpRow('#B8790A', 'Bloqueadas', cats.bloqueadas, null, cats.bloqueadas > 0);
 
  // ── Seção: Execução ──────────────────────────────────────────────────────
  var pctBar = Math.min(100, pctDone);
- var barColor = pctDone >= 75 ? '#1F8A4C' : pctDone >= 50 ? '#050866' : '#b45309';
+ var barColor = pctDone >= 75 ? '#1F8A4C' : pctDone >= 50 ? '#3D4FD1' : '#B8790A';
 
  var execHtml = '<hr class="hp-divider">'
   + '<div class="hp-section-lbl">Execução do Período</div>'
@@ -3491,7 +3491,7 @@ function _dashRenderChartStatus(dados) {
   + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
   + '<span style="font-size:10px;color:var(--muted)"><span style="font-weight:700;color:#1F8A4C">' + cats.concluidas + '</span> concluídas</span>'
   + '<span style="font-size:10px;color:var(--muted)"><span style="font-weight:700;color:#8b949e">' + (cats.afazer + cats.andamento) + '</span> abertas</span>'
-  + (cats.atrasadas > 0 ? '<span style="font-size:10px;color:var(--muted)"><span style="font-weight:700;color:#cf222e">' + cats.atrasadas + '</span> atrasadas</span>' : '')
+  + (cats.atrasadas > 0 ? '<span style="font-size:10px;color:var(--muted)"><span style="font-weight:700;color:#D6433C">' + cats.atrasadas + '</span> atrasadas</span>' : '')
   + '<span onclick="_kpiDrawerOpen(\'abertas\')" style="font-size:10px;color:var(--navy);cursor:pointer;text-decoration:underline;text-underline-offset:2px;margin-left:auto">ver todas</span>'
   + '</div>';
 

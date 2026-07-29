@@ -76,10 +76,10 @@ var _gStatusStyle = {
  'Feito':             { cls:'gs-feito',    dot:'#1F8A4C' },
  'Concluído':         { cls:'gs-feito',    dot:'#1F8A4C' },
  'Concluida':         { cls:'gs-feito',    dot:'#1F8A4C' },
- 'Bloqueado':         { cls:'gs-bloqueado',dot:'#b45309' },
- 'Bloqueada':         { cls:'gs-bloqueado',dot:'#b45309' },
- 'Impedida':          { cls:'gs-bloqueado',dot:'#b45309' },
- 'Aguardando feedback':{ cls:'gs-bloqueado',dot:'#b45309' },
+ 'Bloqueado':         { cls:'gs-bloqueado',dot:'#B8790A' },
+ 'Bloqueada':         { cls:'gs-bloqueado',dot:'#B8790A' },
+ 'Impedida':          { cls:'gs-bloqueado',dot:'#B8790A' },
+ 'Aguardando feedback':{ cls:'gs-bloqueado',dot:'#B8790A' },
  'Obsoleto':          { cls:'gs-afazer',   dot:'#9ca3af' }
 };
 function _gStatusCls(s) { return (_gStatusStyle[s] || { cls:'gs-afazer', dot:'#9ca3af' }); }
@@ -439,7 +439,7 @@ var _SETOR_CORES = {
  'Produção':   '#B8790A',
  'Equipe P&D': '#ec4899',
  'Logística':  '#06b6d4',
- 'Dados':      '#6366f1',
+ 'Dados':      '#3D4FD1',
  'Marketing':  '#f97316',
  'Compras':    '#64748b',
  'Processos':  '#64748b',
@@ -476,14 +476,14 @@ function _gestorRenderSetor() {
   var cards = items.slice(0,50).map(function(a) {
    var late = _gIsLate(a);
    var sc   = _gStatusCls(late ? 'Atrasado' : (a.status || 'A fazer'));
-   var statusDot = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + (late ? '#cf222e' : sc.dot) + ';flex-shrink:0;margin-top:3px"></span>';
+   var statusDot = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + (late ? '#D6433C' : sc.dot) + ';flex-shrink:0;margin-top:3px"></span>';
    var prazoTxt = '';
    if (a.data_prazo) {
     var dp = new Date(a.data_prazo + 'T00:00:00');
     var diff = Math.floor((dp - hoje) / 86400000);
     var dpStr = dp.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
-    prazoTxt = late ? '<span style="color:#cf222e;font-size:9px;font-weight:700">' + dpStr + '</span>'
-     : diff <= 3 ? '<span style="color:#b45309;font-size:9px">' + dpStr + '</span>'
+    prazoTxt = late ? '<span style="color:#D6433C;font-size:9px;font-weight:700">' + dpStr + '</span>'
+     : diff <= 3 ? '<span style="color:#B8790A;font-size:9px">' + dpStr + '</span>'
      : '<span style="color:var(--muted);font-size:9px">' + dpStr + '</span>';
    }
    var respStr = (a.responsavel || '').split(/[,;]+/)[0].trim();
@@ -512,7 +512,7 @@ function _gestorRenderSetor() {
    + '<div style="font-size:12px;font-weight:700;color:#fff">' + setor + '</div>'
    + '<div style="display:flex;align-items:center;gap:6px">'
    + '<span style="background:rgba(255,255,255,.25);color:#fff;font-size:10px;font-weight:700;padding:1px 8px;border-radius:20px">' + items.length + '</span>'
-   + (nLate > 0 ? '<span style="background:#cf222e;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px">' + nLate + ' atras.</span>' : '')
+   + (nLate > 0 ? '<span style="background:#D6433C;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px">' + nLate + ' atras.</span>' : '')
    + '</div></div>'
    + '<div style="background:var(--surface2);border:1px solid ' + cor + '44;border-top:none;border-radius:0 0 8px 8px;padding:6px;overflow-y:auto;max-height:calc(100vh - 280px)">'
    + '<div style="font-size:9px;color:var(--muted);text-align:center;padding:4px 0 8px">' + nDone + '/' + items.length + ' concluídas</div>'
@@ -620,7 +620,7 @@ function _gestorRenderGrid() {
   var nDone = items.filter(function(a){ return _gIsDone(a.status); }).length;
   var nLate = items.filter(function(a){ return _gIsLate(a); }).length;
   var badge = nLate > 0
-   ? '<span style="background:rgba(207,34,46,.12);color:#cf222e;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:6px">' + nLate + ' atrasadas</span>'
+   ? '<span style="background:rgba(207,34,46,.12);color:#D6433C;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:6px">' + nLate + ' atrasadas</span>'
    : '';
   var doneBadge = '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + nDone + '/' + items.length + ' concluídas</span>';
 
@@ -648,7 +648,7 @@ function _gestorRenderRow(a, rowNum, hoje) {
  var late    = _gIsLate(a);
  var sc      = _gStatusCls(late ? 'Atrasado' : (a.status || 'A fazer'));
  var statusLbl = late ? 'Atrasado' : (a.status || 'A fazer');
- var dot     = late ? '#cf222e' : sc.dot;
+ var dot     = late ? '#D6433C' : sc.dot;
 
  // Prazo formatado
  var prazoHtml = '';
@@ -656,8 +656,8 @@ function _gestorRenderRow(a, rowNum, hoje) {
   var dp = new Date(a.data_prazo + 'T00:00:00');
   var diff = Math.floor((dp - hoje) / 86400000);
   var dpStr = dp.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
-  if (late)      prazoHtml = '<span style="color:#cf222e;font-weight:700">' + dpStr + '</span>';
-  else if (diff <= 3) prazoHtml = '<span style="color:#b45309;font-weight:600">' + dpStr + '</span>';
+  if (late)      prazoHtml = '<span style="color:#D6433C;font-weight:700">' + dpStr + '</span>';
+  else if (diff <= 3) prazoHtml = '<span style="color:#B8790A;font-weight:600">' + dpStr + '</span>';
   else           prazoHtml = '<span style="color:var(--muted)">' + dpStr + '</span>';
  } else { prazoHtml = '<span style="color:var(--border)">—</span>'; }
 
@@ -717,7 +717,7 @@ function _gestorRenderRow(a, rowNum, hoje) {
 
  return '<tr onclick="_gestorRowClick(\'' + a.id + '\')" style="' + (late ? 'background:rgba(207,34,46,.02)' : '') + '">'
   + '<td style="color:var(--muted);font-size:10px;text-align:center">' + rowNum + '</td>'
-  + '<td title="' + (a.titulo||'').replace(/"/g,'&quot;') + '" style="font-weight:500;color:' + (late?'#cf222e':'var(--text)') + ';overflow:hidden">'
+  + '<td title="' + (a.titulo||'').replace(/"/g,'&quot;') + '" style="font-weight:500;color:' + (late?'#D6433C':'var(--text)') + ';overflow:hidden">'
   + '<div style="display:flex;align-items:flex-start;gap:6px;min-width:0">'
   + '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';margin-top:4px;flex-shrink:0"></span>'
   + '<div style="min-width:0;overflow:hidden;flex:1">'
@@ -993,7 +993,7 @@ function _gestorTimelineTip(evt, id) {
   + '</div>'
   + '<div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;margin-bottom:6px">'
   + '<span style="color:var(--muted)">Início</span><b>' + inicio + '</b>'
-  + '<span style="color:var(--muted)">Prazo</span><b style="color:' + (late?'#cf222e':'var(--text)') + '">' + prazo + '</b>'
+  + '<span style="color:var(--muted)">Prazo</span><b style="color:' + (late?'#D6433C':'var(--text)') + '">' + prazo + '</b>'
   + (durStr ? '<span style="color:var(--muted)">Duração</span>' + durStr : '')
   + '</div>'
   + '<div style="font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:5px">Resp.: ' + resp + '</div>';

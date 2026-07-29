@@ -89,7 +89,7 @@ function _adminRenderUsers(users) {
   var statusBadge = u.banned
    ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:20px;background:var(--red-dim);color:var(--red);font-weight:700"><span style="width:5px;height:5px;border-radius:50%;background:var(--red);display:inline-block"></span>Suspenso</span>'
    : !u.email_confirmed
-   ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:20px;background:var(--yellow-dim);color:#b45309;font-weight:700"><span style="width:5px;height:5px;border-radius:50%;background:var(--yellow);display:inline-block"></span>Convite pendente</span>'
+   ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:20px;background:var(--yellow-dim);color:#B8790A;font-weight:700"><span style="width:5px;height:5px;border-radius:50%;background:var(--yellow);display:inline-block"></span>Convite pendente</span>'
    : '<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;padding:3px 8px;border-radius:20px;background:var(--green-dim);color:var(--green);font-weight:700"><span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span>Ativo</span>';
 
   var roleSelect = '<select onchange="_adminAlterarRole(\''+u.id+'\',this.value)" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);cursor:pointer;font-weight:600">'

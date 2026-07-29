@@ -41,12 +41,12 @@
     var(--bg);
 }
 .frosted-card{
-  background: rgba(255,255,255,.055);
+  background: rgba(255,255,255,.06);
   -webkit-backdrop-filter: blur(6px) saturate(1.1);
   backdrop-filter: blur(6px) saturate(1.1);
-  border: 1px solid rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.14);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-1);
+  box-shadow: var(--shadow-2);
 }
 body.light .frosted-card{
   background: rgba(255,255,255,.7);
@@ -58,11 +58,12 @@ body.light .frosted-card{
 /* Painéis do "Meu Painel" (Minhas Atividades, Meus Projetos, gráficos, Saúde
    das Atividades, Central de Comunicação) — mesmo tratamento de vidro. */
 .dash-panel{
-  background: rgba(255,255,255,.055);
+  background: rgba(255,255,255,.06);
   -webkit-backdrop-filter: blur(6px) saturate(1.1);
   backdrop-filter: blur(6px) saturate(1.1);
-  border: 1px solid rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.14);
   border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
 }
 body.light .dash-panel{
   background: rgba(255,255,255,.7);
@@ -199,7 +200,7 @@ body.light .dash-panel{
  .kc-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px}
  .kc-count{font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1px 7px}
  .kc-dot{width:7px;height:7px;border-radius:50%;margin-right:5px;display:inline-block;flex-shrink:0}
- .obra-card{background:rgba(255,255,255,.055);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-sm);padding:11px 12px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,opacity .15s;position:relative}
+ .obra-card{background:rgba(255,255,255,.06);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.14);border-radius:var(--r-md);padding:13px 14px;margin-bottom:8px;box-shadow:var(--shadow-1);cursor:pointer;transition:border-color .15s,opacity .15s;position:relative}
  body.light .obra-card{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.6)}
  .obra-card:hover{border-color:var(--green)}
  .obra-card:last-child{margin-bottom:0}
@@ -335,7 +336,7 @@ body.light .dash-panel{
  .dash-tab-btn.active{color:var(--navy);border-bottom-color:var(--navy)}
  
 /* ── KPI CARDS — estilo Linear/Stripe: zero decoração, número é o único herói */
-.dash-kpi-card{background:rgba(255,255,255,.055);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-sm);padding:12px 14px;cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
+.dash-kpi-card{background:rgba(255,255,255,.06);-webkit-backdrop-filter:blur(6px) saturate(1.1);backdrop-filter:blur(6px) saturate(1.1);border:1px solid rgba(255,255,255,.14);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--shadow-2);cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
 body.light .dash-kpi-card{background:rgba(255,255,255,.7);border-color:rgba(255,255,255,.6)}
 .dash-kpi-card:hover{background:var(--surface);border-color:rgba(139,148,158,.4)}
 .dash-kpi-card:active{opacity:.85}
