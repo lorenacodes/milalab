@@ -5,14 +5,16 @@ function _userAvatarHTML(u, size) {
  size = size || 24;
  var fontSize = Math.round(size * 0.38);
  if (u && u.avatar) {
-  return '<img src="' + u.avatar + '" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;object-fit:cover;flex-shrink:0" title="' + (u.nome||'') + '">';
+  // Foto real: nunca preenchida com prata — só um anel fino de prata em volta.
+  var ringPad = Math.max(2, Math.round(size * 0.07));
+  var imgSize = size - ringPad * 2;
+  return '<span style="display:inline-flex;width:' + size + 'px;height:' + size + 'px;padding:' + ringPad + 'px;border-radius:50%;background:var(--silver-grad,#C9CDD8);flex-shrink:0;box-sizing:border-box" title="' + (u.nome||'') + '">'
+   + '<img src="' + u.avatar + '" style="width:' + imgSize + 'px;height:' + imgSize + 'px;border-radius:50%;object-fit:cover;display:block;border:2px solid var(--surface,#fff)">'
+   + '</span>';
  }
- var colors = ['#1B1B8F','#28b548','#e07b00','#8957E5','#1f7ec4','#c44b1f'];
- var key = u ? (u.email || u.nome || '') : '';
- var ci = 0; for(var j=0;j<key.length;j++) ci += key.charCodeAt(j);
- var bg = colors[ci % colors.length];
+ // Sem foto: prata metálica é o padrão, não uma exceção.
  var ltr = u ? (u.iniciais || (u.nome||'U').charAt(0).toUpperCase()) : 'U';
- return '<span style="display:inline-flex;align-items:center;justify-content:center;width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + bg + ';color:#fff;font-size:' + fontSize + 'px;font-weight:700;flex-shrink:0" title="' + (u?u.nome:'') + '">' + ltr + '</span>';
+ return '<span style="display:inline-flex;align-items:center;justify-content:center;width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:var(--silver-grad,#C9CDD8);color:var(--silver-ink,#5B5F6B);font-size:' + fontSize + 'px;font-weight:700;flex-shrink:0" title="' + (u?u.nome:'') + '">' + ltr + '</span>';
 }
 // Normaliza nomes para comparação: remove acentos, baixa caixa, espaços extras
 function _normName(s) {

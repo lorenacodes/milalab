@@ -1,0 +1,68 @@
+/* MilaLab Design System — tokens.
+   Fonte: MilaLab_Design_System.html (raiz do repo).
+   Cores de marca/prioridade/status são idênticas nos dois temas (claro/escuro);
+   apenas os neutros (--gray-*) invertem. O preto neutro do tema escuro do app
+   é intencional (pedido explícito da usuária) e não o azul-petróleo do mock. */
+:root{
+  /* marca */
+  --indigo-900:#141838; --indigo-800:#1B2050; --indigo-700:#293375; --indigo-600:#3D4FD1;
+  --indigo-500:#5768E0; --indigo-100:#EBEDFB;
+  --violet-500:#8B6FE8; --teal-400:#3FBFB4;
+
+  /* prata (uso estratégico, ver seção 6 do Design System) */
+  --silver-grad:linear-gradient(135deg,#EDEFF3 0%,#C9CDD8 28%,#F5F6F8 50%,#B9BEC9 72%,#E7E9ED 100%);
+  --silver-line:linear-gradient(90deg, transparent, #C9CDD8, #F5F6F8, #C9CDD8, transparent);
+  --silver-ink:#5B5F6B;
+
+  /* status / prioridade — constantes nos dois temas */
+  --red-600:#D6433C; --red-100:#FCEAE8;
+  --amber-600:#B8790A; --amber-100:#FDF0DA;
+  --green-600:#1F8A4C; --green-100:#E6F5EB;
+  --blue-600:#2E5FD9;  --blue-100:#E9EEFC;
+
+  --alert-info-text:#1E3E8F;    --alert-info-border:#CBD8F7;
+  --alert-success-text:#175E36; --alert-success-border:#C5E8D1;
+  --alert-warning-text:#7A4F06; --alert-warning-border:#F3DDAF;
+  --alert-error-text:#8F2822;   --alert-error-border:#F4C7C3;
+  --alert-confirm-text:#1B2050; --alert-confirm-border:#CDD3F5;
+
+  /* elevação */
+  --shadow-1:0 1px 2px rgba(21,22,31,.05);
+  --shadow-2:0 2px 6px rgba(21,22,31,.06), 0 1px 2px rgba(21,22,31,.04);
+  --shadow-3:0 8px 24px rgba(21,22,31,.08), 0 2px 6px rgba(21,22,31,.04);
+  --shadow-4:0 16px 40px rgba(21,22,31,.12);
+
+  /* raio */
+  --r-xs:4px; --r-sm:6px; --r-md:8px; --r-lg:10px; --r-xl:14px; --r-full:999px;
+
+  /* espaçamento (base 4px) */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-8:32px; --sp-10:40px; --sp-12:48px;
+
+  /* tipografia — escala fixa, 10 papéis */
+  --fs-caption:11px; --fs-small:12px; --fs-body:13px; --fs-body-lg:14px;
+  --fs-h4:16px; --fs-h3:18px; --fs-h2:22px; --fs-h1:26px; --fs-display:32px; --fs-hero:40px;
+}
+
+body.light{
+  --alert-info-text:#1E3E8F;    --alert-info-border:#CBD8F7;
+  --alert-success-text:#175E36; --alert-success-border:#C5E8D1;
+  --alert-warning-text:#7A4F06; --alert-warning-border:#F3DDAF;
+  --alert-error-text:#8F2822;   --alert-error-border:#F4C7C3;
+  --alert-confirm-text:#1B2050; --alert-confirm-border:#CDD3F5;
+}
+
+/* Tema escuro: mesmos textos de aviso ficam claros o bastante p/ contraste em fundo preto */
+:root{
+  --alert-info-text-dark:#AFC6FB; --alert-info-border-dark:rgba(46,95,217,.35);
+  --alert-success-text-dark:#8FE3B4; --alert-success-border-dark:rgba(31,138,76,.35);
+  --alert-warning-text-dark:#F3C978; --alert-warning-border-dark:rgba(184,121,10,.4);
+  --alert-error-text-dark:#F5A39D; --alert-error-border-dark:rgba(214,67,60,.4);
+  --alert-confirm-text-dark:#C3C9F7; --alert-confirm-border-dark:rgba(139,111,232,.4);
+}
+body:not(.light){
+  --alert-info-text:var(--alert-info-text-dark);       --alert-info-border:var(--alert-info-border-dark);
+  --alert-success-text:var(--alert-success-text-dark);  --alert-success-border:var(--alert-success-border-dark);
+  --alert-warning-text:var(--alert-warning-text-dark);  --alert-warning-border:var(--alert-warning-border-dark);
+  --alert-error-text:var(--alert-error-text-dark);      --alert-error-border:var(--alert-error-border-dark);
+  --alert-confirm-text:var(--alert-confirm-text-dark);  --alert-confirm-border:var(--alert-confirm-border-dark);
+}

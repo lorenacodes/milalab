@@ -96,7 +96,7 @@ function _execNum(v) { return (Number(v)||0).toLocaleString('pt-BR'); }
 function _execPct(v) { return (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%'; }
 
 // ── Componentes visuais reutilizados ────────────────────────────────────────
-var _execCOL = {ok:'#22c55e', prog:'#0891b2', neutral:'#94a3b8', crit:'#ef4444', warn:'#f59e0b', brand:'#1B1B8F'};
+var _execCOL = {ok:'#1F8A4C', prog:'#2E5FD9', neutral:'#7D8199', crit:'#D6433C', warn:'#B8790A', brand:'#3D4FD1'};
 function _execCard(content, extra) { return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;'+(extra||'')+'">'+content+'</div>'; }
 function _execSecHdr(lbl, clr, sub) {
  clr = clr || 'var(--navy)';

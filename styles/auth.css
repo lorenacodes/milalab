@@ -9,7 +9,7 @@
 .auth-screen {
   position:fixed;inset:0;z-index:99999;
   display:flex;align-items:stretch;
-  font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  font-family:'Sora',-apple-system,BlinkMacSystemFont,sans-serif;
   background:#F6F7F8;
 }
 

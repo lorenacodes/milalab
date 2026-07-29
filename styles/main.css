@@ -1,29 +1,32 @@
  :root {
- /* Modo escuro — preto neutro moderno, azul reservado apenas para destaque/interação */
+ /* Modo escuro — preto neutro moderno. Marca/prioridade/status seguem o MilaLab
+    Design System e seus valores exatos são os mesmos nos dois temas (só os
+    neutros abaixo mudam entre claro/escuro). */
  --bg: #0A0A0B; --surface: #141416; --surface2: #1C1C1F;
  --border: #2A2A2E; --text: #EDEDEF; --muted: #8B8B94;
- --green: #00C55A; --green-dim: rgba(0,197,90,0.13);
- --navy: #3B7CF0; --navy-dim: rgba(59,124,240,0.14);
- --yellow: #D4A017; --yellow-dim: rgba(212,160,23,0.12);
- --red: #CF222E; --red-dim: rgba(207,34,46,0.12);
- --blue: #0183FF; --blue-dim: rgba(1,131,255,0.13);
- --purple: #8957E5; --sidebar-w: 224px;
+ --green: #1F8A4C; --green-dim: rgba(31,138,76,0.20);
+ --navy: #3D4FD1; --navy-dim: rgba(61,79,209,0.20);
+ --yellow: #B8790A; --yellow-dim: rgba(184,121,10,0.20);
+ --red: #D6433C; --red-dim: rgba(214,67,60,0.20);
+ --blue: #2E5FD9; --blue-dim: rgba(46,95,217,0.20);
+ --purple: #8B6FE8; --purple-dim: rgba(139,111,232,0.20); --sidebar-w: 224px;
  }
  body.light {
- /* Modo claro — cores exatas da identidade MilaTec / Grupo Mila */
+ /* Modo claro — mesmos tons de marca/status do tema escuro (MilaLab Design System);
+    apenas os neutros abaixo (fundo, texto, bordas) mudam. */
  --bg: #F6F7F8; --surface: #FFFFFF; --surface2: #EEF1F7;
  --border: #CDD3DF; --text: #0D1033; --muted: #5A6380;
- --green: #00A34A; --green-dim: rgba(0,163,74,0.10);
- --navy: #050866; --navy-dim: rgba(5,8,102,0.08);
- --yellow: #B07D0A; --yellow-dim: rgba(176,125,10,0.10);
- --red: #A8161E; --red-dim: rgba(168,22,30,0.10);
- --blue: #004AE8; --blue-dim: rgba(0,74,232,0.10);
- --purple: #6A3FC2;
+ --green: #1F8A4C; --green-dim: #E6F5EB;
+ --navy: #3D4FD1; --navy-dim: #EBEDFB;
+ --yellow: #B8790A; --yellow-dim: #FDF0DA;
+ --red: #D6433C; --red-dim: #FCEAE8;
+ --blue: #2E5FD9; --blue-dim: #E9EEFC;
+ --purple: #8B6FE8; --purple-dim: rgba(139,111,232,.12);
  }
  body.light tr:hover td{background:rgba(0,0,0,0.03)}
  *{box-sizing:border-box;margin:0;padding:0}
- body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
- h1,h2,h3,.modal-title,.kpi-val,.gestor-hd-title{font-family:'DM Sans',sans-serif;letter-spacing:-.2px}
+ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+ h1,h2,h3,.modal-title,.kpi-val,.gestor-hd-title{font-family:'Sora',sans-serif;font-weight:700;letter-spacing:-.2px}
  /* SIDEBAR */
  .sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:10;overflow-y:auto;transition:width .22s cubic-bezier(.4,0,.2,1)}
  .sidebar.collapsed{width:0!important;border-right:none;overflow:hidden}
@@ -37,12 +40,13 @@
  .nav-sec{padding:14px 16px 4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;font-weight:600}
  .nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;color:var(--muted);cursor:pointer;transition:all .15s;font-size:13px;border-left:2px solid transparent;user-select:none}
  .nav-item:hover{color:var(--text);background:var(--surface2)}
- .nav-item.active{color:var(--green);background:var(--green-dim);border-left-color:var(--green);font-weight:500}
+ .nav-item.active{color:var(--navy);background:var(--navy-dim);border-left-color:transparent;font-weight:500;position:relative}
+ .nav-item.active::before{content:'';position:absolute;left:-2px;top:0;bottom:0;width:2px;background:var(--silver-line,var(--navy))}
  .nav-badge{margin-left:auto;background:var(--surface2);color:var(--muted);font-size:10px;padding:1px 6px;border-radius:10px;border:1px solid var(--border)}
- .nav-item.active .nav-badge{background:var(--green-dim);color:var(--green);border-color:transparent}
+ .nav-item.active .nav-badge{background:var(--navy-dim);color:var(--navy);border-color:transparent}
  .sb-user{padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px}
- .avatar{width:30px;height:30px;background:var(--navy-dim);border:1px solid var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--navy);overflow:hidden;position:relative;flex-shrink:0}
- .avatar img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+ .avatar{width:30px;height:30px;background:var(--silver-grad);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--silver-ink);overflow:hidden;position:relative;flex-shrink:0}
+ .avatar img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:50%}
  /* MAIN */
  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin-left .22s cubic-bezier(.4,0,.2,1)}
  .main.sidebar-collapsed{margin-left:0}
@@ -53,8 +57,8 @@
  .page{display:none!important;padding:24px;flex:1}.page.active{display:block!important}.page.active.page-flex{display:flex!important}
  /* BUTTONS */
  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;font-family:inherit;white-space:nowrap}
- .btn-primary{background:var(--green);color:#fff}.btn-primary:hover{filter:brightness(.88)}
- .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{border-color:var(--green);color:var(--green)}
+ .btn-primary{background:var(--navy);color:#fff}.btn-primary:hover{filter:brightness(.88)}
+ .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{border-color:var(--navy);color:var(--navy)}
  .pp-pwd-btn{display:flex;align-items:center;justify-content:center;background:var(--surface2);color:var(--text);border:1px solid var(--border);transition:all .15s}
  .pp-pwd-btn svg{flex-shrink:0}
  .pp-pwd-btn:hover{border-color:var(--navy);color:var(--navy);background:var(--navy-dim)}
