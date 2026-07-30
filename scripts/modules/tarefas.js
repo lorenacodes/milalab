@@ -601,8 +601,13 @@ function _gestorRenderGrid() {
  _gestorFiltered.forEach(function(a) {
   var key;
   if (groupBy === 'responsavel') {
-   var r = (a.responsavel || '').split(/[,;]+/)[0].trim() || '— Sem responsável';
-   key = r;
+   // Antes usava só o primeiro nome da lista como chave — uma tarefa com
+   // 2+ responsáveis ficava escondida debaixo do nome de uma única pessoa,
+   // dando a impressão de que era só dela. Agora só entra no grupo de uma
+   // pessoa quando ela é a ÚNICA responsável; com 2+ vai para um grupo
+   // coletivo à parte, igual ao agrupamento "Individual/Coletiva".
+   var respList = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
+   key = respList.length === 0 ? '— Sem responsável' : (respList.length === 1 ? respList[0] : '👥 Tarefas Coletivas');
   } else if (groupBy === 'status') {
    key = _gIsLate(a) ? 'Atrasadas' : (a.status || 'A fazer');
   } else if (groupBy === 'area') {
@@ -691,13 +696,13 @@ function _gestorRenderRow(a, rowNum, hoje) {
  var respArr = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
  var respAvatarHtml;
  if (!respArr.length) {
-  respAvatarHtml = '<span style="width:22px;height:22px;border-radius:50%;background:var(--surface2);border:1px dashed var(--border);flex-shrink:0" title="Sem responsável"></span>';
+  respAvatarHtml = '<span style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px dashed var(--border);flex-shrink:0" title="Sem responsável"></span>';
  } else {
   var tip = respArr.length > 1 ? 'Tarefa coletiva (' + respArr.length + '): ' + respArr.join(', ') : respArr[0];
   respAvatarHtml = '<span style="display:inline-flex;position:relative;flex-shrink:0" title="' + tip.replace(/"/g,'&quot;') + '">'
-   + _userAvatarByName(respArr[0], 22)
+   + _userAvatarByName(respArr[0], 32)
    + (respArr.length > 1
-     ? '<span style="position:absolute;right:-4px;bottom:-4px;min-width:13px;height:13px;padding:0 2px;border-radius:20px;background:var(--navy);color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--surface)">' + respArr.length + '</span>'
+     ? '<span style="position:absolute;right:-5px;bottom:-5px;min-width:16px;height:16px;padding:0 3px;border-radius:20px;background:var(--navy);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--surface)">' + respArr.length + '</span>'
      : '')
    + '</span>';
  }
@@ -752,9 +757,9 @@ function _gestorRenderRow(a, rowNum, hoje) {
  return '<tr onclick="_gestorRowClick(\'' + a.id + '\')" style="' + (late ? 'background:rgba(207,34,46,.02)' : '') + '">'
   + '<td style="color:var(--muted);font-size:10px;text-align:center">' + rowNum + '</td>'
   + '<td title="' + (a.titulo||'').replace(/"/g,'&quot;') + '" style="font-weight:500;color:' + (late?'#D6433C':'var(--text)') + ';overflow:hidden">'
-  + '<div style="display:flex;align-items:flex-start;gap:6px;min-width:0">'
+  + '<div style="display:flex;align-items:center;gap:6px;min-width:0">'
   + respAvatarHtml
-  + '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';margin-top:6px;flex-shrink:0"></span>'
+  + '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0"></span>'
   + '<div style="min-width:0;overflow:hidden;flex:1">'
   + '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + tituloShort + '</div>'
   + descHtml + vincHtml + '</div>'
