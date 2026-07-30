@@ -123,7 +123,6 @@ body.light .dash-panel{
  .nav-item.active::before{content:'';position:absolute;left:-8px;top:2px;bottom:2px;width:2px;background:var(--silver-line)}
  .nav-badge{margin-left:auto;background:rgba(255,255,255,.08);color:rgba(246,247,248,.7);font-size:10px;padding:1px 6px;border-radius:var(--r-lg);border:1px solid rgba(255,255,255,.08)}
  .nav-item.active .nav-badge{background:rgba(255,255,255,.12);color:#fff;border-color:transparent}
- .nav-icon{color:currentColor}
  .sb-user{padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:8px;color:#fff}
  .sb-user #sb-name{color:#F6F7F8!important}
  .sb-user #sb-cargo{color:rgba(198,201,224,.6)!important}
@@ -846,10 +845,6 @@ body:not(.light) .tag-status-info{background:rgba(46,95,217,.20);color:#AFC6FB}
 body.light .kpi-card,body.light .tbl-box,body.light .obra-card{box-shadow:var(--shadow-1)}
 /* better logo area */
 .sb-logo{height:52px;padding:0 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;box-sizing:border-box}
-/* nav items with icons */
-.nav-icon{width:16px;height:16px;flex-shrink:0;opacity:.7}
-.nav-item.active .nav-icon{opacity:1}
-.nav-item:hover .nav-icon{opacity:1}
 /* page header refinement */
 .ph h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
 .ph p{font-size:12px;color:var(--muted);margin-top:2px}
