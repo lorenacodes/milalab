@@ -93,7 +93,7 @@ function _showUserInfoCard(name, evt) {
  var desde = '—';
  if (u && u.criadoEm) {
   var d = new Date(u.criadoEm);
-  if (!isNaN(d)) desde = d.toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
+  if (!isNaN(d)) desde = d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
  }
  document.getElementById('uic-desde').textContent = desde;
 
