@@ -115,8 +115,6 @@ body.light .dash-panel{
  .sidebar-toggle{width:30px;height:30px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;color:var(--muted)}
  .sidebar-toggle:hover{border-color:var(--navy);color:var(--navy);background:var(--blue-dim)}
  .sb-logo{padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.08)}
- .sb-theme-btn{display:flex;align-items:center;justify-content:center;gap:8px;margin:14px 16px 4px;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-md);color:rgba(246,247,248,.85);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;transition:background .15s}
- .sb-theme-btn:hover{background:rgba(255,255,255,.1)}
  .sb-nav{flex:1;padding:6px 8px}
  .nav-sec{padding:16px 8px 6px;font-size:10px;color:rgba(198,201,224,.5);text-transform:uppercase;letter-spacing:.8px;font-weight:700}
  .nav-item{display:flex;align-items:center;gap:10px;padding:8px 10px;color:rgba(246,247,248,.62);cursor:pointer;transition:all .15s;font-size:13px;border-radius:var(--r-md);user-select:none;position:relative}
