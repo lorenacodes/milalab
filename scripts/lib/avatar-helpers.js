@@ -65,3 +65,52 @@ function _userAvatarByName(name, size) {
  var fakeU = { nome: name, iniciais: (name||'U').charAt(0).toUpperCase(), avatar: avatar, email: name };
  return _userAvatarHTML(fakeU, size);
 }
+
+// ── Cartão de info do usuário (clique direito num avatar) ──────────────────
+// Reaproveita o mesmo lookup do _userAvatarByName (_respUsuarios), então só
+// mostra cargo/área/data quando esses campos já foram carregados por
+// _respLoadUsers (dashboard.js) — não faz uma query nova a cada clique.
+function _userLookupByName(name) {
+ var nn = _normName(name);
+ var nnFirst = _normName((name || '').split(' ')[0]);
+ return _respUsuarios.find(function(r) {
+  return _normName(r.nome) === nn || _normName(r.email) === nn
+   || _normName(r.nome.split(' ')[0]) === nnFirst;
+ }) || null;
+}
+
+function _showUserInfoCard(name, evt) {
+ if (evt) { evt.preventDefault(); evt.stopPropagation(); }
+ var card = document.getElementById('user-info-card');
+ if (!card) return;
+ var u = _userLookupByName(name);
+ var display = u || { nome: name, iniciais: (name||'U').charAt(0).toUpperCase(), avatar: null };
+
+ document.getElementById('uic-avatar').innerHTML = _userAvatarHTML(display, 40);
+ document.getElementById('uic-nome').textContent = display.nome || name || 'Usuário';
+ document.getElementById('uic-cargo').textContent = (u && u.cargo) || '—';
+ document.getElementById('uic-area').textContent = (u && u.departamento) || '—';
+ var desde = '—';
+ if (u && u.criadoEm) {
+  var d = new Date(u.criadoEm);
+  if (!isNaN(d)) desde = d.toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
+ }
+ document.getElementById('uic-desde').textContent = desde;
+
+ // Posiciona no ponto do clique, sem estourar a viewport
+ card.style.display = 'block';
+ var cw = card.offsetWidth || 220, ch = card.offsetHeight || 140;
+ var x = evt ? evt.clientX : 0, y = evt ? evt.clientY : 0;
+ if (x + cw + 8 > window.innerWidth)  x = window.innerWidth  - cw - 8;
+ if (y + ch + 8 > window.innerHeight) y = window.innerHeight - ch - 8;
+ card.style.left = Math.max(8, x) + 'px';
+ card.style.top  = Math.max(8, y) + 'px';
+
+ // Fecha ao clicar fora ou apertar Esc — listener de uso único
+ setTimeout(function() {
+  function close() { card.style.display = 'none'; document.removeEventListener('click', close); document.removeEventListener('keydown', onKey); }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  document.addEventListener('click', close);
+  document.addEventListener('keydown', onKey);
+ }, 0);
+}

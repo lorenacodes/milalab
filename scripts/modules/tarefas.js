@@ -698,16 +698,21 @@ function _gestorRenderRow(a, rowNum, hoje) {
  if (!respArr.length) {
   respAvatarHtml = '<span style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px dashed var(--border);flex-shrink:0" title="Sem responsável"></span>';
  } else if (respArr.length === 1) {
-  respAvatarHtml = '<span style="display:inline-flex;flex-shrink:0" title="' + respArr[0].replace(/"/g,'&quot;') + '">' + _userAvatarByName(respArr[0], 32) + '</span>';
+  // oncontextmenu: clique direito no avatar abre o cartão de info (cargo,
+  // área, data de entrada — ver _showUserInfoCard em avatar-helpers.js).
+  respAvatarHtml = '<span style="display:inline-flex;flex-shrink:0" title="' + respArr[0].replace(/"/g,'&quot;') + '" oncontextmenu="_showUserInfoCard(\'' + respArr[0].replace(/'/g,"\\'") + '\', event); return false;">' + _userAvatarByName(respArr[0], 32) + '</span>';
  } else {
   // Coletiva: linha fica só com o avatar do principal + selo de contagem
   // (não polui a grade) — passar o mouse mostra a foto de TODOS, não só
   // do primeiro, num popover flutuante (puro CSS, sem precisar abrir a tarefa).
+  // Clique direito em qualquer avatar (principal ou dentro do popover) abre
+  // o cartão de info dessa pessoa.
   var panelItems = respArr.map(function(r) {
-   return '<div class="resp-hover-item">' + _userAvatarByName(r, 22) + '<span>' + r.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></div>';
+   var rEsc = r.replace(/'/g,"\\'");
+   return '<div class="resp-hover-item" oncontextmenu="_showUserInfoCard(\'' + rEsc + '\', event); return false;">' + _userAvatarByName(r, 22) + '<span>' + r.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></div>';
   }).join('');
   respAvatarHtml = '<span class="resp-hover" style="display:inline-flex;flex-shrink:0">'
-   + '<span style="display:inline-flex;position:relative">'
+   + '<span style="display:inline-flex;position:relative" oncontextmenu="_showUserInfoCard(\'' + respArr[0].replace(/'/g,"\\'") + '\', event); return false;">'
    + _userAvatarByName(respArr[0], 32)
    + '<span style="position:absolute;right:-5px;bottom:-5px;min-width:16px;height:16px;padding:0 3px;border-radius:20px;background:var(--navy);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--surface)">' + respArr.length + '</span>'
    + '</span>'

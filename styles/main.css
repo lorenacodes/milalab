@@ -745,6 +745,16 @@ body.light .dash-kpi-card{background:rgba(255,255,255,.38);-webkit-backdrop-filt
 .resp-hover:hover .resp-hover-panel{display:block}
 .resp-hover-item{display:flex;align-items:center;gap:7px;padding:4px 6px;font-size:11px;color:var(--text);white-space:nowrap;border-radius:var(--r-sm)}
 .resp-hover-item:hover{background:var(--surface2)}
+/* Cartão de info do usuário — abre com clique direito num avatar de
+   responsável. Posicionado via JS (top/left) no ponto do clique. */
+.user-info-card{position:fixed;z-index:900;width:220px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-4);padding:14px;animation:modalIn .15s ease}
+.uic-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.uic-head-txt{min-width:0}
+.uic-nome{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.uic-cargo{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.uic-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;padding:3px 0;gap:8px}
+.uic-lbl{color:var(--muted)}
+.uic-val{color:var(--text);font-weight:500;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gestor-rel-proj{background:#f3e8ff;color:#7e22ce}
 .gestor-rel-melh{background:#dcfce7;color:#15803d}
 .gestor-rel-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:15px;padding:0 4px;border-radius:3px;font-size:8px;font-weight:800;letter-spacing:.3px;cursor:default}

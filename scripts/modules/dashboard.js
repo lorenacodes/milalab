@@ -915,7 +915,7 @@ async function _respLoadUsers() {
    });
    // Enriquecer com avatares da tabela usuarios
    try {
-    var av = await _sb.from('usuarios').select('id, avatar_url, nome_display');
+    var av = await _sb.from('usuarios').select('id, avatar_url, nome_display, cargo, departamento, created_at');
     if (av.data) {
      var avMap = {};
      av.data.forEach(function(row){ avMap[row.id] = row; });
@@ -925,6 +925,10 @@ async function _respLoadUsers() {
        if (row.avatar_url) u.avatar = row.avatar_url;
        if (row.nome_display) u.nome = row.nome_display;
        u.iniciais = u.nome.split(' ').slice(0,2).map(function(p){return p[0]||'';}).join('').toUpperCase();
+       // Usados pelo cartao de info do usuario (clique com botao direito no avatar)
+       u.cargo = row.cargo || '';
+       u.departamento = row.departamento || '';
+       u.criadoEm = row.created_at || '';
       }
      });
     }
