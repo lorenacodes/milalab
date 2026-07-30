@@ -566,7 +566,7 @@ function _gestorRenderGrid() {
    var projCollapsed = _gestorCollapsed[projKey];
    var projTotal = proj.obraOrder.reduce(function(s,ok){ return s + proj.obras[ok].length; }, 0);
    nrows += '<tr class="gestor-group-hd" onclick="_gestorToggleGroup(\'' + projKey.replace(/'/g,"\\'") + '\')">'
-    + '<td colspan="9"><span style="margin-right:4px">' + (projCollapsed?'▶':'▼') + '</span>'
+    + '<td colspan="8"><span style="margin-right:4px">' + (projCollapsed?'▶':'▼') + '</span>'
     + '<strong>' + pk + '</strong><span style="color:var(--muted);font-size:9px;margin-left:6px">' + projTotal + ' atividade' + (projTotal!==1?'s':'') + '</span></td></tr>';
    if (projCollapsed) return;
    proj.obraOrder.forEach(function(ok) {
@@ -574,13 +574,13 @@ function _gestorRenderGrid() {
     var obraKey = projKey + '::O::' + ok;
     var obraCollapsed = _gestorCollapsed[obraKey];
     nrows += '<tr class="gestor-group-hd" onclick="_gestorToggleGroup(\'' + obraKey.replace(/'/g,"\\'") + '\')" style="background:var(--surface2)">'
-     + '<td colspan="9" style="padding-left:28px"><span style="margin-right:4px">' + (obraCollapsed?'▶':'▼') + '</span>'
+     + '<td colspan="8" style="padding-left:28px"><span style="margin-right:4px">' + (obraCollapsed?'▶':'▼') + '</span>'
      + ok + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + items.length + '</span></td></tr>';
     if (obraCollapsed) return;
     items.forEach(function(a) { nRowNum++; nrows += _gestorRenderRow(a, nRowNum); });
    });
   });
-  tbody.innerHTML = nrows || '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px;font-size:12px">Nenhuma atividade encontrada para o período selecionado.</td></tr>';
+  tbody.innerHTML = nrows || '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px;font-size:12px">Nenhuma atividade encontrada para o período selecionado.</td></tr>';
   return;
  }
 
@@ -625,7 +625,7 @@ function _gestorRenderGrid() {
   var doneBadge = '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + nDone + '/' + items.length + ' concluídas</span>';
 
   rows += '<tr class="gestor-group-hd" onclick="_gestorToggleGroup(\'' + gk.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="9">'
+   + '<td colspan="8">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + gk + '</strong>' + doneBadge + badge
    + '</td></tr>';
@@ -636,7 +636,7 @@ function _gestorRenderGrid() {
  });
 
  if (!rows) {
-  rows = '<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px;font-size:12px">Nenhuma atividade encontrada para o período selecionado.</td></tr>';
+  rows = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px;font-size:12px">Nenhuma atividade encontrada para o período selecionado.</td></tr>';
  }
  tbody.innerHTML = rows;
 }
@@ -661,12 +661,16 @@ function _gestorRenderRow(a, rowNum, hoje) {
   else           prazoHtml = '<span style="color:var(--muted)">' + dpStr + '</span>';
  } else { prazoHtml = '<span style="color:var(--border)">—</span>'; }
 
- // Responsável
+ // Responsável — avatar do principal fica embutido antes do título (ver
+ // tituloCellHtml), em vez de ocupar uma coluna própria. Nome completo dos
+ // responsáveis (todos, não só o primeiro) continua disponível no tooltip.
  var respArr = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
- var respHtml = respArr.slice(0,3).map(function(r) {
-  return '<span style="margin-right:-4px;display:inline-flex">' + _userAvatarByName(r, 24) + '</span>';
- }).join('');
- if (respArr.length > 2) respHtml += '<span style="font-size:9px;color:var(--muted)">+' + (respArr.length-2) + '</span>';
+ var respAvatarHtml = respArr.length
+  ? '<span style="display:inline-flex;align-items:center;flex-shrink:0;margin-top:1px" title="' + respArr.join(', ').replace(/"/g,'&quot;') + '">'
+    + _userAvatarByName(respArr[0], 20)
+    + (respArr.length > 1 ? '<span style="font-size:8px;color:var(--muted);margin-left:2px">+' + (respArr.length - 1) + '</span>' : '')
+    + '</span>'
+  : '<span style="width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px dashed var(--border);flex-shrink:0" title="Sem responsável"></span>';
 
  // Prioridade — mesma decisão de sempre (Alta/Média/Baixa), só a classe de cor mudou
  var prioClasses = { 'Alta':'tag-priority-high','Média':'tag-priority-med','Baixa':'tag-priority-low' };
@@ -719,12 +723,12 @@ function _gestorRenderRow(a, rowNum, hoje) {
   + '<td style="color:var(--muted);font-size:10px;text-align:center">' + rowNum + '</td>'
   + '<td title="' + (a.titulo||'').replace(/"/g,'&quot;') + '" style="font-weight:500;color:' + (late?'#D6433C':'var(--text)') + ';overflow:hidden">'
   + '<div style="display:flex;align-items:flex-start;gap:6px;min-width:0">'
-  + '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';margin-top:4px;flex-shrink:0"></span>'
+  + respAvatarHtml
+  + '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';margin-top:6px;flex-shrink:0"></span>'
   + '<div style="min-width:0;overflow:hidden;flex:1">'
   + '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + tituloShort + '</div>'
   + descHtml + vincHtml + '</div>'
   + '</div></td>'
-  + '<td>' + (respHtml || '<span style="color:var(--border)">—</span>') + '</td>'
   + '<td><span class="gs-badge ' + (late ? 'gs-atrasado' : sc.cls) + '">' + statusLbl + '</span></td>'
   + '<td>' + prazoHtml + '</td>'
   + '<td>' + inicioHtml + '</td>'

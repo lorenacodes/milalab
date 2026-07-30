@@ -84,13 +84,17 @@ body.light .dash-panel{
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .dash-panel{ background: var(--surface); }
 }
- /* Fundo base do body: os mesmos blobs radiais coloridos do `.main`, em opacidade
-    baixa, para que a sidebar (fixed, fora do `.main`) também tenha textura por
-    trás do vidro fosco — sem alterar o neutro --bg preto (decisão da usuária). */
- body{font-family:'Inter',sans-serif;background:radial-gradient(circle at 10% 0%, rgba(61,79,209,.22) 0%, transparent 45%),radial-gradient(circle at 95% 30%, rgba(63,191,180,.16) 0%, transparent 45%),radial-gradient(circle at 20% 100%, rgba(139,111,232,.14) 0%, transparent 50%),var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+ /* Fundo: UM ÚNICO gradiente, aqui no body, cobrindo a tela inteira — não em
+    `.main`/`.page.active` separadamente. Antes cada um pintava seu próprio
+    gradiente calculado sobre sua própria caixa (viewport inteiro vs. viewport
+    menos a sidebar vs. área de conteúdo), e como não coincidiam, aparecia uma
+    costura visível bem na borda entre a sidebar e o `.main`. Com uma fonte só,
+    o vidro (sidebar, topbar, cards) borra sempre a mesma "tela" por trás,
+    sem costura possível. --bg continua o preto neutro (decisão da usuária). */
+ body{font-family:'Inter',sans-serif;background:radial-gradient(circle at 12% 0%, rgba(61,79,209,.38) 0%, transparent 48%),radial-gradient(circle at 92% 18%, rgba(63,191,180,.32) 0%, transparent 48%),radial-gradient(circle at 32% 100%, rgba(139,111,232,.28) 0%, transparent 55%),var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
  /* Tema claro precisa de blobs bem mais saturados que o escuro: o --bg já é quase
     branco (#F6F7F8), então cor fraca some antes mesmo de chegar no vidro. */
- body.light{background:radial-gradient(circle at 10% 0%, rgba(61,79,209,.30) 0%, transparent 45%),radial-gradient(circle at 95% 30%, rgba(63,191,180,.24) 0%, transparent 45%),radial-gradient(circle at 20% 100%, rgba(139,111,232,.22) 0%, transparent 50%),var(--bg)}
+ body.light{background:radial-gradient(circle at 12% 0%, rgba(61,79,209,.30) 0%, transparent 48%),radial-gradient(circle at 92% 18%, rgba(63,191,180,.24) 0%, transparent 48%),radial-gradient(circle at 32% 100%, rgba(139,111,232,.20) 0%, transparent 55%),var(--bg)}
  h1,h2,h3,h4,.modal-title,.kpi-val,.gestor-hd-title{font-family:'Sora',sans-serif;font-weight:700;letter-spacing:-.2px}
  /* SIDEBAR — MilaLab Design System: painel permanentemente escuro (indigo-900),
     igual nos dois temas do app (claro/escuro só trocam o conteúdo principal,
@@ -128,9 +132,13 @@ body.light .dash-panel{
  .avatar{width:30px;height:30px;background:var(--silver-grad);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--silver-ink);overflow:hidden;position:relative;flex-shrink:0}
  .avatar img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:50%}
  /* MAIN */
- .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin-left .22s cubic-bezier(.4,0,.2,1);background:radial-gradient(circle at 15% 0%, rgba(61,79,209,.38) 0%, transparent 48%),radial-gradient(circle at 90% 15%, rgba(63,191,180,.32) 0%, transparent 48%),radial-gradient(circle at 30% 100%, rgba(139,111,232,.28) 0%, transparent 55%),var(--bg)}
- body.light .main{background:radial-gradient(circle at 15% 0%, rgba(61,79,209,.20) 0%, transparent 48%),radial-gradient(circle at 90% 15%, rgba(63,191,180,.18) 0%, transparent 48%),radial-gradient(circle at 30% 100%, rgba(139,111,232,.16) 0%, transparent 55%),var(--bg)}
+ .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin-left .22s cubic-bezier(.4,0,.2,1);background:transparent}
  .main.sidebar-collapsed{margin-left:0}
+ /* #page-dashboard ("Meu Painel") tem max-width:1600px inline pra não deixar as
+    linhas de KPI/gráficos absurdamente esticadas em monitores ultrawide — mas
+    sem centralizar isso sobrava uma faixa vazia enorme só do lado direito.
+    Centraliza para o vão ficar simétrico dos dois lados. */
+ #page-dashboard.page.active{width:100%;margin-left:auto;margin-right:auto}
  .topbar{height:52px;background:rgba(255,255,255,.09);-webkit-backdrop-filter:blur(20px) saturate(1.6);backdrop-filter:blur(20px) saturate(1.6);border-bottom:1px solid rgba(255,255,255,.16);display:flex;align-items:center;padding:0 16px 0 20px;gap:10px;position:sticky;top:0;z-index:5}
  body.light .topbar{background:rgba(255,255,255,.38);-webkit-backdrop-filter:blur(20px) saturate(1.9);backdrop-filter:blur(20px) saturate(1.9);border-bottom-color:rgba(255,255,255,.65)}
  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -140,13 +148,8 @@ body.light .dash-panel{
  .breadcrumb span{color:var(--text);font-weight:500}
  .topbar-right{margin-left:auto;display:flex;gap:8px}
  .page{display:none!important;padding:24px;flex:1}.page.active{display:block!important}.page.active.page-flex{display:flex!important}
- /* Antes essa camada repintava o fundo do `.page` quase opaco (blobs a 6%),
-    escondendo os blobs bem mais vivos do `.main` atrás dela — o vidro dos
-    painéis borrava esse cinza quase sólido e o efeito ficava imperceptível.
-    Agora os blobs aqui acompanham a intensidade do `.main` para o vidro ter
-    cor de verdade para borrar. */
- .page.active{background:radial-gradient(circle at 15% 0%, rgba(61,79,209,.22) 0%, transparent 45%),radial-gradient(circle at 90% 100%, rgba(63,191,180,.18) 0%, transparent 45%),radial-gradient(circle at 40% 40%, rgba(139,111,232,.12) 0%, transparent 55%),var(--bg)}
- body.light .page.active{background:radial-gradient(circle at 15% 0%, rgba(61,79,209,.26) 0%, transparent 45%),radial-gradient(circle at 90% 100%, rgba(63,191,180,.20) 0%, transparent 45%),radial-gradient(circle at 40% 40%, rgba(139,111,232,.16) 0%, transparent 55%),var(--bg)}
+ /* Idem: sem pintura própria aqui — deixa o gradiente único do body aparecer. */
+ .page.active{background:transparent}
  /* BUTTONS */
  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r-sm);font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;font-family:inherit;white-space:nowrap}
  .btn-primary{background:var(--navy);color:#fff}.btn-primary:hover{filter:brightness(.88)}
