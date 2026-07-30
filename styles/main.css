@@ -735,6 +735,16 @@ body.light .dash-kpi-card{background:rgba(255,255,255,.38);-webkit-backdrop-filt
 .gestor-tbl tbody tr{cursor:pointer;transition:background .08s}
 .gestor-tbl tbody tr:hover td{background:rgba(5,8,102,.035)}
 .gestor-rel-obra{background:#dbeafe;color:#1d4ed8}
+/* Popover de responsáveis: em tarefa coletiva a linha mostra só o avatar do
+   principal + selo de contagem (estado normal fica limpo); passar o mouse
+   revela a foto de TODOS os responsáveis, não só o primeiro — sem precisar
+   abrir a tarefa e sem poluir a grade com uma pilha de avatares o tempo
+   todo. CSS puro (:hover), sem JS. */
+.resp-hover{position:relative}
+.resp-hover-panel{display:none;position:absolute;top:100%;left:0;margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:6px;box-shadow:var(--shadow-3);z-index:30;min-width:170px}
+.resp-hover:hover .resp-hover-panel{display:block}
+.resp-hover-item{display:flex;align-items:center;gap:7px;padding:4px 6px;font-size:11px;color:var(--text);white-space:nowrap;border-radius:var(--r-sm)}
+.resp-hover-item:hover{background:var(--surface2)}
 .gestor-rel-proj{background:#f3e8ff;color:#7e22ce}
 .gestor-rel-melh{background:#dcfce7;color:#15803d}
 .gestor-rel-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:15px;padding:0 4px;border-radius:3px;font-size:8px;font-weight:800;letter-spacing:.3px;cursor:default}

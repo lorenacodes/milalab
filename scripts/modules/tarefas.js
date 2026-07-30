@@ -291,7 +291,7 @@ function _gTipoAtividade(a) { return a.tipo_atividade || a.tipo || ''; }
 // poluída; a separação em grupos é mais limpa.
 function _gTipoResp(a) {
  var n = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean).length;
- return n === 0 ? '— Sem responsável' : (n === 1 ? '👤 Tarefas Individuais' : '👥 Tarefas Coletivas');
+ return n === 0 ? '— Sem responsável' : (n === 1 ? 'Tarefas Individuais' : 'Tarefas Coletivas');
 }
 
 // ── Filtros multi-select (status/área/tipo/obra/melhoria/responsável) ────
@@ -607,7 +607,7 @@ function _gestorRenderGrid() {
    // pessoa quando ela é a ÚNICA responsável; com 2+ vai para um grupo
    // coletivo à parte, igual ao agrupamento "Individual/Coletiva".
    var respList = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
-   key = respList.length === 0 ? '— Sem responsável' : (respList.length === 1 ? respList[0] : '👥 Tarefas Coletivas');
+   key = respList.length === 0 ? '— Sem responsável' : (respList.length === 1 ? respList[0] : 'Tarefas Coletivas');
   } else if (groupBy === 'status') {
    key = _gIsLate(a) ? 'Atrasadas' : (a.status || 'A fazer');
   } else if (groupBy === 'area') {
@@ -629,7 +629,7 @@ function _gestorRenderGrid() {
  // "Individual/Coletiva" tem ordem fixa (não faz sentido depender de qual
  // grupo apareceu primeiro nos dados, como nos outros modos de agrupamento).
  if (groupBy === 'tipo_resp') {
-  var _tipoOrder = ['👤 Tarefas Individuais', '👥 Tarefas Coletivas', '— Sem responsável'];
+  var _tipoOrder = ['Tarefas Individuais', 'Tarefas Coletivas', '— Sem responsável'];
   groupOrder = _tipoOrder.filter(function(k){ return groups[k]; });
  }
 
@@ -697,13 +697,21 @@ function _gestorRenderRow(a, rowNum, hoje) {
  var respAvatarHtml;
  if (!respArr.length) {
   respAvatarHtml = '<span style="width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1px dashed var(--border);flex-shrink:0" title="Sem responsável"></span>';
+ } else if (respArr.length === 1) {
+  respAvatarHtml = '<span style="display:inline-flex;flex-shrink:0" title="' + respArr[0].replace(/"/g,'&quot;') + '">' + _userAvatarByName(respArr[0], 32) + '</span>';
  } else {
-  var tip = respArr.length > 1 ? 'Tarefa coletiva (' + respArr.length + '): ' + respArr.join(', ') : respArr[0];
-  respAvatarHtml = '<span style="display:inline-flex;position:relative;flex-shrink:0" title="' + tip.replace(/"/g,'&quot;') + '">'
+  // Coletiva: linha fica só com o avatar do principal + selo de contagem
+  // (não polui a grade) — passar o mouse mostra a foto de TODOS, não só
+  // do primeiro, num popover flutuante (puro CSS, sem precisar abrir a tarefa).
+  var panelItems = respArr.map(function(r) {
+   return '<div class="resp-hover-item">' + _userAvatarByName(r, 22) + '<span>' + r.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></div>';
+  }).join('');
+  respAvatarHtml = '<span class="resp-hover" style="display:inline-flex;flex-shrink:0">'
+   + '<span style="display:inline-flex;position:relative">'
    + _userAvatarByName(respArr[0], 32)
-   + (respArr.length > 1
-     ? '<span style="position:absolute;right:-5px;bottom:-5px;min-width:16px;height:16px;padding:0 3px;border-radius:20px;background:var(--navy);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--surface)">' + respArr.length + '</span>'
-     : '')
+   + '<span style="position:absolute;right:-5px;bottom:-5px;min-width:16px;height:16px;padding:0 3px;border-radius:20px;background:var(--navy);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--surface)">' + respArr.length + '</span>'
+   + '</span>'
+   + '<div class="resp-hover-panel">' + panelItems + '</div>'
    + '</span>';
  }
 
@@ -756,7 +764,7 @@ function _gestorRenderRow(a, rowNum, hoje) {
 
  return '<tr onclick="_gestorRowClick(\'' + a.id + '\')" style="' + (late ? 'background:rgba(207,34,46,.02)' : '') + '">'
   + '<td style="color:var(--muted);font-size:10px;text-align:center">' + rowNum + '</td>'
-  + '<td title="' + (a.titulo||'').replace(/"/g,'&quot;') + '" style="font-weight:500;color:' + (late?'#D6433C':'var(--text)') + ';overflow:hidden">'
+  + '<td title="' + (a.titulo||'').replace(/"/g,'&quot;') + '" style="font-weight:500;color:' + (late?'#D6433C':'var(--text)') + '">'
   + '<div style="display:flex;align-items:center;gap:6px;min-width:0">'
   + respAvatarHtml
   + '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + dot + ';flex-shrink:0"></span>'
