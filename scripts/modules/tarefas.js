@@ -550,6 +550,10 @@ function _gestorSetView(v, btn) {
   var p = document.getElementById(panels[k]);
   if (p) p.style.display = k === v ? (k === 'setor' ? 'flex' : '') : 'none';
  });
+ // "Agrupar" só tem efeito na Grade (_gestorRenderGrid é a única que lê
+ // gestor-f-group) — nas outras abas ele não fazia nada, só confundia.
+ var groupWrap = document.getElementById('gestor-group-wrap');
+ if (groupWrap) groupWrap.style.display = v === 'grid' ? '' : 'none';
  // toolbar visível em todas as views (metricas também tem filtros agora)
  _gestorApplyFilters();
 }
