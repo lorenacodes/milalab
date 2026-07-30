@@ -661,16 +661,32 @@ function _gestorRenderRow(a, rowNum, hoje) {
   else           prazoHtml = '<span style="color:var(--muted)">' + dpStr + '</span>';
  } else { prazoHtml = '<span style="color:var(--border)">—</span>'; }
 
- // Responsável — avatar do principal fica embutido antes do título (ver
- // tituloCellHtml), em vez de ocupar uma coluna própria. Nome completo dos
- // responsáveis (todos, não só o primeiro) continua disponível no tooltip.
+ // Responsável — embutido antes do título em vez de coluna própria (ver
+ // abaixo). Não existe conceito de "equipe" nos dados (responsavel é sempre
+ // uma lista de pessoas — ver decisão registrada, não inventar nomes de
+ // equipe aqui); a distinção individual/coletiva vem só de quantas pessoas
+ // estão na lista. 1 pessoa = avatar único maior (26px), fácil de ler. 2+
+ // pessoas = pilha de até 3 avatares reais (nunca só o principal — antes só
+ // o primeiro responsável aparecia e quem só participava de tarefas em
+ // grupo nunca era visível), com anel pra separar um do outro, +N pro resto.
+ // Tooltip sempre lista todo mundo por extenso.
  var respArr = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
- var respAvatarHtml = respArr.length
-  ? '<span style="display:inline-flex;align-items:center;flex-shrink:0;margin-top:1px" title="' + respArr.join(', ').replace(/"/g,'&quot;') + '">'
-    + _userAvatarByName(respArr[0], 20)
-    + (respArr.length > 1 ? '<span style="font-size:8px;color:var(--muted);margin-left:2px">+' + (respArr.length - 1) + '</span>' : '')
-    + '</span>'
-  : '<span style="width:20px;height:20px;border-radius:50%;background:var(--surface2);border:1px dashed var(--border);flex-shrink:0" title="Sem responsável"></span>';
+ var respAvatarHtml;
+ if (!respArr.length) {
+  respAvatarHtml = '<span style="width:22px;height:22px;border-radius:50%;background:var(--surface2);border:1px dashed var(--border);flex-shrink:0" title="Sem responsável"></span>';
+ } else if (respArr.length === 1) {
+  respAvatarHtml = '<span style="display:inline-flex;flex-shrink:0" title="' + respArr[0].replace(/"/g,'&quot;') + '">' + _userAvatarByName(respArr[0], 26) + '</span>';
+ } else {
+  var shown = respArr.slice(0, 3);
+  var rest = respArr.length - shown.length;
+  var stackHtml = shown.map(function(r, i) {
+   return '<span style="display:inline-flex;border-radius:50%;box-shadow:0 0 0 2px var(--surface);margin-left:' + (i === 0 ? '0' : '-8px') + ';position:relative;z-index:' + (10 - i) + '">' + _userAvatarByName(r, 22) + '</span>';
+  }).join('');
+  if (rest > 0) {
+   stackHtml += '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--surface2);box-shadow:0 0 0 2px var(--surface);margin-left:-8px;font-size:9px;font-weight:700;color:var(--muted);flex-shrink:0">+' + rest + '</span>';
+  }
+  respAvatarHtml = '<span style="display:inline-flex;align-items:center;flex-shrink:0" title="Tarefa coletiva (' + respArr.length + '): ' + respArr.join(', ').replace(/"/g,'&quot;') + '">' + stackHtml + '</span>';
+ }
 
  // Prioridade — mesma decisão de sempre (Alta/Média/Baixa), só a classe de cor mudou
  var prioClasses = { 'Alta':'tag-priority-high','Média':'tag-priority-med','Baixa':'tag-priority-low' };
