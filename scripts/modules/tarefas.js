@@ -216,7 +216,12 @@ async function _gestorLoad() {
    _lookupPage('melhorias', _gestorMelhMap),
    _lookupProjEtapas(),
    _loadAtividadeVinculosCache(),
-   _loadUsuariosCache()
+   _loadUsuariosCache(),
+   // _respUsuarios (cargo/área/data de entrada p/ o cartão de info do avatar)
+   // só carregava quando o usuário abria o editor de tarefa pra escolher
+   // responsável — no Gestor de Tarefas puro, o cartão sempre aparecia
+   // vazio. Carrega junto com o resto (já tem guarda contra load duplicado).
+   _respLoadUsers().catch(function(){})
   ]);
   console.log('[Gestor] lookups:', Object.keys(_gestorObrasMap).length, 'obras,', Object.keys(_gestorProjMap).length, 'projetos,', Object.keys(_gestorMelhMap).length, 'melhorias');
 
