@@ -283,6 +283,17 @@ async function _gestorLoad() {
 // com nenhum valor selecionado). Mesmo fallback usado em dashboard.js.
 function _gTipoAtividade(a) { return a.tipo_atividade || a.tipo || ''; }
 
+// Individual vs coletiva: puramente derivado da quantidade de responsáveis
+// (não existe "equipe" nos dados — ver decisão registrada). 1 pessoa =
+// individual, 2+ = coletiva, 0 = sem responsável. Usado só como uma forma
+// de agrupar/enxergar a grade (groupBy 'tipo_resp'), não como badge por
+// linha — a versão anterior com pilha de avatares em toda linha ficou
+// poluída; a separação em grupos é mais limpa.
+function _gTipoResp(a) {
+ var n = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean).length;
+ return n === 0 ? '— Sem responsável' : (n === 1 ? '👤 Tarefas Individuais' : '👥 Tarefas Coletivas');
+}
+
 // ── Filtros multi-select (status/área/tipo/obra/melhoria/responsável) ────
 var _gestorMultiFilters = { status: [], area: [], tipo: [], obra: [], melh: [], resp: [] };
 var _GESTOR_STATUS_CANONICO = ['Backlog','A fazer','Em progresso','Aguardando feedback','Feito','Obsoleto'];
@@ -602,11 +613,20 @@ function _gestorRenderGrid() {
     var d = new Date(a.data_prazo + 'T00:00:00');
     key = d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
    }
+  } else if (groupBy === 'tipo_resp') {
+   key = _gTipoResp(a);
   }
   if (key === undefined || key === null) key = '— Sem grupo';
   if (!groups[key]) { groups[key] = []; groupOrder.push(key); }
   groups[key].push(a);
  });
+
+ // "Individual/Coletiva" tem ordem fixa (não faz sentido depender de qual
+ // grupo apareceu primeiro nos dados, como nos outros modos de agrupamento).
+ if (groupBy === 'tipo_resp') {
+  var _tipoOrder = ['👤 Tarefas Individuais', '👥 Tarefas Coletivas', '— Sem responsável'];
+  groupOrder = _tipoOrder.filter(function(k){ return groups[k]; });
+ }
 
  var hoje = new Date(); hoje.setHours(0,0,0,0);
  var rows = '';
@@ -661,31 +681,25 @@ function _gestorRenderRow(a, rowNum, hoje) {
   else           prazoHtml = '<span style="color:var(--muted)">' + dpStr + '</span>';
  } else { prazoHtml = '<span style="color:var(--border)">—</span>'; }
 
- // Responsável — embutido antes do título em vez de coluna própria (ver
- // abaixo). Não existe conceito de "equipe" nos dados (responsavel é sempre
- // uma lista de pessoas — ver decisão registrada, não inventar nomes de
- // equipe aqui); a distinção individual/coletiva vem só de quantas pessoas
- // estão na lista. 1 pessoa = avatar único maior (26px), fácil de ler. 2+
- // pessoas = pilha de até 3 avatares reais (nunca só o principal — antes só
- // o primeiro responsável aparecia e quem só participava de tarefas em
- // grupo nunca era visível), com anel pra separar um do outro, +N pro resto.
- // Tooltip sempre lista todo mundo por extenso.
+ // Responsável — embutido antes do título em vez de coluna própria. Não
+ // existe conceito de "equipe" nos dados (ver decisão registrada); a
+ // distinção individual/coletiva agora vive no agrupamento "Individual /
+ // Coletiva" da grade (_gTipoResp/groupBy), não mais numa pilha de avatares
+ // em toda linha — a pilha ficou poluída. Aqui é só o avatar do principal,
+ // com um selinho discreto de contagem quando há mais gente, e o tooltip
+ // lista todo mundo.
  var respArr = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
  var respAvatarHtml;
  if (!respArr.length) {
   respAvatarHtml = '<span style="width:22px;height:22px;border-radius:50%;background:var(--surface2);border:1px dashed var(--border);flex-shrink:0" title="Sem responsável"></span>';
- } else if (respArr.length === 1) {
-  respAvatarHtml = '<span style="display:inline-flex;flex-shrink:0" title="' + respArr[0].replace(/"/g,'&quot;') + '">' + _userAvatarByName(respArr[0], 26) + '</span>';
  } else {
-  var shown = respArr.slice(0, 3);
-  var rest = respArr.length - shown.length;
-  var stackHtml = shown.map(function(r, i) {
-   return '<span style="display:inline-flex;border-radius:50%;box-shadow:0 0 0 2px var(--surface);margin-left:' + (i === 0 ? '0' : '-8px') + ';position:relative;z-index:' + (10 - i) + '">' + _userAvatarByName(r, 22) + '</span>';
-  }).join('');
-  if (rest > 0) {
-   stackHtml += '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--surface2);box-shadow:0 0 0 2px var(--surface);margin-left:-8px;font-size:9px;font-weight:700;color:var(--muted);flex-shrink:0">+' + rest + '</span>';
-  }
-  respAvatarHtml = '<span style="display:inline-flex;align-items:center;flex-shrink:0" title="Tarefa coletiva (' + respArr.length + '): ' + respArr.join(', ').replace(/"/g,'&quot;') + '">' + stackHtml + '</span>';
+  var tip = respArr.length > 1 ? 'Tarefa coletiva (' + respArr.length + '): ' + respArr.join(', ') : respArr[0];
+  respAvatarHtml = '<span style="display:inline-flex;position:relative;flex-shrink:0" title="' + tip.replace(/"/g,'&quot;') + '">'
+   + _userAvatarByName(respArr[0], 22)
+   + (respArr.length > 1
+     ? '<span style="position:absolute;right:-4px;bottom:-4px;min-width:13px;height:13px;padding:0 2px;border-radius:20px;background:var(--navy);color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--surface)">' + respArr.length + '</span>'
+     : '')
+   + '</span>';
  }
 
  // Prioridade — mesma decisão de sempre (Alta/Média/Baixa), só a classe de cor mudou
