@@ -313,95 +313,56 @@ function _gTipoResp(a) {
  return n === 0 ? '— Sem responsável' : (n === 1 ? 'Tarefas Individuais' : 'Tarefas Coletivas');
 }
 
-// ── Filtros multi-select (status/área/tipo/obra/melhoria/responsável) ────
-var _gestorMultiFilters = { status: [], area: [], tipo: [], obra: [], melh: [], resp: [] };
+// ── Filtro (Filtro Builder — scripts/lib/filtro-builder.js) ───────────────
+// Cada campo real da atividade vira uma condição filtrável; as opções de
+// select são calculadas sob demanda (fn), sempre a partir dos dados
+// carregados no momento — _gestorPopulateFilters() só precisa re-inicializar
+// a instância quando os dados mudam (as opções já saem atualizadas).
 var _GESTOR_STATUS_CANONICO = ['Backlog','A fazer','Em progresso','Aguardando feedback','Feito','Obsoleto'];
 
-function _gestorMselToggle(key) {
- Object.keys(_gestorMultiFilters).forEach(function(k) {
-  var panel = document.getElementById('gestor-msel-panel-' + k);
-  if (panel) panel.style.display = (k === key && panel.style.display === 'none') ? '' : 'none';
- });
+function _gestorStatusOptions() {
+ var vistos = {};
+ _gestorAllAt.forEach(function(a){ if (a.status) vistos[a.status] = 1; });
+ var keys = _GESTOR_STATUS_CANONICO.slice();
+ Object.keys(vistos).forEach(function(s){ if (keys.indexOf(s) === -1) keys.push(s); });
+ keys.push('Atrasado');
+ return keys;
 }
-document.addEventListener('click', function(e) {
- if (!e.target.closest('.gestor-msel')) {
-  Object.keys(_gestorMultiFilters).forEach(function(k) {
-   var panel = document.getElementById('gestor-msel-panel-' + k);
-   if (panel) panel.style.display = 'none';
-  });
- }
-});
-function _gestorMselChange(key, value, checked) {
- var arr = _gestorMultiFilters[key];
- var i = arr.indexOf(value);
- if (checked && i === -1) arr.push(value);
- else if (!checked && i !== -1) arr.splice(i, 1);
- var count = document.getElementById('gestor-msel-count-' + key);
- if (count) { count.textContent = arr.length; count.style.display = arr.length ? '' : 'none'; }
- var btn = document.querySelector('#gestor-msel-' + key + ' > button');
- if (btn) btn.classList.toggle('active', arr.length > 0);
- _gestorApplyFilters();
+function _gestorOptionsFrom(getter) {
+ var set = {};
+ _gestorAllAt.forEach(function(a){ var v = getter(a); if (v) set[v] = 1; });
+ return Object.keys(set).sort();
 }
-function _gestorMselClear(key) {
- _gestorMultiFilters[key] = [];
- var panel = document.getElementById('gestor-msel-panel-' + key);
- if (panel) panel.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = false; });
- var count = document.getElementById('gestor-msel-count-' + key);
- if (count) { count.textContent = ''; count.style.display = 'none'; }
- var btn = document.querySelector('#gestor-msel-' + key + ' > button');
- if (btn) btn.classList.remove('active');
- _gestorApplyFilters();
-}
-function _gestorMselBuildPanel(key, keys, label) {
- var panel = document.getElementById('gestor-msel-panel-' + key);
- if (!panel) return;
- var selecionados = _gestorMultiFilters[key];
- panel.innerHTML = keys.map(function(k) {
-  var checked = selecionados.indexOf(k) !== -1 ? ' checked' : '';
-  return '<label><input type="checkbox" value="' + k.replace(/"/g,'&quot;') + '"' + checked
-   + ' onchange="_gestorMselChange(\'' + key + '\', this.value, this.checked)"> ' + k + '</label>';
- }).join('') + (keys.length ? '<button type="button" class="gestor-msel-clear" onclick="_gestorMselClear(\'' + key + '\')">Limpar ' + label + '</button>' : '<div style="padding:8px;font-size:11px;color:var(--muted)">Nenhuma opção</div>');
-}
-
-// ── Popular filtros ────────────────────────────────────────────────────────
-function _gestorPopulateFilters() {
- var areas = {}, tipos = {}, resps = {}, obras = {}, melhs = {}, statusVistos = {};
+function _gestorRespOptions() {
+ var set = {};
  _gestorAllAt.forEach(function(a) {
-  if (a.area)               areas[a.area] = 1;
-  if (_gTipoAtividade(a))   tipos[_gTipoAtividade(a)] = 1;
-  if (a._obraNome)          obras[a._obraNome] = 1;
-  if (a._melhNome)          melhs[a._melhNome] = 1;
-  if (a.status)             statusVistos[a.status] = 1;
-  if (a.responsavel) {
-   a.responsavel.split(/[,;]+/).forEach(function(r) {
-    var e = r.trim(); if (e) resps[e] = 1;
-   });
-  }
+  (a.responsavel || '').split(/[,;]+/).forEach(function(r) { var e = r.trim(); if (e) set[e] = 1; });
  });
- // União do enum canônico (nt-status) com valores legados realmente presentes
- // nos dados, mais "Atrasado" como pseudo-status computado (data_prazo vencida).
- var statusKeys = _GESTOR_STATUS_CANONICO.slice();
- Object.keys(statusVistos).forEach(function(s) { if (statusKeys.indexOf(s) === -1) statusKeys.push(s); });
- statusKeys.push('Atrasado');
+ return Object.keys(set).sort();
+}
 
- _gestorMselBuildPanel('status', statusKeys, 'status');
- _gestorMselBuildPanel('area', Object.keys(areas).sort(), 'área');
- _gestorMselBuildPanel('tipo', Object.keys(tipos).sort(), 'tipo');
- _gestorMselBuildPanel('obra', Object.keys(obras).sort(), 'obra');
- _gestorMselBuildPanel('melh', Object.keys(melhs).sort(), 'melhoria');
- _gestorMselBuildPanel('resp', Object.keys(resps).sort(), 'responsável');
+function _gestorPopulateFilters() {
+ _fbInit('gestor', [
+  { key: 'titulo',      label: 'Tarefa',                type: 'text' },
+  { key: 'responsavel', label: 'Responsável',           type: 'multitext', options: _gestorRespOptions },
+  { key: 'status',      label: 'Status',                type: 'select', options: _gestorStatusOptions,
+    getValue: function(a){ return _gIsLate(a) ? 'Atrasado' : (a.status || ''); } },
+  { key: 'prioridade',  label: 'Prioridade',            type: 'select', options: ['Alta','Média','Baixa'] },
+  { key: 'area',        label: 'Área',                  type: 'select', options: function(){ return _gestorOptionsFrom(function(a){ return a.area; }); } },
+  { key: 'tipo',        label: 'Tipo de Atividade',     type: 'select', options: function(){ return _gestorOptionsFrom(_gTipoAtividade); }, getValue: _gTipoAtividade },
+  { key: 'obra',        label: 'Obra',                  type: 'select', options: function(){ return _gestorOptionsFrom(function(a){ return a._obraNome; }); }, getValue: function(a){ return a._obraNome; } },
+  { key: 'projeto',     label: 'Projeto',               type: 'select', options: function(){ return _gestorOptionsFrom(function(a){ return a._projNome; }); }, getValue: function(a){ return a._projNome; } },
+  { key: 'melhoria',    label: 'Melhoria',               type: 'select', options: function(){ return _gestorOptionsFrom(function(a){ return a._melhNome; }); }, getValue: function(a){ return a._melhNome; } },
+  { key: 'tipo_resp',   label: 'Individual / Coletiva', type: 'select', options: ['Tarefas Individuais','Tarefas Coletivas','— Sem responsável'], getValue: _gTipoResp },
+  { key: 'data_prazo',  label: 'Prazo',                  type: 'date' },
+  { key: 'data_inicio', label: 'Início',                 type: 'date' },
+ ], _gestorApplyFilters);
 }
 
 // ── Aplicar filtros, ordenar e re-renderizar ──────────────────────────────
 function _gestorApplyFilters() {
- var search  = (document.getElementById('gestor-search')   || {}).value || '';
- var fStatus = _gestorMultiFilters.status;
- var fArea   = _gestorMultiFilters.area;
- var fTipo   = _gestorMultiFilters.tipo;
- var fObra   = _gestorMultiFilters.obra;
- var fMelh   = _gestorMultiFilters.melh;
- var fResp   = _gestorMultiFilters.resp;
- var sq = search.toLowerCase();
+ var search = (document.getElementById('gestor-search') || {}).value || '';
+ var sq = search.toLowerCase().trim();
 
  var pIni = _gestorPeriodo.ini; // Date ou null
  var pFim = _gestorPeriodo.fim; // Date ou null
@@ -419,19 +380,14 @@ function _gestorApplyFilters() {
    if (di && df && di <= pFim && df >= pIni) inPeriod = true;
    if (!inPeriod) return false;
   }
-  if (sq && !(a.titulo||'').toLowerCase().includes(sq)) return false;
-  if (fStatus.length) {
-   var matchStatus = fStatus.indexOf(a.status) !== -1 || (fStatus.indexOf('Atrasado') !== -1 && _gIsLate(a));
-   if (!matchStatus) return false;
+  // Busca inteligente: qualquer parte do texto, em vários campos de uma vez
+  // (não só o título) — "encontrar qualquer informação" mesmo com texto parcial.
+  if (sq) {
+   var haystack = [a.titulo, a.responsavel, a._obraNome, a._projNome, a._melhNome, a.area, _gTipoAtividade(a)]
+    .filter(Boolean).join(' ').toLowerCase();
+   if (haystack.indexOf(sq) === -1) return false;
   }
-  if (fArea.length   && fArea.indexOf(a.area) === -1)   return false;
-  if (fTipo.length   && fTipo.indexOf(_gTipoAtividade(a)) === -1) return false;
-  if (fObra.length   && fObra.indexOf(a._obraNome) === -1) return false;
-  if (fMelh.length   && fMelh.indexOf(a._melhNome) === -1) return false;
-  if (fResp.length) {
-   var respArr = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); });
-   if (!fResp.some(function(r){ return respArr.indexOf(r) !== -1; })) return false;
-  }
+  if (!_fbEvaluate(a, 'gestor')) return false;
   return true;
  });
 
