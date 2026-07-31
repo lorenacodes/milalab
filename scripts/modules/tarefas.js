@@ -109,10 +109,24 @@ function _gestorSetInputDates(ini, fim) {
 }
 
 // ── Preset de período ─────────────────────────────────────────────────────
+// As datas De/Até ficam escondidas por padrão (redundantes com os presets +
+// o rótulo de período já resolvido) — só aparecem quando a pessoa realmente
+// quer um intervalo que nenhum preset cobre.
+function _gestorToggleCustomDates() {
+ var el = document.getElementById('gestor-custom-dates');
+ if (!el) return;
+ el.style.display = el.style.display === 'none' ? 'inline-flex' : 'none';
+}
+
 function _gestorPreset(preset, btn) {
  // Atualizar botão ativo
  document.querySelectorAll('.gp-preset').forEach(function(b){ b.classList.remove('active'); });
  if (btn) btn.classList.add('active');
+ // Escolher um preset fixo resolve o período — some com as datas manuais.
+ if (btn) {
+  var cd = document.getElementById('gestor-custom-dates');
+  if (cd) cd.style.display = 'none';
+ }
 
  var today = new Date(); today.setHours(0,0,0,0);
  var ini, fim;
