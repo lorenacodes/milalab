@@ -781,25 +781,91 @@ function _taskAutoSaveFlush() {
  _taskAutoSavePending = null;
  patch.updated_at = new Date().toISOString();
  _sb.from('atividades').update(patch).eq('id', id).then(function(res) {
-  // Usuário já fechou/trocou de atividade enquanto salvava — não mexe na UI
-  if (String(_taskEditId) !== String(id)) return;
+  // Só pula a atualização de UI se o usuário JÁ ABRIU OUTRA atividade
+  // enquanto salvava (_taskEditId aponta pra outro id) — fechar o painel
+  // (_taskEditId vira null) NÃO deve bloquear isso: é o caso mais comum
+  // (editar e fechar em seguida) e antes descartava a atualização do cache
+  // em memória bem aí, deixando Meu Painel/Gestor de Tarefas com dado velho
+  // até um F5.
+  if (_taskEditId && String(_taskEditId) !== String(id)) return;
   if (res.error) {
    _taskAutoSaveStatus('error', 'Erro ao salvar: ' + _supaErrPt(res.error.message));
    console.error('[auto-save]', res.error);
    return;
   }
   _taskAutoSaveStatus('saved', 'Alterações salvas');
-  // Reflete nas outras telas sem precisar de refresh (sem refetch — só
-  // aplica o mesmo patch nos caches em memória já carregados)
-  var gIdx = (typeof _gestorAllAt !== 'undefined') ? _gestorAllAt.findIndex(function(x){ return String(x.id) === String(id); }) : -1;
-  if (gIdx !== -1) { Object.assign(_gestorAllAt[gIdx], patch); if (typeof _gestorApplyFilters === 'function') _gestorApplyFilters(); }
-  var dIdx = (_dashAllAtRaw||[]).findIndex(function(x){ return String(x.id) === String(id); });
-  if (dIdx !== -1) Object.assign(_dashAllAtRaw[dIdx], patch);
+  _taskApplyPatchEverywhere(id, patch);
  }).catch(function(e) {
-  if (String(_taskEditId) !== String(id)) return;
+  if (_taskEditId && String(_taskEditId) !== String(id)) return;
   _taskAutoSaveStatus('error', 'Erro: ' + e.message);
   console.error('[auto-save]', e);
  });
+}
+
+// Única fonte de verdade: _gestorAllAt (Gestor de Tarefas) e _dashAllAtRaw
+// (Meu Painel) guardam a MESMA atividade em dois caches independentes —
+// depois de qualquer save bem-sucedido, aplica o patch nos dois e
+// re-renderiza tudo que é derivado deles (sem nenhuma consulta nova).
+function _taskApplyPatchEverywhere(id, patch) {
+ var gIdx = (typeof _gestorAllAt !== 'undefined') ? _gestorAllAt.findIndex(function(x){ return String(x.id) === String(id); }) : -1;
+ if (gIdx !== -1) { Object.assign(_gestorAllAt[gIdx], patch); if (typeof _gestorApplyFilters === 'function') _gestorApplyFilters(); }
+ var dIdx = (_dashAllAtRaw||[]).findIndex(function(x){ return String(x.id) === String(id); });
+ if (dIdx !== -1) { Object.assign(_dashAllAtRaw[dIdx], patch); _dashRerenderAllFromCache(); }
+}
+
+// Recalcula feed/KPIs/gráficos do Meu Painel a partir de _dashAllAtRaw (já
+// atualizado) — sem refetch. areaAt/semAt (usados só nos gráficos) são
+// simples recortes de colunas que _dashAllAtRaw já tem, então não precisam
+// de cache próprio: derivar na hora é a mesma coisa e mantém uma única
+// fonte de verdade de verdade.
+function _dashRerenderAllFromCache() {
+ if (!Array.isArray(_dashAllAtRaw)) return;
+ var allAt = _dashAllAtRaw;
+ var hoje = new Date(); hoje.setHours(0,0,0,0);
+
+ var feedData = allAt
+  .filter(function(a){ return a.status !== 'Feito' && a.status !== 'Concluído' && a.status !== 'Obsoleto'; })
+  .sort(function(a,b){
+   var dA = a.data_prazo ? new Date(a.data_prazo+'T00:00:00').getTime() : Infinity;
+   var dB = b.data_prazo ? new Date(b.data_prazo+'T00:00:00').getTime() : Infinity;
+   var atA = dA < hoje.getTime() ? 0 : 1;
+   var atB = dB < hoje.getTime() ? 0 : 1;
+   if (atA !== atB) return atA - atB;
+   return dA - dB;
+  })
+  .slice(0, 15);
+ _dashFeedRaw = feedData;
+ if (typeof _dashRenderFeed === 'function') _dashRenderFeed(_dashApplySomenteEu(_dashFeedRaw));
+
+ if (typeof _dashUpdateKPIsFromDB === 'function') _dashUpdateKPIsFromDB(allAt);
+ var amanha14 = new Date(hoje); amanha14.setDate(hoje.getDate()+14);
+ var prox14 = allAt.filter(function(a){
+  var d = a.data_prazo ? new Date(a.data_prazo+'T00:00:00') : null;
+  return d && d >= hoje && d <= amanha14 && a.status !== 'Feito' && a.status !== 'Concluído';
+ }).length;
+ var total = allAt.length;
+ var feitas = allAt.filter(function(a){ return a.status === 'Feito' || a.status === 'Concluído'; }).length;
+ var taxaPct = total > 0 ? Math.round(feitas * 100 / total) : 0;
+ var kP = document.getElementById('dash-kpi-prox'); if (kP) kP.textContent = prox14;
+ var kC = document.getElementById('dash-kpi-conclusao'); if (kC) kC.textContent = taxaPct + '%';
+
+ window._dashAlertsData = allAt;
+ if (typeof _dashBuildAlertsFromDB === 'function') _dashBuildAlertsFromDB(allAt);
+
+ if (typeof _dashRenderChartAreas === 'function') {
+  _dashRenderChartAreas(allAt.map(function(a){ return { area: a.area, status: a.status }; }));
+ }
+ if (typeof _dashRenderChartSemanas === 'function') {
+  var dozeMeses = new Date(); dozeMeses.setFullYear(dozeMeses.getFullYear() - 1);
+  var dozeMesesStr = dozeMeses.toISOString().substring(0,10);
+  var semAtDerivado = allAt
+   .filter(function(a){ return (a.status === 'Feito' || a.status === 'Concluído') && a.data_prazo && a.data_prazo >= dozeMesesStr; })
+   .map(function(a){ return { data_prazo: a.data_prazo, status: a.status, updated_at: a.updated_at }; })
+   .sort(function(x,y){ return (x.data_prazo||'').localeCompare(y.data_prazo||''); });
+  _dashSemanasRaw = semAtDerivado;
+  _dashRenderChartSemanas(semAtDerivado);
+ }
+ if (typeof _dashRenderChartStatus === 'function') _dashRenderChartStatus(allAt);
 }
 
 // Chamado ao fechar o drawer: se ainda houver um patch pendente (debounce não
@@ -1315,6 +1381,12 @@ function _taskDelete() {
     _showToast('Atividade excluída do sistema', 'ok');
     _histLogAdd('excluiu', titulo, 'Removida do Supabase');
     _histBadgeUpdate();
+    // Remove dos dois caches na hora (não precisa esperar o _dashLoad abaixo
+    // pra sumir do Gestor de Tarefas também, não só do Meu Painel)
+    if (typeof _gestorAllAt !== 'undefined') {
+     var gIdx = _gestorAllAt.findIndex(function(x){ return String(x.id) === String(sbId); });
+     if (gIdx !== -1) { _gestorAllAt.splice(gIdx, 1); if (typeof _gestorApplyFilters === 'function') _gestorApplyFilters(); }
+    }
     _dashLoad(); // atualiza feed e KPIs
    }
   })
@@ -1582,7 +1654,9 @@ function _ntAutoSaveVinculos() {
  var id = _taskEditId;
  _taskAutoSaveStatus('saving', 'Salvando…');
  _syncAtividadeVinculos(id, obraId, projId, melhId).then(function() {
-  if (String(_taskEditId) !== String(id)) return;
+  // Mesmo cuidado do _taskAutoSaveFlush: só pula se já abriu OUTRA
+  // atividade, não quando o painel simplesmente fechou (_taskEditId nulo).
+  if (_taskEditId && String(_taskEditId) !== String(id)) return;
   _taskAutoSaveStatus('saved', 'Alterações salvas');
   var gIdx = (typeof _gestorAllAt !== 'undefined') ? _gestorAllAt.findIndex(function(x){ return String(x.id) === String(id); }) : -1;
   if (gIdx !== -1) {
@@ -1590,6 +1664,13 @@ function _ntAutoSaveVinculos() {
    _gestorAllAt[gIdx]._obraNome = obraId ? (_gestorObrasMap[String(obraId)] || '') : '';
    _gestorAllAt[gIdx]._projNome = projId ? (_gestorProjMap[String(projId)] || '') : '';
    if (typeof _gestorApplyFilters === 'function') _gestorApplyFilters();
+  }
+  var dIdx = (_dashAllAtRaw||[]).findIndex(function(x){ return String(x.id) === String(id); });
+  if (dIdx !== -1) {
+   _dashAllAtRaw[dIdx].obra_id = obraId; _dashAllAtRaw[dIdx].projeto_id = projId; _dashAllAtRaw[dIdx].melhoria_id = melhId;
+   _dashAllAtRaw[dIdx]._obraNome = obraId ? (_gestorObrasMap[String(obraId)] || '') : '';
+   _dashAllAtRaw[dIdx]._projNome = projId ? (_gestorProjMap[String(projId)] || '') : '';
+   _dashRerenderAllFromCache();
   }
  });
 }
