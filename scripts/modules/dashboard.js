@@ -769,7 +769,6 @@ function _taskDrawerOpen(editId) {
 
  // ── Aba Geral ──
  set('nt-titulo',        t ? t.titulo        : '');
- set('nt-descricao',     t ? t.descricao     : '');
  set('nt-observacoes',   t ? t.observacoes   : '');
  set('nt-dt-inicio',     t ? t.data_inicio   : '');
  set('nt-dt-fim',        t ? t.data_fim      : '');
@@ -811,8 +810,6 @@ function _taskDrawerOpen(editId) {
  window._drwCurrentTask = t || null;
 
  // ── Aba Comunicação ──
- set('nt-comentarios', t ? t.comentarios : '');
- set('nt-decisoes',    t ? t.decisoes    : '');
  var histWrap = get('drw-hist-wrap');
  var histList = get('drw-hist-list');
  if (t && t.historico && t.historico.length && histWrap && histList) {
@@ -844,17 +841,21 @@ function _taskDrawerOpen(editId) {
   : [];
  _drwSubRender();
 
- // ── Aba Recorrência ──
- document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){
-  r.checked = r.value === (t ? (t.recorrencia || 'nao') : 'nao');
- });
- set('nt-freq-val',       t ? (t.freq_val   || 1)       : 1);
- set('nt-freq-unit',      t ? (t.freq_unit  || 'semanal'): 'semanal');
- set('nt-rec-repeticoes', t ? (t.rec_repeticoes || '')   : '');
- set('nt-rec-dt-fim',     t ? (t.rec_dt_fim     || '')   : '');
- var infEl = get('nt-rec-infinita');
- if (infEl) infEl.checked = t ? !!t.rec_infinita : false;
- _taskRecorrenciaChange();
+ // ── Seção Recorrência — só faz sentido ao criar (editar a recorrência de
+ // uma atividade existente não regenera nem afeta nada hoje, então a seção
+ // fica oculta em modo edição em vez de fingir que funciona) ──
+ var recWrap = get('drw-sec-recorrencia-wrap');
+ if (recWrap) recWrap.style.display = t ? 'none' : '';
+ if (!t) {
+  document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ r.checked = r.value === 'nao'; });
+  set('nt-freq-val', 1);
+  set('nt-freq-unit', 'semanal');
+  set('nt-rec-repeticoes', '');
+  set('nt-rec-dt-fim', '');
+  var infEl = get('nt-rec-infinita');
+  if (infEl) infEl.checked = false;
+  _taskRecorrenciaChange();
+ }
 
  // ── Aba Auditoria (só no modo edição) ──
  var auditTab = get('drw-tab-auditoria');
@@ -1579,8 +1580,9 @@ function _ntPopulateVinculos(t) {
   }
  }
  if (!_dbOk) {
+  // Obra não é mais um <select> simples (virou busca com dropdown próprio,
+  // ver nt-obra-box/nt-obra-drop), só a Melhoria ainda é.
   var msg = '<option value="">Sem conexão</option>';
-  if (selObra && selObra.options.length <= 1) selObra.innerHTML = msg;
   if (selMelh && selMelh.options.length <= 1) selMelh.innerHTML = msg;
  }
 }
@@ -1786,10 +1788,7 @@ function _submitNewTask() {
    status:          document.getElementById('nt-status').value,
    data_inicio:     document.getElementById('nt-dt-inicio').value,
    data_fim:        document.getElementById('nt-dt-fim').value,
-   descricao:       (document.getElementById('nt-descricao')   || {}).value || '',
    observacoes:     (document.getElementById('nt-observacoes') || {}).value || '',
-   comentarios:     (document.getElementById('nt-comentarios') || {}).value || '',
-   decisoes:        (document.getElementById('nt-decisoes')    || {}).value || '',
    obra_id:         obraEl ? obraEl.value : '',
    obra_nome:       obraText.split(' — ')[0] || '',
    projeto_id:      projEl ? projEl.value : '',
@@ -2344,65 +2343,16 @@ function _feedItemClick(el, ativDireto) {
   }
   if (!a || !a.id) return;
 
-  // Verifica se já está em _dashTasks (tarefa local)
-  var local = (_dashTasks||[]).find(function(t){ return String(t.id) === String(a.id); });
-  if (local) { _taskDrawerOpen(a.id); return; }
-
-  // Tarefa do Supabase — pré-popula o drawer manualmente
-  _taskEditId = a.id; // marca modo edição
-  var ttlEl = document.getElementById('task-drw-ttl');
-  var btnEl = document.getElementById('task-drw-submit-btn');
-  var delEl = document.getElementById('task-drw-del-btn');
-  if (ttlEl) ttlEl.textContent = 'Editar atividade';
-  if (btnEl) btnEl.textContent = 'Salvar alterações';
-  if (delEl) delEl.style.display = ''; // mostra excluir para Supabase também
-
-  var set = function(id, val){ var el = document.getElementById(id); if(el) el.value = val||''; };
-  set('nt-titulo',    a.titulo      || '');
-  set('nt-descricao', a.descricao   || '');
-  set('nt-observacoes', a.observacoes || '');
-  set('nt-dt-inicio', a.data_inicio || '');
-  set('nt-dt-fim',    a.data_prazo  || '');
-
-  var prioEl = document.getElementById('nt-prioridade');
-  var stEl   = document.getElementById('nt-status');
-  var areaEl = document.getElementById('nt-area');
-  var tipoEl = document.getElementById('nt-tipo-atividade');
-  if (prioEl) prioEl.value = a.prioridade       || 'Média';
-  if (stEl)   stEl.value   = a.status           || 'A fazer';
-  if (areaEl) areaEl.value = a.area || '';
-  if (tipoEl) {
-   var tipoVal = a.tipo_atividade || a.tipo || '';
-   tipoEl.value = tipoVal;
-   if (tipoVal && !tipoEl.value) { // sem match exato — tenta case-insensitive
-    var lc = tipoVal.toLowerCase();
-    for (var oi = 0; oi < tipoEl.options.length; oi++) {
-     if (tipoEl.options[oi].value.toLowerCase() === lc) { tipoEl.value = tipoEl.options[oi].value; break; }
-    }
-   }
-  }
-
-  var respVal = a.responsavel || '';
-  _respLoadUsers().then(function(){ _respSetFromString(respVal); }).catch(function(){ _respSetFromString(respVal); });
-  if (!respVal) _respSetFromString('');
-
-  // Limpa erros visuais e abre
-  ['nt-titulo','nt-tipo-atividade','nt-area','nt-dt-inicio','nt-dt-fim'].forEach(function(id){
-   var el = document.getElementById(id);
-   if(el){ el.style.borderColor=''; el.style.boxShadow=''; }
-  });
-  _ntPopulateVinculos(a);
-  ['task-acc-vinculos','task-acc-datas','task-acc-obs'].forEach(function(id){
-   var acc = document.getElementById(id); if(acc) acc.classList.remove('open');
-  });
-  // Sempre volta para a aba Geral ao abrir (pode estar em Subtarefas/Colaboração)
-  _drwTab('geral', document.querySelector('.drw-tab'));
-
-  var drw = document.getElementById('task-drw');
-  var bd  = document.getElementById('drw-backdrop-task');
-  if (drw) drw.classList.add('open');
-  if (bd)  bd.classList.add('open');
-  setTimeout(function(){ var inp = document.getElementById('nt-titulo'); if(inp) inp.focus(); }, 260);
+  // Antes esta função tinha sua própria pré-população manual do drawer,
+  // usada sempre que a atividade não estava em _dashTasks (que na prática é
+  // sempre — esse array legado nunca é mais preenchido). Isso duplicava (e
+  // fazia pior) o que _taskDrawerOpen já faz: pulava _ntPrivacidadeSet (podia
+  // salvar a atividade com a privacidade errada), não resetava _drwSubItems
+  // (subtarefas de uma tarefa vazavam pra próxima aberta), não setava
+  // window._drwCurrentTask (quebrava "Solicitar Colaboração") e não populava
+  // a aba Auditoria. _taskDrawerOpen já sabe achar a atividade em _gestorAllAt
+  // /_dashAllAtRaw quando não está em _dashTasks, então basta delegar.
+  _taskDrawerOpen(a.id);
  } catch(e) { console.warn('[feedItemClick]', e); }
 }
 
@@ -2469,17 +2419,12 @@ function _dashRenderFeed(atividades) {
     + '</div>';
   }
 
-  var checkIcon = isConcluida
-   ? '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.2"><polyline points="2 6 5 9 10 3"/></svg>'
-   : '';
-  var checkStyle = isConcluida
-   ? 'width:18px;height:18px;border-radius:50%;border:2px solid var(--green);background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:3px;cursor:pointer;transition:all .18s'
-   : 'width:18px;height:18px;border-radius:50%;border:2px solid var(--border);background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:3px;cursor:pointer;transition:all .18s';
-
+  // Antes havia uma bolinha aqui que marcava a atividade como concluída num
+  // clique — fácil de acionar sem querer, e já existe uma forma clara de
+  // fazer isso (campo Status = Concluída, no editor). Removida — ver
+  // _feedConcluir (também removida).
   var aId = JSON.stringify(a);
-  return '<div data-ativ=\'' + aId.replace(/'/g,'&#39;') + '\' style="display:flex;align-items:flex-start;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;' + (isConcluida ? 'opacity:.55' : '') + '" onmouseover="this.style.background=\'var(--surface2)\';this.querySelector(\'.feed-edit-hint\').style.opacity=\'1\';if(!this.querySelector(\'.feed-check\').classList.contains(\'done\'))this.querySelector(\'.feed-check\').style.borderColor=\'var(--green)\'" onmouseout="this.style.background=\'\';this.querySelector(\'.feed-edit-hint\').style.opacity=\'0\';if(!this.querySelector(\'.feed-check\').classList.contains(\'done\'))this.querySelector(\'.feed-check\').style.borderColor=\'var(--border)\'" onclick="_feedItemClick(this)">'
-
-   + '<div class="feed-check ' + (isConcluida ? 'done' : '') + '" onclick="event.stopPropagation();_feedConcluir(this,\'' + a.id + '\')" style="' + checkStyle + '" title="' + (isConcluida ? 'Marcar como pendente' : 'Marcar como concluída') + '">' + checkIcon + '</div>'
+  return '<div data-ativ=\'' + aId.replace(/'/g,'&#39;') + '\' style="display:flex;align-items:flex-start;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s;' + (isConcluida ? 'opacity:.55' : '') + '" onmouseover="this.style.background=\'var(--surface2)\';this.querySelector(\'.feed-edit-hint\').style.opacity=\'1\'" onmouseout="this.style.background=\'\';this.querySelector(\'.feed-edit-hint\').style.opacity=\'0\'" onclick="_feedItemClick(this)">'
 
    + '<div style="flex:1;min-width:0">'
    + '<div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;display:flex;align-items:center;gap:5px;' + (isConcluida ? 'text-decoration:line-through;color:var(--muted)' : '') + '">'
@@ -2510,62 +2455,6 @@ function _dashRenderFeed(atividades) {
    + '</div>';
  }).join('');
 }
-
-async function _feedConcluir(checkEl, atividadeId) {
- var row = checkEl.closest('[data-ativ]');
- var isDone = checkEl.classList.contains('done');
- var novoStatus = isDone ? 'A fazer' : 'Concluída';
-
- // Visual imediato
- if (!isDone) {
-  checkEl.classList.add('done');
-  checkEl.style.background = 'var(--green)';
-  checkEl.style.borderColor = 'var(--green)';
-  checkEl.innerHTML = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.2"><polyline points="2 6 5 9 10 3"/></svg>';
-  checkEl.title = 'Marcar como pendente';
-  var titulo = row.querySelector('[style*="font-weight:600"]');
-  if (titulo) { titulo.style.textDecoration = 'line-through'; titulo.style.color = 'var(--muted)'; }
-  row.style.opacity = '.55';
- } else {
-  checkEl.classList.remove('done');
-  checkEl.style.background = 'transparent';
-  checkEl.style.borderColor = 'var(--border)';
-  checkEl.innerHTML = '';
-  checkEl.title = 'Marcar como concluída';
-  var titulo = row.querySelector('[style*="font-weight:600"]');
-  if (titulo) { titulo.style.textDecoration = ''; titulo.style.color = 'var(--text)'; }
-  row.style.opacity = '';
- }
-
- // Salva no banco
- if (_dbOk) {
-  var res = await _sb.from('atividades').update({ status: novoStatus }).eq('id', atividadeId);
-  if (res.error) {
-   console.error('[Dashboard] erro ao atualizar status da atividade:', res.error);
-   _showToast('Erro ao salvar — desfazendo alteração: ' + _supaErrPt(res.error.message), 'erro');
-   // Reverte a UI otimista (sem tentar gravar de novo) já que a gravação falhou
-   var tituloEl = row.querySelector('[style*="font-weight:600"]');
-   if (!isDone) {
-    checkEl.classList.remove('done');
-    checkEl.style.background = 'transparent';
-    checkEl.style.borderColor = 'var(--border)';
-    checkEl.innerHTML = '';
-    checkEl.title = 'Marcar como concluída';
-    if (tituloEl) { tituloEl.style.textDecoration = ''; tituloEl.style.color = 'var(--text)'; }
-    row.style.opacity = '';
-   } else {
-    checkEl.classList.add('done');
-    checkEl.style.background = 'var(--green)';
-    checkEl.style.borderColor = 'var(--green)';
-    checkEl.innerHTML = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="#fff" stroke-width="2.2"><polyline points="2 6 5 9 10 3"/></svg>';
-    checkEl.title = 'Marcar como pendente';
-    if (tituloEl) { tituloEl.style.textDecoration = 'line-through'; tituloEl.style.color = 'var(--muted)'; }
-    row.style.opacity = '.55';
-   }
-  }
- }
-}
-
 
 /* ── SEÇÃO INICIATIVAS DE INOVAÇÃO ─────────────────────────────────── */
 // Motivo: renderiza melhorias do Supabase filtradas pelo responsável logado.
