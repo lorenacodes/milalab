@@ -250,32 +250,77 @@ function _fbRender(instanceId) {
  _fbRenderPopoverVisibility(instanceId);
  _fbUpdateBadge(instanceId);
 }
+// Listas grandes (Obra, Projeto, Melhoria, Responsável, Empresa...) ganham
+// uma busca no topo — sem isso, achar um valor específico numa lista de
+// centenas de obras exigia rolar a lista inteira. Só aparece quando a lista
+// realmente compensa (mais de _FB_SEARCH_THRESHOLD itens); listas curtas
+// (Prioridade, Status com poucos valores) continuam sem busca, sem ruído.
+var _FB_SEARCH_THRESHOLD = 8;
+
 function _fbRenderValueInput(instanceId, c, f) {
  if (c.operator === 'empty' || c.operator === 'nempty') return '<span class="fb-val-empty"></span>';
  if (c.operator === 'anyof' || c.operator === 'noneof') {
-  var opts = (typeof f.options === 'function') ? f.options() : (f.options || []);
-  var sel = Array.isArray(c.value) ? c.value : [];
-  return '<div class="fb-msel-wrap">'
-   + '<button type="button" class="fb-msel-btn" data-cond="' + c.id + '" onclick="this.nextElementSibling.classList.toggle(\'open\')">'
-   + (sel.length ? sel.length + ' selecionado(s)' : 'Selecionar...') + '</button>'
-   + '<div class="fb-msel-panel">' + opts.map(function(o) {
-      var ck = sel.indexOf(o) !== -1 ? ' checked' : '';
-      return '<label><input type="checkbox" value="' + o.replace(/"/g,'&quot;') + '"' + ck
-       + ' onchange="_fbValueToggleOpt(\'' + instanceId + '\',\'' + c.id + '\',this.value,this.checked)"> ' + o + '</label>';
-     }).join('') + '</div></div>';
+  return _fbSearchableDropdown(instanceId, c, f, true);
  }
  if (f.type === 'select') {
-  var opts2 = (typeof f.options === 'function') ? f.options() : (f.options || []);
-  return '<select class="fb-val-sel" onchange="_fbValueChange(\'' + instanceId + '\',\'' + c.id + '\',this.value)">'
-   + '<option value="">Selecione...</option>'
-   + opts2.map(function(o) { return '<option value="' + o.replace(/"/g,'&quot;') + '"' + (c.value===o?' selected':'') + '>' + o + '</option>'; }).join('')
-   + '</select>';
+  return _fbSearchableDropdown(instanceId, c, f, false);
  }
  if (f.type === 'date') {
   return '<input type="date" class="fb-val-date" value="' + (c.value||'') + '" onchange="_fbValueChange(\'' + instanceId + '\',\'' + c.id + '\',this.value)">';
  }
  return '<input type="text" class="fb-val-text" placeholder="Digite um valor..." value="' + ((c.value||'')+'').replace(/"/g,'&quot;')
   + '" oninput="_fbValueChange(\'' + instanceId + '\',\'' + c.id + '\',this.value)">';
+}
+
+// multi=true: lista de checkboxes (anyof/noneof) — multi=false: lista de
+// opções de escolha única (eq/is), substitui o <select> nativo antigo pra
+// poder ter busca (um <select> nativo não permite injetar um campo de busca
+// dentro do próprio dropdown).
+function _fbSearchableDropdown(instanceId, c, f, multi) {
+ var opts = (typeof f.options === 'function') ? f.options() : (f.options || []);
+ var sel = multi ? (Array.isArray(c.value) ? c.value : []) : null;
+ var btnLabel = multi
+  ? (sel.length ? sel.length + ' selecionado(s)' : 'Selecionar...')
+  : (c.value || 'Selecione...');
+ var searchHtml = opts.length > _FB_SEARCH_THRESHOLD
+  ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_fbFilterMselOptions(this)">'
+  : '';
+ var itemsHtml = opts.map(function(o) {
+  var esc = o.replace(/"/g,'&quot;');
+  var norm = _ssNormalize(o);
+  if (multi) {
+   var ck = sel.indexOf(o) !== -1 ? ' checked' : '';
+   return '<label class="fb-msel-item" data-norm="' + norm + '"><input type="checkbox" value="' + esc + '"' + ck
+    + ' onchange="_fbValueToggleOpt(\'' + instanceId + '\',\'' + c.id + '\',this.value,this.checked)"> ' + o + '</label>';
+  }
+  var activeCls = c.value === o ? ' fb-msel-item-active' : '';
+  return '<div class="fb-msel-item' + activeCls + '" data-norm="' + norm + '" onclick="_fbSelectValue(\'' + instanceId + '\',\'' + c.id + '\',\'' + o.replace(/'/g,"\\'").replace(/"/g,'&quot;') + '\')">' + o + '</div>';
+ }).join('');
+ return '<div class="fb-msel-wrap">'
+  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabel + '</button>'
+  + '<div class="fb-msel-panel">' + searchHtml + '<div class="fb-msel-list">' + itemsHtml + '</div></div>'
+  + '</div>';
+}
+
+// Filtra a lista de opções conforme o texto digitado — ignora acento/caixa
+// (_ssNormalize/_ssMatch, scripts/lib/smart-search.js), instantâneo (sem
+// round-trip, tudo já está renderizado no DOM).
+function _fbFilterMselOptions(inputEl) {
+ var q = _ssNormalize(inputEl.value || '');
+ var list = inputEl.nextElementSibling;
+ if (!list) return;
+ Array.prototype.forEach.call(list.children, function(item) {
+  var norm = item.getAttribute('data-norm') || '';
+  item.style.display = (!q || _ssMatch(norm, q)) ? '' : 'none';
+ });
+}
+
+// Seleção de valor único (eq/is) via lista customizada em vez de <select>
+// nativo — precisa re-renderizar o popover pra atualizar o rótulo do botão
+// (um <select> nativo faz isso sozinho; a lista customizada não).
+function _fbSelectValue(instanceId, condId, val) {
+ _fbValueChange(instanceId, condId, val);
+ _fbRender(instanceId);
 }
 
 // Export só pra Node (testes, node:test) — não muda nada no navegador.

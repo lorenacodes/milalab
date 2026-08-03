@@ -518,11 +518,14 @@ function _gTipoResp(a) {
 var _GESTOR_STATUS_CANONICO = ['Backlog','A fazer','Em progresso','Aguardando feedback','Feito','Obsoleto'];
 
 function _gestorStatusOptions() {
+ // "Atrasado" NÃO é uma opção aqui: é uma condição calculada (prazo vencido +
+ // não concluída), não um status real gravado na atividade. Selecionável só
+ // através do campo "Somente atrasadas" (ver _gestorPopulateFilters), pra não
+ // mascarar o status verdadeiro nem no filtro nem na tela.
  var vistos = {};
  _gestorAllAt.forEach(function(a){ if (a.status) vistos[a.status] = 1; });
  var keys = _GESTOR_STATUS_CANONICO.slice();
  Object.keys(vistos).forEach(function(s){ if (keys.indexOf(s) === -1) keys.push(s); });
- keys.push('Atrasado');
  return keys;
 }
 function _gestorOptionsFrom(getter) {
@@ -542,28 +545,16 @@ function _gestorPopulateFilters() {
  _fbInit('gestor', [
   { key: 'titulo',      label: 'Tarefa',                type: 'text' },
   { key: 'responsavel', label: 'Responsável',           type: 'multitext', options: _gestorRespOptions },
-  // "Atrasado" é um pseudo-status (computado por prazo vencido, não uma coluna
-  // real) — precisa ser selecionável no filtro, mas NÃO pode mascarar o status
-  // verdadeiro dos itens que também estão atrasados (bug real encontrado na
-  // auditoria: filtrar por "Obsoleto" ou "A fazer" excluía silenciosamente
-  // qualquer item nesse status que também estivesse vencido, porque o valor
-  // usado pra comparação virava sempre "Atrasado"). matchValue trata os dois
-  // como coisas independentes: o status real E, separadamente, se está
-  // atrasado — uma tarefa "Obsoleto" e atrasada aparece em Obsoleto E em
-  // Atrasado, nunca só em um dos dois.
+  // Status = só o valor real gravado na atividade, nunca sobrescrito.
+  // "Atrasado" não é status — é a condição calculada por _gIsLate (prazo
+  // vencido + não concluída), filtrável separadamente pelo campo "Somente
+  // atrasadas" logo abaixo. Os dois combinam com AND normalmente (o motor de
+  // filtro já faz isso): Status=Obsoleto + Somente atrasadas=Sim retorna só
+  // as obsoletas que também estão vencidas.
   { key: 'status',      label: 'Status',                type: 'select', options: _gestorStatusOptions,
-    matchValue: function(a, operator, value) {
-     var real = (a.status || '').toLowerCase();
-     var late = _gIsLate(a);
-     function isMatch(v) { return String(v).toLowerCase() === 'atrasado' ? late : real === String(v).toLowerCase(); }
-     if (operator === 'empty')  return !a.status;
-     if (operator === 'nempty') return !!a.status;
-     if (operator === 'eq')     return isMatch(value);
-     if (operator === 'neq')    return !isMatch(value);
-     if (operator === 'anyof')  return (value||[]).some(isMatch);
-     if (operator === 'noneof') return !(value||[]).some(isMatch);
-     return true;
-    } },
+    getValue: function(a) { return a.status || ''; } },
+  { key: 'atrasada',    label: 'Somente atrasadas',     type: 'select', options: ['Sim', 'Não'],
+    getValue: function(a) { return _gIsLate(a) ? 'Sim' : 'Não'; } },
   { key: 'prioridade',  label: 'Prioridade',            type: 'select', options: ['Alta','Média','Baixa'] },
   { key: 'area',        label: 'Área',                  type: 'select', options: function(){ return _gestorOptionsFrom(function(a){ return a.area; }); } },
   { key: 'tipo',        label: 'Tipo de Atividade',     type: 'select', options: function(){ return _gestorOptionsFrom(_gTipoAtividade); }, getValue: _gTipoAtividade },
@@ -581,7 +572,7 @@ function _gestorPopulateFilters() {
   { key: 'data_inicio', label: 'Início',     type: 'date' },
   { key: 'titulo',      label: 'Tarefa',     type: 'text' },
   { key: 'prioridade',  label: 'Prioridade', type: 'number', getValue: function(a){ return _prioOrdemSort[a.prioridade] ?? 3; } },
-  { key: 'status',      label: 'Status',     type: 'text', getValue: function(a){ return _gIsLate(a) ? 'Atrasado' : (a.status||''); } },
+  { key: 'status',      label: 'Status',     type: 'text', getValue: function(a){ return a.status||''; } },
   { key: 'area',        label: 'Área',       type: 'text' },
  ], _gestorApplyFilters);
  // Só inicializa o nível padrão (Prazo ↑) na primeira vez — trocas de aba/
@@ -772,7 +763,9 @@ function _gestorRenderSetor() {
 
   var cards = items.slice(0,50).map(function(a) {
    var late = _gIsLate(a);
-   var sc   = _gStatusCls(late ? 'Atrasado' : (a.status || 'A fazer'));
+   // sc/status sempre do valor real — "atrasada" é só a cor do dot/data
+   // (cor diferenciada), nunca substitui o texto do status.
+   var sc   = _gStatusCls(a.status || 'A fazer');
    var statusDot = '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + (late ? '#D6433C' : sc.dot) + ';flex-shrink:0;margin-top:3px"></span>';
    var prazoTxt = '';
    if (a.data_prazo) {
@@ -792,7 +785,8 @@ function _gestorRenderSetor() {
     + '<div style="font-size:12px;font-weight:500;color:var(--text);line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">' + titulo + '</div>'
     + '</div></div>'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
-    + '<span style="font-size:9px;background:' + sc.dot + '22;color:' + sc.dot + ';padding:1px 7px;border-radius:20px;font-weight:700">' + (late ? 'Atrasada' : (a.status || 'A fazer')) + '</span>'
+    + '<span style="font-size:9px;background:' + sc.dot + '22;color:' + sc.dot + ';padding:1px 7px;border-radius:20px;font-weight:700">' + (a.status || 'A fazer') + '</span>'
+    + (late ? '<span title="Prazo vencido" style="font-size:9px;background:#D6433C22;color:#D6433C;padding:1px 6px;border-radius:20px;font-weight:700;margin-left:3px">Atrasada</span>' : '')
     + '<div style="display:flex;align-items:center;gap:6px">'
     + (respStr ? '<span style="font-size:9px;color:var(--muted)">' + respStr.split(' ')[0] + '</span>' : '')
     + (prazoTxt || '')
@@ -899,7 +893,11 @@ function _gestorRenderGrid() {
    var respList = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
    key = respList.length === 0 ? '— Sem responsável' : (respList.length === 1 ? respList[0] : 'Tarefas Coletivas');
   } else if (groupBy === 'status') {
-   key = _gIsLate(a) ? 'Atrasadas' : (a.status || 'A fazer');
+   // Agrupa pelo status real — "atrasada" não é status, então não cria um
+   // grupo "Atrasadas" à parte (isso escondia o status real das atividades
+   // vencidas). O badge de contagem de atrasadas por grupo (linha abaixo)
+   // já mostra quantas de cada status estão vencidas.
+   key = a.status || 'A fazer';
   } else if (groupBy === 'area') {
    key = a.area || '— Sem área';
   } else if (groupBy === 'data_prazo') {
@@ -961,8 +959,12 @@ function _gestorRenderGrid() {
 function _gestorRenderRow(a, rowNum, hoje) {
  hoje = hoje || (function(){ var h = new Date(); h.setHours(0,0,0,0); return h; })();
  var late    = _gIsLate(a);
- var sc      = _gStatusCls(late ? 'Atrasado' : (a.status || 'A fazer'));
- var statusLbl = late ? 'Atrasado' : (a.status || 'A fazer');
+ // Status = sempre o valor real da atividade — "atrasada" é uma condição
+ // calculada exibida como badge à parte (abaixo), nunca sobrescreve o
+ // status verdadeiro (bug real: uma tarefa "Obsoleto" vencida aparecia
+ // como "Atrasado" na Grade, escondendo o status que o usuário definiu).
+ var sc      = _gStatusCls(a.status || 'A fazer');
+ var statusLbl = a.status || 'A fazer';
  var dot     = late ? '#D6433C' : sc.dot;
 
  // Prazo formatado
@@ -1067,7 +1069,9 @@ function _gestorRenderRow(a, rowNum, hoje) {
   + '<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + tituloShort + '</div>'
   + descHtml + vincHtml + '</div>'
   + '</div></td>'
-  + '<td><span class="gs-badge ' + (late ? 'gs-atrasado' : sc.cls) + '">' + statusLbl + '</span></td>'
+  + '<td><span class="gs-badge ' + sc.cls + '">' + statusLbl + '</span>'
+  + (late ? '<span class="gs-badge gs-atrasado" title="Prazo vencido" style="margin-left:4px">Atrasada</span>' : '')
+  + '</td>'
   + '<td>' + prazoHtml + '</td>'
   + '<td>' + inicioHtml + '</td>'
   + '<td>' + (a.prioridade ? '<span class="' + prioCls + '">' + a.prioridade + '</span>' : '<span style="color:var(--border)">—</span>') + '</td>'
@@ -1317,7 +1321,7 @@ function _gestorTimelineTip(evt, id) {
  var tip = document.getElementById('gestor-timeline-tooltip');
  if (!tip || !a) return;
  var late   = _gIsLate(a);
- var sc     = _gStatusCls(late ? 'Atrasado' : (a.status||'A fazer'));
+ var sc     = _gStatusCls(a.status||'A fazer');
  var prazo  = a.data_prazo  ? new Date(a.data_prazo +'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'}) : '—';
  var inicio = a.data_inicio ? new Date(a.data_inicio+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'}) : '—';
  // Duração em dias
@@ -1330,7 +1334,8 @@ function _gestorTimelineTip(evt, id) {
  tip.innerHTML =
   '<div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--text);max-width:220px;word-break:break-word">' + (a.titulo||'—') + '</div>'
   + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
-  + '<span class="gs-badge ' + sc.cls + '">' + (late?'Atrasado':a.status) + '</span>'
+  + '<span class="gs-badge ' + sc.cls + '">' + (a.status||'A fazer') + '</span>'
+  + (late ? '<span class="gs-badge gs-atrasado" style="margin-left:4px">Atrasada</span>' : '')
   + (a.prioridade ? '<span class="' + ({'Alta':'tag-priority-high','Média':'tag-priority-med','Baixa':'tag-priority-low'}[a.prioridade]||'') + '">' + a.prioridade + '</span>' : '')
   + '</div>'
   + '<div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;margin-bottom:6px">'

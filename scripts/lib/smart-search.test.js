@@ -33,6 +33,15 @@ test('_ssMatch: fuzzy NÃO entra em ação pra queries curtas (evita falso-posit
  assert.equal(_ssMatch(_ssNormalize('Área TO'), _ssNormalize('ti')), false);
 });
 
+test('_ssMatch: fuzzy NÃO entra em ação pra queries com mais de 1 palavra (evita falso-positivo em listas grandes)', () => {
+ // Bug real: "teste 3" tinha distância de edição 2 até "teste" (apagar " 3"),
+ // dentro do maxDist de queries de 7 caracteres — "Obra Teste 5" "quase
+ // batia" com a busca "teste 3" na lista de Obras do filtro. Fuzzy é só
+ // pra corrigir 1 palavra digitada errada; frases usam só o indexOf normal.
+ assert.equal(_ssMatch(_ssNormalize('Obra Teste 5'), _ssNormalize('teste 3')), false);
+ assert.equal(_ssMatch(_ssNormalize('Obra Teste 3'), _ssNormalize('teste 3')), true);
+});
+
 test('_ssHaystack junta vários campos, ignora falsy, normaliza tudo junto', () => {
  const h = _ssHaystack(['Projeto Casacor', null, 'Ana', undefined, 'Instalação Elétrica']);
  assert.equal(_ssMatch(h, _ssNormalize('casacor')), true);

@@ -23,22 +23,32 @@
 
 function _tsSmartPosition(wrapEl, popEl) {
  if (!wrapEl || !popEl) return;
- popEl.style.left = '';
- popEl.style.right = '';
- popEl.style.transform = '';
  var wrapRect = wrapEl.getBoundingClientRect();
  var popWidth = popEl.offsetWidth || parseInt(getComputedStyle(popEl).width, 10) || 300;
  var vw = document.documentElement.clientWidth;
  var margin = 12; // respiro mínimo até a borda da tela
  var spaceRight = vw - wrapRect.left - margin;
  var spaceLeft = wrapRect.right - margin;
+ // IMPORTANTE: o lado que não vamos usar precisa virar 'auto' explícito, não
+ // '' (vazio). Zerar com '' só remove um override inline anterior — a
+ // largura fixa em CSS (.fb-pop{width:460px;left:0}) continua valendo, e
+ // quando left/right/width ficam todos definidos ao mesmo tempo (over-
+ // constrained), a spec do CSS manda ignorar 'right' e resolver por
+ // left+width em LTR. Resultado: popovers cujo left:0 vem do stylesheet (ex.
+ // Filtro/Agrupar/Ordenar) IGNORAVAM o right:0 que esta função tentava
+ // aplicar e vazavam da tela mesmo assim (bug real, achado testando
+ // Ordenar numa viewport de 560px). 'auto' explícito no lado não usado
+ // resolve de vez.
  if (spaceRight >= popWidth) {
   popEl.style.left = '0';
+  popEl.style.right = 'auto';
  } else if (spaceLeft >= popWidth) {
   popEl.style.right = '0';
+  popEl.style.left = 'auto';
  } else {
   // Nenhum lado tem espaço pra largura toda (tela estreita/zoom alto) —
   // alinha pela esquerda e desloca só o suficiente pra não vazar da tela.
+  popEl.style.right = 'auto';
   popEl.style.left = '0';
   var overflowRight = (wrapRect.left + popWidth + margin) - vw;
   if (overflowRight > 0) popEl.style.left = (-overflowRight) + 'px';

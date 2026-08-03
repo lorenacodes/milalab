@@ -45,6 +45,14 @@ function _ssMatch(haystackNorm, queryNorm) {
  // Fuzzy leve: só entra em jogo com 4+ caracteres, pra não dar falso-positivo
  // em buscas curtas (ex.: "ti" não deveria "quase bater" com qualquer coisa).
  if (queryNorm.length < 4) return false;
+ // Só pra 1 palavra: comparar uma query de várias palavras contra palavras
+ // isoladas do haystack dava falso-positivo real (bug encontrado testando o
+ // filtro de Obra) — "teste 3" tem distância de edição 2 até só "teste"
+ // (apagar " 3"), que já cabia dentro do maxDist de queries de 7 caracteres,
+ // então "Obra Teste 5" "quase batia" com a busca "teste 3". Frases inteiras
+ // já são cobertas pelo indexOf acima; fuzzy é só para corrigir 1 palavra
+ // digitada errada.
+ if (queryNorm.indexOf(' ') !== -1) return false;
  var maxDist = queryNorm.length <= 6 ? 1 : 2;
  // Compara a query contra janelas do tamanho da query dentro do haystack,
  // não a string inteira (senão uma frase longa nunca "quase bate").
