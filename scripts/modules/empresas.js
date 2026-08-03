@@ -151,12 +151,14 @@ async function _dbLoadEmpresas() {
   allData = allData.concat(res.data);
   more = res.data.length === 1000; from += 1000;
  }
- if (!allData.length) return;
  _empresasArr = allData;
 
  // Atualiza badges e stats
  var badge = document.getElementById('badge-emp');
  if (badge) badge.textContent = allData.length;
+ var navBadge = document.getElementById('nav-badge-empresas');
+ if (navBadge) navBadge.textContent = allData.length;
+ if (!allData.length) return;
  var stTotal = document.getElementById('emp-stat-total');
  if (stTotal) stTotal.textContent = allData.length;
  var stCtt = document.getElementById('emp-stat-ctt');

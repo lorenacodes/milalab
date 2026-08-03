@@ -192,6 +192,8 @@ async function _dbLoadEntregas() {
   .from('entregas')
   .select('*, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
   .order('created_at', { ascending: false });
+ const navBadge = document.getElementById('nav-badge-entregas');
+ if (navBadge && !error) navBadge.textContent = (data || []).length;
  if (error || !data?.length) return;
  const tbody = document.getElementById('ent-tbody');
  if (!tbody) return;

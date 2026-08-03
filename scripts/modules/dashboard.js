@@ -268,6 +268,38 @@ async function _remLoadSent() {
  } catch(e) { console.error('[Lembretes] Erro enviados:', e); }
 }
 
+// ── Realtime: badges do menu lateral (Empresas/Obras/Projetos/Entregas/
+// Instalações/Melhorias) ── Empresas e Projetos são as únicas dessas 6
+// tabelas com fluxo de criação dentro do app; Obras/Instalações/Melhorias/
+// Entregas só mudam por fora (Supabase direto, outra ferramenta). Assinar
+// a tabela em si (INSERT/DELETE), em vez de só reagir ao clique de "criar"
+// deste app, cobre os dois casos com o mesmo código — mesmo padrão já
+// usado em _remStartRealtime (lembretes).
+var _navBadgeChannels = {};
+function _navBadgeBump(badgeId, delta) {
+ var el = document.getElementById(badgeId);
+ if (!el) return;
+ var cur = parseInt(el.textContent, 10);
+ if (isNaN(cur)) return; // ainda "—" (carregando) — a carga inicial já traz o valor certo
+ el.textContent = Math.max(0, cur + delta);
+}
+function _navBadgeStartRealtime(table, badgeId) {
+ if (_navBadgeChannels[table]) { try { _sb.removeChannel(_navBadgeChannels[table]); } catch(e){} }
+ _navBadgeChannels[table] = _sb
+  .channel('navbadge-' + table)
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: table }, function(){ _navBadgeBump(badgeId, 1); })
+  .on('postgres_changes', { event: 'DELETE', schema: 'public', table: table }, function(){ _navBadgeBump(badgeId, -1); })
+  .subscribe();
+}
+function _navBadgesStartRealtimeAll() {
+ _navBadgeStartRealtime('empresas',    'nav-badge-empresas');
+ _navBadgeStartRealtime('obras',       'nav-badge-obras');
+ _navBadgeStartRealtime('projetos',    'nav-badge-projetos');
+ _navBadgeStartRealtime('entregas',    'nav-badge-entregas');
+ _navBadgeStartRealtime('instalacoes', 'nav-badge-instalacoes');
+ _navBadgeStartRealtime('melhorias',   'nav-badge-melhorias');
+}
+
 // ── Realtime: receber lembretes em tempo real ─────────────────────────────
 function _remStartRealtime() {
  if (_remRealtimeSub) { try { _sb.removeChannel(_remRealtimeSub); } catch(e){} }
@@ -2896,6 +2928,7 @@ async function _dashLoad() {
  _remLoadInbox();
  _remLoadColab();
  _remStartRealtime();
+ _navBadgesStartRealtimeAll();
  // Central de Colaborações (localStorage)
  _ccLoad();
 }

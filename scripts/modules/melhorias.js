@@ -41,9 +41,17 @@ async function _pageLoadMelhorias() {
   _melhData = [];
  }
 
- // Atualiza badge no nav
+ // Atualiza badge no nav — contagem própria (count:'exact', head:true, sem
+ // trazer linha nenhuma) em vez de _melhData.length: a lista acima é
+ // limitada a 100 (.limit(100), de propósito, pra pagina ficar leve), então
+ // usar o tamanho dela subcontava badge sempre que houvesse mais de 100
+ // melhorias cadastradas.
  var navBadge = document.getElementById('nav-badge-melhorias');
- if (navBadge) navBadge.textContent = _melhData.length || '0';
+ if (navBadge) {
+  _sb.from('melhorias').select('id', { count: 'exact', head: true }).then(function(cRes) {
+   navBadge.textContent = (cRes.count != null) ? cRes.count : (_melhData.length || '0');
+  }).catch(function(){ navBadge.textContent = _melhData.length || '0'; });
+ }
 
  // Atualiza contador no dash também
  var dashCount = document.getElementById('dash-melhoria-count');
