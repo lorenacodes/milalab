@@ -129,7 +129,10 @@ function _sbCompareOne(a, b, f) {
 function _sbRenderVisibility(instanceId) {
  if (typeof document === 'undefined') return; // Node (testes) — sem DOM, no-op
  var pop = document.getElementById('sb-pop-' + instanceId);
- if (pop) pop.style.display = _sbInstances[instanceId].open ? 'block' : 'none';
+ var wrap = document.getElementById('sb-wrap-' + instanceId);
+ var open = _sbInstances[instanceId].open;
+ if (pop) pop.style.display = open ? 'block' : 'none';
+ if (open && wrap && typeof _tsSmartPosition === 'function') _tsSmartPosition(wrap, pop);
 }
 function _sbRender(instanceId) {
  if (typeof document === 'undefined') return; // Node (testes) — sem DOM, no-op

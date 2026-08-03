@@ -88,7 +88,10 @@ function _gbUpdateBadge(instanceId) {
 function _gbRenderVisibility(instanceId) {
  if (typeof document === 'undefined') return; // Node (testes) — sem DOM, no-op
  var pop = document.getElementById('gb-pop-' + instanceId);
- if (pop) pop.style.display = _gbInstances[instanceId].open ? 'block' : 'none';
+ var wrap = document.getElementById('gb-wrap-' + instanceId);
+ var open = _gbInstances[instanceId].open;
+ if (pop) pop.style.display = open ? 'block' : 'none';
+ if (open && wrap && typeof _tsSmartPosition === 'function') _tsSmartPosition(wrap, pop);
 }
 function _gbRender(instanceId) {
  if (typeof document === 'undefined') return; // Node (testes) — sem DOM, no-op

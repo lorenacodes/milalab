@@ -204,7 +204,10 @@ function _fbEvalCondition(item, inst, c) {
 function _fbRenderPopoverVisibility(instanceId) {
  if (typeof document === 'undefined') return; // Node (testes) — sem DOM, no-op
  var pop = document.getElementById('fb-pop-' + instanceId);
- if (pop) pop.style.display = _fbInstances[instanceId].open ? 'block' : 'none';
+ var wrap = document.getElementById('fb-wrap-' + instanceId);
+ var open = _fbInstances[instanceId].open;
+ if (pop) pop.style.display = open ? 'block' : 'none';
+ if (open && wrap && typeof _tsSmartPosition === 'function') _tsSmartPosition(wrap, pop);
 }
 function _fbRender(instanceId) {
  if (typeof document === 'undefined') return; // Node (testes) — sem DOM, no-op

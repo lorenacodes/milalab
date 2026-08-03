@@ -184,9 +184,11 @@ function _gestorPreset(preset, btn) {
 // ── Dropdown de período (substitui a barra de 5 botões sempre visível) ───
 function _gpToggle(force) {
  var pop = document.getElementById('gp-pop');
+ var wrap = document.getElementById('gp-wrap');
  if (!pop) return;
  var open = force !== undefined ? force : (pop.style.display === 'none');
  pop.style.display = open ? 'flex' : 'none';
+ if (open && wrap && typeof _tsSmartPosition === 'function') _tsSmartPosition(wrap, pop);
 }
 document.addEventListener('click', function(e) {
  // composedPath(), não e.target.closest(): ações dentro do painel de
@@ -209,11 +211,13 @@ var _gviewsCache = null; // null = ainda não carregou; [] = carregou e está va
 
 function _gviewsToggle(force) {
  var pop = document.getElementById('gv-pop');
+ var wrap = document.getElementById('gv-wrap');
  if (!pop) return;
  var open = force !== undefined ? force : (pop.style.display === 'none');
  if (open && _gviewsCache === null) { _gviewsLoad(); return; } // abre depois que carregar
  pop.style.display = open ? 'block' : 'none';
  if (open) _gviewsRender();
+ if (open && wrap && typeof _tsSmartPosition === 'function') _tsSmartPosition(wrap, pop);
 }
 
 function _gviewsLoad() {
