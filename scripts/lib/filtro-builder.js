@@ -41,12 +41,16 @@ function _fbToggle(instanceId) {
  if (inst.open && inst.state.conditions.length === 0) inst.state.conditions.push(_fbNewCondition(inst));
  _fbRender(instanceId);
 }
-document.addEventListener('click', function(e) {
- Object.keys(_fbInstances).forEach(function(id) {
-  var inst = _fbInstances[id];
-  if (inst.open && !e.target.closest('#fb-wrap-' + id)) { inst.open = false; _fbRenderPopoverVisibility(id); }
+// typeof document check: permite carregar este arquivo em Node (node:test)
+// sem quebrar — no navegador `document` sempre existe, comportamento igual.
+if (typeof document !== 'undefined') {
+ document.addEventListener('click', function(e) {
+  Object.keys(_fbInstances).forEach(function(id) {
+   var inst = _fbInstances[id];
+   if (inst.open && !e.target.closest('#fb-wrap-' + id)) { inst.open = false; _fbRenderPopoverVisibility(id); }
+  });
  });
-});
+}
 
 // ── Edição de condições ──────────────────────────────────────────────────
 function _fbAddCondition(instanceId) {
@@ -110,8 +114,10 @@ function _fbValueToggleOpt(instanceId, condId, opt, checked) {
  else if (!checked && i !== -1) c.value.splice(i, 1);
  _fbApply(instanceId);
  _fbUpdateBadge(instanceId);
- var btn = document.querySelector('#fb-pop-' + instanceId + ' .fb-msel-btn[data-cond="' + condId + '"]');
- if (btn) btn.textContent = c.value.length ? (c.value.length + ' selecionado(s)') : 'Selecionar...';
+ if (typeof document !== 'undefined') {
+  var btn = document.querySelector('#fb-pop-' + instanceId + ' .fb-msel-btn[data-cond="' + condId + '"]');
+  if (btn) btn.textContent = c.value.length ? (c.value.length + ' selecionado(s)') : 'Selecionar...';
+ }
 }
 function _fbClearAll(instanceId) {
  var inst = _fbInstances[instanceId];
@@ -125,6 +131,7 @@ function _fbApply(instanceId) {
  if (inst.onChange) inst.onChange(inst.state);
 }
 function _fbUpdateBadge(instanceId) {
+ if (typeof document === 'undefined') return; // Node (testes) — sem DOM, no-op
  var inst = _fbInstances[instanceId];
  var n = inst.state.conditions.filter(_fbConditionIsUsable).length;
  var badge = document.getElementById('fb-badge-' + instanceId);
@@ -186,10 +193,12 @@ function _fbEvalCondition(item, inst, c) {
 
 // ── Render do popover ────────────────────────────────────────────────────
 function _fbRenderPopoverVisibility(instanceId) {
+ if (typeof document === 'undefined') return; // Node (testes) — sem DOM, no-op
  var pop = document.getElementById('fb-pop-' + instanceId);
  if (pop) pop.style.display = _fbInstances[instanceId].open ? 'block' : 'none';
 }
 function _fbRender(instanceId) {
+ if (typeof document === 'undefined') return; // Node (testes) — sem DOM, no-op
  var inst = _fbInstances[instanceId];
  var pop = document.getElementById('fb-pop-' + instanceId);
  if (!pop) return;
@@ -255,4 +264,9 @@ function _fbRenderValueInput(instanceId, c, f) {
  }
  return '<input type="text" class="fb-val-text" placeholder="Digite um valor..." value="' + ((c.value||'')+'').replace(/"/g,'&quot;')
   + '" oninput="_fbValueChange(\'' + instanceId + '\',\'' + c.id + '\',this.value)">';
+}
+
+// Export só pra Node (testes, node:test) — não muda nada no navegador.
+if (typeof module !== 'undefined' && module.exports) {
+ module.exports = { _fbInstances, _fbInit, _fbEvaluate, _fbEvalCondition, _fbConditionIsUsable, FB_OPS };
 }

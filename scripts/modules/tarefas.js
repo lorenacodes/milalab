@@ -210,7 +210,10 @@ function _gviewsToggle(force) {
 
 function _gviewsLoad() {
  if (!_sb) return;
- _sb.from('gestor_views').select('*').order('created_at', { ascending: false }).then(function(res) {
+ // modulo='gestor': a tabela já nasceu preparada pra guardar views de outras
+ // páginas também (Fase 2) — sem o filtro, uma view de outro módulo apareceria
+ // aqui por engano.
+ _sb.from('gestor_views').select('*').eq('modulo', 'gestor').order('created_at', { ascending: false }).then(function(res) {
   _gviewsCache = res.data || [];
   _gviewsToggle(true);
  }).catch(function(){ _gviewsCache = []; _gviewsToggle(true); });
@@ -219,9 +222,16 @@ function _gviewsLoad() {
 function _gviewsRender() {
  var pop = document.getElementById('gv-pop');
  if (!pop) return;
- var items = (_gviewsCache || []).map(function(v) {
+ // Favoritas primeiro, senão mantém a ordem que já veio (mais recente primeiro).
+ var sorted = (_gviewsCache || []).slice().sort(function(a,b){ return (b.favorito?1:0) - (a.favorito?1:0); });
+ var items = sorted.map(function(v) {
+  var favOn = !!v.favorito;
   return '<div class="gv-item" onclick="_gviewsApply(\'' + v.id + '\')">'
-   + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + v.nome.replace(/</g,'&lt;') + '</span>'
+   + '<button type="button" class="gv-item-fav' + (favOn?' on':'') + '" title="' + (favOn?'Desfavoritar':'Favoritar') + '" onclick="event.stopPropagation();_gviewsToggleFav(\'' + v.id + '\')">' + (favOn?'★':'☆') + '</button>'
+   + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">' + v.nome.replace(/</g,'&lt;') + '</span>'
+   + '<button type="button" class="gv-item-act" title="Renomear" onclick="event.stopPropagation();_gviewsRename(\'' + v.id + '\')">&#9998;</button>'
+   + '<button type="button" class="gv-item-act" title="Duplicar" onclick="event.stopPropagation();_gviewsDuplicate(\'' + v.id + '\')">&#10697;</button>'
+   + '<button type="button" class="gv-item-act" title="Compartilhar (em breve)" disabled>&#8599;</button>'
    + '<button type="button" class="gv-item-del" title="Excluir visualização" onclick="event.stopPropagation();_gviewsDelete(\'' + v.id + '\')">&times;</button>'
    + '</div>';
  }).join('');
@@ -230,18 +240,70 @@ function _gviewsRender() {
  pop.style.display = 'block';
 }
 
+function _gviewsToggleFav(id) {
+ var v = (_gviewsCache || []).find(function(x){ return String(x.id) === String(id); });
+ if (!v) return;
+ var novo = !v.favorito;
+ _sb.from('gestor_views').update({ favorito: novo, updated_at: new Date().toISOString() }).eq('id', id).then(function(res) {
+  if (res.error) { _showToast('Erro: ' + _supaErrPt(res.error.message), 'erro'); return; }
+  v.favorito = novo;
+  _gviewsRender();
+ }).catch(function(e){ _showToast('Erro: ' + e.message, 'erro'); });
+}
+
+function _gviewsRename(id) {
+ var v = (_gviewsCache || []).find(function(x){ return String(x.id) === String(id); });
+ if (!v) return;
+ var novoNome = prompt('Novo nome da visualização:', v.nome);
+ if (!novoNome || !novoNome.trim() || novoNome.trim() === v.nome) return;
+ _sb.from('gestor_views').update({ nome: novoNome.trim(), updated_at: new Date().toISOString() }).eq('id', id).then(function(res) {
+  if (res.error) { _showToast('Erro ao renomear: ' + _supaErrPt(res.error.message), 'erro'); return; }
+  v.nome = novoNome.trim();
+  _gviewsRender();
+ }).catch(function(e){ _showToast('Erro: ' + e.message, 'erro'); });
+}
+
+function _gviewsDuplicate(id) {
+ var v = (_gviewsCache || []).find(function(x){ return String(x.id) === String(id); });
+ if (!v) return;
+ var payload = {
+  nome: v.nome + ' (cópia)',
+  group_by: v.group_by, sort_by: v.sort_by,
+  sort_state: v.sort_state, group_state: v.group_state,
+  period_preset: v.period_preset, period_ini: v.period_ini, period_fim: v.period_fim,
+  filtro_state: v.filtro_state, modulo: v.modulo || 'gestor', favorito: false,
+  criado_por: (_currentUser && _currentUser.id) || null
+ };
+ _sb.from('gestor_views').insert(payload).select().then(function(res) {
+  if (res.error) { _showToast('Erro ao duplicar: ' + _supaErrPt(res.error.message), 'erro'); return; }
+  _gviewsCache = null;
+  _showToast('Visualização duplicada!', 'ok');
+  _gviewsToggle(true);
+ }).catch(function(e){ _showToast('Erro: ' + e.message, 'erro'); });
+}
+
 function _gviewsSaveCurrent() {
  var nome = prompt('Nome da visualização:');
  if (!nome || !nome.trim()) return;
  var fbInst = _fbInstances && _fbInstances['gestor'];
+ var sbInst = _sbInstances && _sbInstances['gestor'];
+ var gbInst = _gbInstances && _gbInstances['gestor'];
  var payload = {
   nome: nome.trim(),
-  group_by: (document.getElementById('gestor-f-group') || {}).value || 'responsavel',
-  sort_by: (document.getElementById('gestor-f-sort') || {}).value || 'prazo_asc',
+  // group_by/sort_by: espelho legado (texto simples, 1º nível) — mantido pra
+  // compatibilidade com qualquer código/relatório que já leia essas colunas;
+  // sort_state/group_state (jsonb) guardam o estado completo, com todos os
+  // níveis, e são o que _gviewsApply de fato usa pra restaurar.
+  group_by: (gbInst && gbInst.state.levels[0] && gbInst.state.levels[0].field) || 'responsavel',
+  sort_by: (sbInst && sbInst.state.levels[0] && sbInst.state.levels[0].field) || 'data_prazo',
+  sort_state: sbInst ? sbInst.state : { levels: [] },
+  group_state: gbInst ? gbInst.state : { levels: [] },
   period_preset: _gestorPeriodo.preset || 'semana',
   period_ini: _gestorPeriodo.ini ? _gestorFmtDate(_gestorPeriodo.ini) : null,
   period_fim: _gestorPeriodo.fim ? _gestorFmtDate(_gestorPeriodo.fim) : null,
   filtro_state: fbInst ? fbInst.state : { logic:'AND', conditions:[] },
+  modulo: 'gestor',
+  favorito: false,
   criado_por: (_currentUser && _currentUser.id) || null
  };
  _sb.from('gestor_views').insert(payload).select().then(function(res) {
@@ -255,9 +317,19 @@ function _gviewsSaveCurrent() {
 function _gviewsApply(id) {
  var v = (_gviewsCache || []).find(function(x){ return String(x.id) === String(id); });
  if (!v) return;
- // Agrupar / ordenar
- var selG = document.getElementById('gestor-f-group'); if (selG) selG.value = v.group_by || 'responsavel';
- var selS = document.getElementById('gestor-f-sort');  if (selS) selS.value = v.sort_by  || 'prazo_asc';
+ // Ordenar / Agrupar: usa o estado completo (sort_state/group_state) quando
+ // existir; visões antigas (salvas antes desses campos existirem) caem pro
+ // espelho legado de 1 campo só (group_by/sort_by).
+ var sbInst = _sbInstances && _sbInstances['gestor'];
+ if (sbInst) {
+  sbInst.state = (v.sort_state && v.sort_state.levels) ? v.sort_state : { levels: [{ field: v.sort_by || 'data_prazo', dir: 'asc' }] };
+  _sbRender('gestor');
+ }
+ var gbInst = _gbInstances && _gbInstances['gestor'];
+ if (gbInst) {
+  gbInst.state = (v.group_state && v.group_state.levels) ? v.group_state : { levels: [{ field: v.group_by || 'responsavel' }] };
+  _gbRender('gestor');
+ }
  // Período
  if (v.period_preset === 'custom' && v.period_ini && v.period_fim) {
   var ei = document.getElementById('gestor-dt-ini'), ef = document.getElementById('gestor-dt-fim');
@@ -489,12 +561,105 @@ function _gestorPopulateFilters() {
   { key: 'data_prazo',  label: 'Prazo',                  type: 'date' },
   { key: 'data_inicio', label: 'Início',                 type: 'date' },
  ], _gestorApplyFilters);
+
+ var _prioOrdemSort = { 'Alta': 0, 'Média': 1, 'Baixa': 2 };
+ _sbInit('gestor', [
+  { key: 'data_prazo',  label: 'Prazo',      type: 'date' },
+  { key: 'data_inicio', label: 'Início',     type: 'date' },
+  { key: 'titulo',      label: 'Tarefa',     type: 'text' },
+  { key: 'prioridade',  label: 'Prioridade', type: 'number', getValue: function(a){ return _prioOrdemSort[a.prioridade] ?? 3; } },
+  { key: 'status',      label: 'Status',     type: 'text', getValue: function(a){ return _gIsLate(a) ? 'Atrasado' : (a.status||''); } },
+  { key: 'area',        label: 'Área',       type: 'text' },
+ ], _gestorApplyFilters);
+ // Só inicializa o nível padrão (Prazo ↑) na primeira vez — trocas de aba/
+ // dados não devem resetar uma ordenação que a pessoa já escolheu.
+ if (!_sbInstances.gestor.state.levels.length) _sbInstances.gestor.state.levels = [{ field: 'data_prazo', dir: 'asc' }];
+
+ // Agrupamento — mesmos campos/semântica que _gestorRenderGrid já entende
+ // (inclusive "Projeto → Obra", que é um caso especial de 2 níveis fixos,
+ // não um nível genérico do group-builder). 1 nível só: a Grade não tem
+ // renderização pra agrupamento aninhado genérico ainda.
+ _gbInit('gestor', [
+  { key: 'responsavel',   label: 'Responsável' },
+  { key: 'tipo_resp',     label: 'Individual / Coletiva' },
+  { key: 'status',        label: 'Status' },
+  { key: 'area',          label: 'Área' },
+  { key: 'data_prazo',    label: 'Prazo' },
+  { key: 'projeto_obra',  label: 'Projeto → Obra' },
+ ], _gestorApplyFilters, 1);
+ if (!_gbInstances.gestor.state.levels.length) _gbInstances.gestor.state.levels = [{ field: 'responsavel' }];
+
+ // Restaura filtro/ordenação/agrupamento/período da última vez que a pessoa
+ // usou o Gestor de Tarefas (senão tudo resetava a cada F5/reabertura da
+ // aba). Vem depois dos *Init acima de propósito: eles é que garantem os
+ // valores padrão quando não há nada salvo ainda.
+ _gestorRestoreState();
+}
+
+// ── Persistência local (filtro/ordenação/agrupamento/período) ────────────
+// Mesma convenção de chaves já usada no app (sb-collapsed, milatec-theme em
+// scripts/app.js) — só o estado da TELA, não dados; "Visualizações" salvas
+// (nomeadas, compartilhadas com outros usuários) continuam 100% no Supabase.
+var GESTOR_STATE_KEY = 'milatec-gestor-state';
+function _gestorSaveState() {
+ try {
+  var fbInst = _fbInstances && _fbInstances.gestor;
+  var sbInst = _sbInstances && _sbInstances.gestor;
+  var gbInst = _gbInstances && _gbInstances.gestor;
+  var state = {
+   filtro: fbInst ? fbInst.state : null,
+   ordenacao: sbInst ? sbInst.state : null,
+   agrupamento: gbInst ? gbInst.state : null,
+   periodo: {
+    preset: _gestorPeriodo.preset,
+    ini: _gestorPeriodo.ini ? _gestorFmtDate(_gestorPeriodo.ini) : null,
+    fim: _gestorPeriodo.fim ? _gestorFmtDate(_gestorPeriodo.fim) : null
+   },
+   busca: (document.getElementById('gestor-search') || {}).value || ''
+  };
+  localStorage.setItem(GESTOR_STATE_KEY, JSON.stringify(state));
+ } catch (e) { /* localStorage indisponível (modo privado etc.) — ignora */ }
+}
+function _gestorRestoreState() {
+ var raw;
+ try { raw = localStorage.getItem(GESTOR_STATE_KEY); } catch (e) { return; }
+ if (!raw) return;
+ var state;
+ try { state = JSON.parse(raw); } catch (e) { return; }
+ if (!state) return;
+
+ if (state.filtro && _fbInstances.gestor) { _fbInstances.gestor.state = state.filtro; }
+ if (state.ordenacao && _sbInstances.gestor) { _sbInstances.gestor.state = state.ordenacao; }
+ if (state.agrupamento && _gbInstances.gestor) { _gbInstances.gestor.state = state.agrupamento; }
+ if (state.busca) {
+  var si = document.getElementById('gestor-search');
+  if (si) si.value = state.busca;
+ }
+ if (state.periodo && state.periodo.preset) {
+  if (state.periodo.preset === 'custom' && state.periodo.ini && state.periodo.fim) {
+   var ei = document.getElementById('gestor-dt-ini'), ef = document.getElementById('gestor-dt-fim');
+   if (ei) ei.value = state.periodo.ini;
+   if (ef) ef.value = state.periodo.fim;
+   var cd = document.getElementById('gestor-custom-dates'); if (cd) cd.style.display = 'inline-flex';
+   _gestorPreset('custom', null);
+  } else {
+   var btnMap = { semana:'gp-semana', prox2:'gp-prox2', mes:'gp-mes', trim:'gp-trim', todas:'gp-todas' };
+   var btnId = btnMap[state.periodo.preset];
+   if (btnId) _gestorPreset(state.periodo.preset, document.getElementById(btnId));
+  }
+ }
+ // Re-render dos popovers com o estado restaurado (sem isso, só o dado
+ // interno mudaria — o popover mostraria o padrão até a pessoa abrir/fechar).
+ if (_fbInstances.gestor) _fbRender('gestor');
+ if (_sbInstances.gestor) _sbRender('gestor');
+ if (_gbInstances.gestor) _gbRender('gestor');
+ _gestorApplyFilters();
 }
 
 // ── Aplicar filtros, ordenar e re-renderizar ──────────────────────────────
 function _gestorApplyFilters() {
  var search = (document.getElementById('gestor-search') || {}).value || '';
- var sq = search.toLowerCase().trim();
+ var sq = _ssNormalize(search);
 
  var pIni = _gestorPeriodo.ini; // Date ou null
  var pFim = _gestorPeriodo.fim; // Date ou null
@@ -513,25 +678,24 @@ function _gestorApplyFilters() {
    if (!inPeriod) return false;
   }
   // Busca inteligente: qualquer parte do texto, em vários campos de uma vez
-  // (não só o título) — "encontrar qualquer informação" mesmo com texto parcial.
+  // (não só o título) — ignora acento/caixa/espaço duplo e cai pra fuzzy leve
+  // em queries de 4+ caracteres (scripts/lib/smart-search.js).
   if (sq) {
-   var haystack = [a.titulo, a.responsavel, a._obraNome, a._projNome, a._melhNome, a.area, _gTipoAtividade(a)]
-    .filter(Boolean).join(' ').toLowerCase();
-   if (haystack.indexOf(sq) === -1) return false;
+   var haystack = _ssHaystack([a.titulo, a.responsavel, a._obraNome, a._projNome, a._melhNome, a.area, _gTipoAtividade(a), a.observacoes]);
+   if (!_ssMatch(haystack, sq)) return false;
   }
   if (!_fbEvaluate(a, 'gestor')) return false;
   return true;
  });
 
- // ── Ordenação ──────────────────────────────────────────────────────────
- var sortMode = (document.getElementById('gestor-f-sort') || {}).value || 'prazo_asc';
- var prioOrder = { 'Alta': 0, 'Média': 1, 'Baixa': 2 };
+ // ── Ordenação (múltipla, em cascata — scripts/lib/sort-builder.js) ───────
  _gestorFiltered.sort(function(a, b) {
-  if (sortMode === 'titulo_asc') return (a.titulo||'').localeCompare(b.titulo||'');
-  if (sortMode === 'prioridade') return (prioOrder[a.prioridade] ?? 3) - (prioOrder[b.prioridade] ?? 3);
+  var r = _sbCompare(a, b, 'gestor');
+  if (r !== 0) return r;
+  // Empate: mesmo desempate de sempre (prazo ↑), pra ordem ficar estável.
   var dA = a.data_prazo ? new Date(a.data_prazo+'T00:00:00').getTime() : Infinity;
   var dB = b.data_prazo ? new Date(b.data_prazo+'T00:00:00').getTime() : Infinity;
-  return sortMode === 'prazo_desc' ? (dB===Infinity?-Infinity:dB) - (dA===Infinity?-Infinity:dA) : dA - dB;
+  return dA - dB;
  });
 
  // Atualizar stats rápidos
@@ -547,6 +711,8 @@ function _gestorApplyFilters() {
  else if (_gestorView === 'timeline') _gestorRenderTimeline();
  else if (_gestorView === 'metricas') _gestorRenderMetricas();
  else if (_gestorView === 'setor')    _gestorRenderSetor();
+
+ _gestorSaveState();
 }
 
 // ── Troca de aba ──────────────────────────────────────────────────────────
@@ -667,7 +833,7 @@ function _gestorRenderGrid() {
  var tbody = document.getElementById('gestor-tbl-body');
  if (!tbody) return;
 
- var groupBy = (document.getElementById('gestor-f-group') || {}).value || 'responsavel';
+ var groupBy = _gbPrimaryField('gestor') || 'responsavel';
 
  // Agrupamento hierárquico Projeto → Obra: usa uma estrutura aninhada própria
  // (dois níveis de cabeçalho colapsável) em vez do grupo plano de 1 nível
