@@ -828,6 +828,7 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
    ativo; nth-child conta #/Atividade/Status/Prazo/Início/Prioridade/Área/Tipo. */
 .gestor-tbl.gb-hide-status th:nth-child(3),.gestor-tbl.gb-hide-status td:nth-child(3){display:none}
 .gestor-tbl.gb-hide-prazo th:nth-child(4),.gestor-tbl.gb-hide-prazo td:nth-child(4){display:none}
+.gestor-tbl.gb-hide-inicio th:nth-child(5),.gestor-tbl.gb-hide-inicio td:nth-child(5){display:none}
 .gestor-tbl.gb-hide-area th:nth-child(7),.gestor-tbl.gb-hide-area td:nth-child(7){display:none}
 .gestor-tbl td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
 .gestor-tbl td.td-clip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}

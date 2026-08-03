@@ -683,16 +683,21 @@ function _gestorPopulateFilters() {
 
  // Agrupamento — mesmos campos/semântica que _gestorRenderGrid já entende
  // (inclusive "Projeto → Obra", que é um caso especial de 2 níveis fixos,
- // não um nível genérico do group-builder). 1 nível só: a Grade não tem
- // renderização pra agrupamento aninhado genérico ainda.
+ // não um nível genérico do group-builder). Até 3 níveis (Responsável →
+ // Início → Status, por exemplo) via _gestorBuildGroupTree/_gestorRenderGroupNode,
+ // com expansão/recolhimento independente por nó (chave composta, path::path).
+ // "Projeto → Obra" continua um caso especial fixo de 2 níveis (não é um
+ // campo comum — é uma relação hierárquica própria), sem entrar no sistema
+ // genérico de múltiplos níveis.
  _gbInit('gestor', [
   { key: 'responsavel',   label: 'Responsável' },
   { key: 'tipo_resp',     label: 'Individual / Coletiva' },
   { key: 'status',        label: 'Status' },
   { key: 'area',          label: 'Área' },
   { key: 'data_prazo',    label: 'Prazo' },
+  { key: 'data_inicio',   label: 'Data de Início' },
   { key: 'projeto_obra',  label: 'Projeto → Obra' },
- ], _gestorApplyFilters, 1);
+ ], _gestorApplyFilters, 3);
  if (!_gbInstances.gestor.state.levels.length) _gbInstances.gestor.state.levels = [{ field: 'responsavel' }];
 
  // Restaura filtro/ordenação/agrupamento/período da última vez que a pessoa
@@ -952,28 +957,92 @@ function _gestorSetView(v, btn) {
 // ══════════════════════════════════════════════════════════════════════════
 // Campo de agrupamento → coluna real da tabela que fica redundante (o valor
 // já está no cabeçalho do grupo) — só existe mapeamento pra quem TEM uma
-// coluna própria (Status/Área/Prazo); Responsável, Individual/Coletiva e
-// Projeto→Obra não têm coluna dedicada na Grade, então não há o que ocultar.
-var _GESTOR_GROUP_COL_CLASS = { status: 'gb-hide-status', area: 'gb-hide-area', data_prazo: 'gb-hide-prazo' };
-function _gestorSyncGroupedColumn(groupBy) {
+// coluna própria (Status/Área/Prazo/Início); Responsável, Individual/Coletiva
+// e Projeto→Obra não têm coluna dedicada na Grade, então não há o que ocultar.
+// Recebe a lista de campos de TODOS os níveis ativos (agrupamento múltiplo) —
+// cada nível que tiver coluna correspondente esconde a sua.
+var _GESTOR_GROUP_COL_CLASS = { status: 'gb-hide-status', area: 'gb-hide-area', data_prazo: 'gb-hide-prazo', data_inicio: 'gb-hide-inicio' };
+function _gestorSyncGroupedColumn(fields) {
  var table = document.querySelector('#gestor-panel-grid .gestor-tbl');
  if (!table) return;
  Object.keys(_GESTOR_GROUP_COL_CLASS).forEach(function(k){ table.classList.remove(_GESTOR_GROUP_COL_CLASS[k]); });
- var cls = _GESTOR_GROUP_COL_CLASS[groupBy];
- if (cls) table.classList.add(cls);
+ (fields || []).forEach(function(f) {
+  var cls = _GESTOR_GROUP_COL_CLASS[f];
+  if (cls) table.classList.add(cls);
+ });
+}
+
+// ── Agrupamento múltiplo + buckets de data (itens #3/#4 do pedido de UX) ──
+// A árvore N-níveis e os buckets inteligentes de data (Hoje/Amanhã/Esta
+// semana/.../Mês de Ano) são lógica pura e reutilizável por qualquer módulo
+// — vivem em scripts/lib/group-tree.js (_gtBuildTree/_gtDateBucket/
+// _gtTreeCount), com teste automatizado próprio. Aqui só fica o que é
+// específico do Gestor de Tarefas: como cada CAMPO vira chave de grupo.
+function _gestorGroupKeyFor(a, field) {
+ if (field === 'responsavel') {
+  var respList = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
+  return { key: respList.length === 0 ? '— Sem responsável' : (respList.length === 1 ? respList[0] : 'Tarefas Coletivas'), sortKey: null };
+ }
+ if (field === 'status') return { key: a.status || 'A fazer', sortKey: null };
+ if (field === 'area') return { key: a.area || '— Sem área', sortKey: null };
+ if (field === 'tipo_resp') return { key: _gTipoResp(a), sortKey: null };
+ if (field === 'data_prazo') return _gtDateBucket(a.data_prazo);
+ if (field === 'data_inicio') return _gtDateBucket(a.data_inicio);
+ return { key: '— Sem grupo', sortKey: null };
+}
+var _GESTOR_GROUP_FIXED_ORDERS = { tipo_resp: ['Tarefas Individuais', 'Tarefas Coletivas', '— Sem responsável'] };
+function _gestorBuildGroupTree(items, levels) {
+ return _gtBuildTree(items, levels, _gestorGroupKeyFor, _GESTOR_GROUP_FIXED_ORDERS, 0);
+}
+function _gestorTreeCount(node, predicate) {
+ return _gtTreeCount(node, predicate);
+}
+
+// Renderiza a árvore recursivamente. path[] identifica o nó atual (usado pra
+// compor a chave de expandir/recolher, independente por nó — não só por
+// nome do grupo, senão "João" dentro de "Agosto" e "João" dentro de
+// "Setembro" compartilhariam o mesmo estado de expansão).
+function _gestorRenderGroupNode(node, path, rowNumRef, hoje, rowsArr) {
+ if (node.leaf) {
+  node.items.forEach(function(a) { rowNumRef.n++; rowsArr.push(_gestorRenderRow(a, rowNumRef.n, hoje)); });
+  return;
+ }
+ node.order.forEach(function(k) {
+  var child = node.children[k];
+  var nodePath = path.concat(k).join(' :: ');
+  var isCollapsed = !!_gestorCollapsed[nodePath];
+  var total = _gestorTreeCount(child);
+  var nDone = _gestorTreeCount(child, function(a){ return _gIsDone(a.status); });
+  var nLate = _gestorTreeCount(child, function(a){ return _gIsLate(a); });
+  var indent = path.length * 20;
+  var badge = nLate > 0
+   ? '<span style="background:rgba(207,34,46,.12);color:#D6433C;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:6px">' + nLate + ' atrasadas</span>'
+   : '';
+  var doneBadge = '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + nDone + '/' + total + ' concluídas</span>';
+  rowsArr.push(
+   '<tr class="gestor-group-hd" onclick="_gestorToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
+   + '<td colspan="8" style="padding-left:' + (12 + indent) + 'px">'
+   + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
+   + '<strong>' + k + '</strong>' + doneBadge + badge
+   + '</td></tr>'
+  );
+  if (!isCollapsed) _gestorRenderGroupNode(child, path.concat(k), rowNumRef, hoje, rowsArr);
+ });
 }
 
 function _gestorRenderGrid() {
  var tbody = document.getElementById('gestor-tbl-body');
  if (!tbody) return;
 
- var groupBy = _gbPrimaryField('gestor') || 'responsavel';
- _gestorSyncGroupedColumn(groupBy);
+ var levels = (_gbInstances.gestor && _gbInstances.gestor.state.levels) || [];
+ var primaryField = levels[0] && levels[0].field;
 
- // Agrupamento hierárquico Projeto → Obra: usa uma estrutura aninhada própria
- // (dois níveis de cabeçalho colapsável) em vez do grupo plano de 1 nível
- // usado pelos demais modos — não cabe no mesmo formato groups{}/groupOrder[].
- if (groupBy === 'projeto_obra') {
+ // Agrupamento hierárquico Projeto → Obra: continua uma estrutura fixa de 2
+ // níveis própria (não é um campo comum — é uma relação, não composável com
+ // outros campos no mesmo nível), fora do sistema genérico de múltiplos
+ // níveis abaixo.
+ if (primaryField === 'projeto_obra') {
+  _gestorSyncGroupedColumn([]);
   var nested = {}, projOrder = [];
   _gestorFiltered.forEach(function(a) {
    var pk = a._projNome || '— Sem projeto';
@@ -1007,79 +1076,19 @@ function _gestorRenderGrid() {
   return;
  }
 
- // Agrupar (1 nível)
- var groups = {};
- var groupOrder = [];
- _gestorFiltered.forEach(function(a) {
-  var key;
-  if (groupBy === 'responsavel') {
-   // Antes usava só o primeiro nome da lista como chave — uma tarefa com
-   // 2+ responsáveis ficava escondida debaixo do nome de uma única pessoa,
-   // dando a impressão de que era só dela. Agora só entra no grupo de uma
-   // pessoa quando ela é a ÚNICA responsável; com 2+ vai para um grupo
-   // coletivo à parte, igual ao agrupamento "Individual/Coletiva".
-   var respList = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
-   key = respList.length === 0 ? '— Sem responsável' : (respList.length === 1 ? respList[0] : 'Tarefas Coletivas');
-  } else if (groupBy === 'status') {
-   // Agrupa pelo status real — "atrasada" não é status, então não cria um
-   // grupo "Atrasadas" à parte (isso escondia o status real das atividades
-   // vencidas). O badge de contagem de atrasadas por grupo (linha abaixo)
-   // já mostra quantas de cada status estão vencidas.
-   key = a.status || 'A fazer';
-  } else if (groupBy === 'area') {
-   key = a.area || '— Sem área';
-  } else if (groupBy === 'data_prazo') {
-   if (!a.data_prazo) { key = '— Sem prazo'; }
-   else {
-    var d = new Date(a.data_prazo + 'T00:00:00');
-    key = d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' });
-   }
-  } else if (groupBy === 'tipo_resp') {
-   key = _gTipoResp(a);
-  }
-  if (key === undefined || key === null) key = '— Sem grupo';
-  if (!groups[key]) { groups[key] = []; groupOrder.push(key); }
-  groups[key].push(a);
- });
-
- // "Individual/Coletiva" tem ordem fixa (não faz sentido depender de qual
- // grupo apareceu primeiro nos dados, como nos outros modos de agrupamento).
- if (groupBy === 'tipo_resp') {
-  var _tipoOrder = ['Tarefas Individuais', 'Tarefas Coletivas', '— Sem responsável'];
-  groupOrder = _tipoOrder.filter(function(k){ return groups[k]; });
- }
+ // Sem agrupamento nenhum: trata como 1 nível "responsável" (comportamento
+ // padrão de sempre, pra Grade nunca aparecer sem organização nenhuma).
+ var effectiveLevels = levels.length ? levels : [{ field: 'responsavel' }];
+ _gestorSyncGroupedColumn(effectiveLevels.map(function(l){ return l.field; }));
 
  var hoje = new Date(); hoje.setHours(0,0,0,0);
- var rows = '';
- var rowNum = 0;
+ var tree = _gestorBuildGroupTree(_gestorFiltered, effectiveLevels, 0);
+ var rowsArr = [];
+ _gestorRenderGroupNode(tree, [], { n: 0 }, hoje, rowsArr);
 
- groupOrder.forEach(function(gk) {
-  var items = groups[gk];
-  var isCollapsed = _gestorCollapsed[gk];
-
-  // Contar por status
-  var nDone = items.filter(function(a){ return _gIsDone(a.status); }).length;
-  var nLate = items.filter(function(a){ return _gIsLate(a); }).length;
-  var badge = nLate > 0
-   ? '<span style="background:rgba(207,34,46,.12);color:#D6433C;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:6px">' + nLate + ' atrasadas</span>'
-   : '';
-  var doneBadge = '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + nDone + '/' + items.length + ' concluídas</span>';
-
-  rows += '<tr class="gestor-group-hd" onclick="_gestorToggleGroup(\'' + gk.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="8">'
-   + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
-   + '<strong>' + gk + '</strong>' + doneBadge + badge
-   + '</td></tr>';
-
-  if (!isCollapsed) {
-   items.forEach(function(a) { rowNum++; rows += _gestorRenderRow(a, rowNum, hoje); });
-  }
- });
-
- if (!rows) {
-  rows = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px;font-size:12px">Nenhuma atividade encontrada para o período selecionado.</td></tr>';
- }
- tbody.innerHTML = rows;
+ tbody.innerHTML = rowsArr.length
+  ? rowsArr.join('')
+  : '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px;font-size:12px">Nenhuma atividade encontrada para o período selecionado.</td></tr>';
 }
 
 // Renderiza uma linha da Grade — extraído para ser reaproveitado tanto pelo
