@@ -36,38 +36,50 @@ function setEntView(v) {
   if (v === 'calendario') renderEntCal();
 }
 
-// Chip de status e busca por texto combinam (AND) sobre as mesmas linhas —
-// antes cada função sobrescrevia sozinha o style.display, então aplicar um
-// filtro desfazia o outro já ativo.
-var _entChipAtivo = 'all';
-var _entBusca = '';
+// Filtro/Ordenação — mesmos componentes reutilizáveis do Gestor de Tarefas/
+// Obras/Empresas/Instalações (filtro-builder/sort-builder/smart-search),
+// substituindo os 4 chips fixos de status por um Filtro de condições de
+// verdade. Só a vista Tabela é afetada — o Calendário usa dados mock
+// independentes (_entEvents), não a tabela real.
+var _entFbFields = [
+ { key: 'status',     label: 'Status',      type: 'select', options: ['aguardando','producao','transporte','entregue'] },
+ { key: 'obra',       label: 'Obra',        type: 'text' },
+ { key: 'empresa',    label: 'Empresa',     type: 'text' },
+ { key: 'transporte', label: 'Transporte',  type: 'text' },
+];
+_fbInit('entregas', _entFbFields, _entApplyFilters);
 
-function _entAplicarFiltros() {
-  var qn = _entBusca.toLowerCase().trim();
-  var rows = document.querySelectorAll('#ent-tbody tr');
-  rows.forEach(function(tr) {
-    var st = tr.getAttribute('data-status') || '';
-    var showChip = _entChipAtivo === 'all'
-      || (_entChipAtivo === 'prod'   && (st === 'producao' || st === 'aguardando'))
-      || (_entChipAtivo === 'transp' && st === 'transporte')
-      || (_entChipAtivo === 'ent'    && st === 'entregue');
-    var showBusca = !qn || tr.textContent.toLowerCase().includes(qn);
-    tr.style.display = (showChip && showBusca) ? '' : 'none';
-  });
-}
+var _entSbFields = [
+ { key: 'obra',       label: 'Obra',       type: 'text' },
+ { key: 'empresa',    label: 'Empresa',    type: 'text' },
+ { key: 'dataFat',    label: 'Faturamento', type: 'date' },
+ { key: 'quantidade', label: 'Peso (kg)',  type: 'number', getValue: function(ds) { return parseFloat(ds.quantidade) || 0; } },
+];
+_sbInit('entregas', _entSbFields, _entApplyFilters);
 
-function filterEntregas(f) {
-  _entChipAtivo = f;
-  ['all','prod','transp','ent'].forEach(function(k) {
-    var el = document.getElementById('ent-chip-' + k);
-    if (el) el.className = 'chip' + (k === f ? ' active' : '');
-  });
-  _entAplicarFiltros();
-}
-
-function searchEntregas(q) {
-  _entBusca = q;
-  _entAplicarFiltros();
+function _entApplyFilters() {
+ var buscaNorm = _ssNormalize(((document.getElementById('ent-search') || {}).value || '').trim());
+ var activeConds = _fbInstances.entregas.state.conditions.filter(_fbConditionIsUsable).length;
+ var rows = Array.prototype.slice.call(document.querySelectorAll('#ent-tbody tr[data-id]'));
+ var visivel = 0;
+ rows.forEach(function(tr) {
+  var ok = _fbEvaluate(tr.dataset, 'entregas');
+  if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(tr.textContent), buscaNorm);
+  tr.style.display = ok ? '' : 'none';
+  if (ok) visivel++;
+ });
+ if (rows.length) {
+  rows.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'entregas'); });
+  var tbody = rows[0].parentElement;
+  rows.forEach(function(tr) { tbody.appendChild(tr); });
+ }
+ var fbBadge = document.getElementById('fb-badge-entregas');
+ if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
+ var countEl = document.getElementById('ent-filter-count');
+ if (countEl) {
+  if (activeConds || buscaNorm) { countEl.textContent = visivel + (visivel === 1 ? ' resultado' : ' resultados'); countEl.style.display = 'inline'; }
+  else { countEl.style.display = 'none'; }
+ }
 }
 
 function entCalNav(dir) {
@@ -207,7 +219,9 @@ async function _dbLoadEntregas() {
   const obraNome = e.obra?.nome || '—';
   const empNome  = e.obra?.empresas_obras?.[0]?.empresa?.nome || '—';
   return `<tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('entregas',this)"
-   data-id="${e.id}" data-status="${st}">
+   data-id="${e.id}" data-status="${st}" data-obra="${(obraNome!=='—'?obraNome:'').replace(/"/g,'&quot;')}"
+   data-empresa="${(empNome!=='—'?empNome:'').replace(/"/g,'&quot;')}" data-transporte="${e.transporte||''}"
+   data-data-fat="${e.data_faturamento||''}" data-quantidade="${e.quantidade||0}">
    <td><div style="font-weight:500">${empNome} — ${obraNome}</div><div style="font-size:11px;color:var(--muted)">#${String(e.numero).padStart(3,'0')}</div></td>
    <td><span class="badge bg">${(e.obra?.tipo_orcamento||['—'])[0]||'—'}</span></td>
    <td><span class="ent-date">${e.data_faturamento||'—'}</span></td>

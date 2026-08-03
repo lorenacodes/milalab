@@ -3,34 +3,52 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 function openNovaInstalacao() { alert('Modal "Nova Instalação" será implementado em breve.'); }
 
-// Chip de status e busca por texto combinam (AND) — mesmo padrão de entregas.js.
-var _instChipAtivo = 'all';
-var _instBusca = '';
+// Filtro/Ordenação — mesmos componentes reutilizáveis do Gestor de Tarefas/
+// Obras/Empresas (filtro-builder/sort-builder/smart-search), substituindo os
+// 4 chips fixos de status (Todas/Programadas/Em andamento/Concluídas) por um
+// Filtro de condições de verdade. _fbEvaluate/_sbCompare recebem tr.dataset
+// direto — ver data-* adicionados no template de _dbLoadInstalacoes.
+var _instFbFields = [
+ { key: 'funil',   label: 'Status',  type: 'select', options: ['Programado','Planejado','Em andamento','Finalizado','Cancelado'] },
+ { key: 'tipo',    label: 'Tipo',    type: 'text' },
+ { key: 'obra',    label: 'Obra',    type: 'text' },
+ { key: 'cliente', label: 'Cliente', type: 'text' },
+];
+_fbInit('instalacoes', _instFbFields, _instApplyFilters);
 
-function _instAplicarFiltros() {
- var qn = _instBusca.toLowerCase().trim();
- var rows = document.querySelectorAll('#inst-tbody tr[data-id]');
+var _instSbFields = [
+ { key: 'obra',      label: 'Obra',    type: 'text' },
+ { key: 'cliente',   label: 'Cliente', type: 'text' },
+ { key: 'tipo',      label: 'Tipo',    type: 'text' },
+ { key: 'inicio',    label: 'Início',  type: 'date' },
+ { key: 'fim',       label: 'Fim',     type: 'date' },
+ { key: 'dias',      label: 'Dias',    type: 'number', getValue: function(ds) { return parseFloat(ds.dias) || 0; } },
+];
+_sbInit('instalacoes', _instSbFields, _instApplyFilters);
+
+function _instApplyFilters() {
+ var buscaNorm = _ssNormalize(((document.getElementById('inst-search') || {}).value || '').trim());
+ var activeConds = _fbInstances.instalacoes.state.conditions.filter(_fbConditionIsUsable).length;
+ var rows = Array.prototype.slice.call(document.querySelectorAll('#inst-tbody tr[data-id]'));
+ var visivel = 0;
  rows.forEach(function(tr) {
-  var funil = tr.getAttribute('data-funil') || '';
-  var showChip = _instChipAtivo === 'all'
-   || (_instChipAtivo === 'prog' && (funil === 'Programado' || funil === 'Planejado'))
-   || (_instChipAtivo === 'and'  && funil === 'Em andamento')
-   || (_instChipAtivo === 'conc' && funil === 'Finalizado');
-  var showBusca = !qn || tr.textContent.toLowerCase().includes(qn);
-  tr.style.display = (showChip && showBusca) ? '' : 'none';
+  var ok = _fbEvaluate(tr.dataset, 'instalacoes');
+  if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(tr.textContent), buscaNorm);
+  tr.style.display = ok ? '' : 'none';
+  if (ok) visivel++;
  });
-}
-function filterInstalacoes(f) {
- _instChipAtivo = f;
- ['all','prog','and','conc'].forEach(function(k) {
-  var el = document.getElementById('inst-chip-' + k);
-  if (el) el.className = 'chip' + (k === f ? ' active' : '');
- });
- _instAplicarFiltros();
-}
-function searchInstalacoes(q) {
- _instBusca = q;
- _instAplicarFiltros();
+ if (rows.length) {
+  rows.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'instalacoes'); });
+  var tbody = rows[0].parentElement;
+  rows.forEach(function(tr) { tbody.appendChild(tr); });
+ }
+ var fbBadge = document.getElementById('fb-badge-instalacoes');
+ if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
+ var countEl = document.getElementById('inst-filter-count');
+ if (countEl) {
+  if (activeConds || buscaNorm) { countEl.textContent = visivel + (visivel === 1 ? ' resultado' : ' resultados'); countEl.style.display = 'inline'; }
+  else { countEl.style.display = 'none'; }
+ }
 }
 
 function _spInstalacoes(row, tds) {
@@ -98,7 +116,9 @@ async function _dbLoadInstalacoes() {
     var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2);
    };
    var dias = inst.dias_executados != null ? inst.dias_executados : (inst.data_inicio && inst.data_fim ? Math.round((new Date(inst.data_fim)-new Date(inst.data_inicio))/86400000) : '—');
-   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'instalacoes\',this)" data-id="'+inst.id+'" data-funil="'+funil+'">'
+   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'instalacoes\',this)" data-id="'+inst.id+'" data-funil="'+funil+'"'
+    +' data-tipo="'+(tipo!=='—'?tipo:'')+'" data-obra="'+(obraNome!=='—'?obraNome.replace(/"/g,'&quot;'):'')+'" data-cliente="'+(clienteNome!=='—'?clienteNome.replace(/"/g,'&quot;'):'')+'"'
+    +' data-inicio="'+(inst.data_inicio||'')+'" data-fim="'+(inst.data_fim||'')+'" data-dias="'+(typeof dias==='number'?dias:0)+'">'
     + '<td style="font-weight:500">' + obraNome + '</td>'
     + '<td style="color:var(--muted);font-size:12px">' + clienteNome + '</td>'
     + '<td>' + (tipo !== '—' ? '<span class="badge bg">'+tipo+'</span>' : '<span style="color:var(--border)">—</span>') + '</td>'

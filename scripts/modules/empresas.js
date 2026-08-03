@@ -563,108 +563,29 @@ async function submitNovoFornecedor() {
  _dbLoadFornecedores();
 }
 
-/* --- EMPRESAS FILTER --- */
-function toggleEmpFilterPanel() {
- _empPanelOpen = !_empPanelOpen;
- document.getElementById('emp-filter-panel').style.display = _empPanelOpen ? 'block' : 'none';
- if (_empPanelOpen && _empConditions.length === 0) addEmpCondition();
-}
-
-function addEmpCondition() {
- var id = ++_empCondId;
- var firstKey = Object.keys(_empCampos)[0];
- _empConditions.push({ id: id, field: firstKey, op: 'contains', value: '' });
- _renderEmpConditions();
-}
-
-function _condEmpChange(el) {
- var id = +el.dataset.cid;
- var key = el.dataset.key;
- var cond = _empConditions.find(function(c){ return c.id === id; });
- if (!cond) return;
- cond[key] = el.value;
- if (key === 'field') { cond.op = 'contains'; cond.value = ''; }
- if (key === 'op' && (el.value === 'is_empty' || el.value === 'is_not_empty')) cond.value = '';
- _renderEmpConditions();
-}
-
-function _condEmpRemove(id) {
- _empConditions = _empConditions.filter(function(c){ return c.id !== id; });
- _renderEmpConditions();
-}
-
-function _renderEmpConditions() {
- var container = document.getElementById('emp-filter-conditions');
- if (!container) return;
- var ss = 'border:1px solid var(--border);border-radius:6px;font-size:12px;padding:5px 8px;background:var(--surface);color:var(--text);outline:none';
- var html = _empConditions.map(function(cond) {
- var campo = _empCampos[cond.field] || {};
- var tipo = campo.type || 'text';
- var opsArr = _empCttOps[tipo] || _empCttOps.text;
- var needsVal = cond.op !== 'is_empty' && cond.op !== 'is_not_empty';
- var campoSel = '<select style="' + ss + '" data-cid="' + cond.id + '" data-key="field" onchange="_condEmpChange(this)">';
- Object.keys(_empCampos).forEach(function(k) {
- campoSel += '<option value="' + k + '"' + (cond.field === k ? ' selected' : '') + '>' + _empCampos[k].label + '</option>';
- });
- campoSel += '</select>';
- var opSel = '<select style="' + ss + '" data-cid="' + cond.id + '" data-key="op" onchange="_condEmpChange(this)">';
- opsArr.forEach(function(o) {
- opSel += '<option value="' + o.val + '"' + (cond.op === o.val ? ' selected' : '') + '>' + o.label + '</option>';
- });
- opSel += '</select>';
- var valEl = '';
- if (needsVal) {
- if (tipo === 'select' && campo.opts) {
- valEl = '<select style="' + ss + ';flex:1" data-cid="' + cond.id + '" data-key="value" onchange="_condEmpChange(this)">';
- valEl += '<option value="">— selecione —</option>';
- campo.opts.forEach(function(opt) {
- valEl += '<option value="' + opt + '"' + (cond.value === opt ? ' selected' : '') + '>' + opt + '</option>';
- });
- valEl += '</select>';
- } else {
- valEl = '<input type="text" placeholder="valor..." value="' + (cond.value || '') + '" style="' + ss + ';flex:1" data-cid="' + cond.id + '" data-key="value" oninput="_condEmpChange(this)">';
- }
- }
- return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
- campoSel + opSel + valEl +
- '<button onclick="_condEmpRemove(' + cond.id + ')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:0 4px">×</button>' +
- '</div>';
- }).join('');
- container.innerHTML = html;
-}
-
-function filterEmpresas() {
- var searchEl = document.getElementById('emp-search');
- var q = searchEl ? searchEl.value.toLowerCase() : '';
- var rows = document.querySelectorAll('#emp-tbody tr');
+function _empApplyFilters() {
+ var buscaNorm = _ssNormalize(((document.getElementById('emp-search') || {}).value || '').trim());
+ var activeConds = _fbInstances.empresas.state.conditions.filter(_fbConditionIsUsable).length;
+ var rows = Array.prototype.slice.call(document.querySelectorAll('#emp-tbody tr'));
+ var visivel = 0;
  rows.forEach(function(tr) {
- var matchSearch = !q || tr.textContent.toLowerCase().includes(q);
- var matchConds = _empConditions.every(function(cond) {
- var rawVal = (tr.dataset[cond.field] || '').toLowerCase();
- var condVal = (cond.value || '').toLowerCase();
- switch (cond.op) {
- case 'contains': return rawVal.includes(condVal);
- case 'not_contains': return !rawVal.includes(condVal);
- case 'is': return rawVal === condVal;
- case 'is_not': return rawVal !== condVal;
- case 'is_empty': return rawVal === '';
- case 'is_not_empty': return rawVal !== '';
- default: return true;
+  var ok = _fbEvaluate(tr.dataset, 'empresas');
+  if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(tr.textContent), buscaNorm);
+  tr.style.display = ok ? '' : 'none';
+  if (ok) visivel++;
+ });
+ if (rows.length) {
+  rows.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'empresas'); });
+  var tbody = rows[0].parentElement;
+  rows.forEach(function(tr) { tbody.appendChild(tr); });
  }
- });
- tr.style.display = (matchSearch && matchConds) ? '' : 'none';
- });
- var count = _empConditions.length;
+ var fbBadge = document.getElementById('fb-badge-empresas');
+ if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
  var countEl = document.getElementById('emp-filter-count');
- if (countEl) { countEl.textContent = count ? count + ' filtro(s) ativo(s)' : ''; countEl.style.display = count ? 'inline' : 'none'; }
-}
-
-function limparEmpFiltros() {
- _empConditions = []; _empCondId = 0;
- _renderEmpConditions();
- filterEmpresas();
- var countEl = document.getElementById('emp-filter-count');
- if (countEl) { countEl.style.display = 'none'; }
+ if (countEl) {
+  if (activeConds || buscaNorm) { countEl.textContent = visivel + (visivel === 1 ? ' resultado' : ' resultados'); countEl.style.display = 'inline'; }
+  else { countEl.style.display = 'none'; }
+ }
 }
 
 /* --- CONTATOS FILTER --- */
@@ -807,6 +728,26 @@ var _empCttOps = {
  { val: 'is_not_empty', label: 'não está vazio' }
  ]
 };
-var _empConditions = []; var _empCondId = 0;
 var _cttConditions = []; var _cttCondId = 0;
-var _empPanelOpen = false; var _cttPanelOpen = false;
+var _cttPanelOpen = false;
+
+/* Filtro/Ordenação de Empresas — componentes reutilizáveis (filtro-builder/
+   sort-builder/smart-search), mesmo padrão do Gestor de Tarefas/Obras.
+   _empCampos já tinha exatamente o formato certo (label+type+opts), só
+   precisou virar array. _fbEvaluate/_ssMatch recebem tr.dataset direto: os
+   valores já são gravados em minúsculas no template de _dbLoadEmpresas, o
+   que já basta pra comparação — filtro-builder também lowercasa dos dois
+   lados então funciona igual com ou sem essa normalização prévia. */
+var _empFbFields = Object.keys(_empCampos).map(function(k) {
+ var c = _empCampos[k];
+ return { key: k, label: c.label, type: c.type, options: c.opts || [] };
+});
+_fbInit('empresas', _empFbFields, _empApplyFilters);
+
+var _empSbFields = [
+ { key: 'nome', label: 'Empresa', type: 'text' },
+ { key: 'setor', label: 'Setor', type: 'text' },
+ { key: 'fase', label: 'Fase', type: 'text' },
+ { key: 'estado', label: 'Estado', type: 'text' },
+];
+_sbInit('empresas', _empSbFields, _empApplyFilters);
