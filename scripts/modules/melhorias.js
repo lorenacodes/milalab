@@ -4,8 +4,43 @@
 /* ── PÁGINA MELHORIAS (INICIATIVAS DE INOVAÇÃO) ──────────────────── */
 // Estado da página melhorias
 var _melhData      = [];   // todos os registros carregados do Supabase
-var _melhTipoFlt   = '';   // filtro de tipo/categoria ativo
-var _melhStatusFlt = '';   // filtro de status ativo
+
+// Normaliza os fallbacks de campo (nome/titulo, tipo/categoria/tipo_melhoria/
+// area, status/etapa) num objeto canônico só — usado tanto pra exibir quanto
+// pra filtrar/ordenar (_fbEvaluate/_sbCompare), já que aqui os cards são
+// reconstruídos do zero a cada render (array em memória, sem dataset
+// persistente no DOM como os outros módulos).
+function _melhNormalize(m) {
+ return {
+  nome: m.nome || m.titulo || '',
+  tipo: m.tipo || m.categoria || m.tipo_melhoria || m.area || '',
+  status: m.status || m.etapa || '',
+  responsavel: m.responsavel || '',
+  criado: m.created_at || '',
+  _raw: m,
+ };
+}
+
+var _melhFbFields = [
+ { key: 'status', label: 'Status', type: 'select', options: ['Backlog','Em andamento','Pausado','Concluído','Concluida','Aprovado','Cancelado','Rejeitado','Arquivado'] },
+ { key: 'tipo',   label: 'Tipo',   type: 'select', options: function() { return _melhTipoOptions(); } },
+ { key: 'responsavel', label: 'Responsável', type: 'text' },
+];
+_fbInit('melhorias', _melhFbFields, _melhRender);
+
+var _melhSbFields = [
+ { key: 'nome',   label: 'Nome',        type: 'text' },
+ { key: 'status', label: 'Status',      type: 'text' },
+ { key: 'tipo',   label: 'Tipo',        type: 'text' },
+ { key: 'criado', label: 'Criado em',   type: 'date' },
+];
+_sbInit('melhorias', _melhSbFields, _melhRender);
+
+function _melhTipoOptions() {
+ var tipos = {};
+ _melhData.forEach(function(m) { var t = _melhNormalize(m).tipo; if (t) tipos[t] = true; });
+ return Object.keys(tipos);
+}
 
 var _melhStatusColor = {
  'Em andamento': 'var(--navy)',
@@ -57,12 +92,9 @@ async function _pageLoadMelhorias() {
  var dashCount = document.getElementById('dash-melhoria-count');
  if (dashCount) dashCount.textContent = String(_melhData.length);
 
- // Reseta filtros e renderiza
- _melhStatusFlt = '';
- _melhTipoFlt   = '';
- _melhSyncChips();
- _melhBuildTipoBar();
- _melhRender();
+ // Reseta filtro/ordenação e renderiza
+ _fbClearAll('melhorias');
+ _sbClearAll('melhorias');
 }
 
 function _melhRender() {
@@ -70,17 +102,21 @@ function _melhRender() {
  var label = document.getElementById('melh-count-label');
  if (!list) return;
 
- var q    = (document.getElementById('melh-search') || {}).value || '';
- var data = _melhData.filter(function(m) {
-  var nome   = (m.nome || m.titulo || '').toLowerCase();
-  var tipo   = (m.tipo || m.categoria || m.tipo_melhoria || m.area || '').toLowerCase();
-  var status = m.status || m.etapa || '';
-  var resp   = (m.responsavel || '').toLowerCase();
-  var matchQ = !q || nome.includes(q.toLowerCase()) || tipo.includes(q.toLowerCase()) || resp.includes(q.toLowerCase());
-  var matchS = !_melhStatusFlt || status === _melhStatusFlt;
-  var matchT = !_melhTipoFlt   || (m.tipo || m.categoria || m.tipo_melhoria || m.area || '') === _melhTipoFlt;
-  return matchQ && matchS && matchT;
+ var buscaNorm = _ssNormalize(((document.getElementById('melh-search') || {}).value || '').trim());
+ var normalized = _melhData.map(_melhNormalize);
+ var data = normalized.filter(function(n) {
+  var ok = _fbEvaluate(n, 'melhorias');
+  if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(n.nome + ' ' + n.tipo + ' ' + n.responsavel), buscaNorm);
+  return ok;
  });
+ data.sort(function(a, b) { return _sbCompare(a, b, 'melhorias'); });
+ data = data.map(function(n) { return n._raw; });
+
+ var fbBadge = document.getElementById('fb-badge-melhorias');
+ if (fbBadge) {
+  var activeConds = _fbInstances.melhorias.state.conditions.filter(_fbConditionIsUsable).length;
+  fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none';
+ }
 
  if (label) label.textContent = data.length + ' iniciativa' + (data.length !== 1 ? 's' : '');
 
@@ -121,44 +157,3 @@ function _melhRender() {
  }).join('');
 }
 
-function _melhSetStatus(val) {
- _melhStatusFlt = val;
- _melhSyncChips();
- _melhRender();
-}
-
-function _melhSyncChips() {
- document.querySelectorAll('[id^="melh-chip-"]').forEach(function(c) {
-  var key = c.id.replace('melh-chip-', '');
-  c.classList.toggle('active', key === _melhStatusFlt);
- });
-}
-
-function _melhApplyFilter() { _melhRender(); }
-
-function _melhBuildTipoBar() {
- var bar = document.getElementById('melh-tipo-bar');
- if (!bar) return;
- var tipos = {};
- _melhData.forEach(function(m) {
-  var t = m.tipo || m.categoria || m.tipo_melhoria || m.area || '';
-  if (t) tipos[t] = (tipos[t] || 0) + 1;
- });
- var keys = Object.keys(tipos);
- if (!keys.length) { bar.style.display = 'none'; return; }
- bar.style.display = '';
- bar.innerHTML = '<span class="chip active" onclick="_melhSetTipo(\'\')">Todos os tipos</span>'
-  + keys.map(function(t) {
-   return '<span class="chip" onclick="_melhSetTipo(\'' + t.replace(/'/g, "\\'") + '\')">' + t + ' <small style="opacity:.6">(' + tipos[t] + ')</small></span>';
-  }).join('');
-}
-
-function _melhSetTipo(val) {
- _melhTipoFlt = val;
- var bar = document.getElementById('melh-tipo-bar');
- if (bar) bar.querySelectorAll('.chip').forEach(function(c) {
-  var txt = c.textContent.trim().split(' ')[0];
-  c.classList.toggle('active', val === '' ? txt === 'Todos' : txt === val);
- });
- _melhRender();
-}
