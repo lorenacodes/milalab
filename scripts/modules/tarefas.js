@@ -457,8 +457,28 @@ function _gestorPopulateFilters() {
  _fbInit('gestor', [
   { key: 'titulo',      label: 'Tarefa',                type: 'text' },
   { key: 'responsavel', label: 'Responsável',           type: 'multitext', options: _gestorRespOptions },
+  // "Atrasado" é um pseudo-status (computado por prazo vencido, não uma coluna
+  // real) — precisa ser selecionável no filtro, mas NÃO pode mascarar o status
+  // verdadeiro dos itens que também estão atrasados (bug real encontrado na
+  // auditoria: filtrar por "Obsoleto" ou "A fazer" excluía silenciosamente
+  // qualquer item nesse status que também estivesse vencido, porque o valor
+  // usado pra comparação virava sempre "Atrasado"). matchValue trata os dois
+  // como coisas independentes: o status real E, separadamente, se está
+  // atrasado — uma tarefa "Obsoleto" e atrasada aparece em Obsoleto E em
+  // Atrasado, nunca só em um dos dois.
   { key: 'status',      label: 'Status',                type: 'select', options: _gestorStatusOptions,
-    getValue: function(a){ return _gIsLate(a) ? 'Atrasado' : (a.status || ''); } },
+    matchValue: function(a, operator, value) {
+     var real = (a.status || '').toLowerCase();
+     var late = _gIsLate(a);
+     function isMatch(v) { return String(v).toLowerCase() === 'atrasado' ? late : real === String(v).toLowerCase(); }
+     if (operator === 'empty')  return !a.status;
+     if (operator === 'nempty') return !!a.status;
+     if (operator === 'eq')     return isMatch(value);
+     if (operator === 'neq')    return !isMatch(value);
+     if (operator === 'anyof')  return (value||[]).some(isMatch);
+     if (operator === 'noneof') return !(value||[]).some(isMatch);
+     return true;
+    } },
   { key: 'prioridade',  label: 'Prioridade',            type: 'select', options: ['Alta','Média','Baixa'] },
   { key: 'area',        label: 'Área',                  type: 'select', options: function(){ return _gestorOptionsFrom(function(a){ return a.area; }); } },
   { key: 'tipo',        label: 'Tipo de Atividade',     type: 'select', options: function(){ return _gestorOptionsFrom(_gTipoAtividade); }, getValue: _gTipoAtividade },

@@ -144,6 +144,12 @@ function _fbEvaluate(item, instanceId) {
 }
 function _fbEvalCondition(item, inst, c) {
  var f = _fbFieldByKey(inst, c.field);
+ // matchValue: hook opcional pra campos onde comparar getValue(item) === c.value
+ // como texto simples não é suficiente (ex.: um pseudo-valor computado, tipo
+ // "Atrasado", que não deve MASCARAR o valor real do campo — só ser mais uma
+ // opção de busca além dele). Quando presente, assume o lugar inteiro da
+ // comparação eq/neq/anyof/noneof/empty/nempty pra esse campo.
+ if (f.matchValue) return f.matchValue(item, c.operator, c.value);
  var raw = f.getValue ? f.getValue(item) : item[c.field];
  if (f.type === 'multitext') {
   var arr = (raw || '').split(/[,;]+/).map(function(s){ return s.trim(); }).filter(Boolean);
