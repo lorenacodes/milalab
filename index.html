@@ -11,16 +11,16 @@
  <title>MilaLab — Sistema Interno</title>
  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='%233D4FD1'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%239DA3B0'/%3E%3Cstop offset='45%25' stop-color='%23F5F6F8'/%3E%3Cstop offset='100%25' stop-color='%238E94A3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M50 20 L78 35 V65 L50 80 L22 65 V35 Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='10' fill='url(%23g)'/%3E%3C/svg%3E">
  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles/tokens.css?v=mldsv22">
-<link rel="stylesheet" href="styles/main.css?v=mldsv22">
+<link rel="stylesheet" href="styles/tokens.css?v=mldsv23">
+<link rel="stylesheet" href="styles/main.css?v=mldsv23">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="scripts/lib/supabase-client.js?v=mldsv22"></script>
-<script src="scripts/lib/ui-helpers.js?v=mldsv22"></script>
-<script src="scripts/lib/avatar-helpers.js?v=mldsv22"></script>
-<script src="scripts/lib/filtro-builder.js?v=mldsv22"></script>
-<script src="scripts/services/usuarios.service.js?v=mldsv22"></script>
-<script src="scripts/services/auth.service.js?v=mldsv22"></script>
-<script src="scripts/services/propostas.service.js?v=mldsv22"></script>
+<script src="scripts/lib/supabase-client.js?v=mldsv23"></script>
+<script src="scripts/lib/ui-helpers.js?v=mldsv23"></script>
+<script src="scripts/lib/avatar-helpers.js?v=mldsv23"></script>
+<script src="scripts/lib/filtro-builder.js?v=mldsv23"></script>
+<script src="scripts/services/usuarios.service.js?v=mldsv23"></script>
+<script src="scripts/services/auth.service.js?v=mldsv23"></script>
+<script src="scripts/services/propostas.service.js?v=mldsv23"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
@@ -271,7 +271,7 @@
 <!-- Design system unificado dos campos do wizard Nova Obra: todo select/input/checklist
      do modal usa a mesma geometria de .mf input,.mf select (padding 9px 12px, radius 7px,
      borda var(--border), foco navy com ring) para não ter dois estilos de campo coexistindo. -->
-<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv22">
+<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv23">
 <!-- MODAL NOVA OBRA — wizard 4 etapas (fluxo único, sem gate de tipo) -->
 <div class="modal-backdrop" id="modal-nova-obra" onclick="handleModalBackdrop(event)">
  <div class="modal" id="modal-obra-box" style="max-width:900px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh">
@@ -791,40 +791,87 @@
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
 <div id="page-gestor" class="page page-flex" style="padding-top:0;flex-direction:column;height:calc(100vh - 56px);overflow:hidden">
 
- <!-- Cabeçalho -->
+ <!-- Cabeçalho — uma linha só: título+status à esquerda, todos os controles
+      à direita (período, busca, filtro, organizar, visualizações, atualizar).
+      Antes eram 4 barras empilhadas (cabeçalho / período sempre visível /
+      abas+métricas / busca+filtro+ordenar+agrupar) — reduzido pra 2. -->
  <div class="gestor-hd">
   <div>
    <div class="gestor-hd-title">Gestor de Tarefas</div>
    <div class="gestor-hd-sub" id="gestor-sync-lbl">Carregando dados...</div>
   </div>
-  <div style="display:flex;align-items:center;gap:8px">
+  <div class="gestor-hd-controls">
+   <!-- Período: dropdown compacto (antes 5 botões sempre visíveis + campos de data) -->
+   <div class="gp-wrap" id="gp-wrap">
+    <button type="button" class="gestor-sel gestor-sel-caret" onclick="_gpToggle()">
+     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="12" height="13" rx="2"/><path d="M5 1v2M11 1v2M2 6h12" stroke-linecap="round"/></svg>
+     <span id="gp-btn-lbl">Esta semana</span>
+    </button>
+    <div class="gp-pop" id="gp-pop" style="display:none">
+     <button class="gp-preset active" id="gp-semana" onclick="_gestorPreset('semana',this)">Esta semana</button>
+     <button class="gp-preset" id="gp-prox2" onclick="_gestorPreset('prox2',this)">Próx. 2 semanas</button>
+     <button class="gp-preset" id="gp-mes" onclick="_gestorPreset('mes',this)">Este mês</button>
+     <button class="gp-preset" id="gp-trim" onclick="_gestorPreset('trim',this)">Trimestre</button>
+     <button class="gp-preset" id="gp-todas" onclick="_gestorPreset('todas',this)">Todas</button>
+     <button type="button" id="gp-custom-toggle" onclick="_gestorToggleCustomDates()" class="gp-custom-link">Personalizado…</button>
+     <div id="gestor-custom-dates" style="display:none">
+      <label>De</label>
+      <input type="date" class="gp-date-inp" id="gestor-dt-ini" onchange="_gestorPreset('custom',null)">
+      <label>até</label>
+      <input type="date" class="gp-date-inp" id="gestor-dt-fim" onchange="_gestorPreset('custom',null)">
+     </div>
+    </div>
+   </div>
+
+   <div class="gestor-search-box">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="15" y2="15"/></svg>
+    <input id="gestor-search" placeholder="Pesquisar..." oninput="_gestorApplyFilters()">
+   </div>
+
+   <div class="fb-wrap" id="fb-wrap-gestor" style="position:relative;display:inline-block">
+    <button type="button" class="gestor-sel" id="fb-btn-gestor" onclick="_fbToggle('gestor')">Filtro<span class="fb-badge" id="fb-badge-gestor" style="display:none"></span></button>
+    <div class="fb-pop" id="fb-pop-gestor" style="display:none"></div>
+   </div>
+
+   <!-- Organizar: ordenar + agrupar num único bloco visual, em vez de dois
+        controles soltos com um rótulo "Agrupar:" competindo por atenção -->
+   <div class="gestor-organizar">
+    <select class="gestor-sel gestor-sel-plain" id="gestor-f-sort" onchange="_gestorApplyFilters()" title="Ordenar por">
+     <option value="prazo_asc">Prazo ↑</option>
+     <option value="prazo_desc">Prazo ↓</option>
+     <option value="titulo_asc">Título A-Z</option>
+     <option value="prioridade">Prioridade</option>
+    </select>
+    <span class="gestor-organizar-div"></span>
+    <select class="gestor-sel gestor-sel-plain" id="gestor-f-group" onchange="_gestorApplyFilters()" title="Agrupar por">
+     <option value="responsavel">Agrupar: Responsável</option>
+     <option value="tipo_resp">Agrupar: Individual/Coletiva</option>
+     <option value="status">Agrupar: Status</option>
+     <option value="area">Agrupar: Área</option>
+     <option value="data_prazo">Agrupar: Prazo</option>
+     <option value="projeto_obra">Agrupar: Projeto → Obra</option>
+    </select>
+   </div>
+
+   <!-- Visualizações salvas (agrupamento+ordenação+período+filtro com nome,
+        estilo Airtable) — persistidas no Supabase (gestor_views) -->
+   <div class="gv-wrap" id="gv-wrap">
+    <button type="button" class="gestor-sel gestor-sel-caret" onclick="_gviewsToggle()">
+     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="2" width="14" height="3" rx="1"/><rect x="1" y="7" width="14" height="3" rx="1"/><rect x="1" y="12" width="14" height="2" rx="1"/></svg>
+     Visualizações
+    </button>
+    <div class="gv-pop" id="gv-pop" style="display:none"></div>
+   </div>
+
    <span id="gestor-loading-spin" style="display:none;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite"></span>
-   <button onclick="_gestorLoad()" title="Atualizar" style="background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--muted);padding:5px 8px;display:flex;align-items:center;gap:5px;font-size:11px;font-family:inherit;transition:all .12s" onmouseover="this.style.borderColor='var(--navy)';this.style.color='var(--navy)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>Atualizar
+   <button onclick="_gestorLoad()" title="Atualizar" class="gestor-refresh-btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
    </button>
   </div>
  </div>
 
- <!-- Barra de período — PRIMÁRIA, sempre visível -->
- <div class="gestor-period-bar">
-  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.8" style="flex-shrink:0"><rect x="2" y="2" width="12" height="13" rx="2"/><path d="M5 1v2M11 1v2M2 6h12" stroke-linecap="round"/></svg>
-  <span style="font-size:11px;font-weight:600;color:var(--muted);margin-right:2px">Período:</span>
-  <button class="gp-preset" id="gp-semana" onclick="_gestorPreset('semana',this)">Esta semana</button>
-  <button class="gp-preset" id="gp-prox2" onclick="_gestorPreset('prox2',this)">Próx. 2 semanas</button>
-  <button class="gp-preset" id="gp-mes" onclick="_gestorPreset('mes',this)">Este mês</button>
-  <button class="gp-preset" id="gp-trim" onclick="_gestorPreset('trim',this)">Trimestre</button>
-  <button class="gp-preset" id="gp-todas" onclick="_gestorPreset('todas',this)">Todas</button>
-  <button type="button" id="gp-custom-toggle" onclick="_gestorToggleCustomDates()" style="background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;font-family:inherit;padding:4px 6px;text-decoration:underline;text-underline-offset:2px">Personalizado</button>
-  <span id="gestor-custom-dates" style="display:none;align-items:center;gap:6px">
-   <label style="font-size:10px;color:var(--muted)">De</label>
-   <input type="date" class="gp-date-inp" id="gestor-dt-ini" onchange="_gestorPreset('custom',null)">
-   <label style="font-size:10px;color:var(--muted)">até</label>
-   <input type="date" class="gp-date-inp" id="gestor-dt-fim" onchange="_gestorPreset('custom',null)">
-  </span>
-  <span id="gestor-period-lbl" style="font-size:10px;color:var(--muted);margin-left:auto;white-space:nowrap"></span>
- </div>
-
- <!-- Tabs de visualização -->
+ <!-- Abas de visualização + métricas discretas (separadas visualmente da
+      navegação: fonte menor, tom apagado, à direita, sem competir com as abas) -->
  <div class="gestor-view-tabs">
   <button class="gestor-tab active" id="gtab-grid" onclick="_gestorSetView('grid',this)">
    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="1" width="14" height="3" rx="1"/><rect x="1" y="6" width="14" height="3" rx="1"/><rect x="1" y="11" width="14" height="3" rx="1"/></svg>Grade
@@ -838,41 +885,11 @@
   <button class="gestor-tab" id="gtab-metricas" onclick="_gestorSetView('metricas',this)">
    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="8" width="3" height="7" rx="1"/><rect x="6" y="5" width="3" height="10" rx="1"/><rect x="11" y="2" width="3" height="13" rx="1"/></svg>Métricas
   </button>
-  <!-- Stats rápidas na mesma linha das tabs -->
-  <div id="gestor-stats-bar" style="display:flex;align-items:center;gap:20px;margin-left:auto;padding:0 16px;font-size:11px">
-   <span><b id="gst-total" style="font-weight:800;color:var(--text)">—</b> <span style="color:var(--muted)">total</span></span>
-   <span><b id="gst-done" style="font-weight:800;color:#28b548">—</b> <span style="color:var(--muted)">concluídas</span></span>
-   <span><b id="gst-prog" style="font-weight:800;color:#3b82f6">—</b> <span style="color:var(--muted)">em progresso</span></span>
-   <span><b id="gst-late" style="font-weight:800;color:#D6433C">—</b> <span style="color:var(--muted)">atrasadas</span></span>
-  </div>
- </div>
-
- <!-- Toolbar de filtros secundários -->
- <div class="gestor-toolbar" id="gestor-toolbar">
-  <div class="gestor-search-box">
-   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="15" y2="15"/></svg>
-   <input id="gestor-search" placeholder="Pesquisar..." oninput="_gestorApplyFilters()">
-  </div>
-  <div class="fb-wrap" id="fb-wrap-gestor" style="position:relative;display:inline-block">
-   <button type="button" class="gestor-sel" id="fb-btn-gestor" onclick="_fbToggle('gestor')">Filtro<span class="fb-badge" id="fb-badge-gestor" style="display:none"></span></button>
-   <div class="fb-pop" id="fb-pop-gestor" style="display:none"></div>
-  </div>
-  <select class="gestor-sel" id="gestor-f-sort" onchange="_gestorApplyFilters()">
-   <option value="prazo_asc">Prazo (mais próximo)</option>
-   <option value="prazo_desc">Prazo (mais distante)</option>
-   <option value="titulo_asc">Título (A-Z)</option>
-   <option value="prioridade">Prioridade</option>
-  </select>
-  <div id="gestor-group-wrap" style="margin-left:auto;display:flex;align-items:center;gap:6px">
-   <label style="font-size:10px;color:var(--muted)">Agrupar:</label>
-   <select class="gestor-sel" id="gestor-f-group" onchange="_gestorApplyFilters()">
-    <option value="responsavel">Responsável</option>
-    <option value="tipo_resp">Individual / Coletiva</option>
-    <option value="status">Status</option>
-    <option value="area">Área</option>
-    <option value="data_prazo">Prazo</option>
-    <option value="projeto_obra">Projeto → Obra</option>
-   </select>
+  <div id="gestor-stats-bar" class="gestor-stats-bar">
+   <span><b id="gst-total">—</b> total</span>
+   <span><b id="gst-done" class="gst-done">—</b> concluídas</span>
+   <span><b id="gst-prog" class="gst-prog">—</b> em progresso</span>
+   <span><b id="gst-late" class="gst-late">—</b> atrasadas</span>
   </div>
  </div>
 
@@ -985,7 +1002,7 @@
 <div id="page-empresas" class="page" style="padding-top:8px">
 
  <!-- Estilos Notion para esta página -->
-<link rel="stylesheet" href="styles/empresas.css?v=mldsv22">
+<link rel="stylesheet" href="styles/empresas.css?v=mldsv23">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -2045,7 +2062,7 @@
  <!-- ENTREGAS -->
  <div id="page-entregas" class="page">
 
-<link rel="stylesheet" href="styles/entregas.css?v=mldsv22">
+<link rel="stylesheet" href="styles/entregas.css?v=mldsv23">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -2671,20 +2688,20 @@
 
 </main>
 
-<script src="scripts/app.js?v=mldsv22"></script>
-<script src="scripts/modules/side-panel.js?v=mldsv22"></script>
-<script src="scripts/lib/atividades-vinculos.js?v=mldsv22"></script>
-<script src="scripts/modules/obras.js?v=mldsv22"></script>
-<script src="scripts/modules/projetos.js?v=mldsv22"></script>
-<script src="scripts/modules/entregas.js?v=mldsv22"></script>
-<script src="scripts/modules/instalacoes.js?v=mldsv22"></script>
-<script src="scripts/modules/empresas.js?v=mldsv22"></script>
-<script src="scripts/modules/wizard-nova-obra.js?v=mldsv22"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv22"></script>
-<script src="scripts/modules/melhorias.js?v=mldsv22"></script>
-<script src="scripts/modules/admin.js?v=mldsv22"></script>
-<script src="scripts/modules/exec-dashboard.js?v=mldsv22"></script>
-<script src="scripts/modules/tarefas.js?v=mldsv22"></script>
+<script src="scripts/app.js?v=mldsv23"></script>
+<script src="scripts/modules/side-panel.js?v=mldsv23"></script>
+<script src="scripts/lib/atividades-vinculos.js?v=mldsv23"></script>
+<script src="scripts/modules/obras.js?v=mldsv23"></script>
+<script src="scripts/modules/projetos.js?v=mldsv23"></script>
+<script src="scripts/modules/entregas.js?v=mldsv23"></script>
+<script src="scripts/modules/instalacoes.js?v=mldsv23"></script>
+<script src="scripts/modules/empresas.js?v=mldsv23"></script>
+<script src="scripts/modules/wizard-nova-obra.js?v=mldsv23"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv23"></script>
+<script src="scripts/modules/melhorias.js?v=mldsv23"></script>
+<script src="scripts/modules/admin.js?v=mldsv23"></script>
+<script src="scripts/modules/exec-dashboard.js?v=mldsv23"></script>
+<script src="scripts/modules/tarefas.js?v=mldsv23"></script>
 
  <!-- BACKDROP DRAWERS -->
  <div class="drw-backdrop" id="drw-backdrop-proj" onclick="_projDrawerClose()"></div>
@@ -3124,7 +3141,7 @@
 <!-- SISTEMA DE AUTENTICAÇÃO MILATEC v3.04 — Identidade Visual Grupo Mila      -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<link rel="stylesheet" href="styles/auth.css?v=mldsv22">
+<link rel="stylesheet" href="styles/auth.css?v=mldsv23">
 
 <!-- ═══════════════════════════════════════════════════════════════
      TELA 1 — LOGIN

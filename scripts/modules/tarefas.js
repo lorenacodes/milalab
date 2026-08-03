@@ -147,7 +147,7 @@ function _gestorPreset(preset, btn) {
   fim = new Date(today.getFullYear(), qStart+3, 0);
  } else if (preset === 'todas') {
   ini = null; fim = null;
-  var lp = document.getElementById('gestor-period-lbl');
+  var lp = document.getElementById('gp-btn-lbl');
   if (lp) lp.textContent = 'Todas as atividades';
   _gestorPeriodo = { ini: null, fim: null, preset: 'todas' };
   // Limpa inputs
@@ -156,6 +156,7 @@ function _gestorPreset(preset, btn) {
   if (ei) ei.value = '';
   if (ef) ef.value = '';
   _gestorApplyFilters();
+  _gpToggle(false);
   return;
  } else if (preset === 'custom') {
   var ei = document.getElementById('gestor-dt-ini');
@@ -171,12 +172,123 @@ function _gestorPreset(preset, btn) {
  _gestorPeriodo = { ini: ini, fim: fim, preset: preset };
  if (ini && fim) _gestorSetInputDates(ini, fim);
 
- // Label do período
- var lp = document.getElementById('gestor-period-lbl');
+ // Label do período (mostrado no próprio botão do dropdown, fechado)
+ var lp = document.getElementById('gp-btn-lbl');
  if (lp && ini && fim) {
   lp.textContent = ini.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) + ' – ' + fim.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
  }
  _gestorApplyFilters();
+ if (preset !== 'custom') _gpToggle(false);
+}
+
+// ── Dropdown de período (substitui a barra de 5 botões sempre visível) ───
+function _gpToggle(force) {
+ var pop = document.getElementById('gp-pop');
+ if (!pop) return;
+ var open = force !== undefined ? force : (pop.style.display === 'none');
+ pop.style.display = open ? 'flex' : 'none';
+}
+document.addEventListener('click', function(e) {
+ if (!e.target.closest('#gp-wrap')) _gpToggle(false);
+ if (!e.target.closest('#gv-wrap')) _gviewsToggle(false);
+});
+
+// ── Visualizações salvas (agrupamento + ordenação + período + filtro, com
+// nome — estilo "Views" do Airtable). Persistidas no Supabase
+// (gestor_views), não em localStorage — visíveis pra qualquer usuário do
+// sistema, não só em quem salvou neste navegador.
+var _gviewsCache = null; // null = ainda não carregou; [] = carregou e está vazio
+
+function _gviewsToggle(force) {
+ var pop = document.getElementById('gv-pop');
+ if (!pop) return;
+ var open = force !== undefined ? force : (pop.style.display === 'none');
+ if (open && _gviewsCache === null) { _gviewsLoad(); return; } // abre depois que carregar
+ pop.style.display = open ? 'block' : 'none';
+ if (open) _gviewsRender();
+}
+
+function _gviewsLoad() {
+ if (!_sb) return;
+ _sb.from('gestor_views').select('*').order('created_at', { ascending: false }).then(function(res) {
+  _gviewsCache = res.data || [];
+  _gviewsToggle(true);
+ }).catch(function(){ _gviewsCache = []; _gviewsToggle(true); });
+}
+
+function _gviewsRender() {
+ var pop = document.getElementById('gv-pop');
+ if (!pop) return;
+ var items = (_gviewsCache || []).map(function(v) {
+  return '<div class="gv-item" onclick="_gviewsApply(\'' + v.id + '\')">'
+   + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + v.nome.replace(/</g,'&lt;') + '</span>'
+   + '<button type="button" class="gv-item-del" title="Excluir visualização" onclick="event.stopPropagation();_gviewsDelete(\'' + v.id + '\')">&times;</button>'
+   + '</div>';
+ }).join('');
+ pop.innerHTML = (items || '<div class="gv-empty">Nenhuma visualização salva ainda</div>')
+  + '<button type="button" class="gv-save-btn" onclick="_gviewsSaveCurrent()">+ Salvar visualização atual</button>';
+ pop.style.display = 'block';
+}
+
+function _gviewsSaveCurrent() {
+ var nome = prompt('Nome da visualização:');
+ if (!nome || !nome.trim()) return;
+ var fbInst = _fbInstances && _fbInstances['gestor'];
+ var payload = {
+  nome: nome.trim(),
+  group_by: (document.getElementById('gestor-f-group') || {}).value || 'responsavel',
+  sort_by: (document.getElementById('gestor-f-sort') || {}).value || 'prazo_asc',
+  period_preset: _gestorPeriodo.preset || 'semana',
+  period_ini: _gestorPeriodo.ini ? _gestorFmtDate(_gestorPeriodo.ini) : null,
+  period_fim: _gestorPeriodo.fim ? _gestorFmtDate(_gestorPeriodo.fim) : null,
+  filtro_state: fbInst ? fbInst.state : { logic:'AND', conditions:[] },
+  criado_por: (_currentUser && _currentUser.id) || null
+ };
+ _sb.from('gestor_views').insert(payload).select().then(function(res) {
+  if (res.error) { _showToast('Erro ao salvar visualização: ' + _supaErrPt(res.error.message), 'erro'); return; }
+  _gviewsCache = null; // força recarregar da próxima vez que abrir
+  _showToast('Visualização "' + payload.nome + '" salva!', 'ok');
+  _gviewsToggle(false);
+ }).catch(function(e){ _showToast('Erro: ' + e.message, 'erro'); });
+}
+
+function _gviewsApply(id) {
+ var v = (_gviewsCache || []).find(function(x){ return String(x.id) === String(id); });
+ if (!v) return;
+ // Agrupar / ordenar
+ var selG = document.getElementById('gestor-f-group'); if (selG) selG.value = v.group_by || 'responsavel';
+ var selS = document.getElementById('gestor-f-sort');  if (selS) selS.value = v.sort_by  || 'prazo_asc';
+ // Período
+ if (v.period_preset === 'custom' && v.period_ini && v.period_fim) {
+  var ei = document.getElementById('gestor-dt-ini'), ef = document.getElementById('gestor-dt-fim');
+  if (ei) ei.value = v.period_ini;
+  if (ef) ef.value = v.period_fim;
+  var cd = document.getElementById('gestor-custom-dates'); if (cd) cd.style.display = 'inline-flex';
+  _gestorPreset('custom', null);
+ } else {
+  var btnMap = { semana:'gp-semana', prox2:'gp-prox2', mes:'gp-mes', trim:'gp-trim', todas:'gp-todas' };
+  var btnId = btnMap[v.period_preset] || 'gp-semana';
+  _gestorPreset(v.period_preset || 'semana', document.getElementById(btnId));
+ }
+ // Filtro (condições E/OU do filtro-builder)
+ var fbInst = _fbInstances && _fbInstances['gestor'];
+ if (fbInst) {
+  fbInst.state = v.filtro_state || { logic:'AND', conditions:[] };
+  _fbRender('gestor');
+  _fbApply('gestor');
+ }
+ _gestorApplyFilters();
+ _gviewsToggle(false);
+ _showToast('Visualização "' + v.nome + '" aplicada', 'ok');
+}
+
+function _gviewsDelete(id) {
+ if (!confirm('Excluir esta visualização salva?')) return;
+ _sb.from('gestor_views').delete().eq('id', id).then(function(res) {
+  if (res.error) { _showToast('Erro ao excluir: ' + _supaErrPt(res.error.message), 'erro'); return; }
+  _gviewsCache = (_gviewsCache || []).filter(function(v){ return String(v.id) !== String(id); });
+  _gviewsRender();
+ }).catch(function(e){ _showToast('Erro: ' + e.message, 'erro'); });
 }
 
 // ── Carregar dados ─────────────────────────────────────────────────────────
