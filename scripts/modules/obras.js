@@ -447,7 +447,8 @@ async function _dbLoadObras() {
   // "Gerar Orçamento" vive só dentro do painel da Obra (Calculadora Modular
   // para Modular, Proposta Comercial para Solar) — aqui só abre o painel.
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'obras\',this)"'
-   +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'" data-projeto="sim">'
+   +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'" data-projeto="sim"'
+   +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'">'
    +'<td><div style="font-weight:500">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
    +'<td><div class="oc-tags" style="margin-bottom:0">'+catBadges+'</div></td>'
    +'<td style="text-align:center;color:var(--muted)">'+qtd+'</td>'
@@ -494,8 +495,15 @@ async function _dbLoadObrasKanban() {
   card.className = 'obra-card';
   card.dataset.id = o.id;
   card.dataset.etapa = o.etapa_negocio || '';
-  card.dataset.tipo = (o.tipo_obra || []).join(',').toLowerCase();
+  card.dataset.tipo = (o.tipo_obra || []).join(', ');
   card.dataset.canal = (o.canal_vendas || '').toLowerCase();
+  card.dataset.empresa = empNome;
+  card.dataset.cidade = o.cidade || '';
+  card.dataset.estado = o.estado || '';
+  card.dataset.projeto = 'sim';
+  card.dataset.nome = o.nome || '';
+  card.dataset.valor = o.valor != null ? o.valor : 0;
+  card.dataset.dataEnvio = o.data_envio_proposta || '';
   card.dataset.search = [(o.nome||''), empNome, (o.cidade||''), (o.canal_vendas||''), (o.tipo_obra||[]).join(' ')].join(' ').toLowerCase();
   card.draggable = true;
   card.addEventListener('dragstart', _onObraCardDragStart);
@@ -1704,250 +1712,90 @@ async function _spCriarContato() {
  _spToggleNovoContato();
 }
 
-// Estado das condições ativas
-var _obrasConditions = []; // [{id, field, op, value}]
-var _obrasCondId = 0;
-var _filterPanelOpen = false;
+// ── Filtro/Ordenação de Obras — mesmos componentes reutilizáveis do Gestor
+// de Tarefas (filtro-builder.js/sort-builder.js/smart-search.js), só troca a
+// config de campos. _fbEvaluate/_sbCompare recebem direto o `.dataset` da
+// <tr>/.obra-card como "item": como esses elementos já gravam tipo/etapa/
+// empresa/cidade/estado/nome/valor em data-* (ver _dbLoadObras/
+// _dbLoadObrasKanban), field.key bate 1:1 com a chave do dataset — nenhum
+// adaptador precisa existir. Agrupar/Visualizações deste módulo ficam para
+// o próximo incremento (o Gestor de Tarefas trabalha sobre um array em
+// memória; Obras filtra o DOM direto pra não duplicar a lógica de
+// renderização do Kanban/Tabela — agrupar por aqui exigiria decidir se
+// agrupamento e as colunas do Kanban, que já agrupam por etapa, coexistem).
+var _obrasFbFields = Object.keys(_obrasCampos).map(function(k) {
+ var c = _obrasCampos[k];
+ return { key: k, label: c.label, type: c.type, options: c.opts || [] };
+});
+_fbInit('obras', _obrasFbFields, _obrasApplyFilters);
 
-function toggleFilterPanel() {
- _filterPanelOpen = !_filterPanelOpen;
- var panel = document.getElementById('obras-filter-panel');
- var btn = document.getElementById('btn-obras-filter');
- if (panel) {
- panel.style.display = _filterPanelOpen ? 'block' : 'none';
- if (btn) btn.style.borderColor = _filterPanelOpen ? 'var(--navy)' : 'var(--border)';
- }
- // Fechar ao clicar fora
- if (_filterPanelOpen) {
- setTimeout(function() {
- document.addEventListener('click', _closeFilterOnOutside, { once: true });
- }, 10);
- }
-}
+var _obrasSbFields = [
+ { key: 'nome', label: 'Nome da obra', type: 'text' },
+ { key: 'etapa', label: 'Etapa', type: 'text' },
+ { key: 'empresa', label: 'Empresa', type: 'text' },
+ { key: 'cidade', label: 'Cidade', type: 'text' },
+ { key: 'valor', label: 'Valor', type: 'number', getValue: function(ds) { return parseFloat(ds.valor) || 0; } },
+ { key: 'dataEnvio', label: 'Envio da proposta', type: 'date', getValue: function(ds) { return ds.dataEnvio || ''; } },
+];
+_sbInit('obras', _obrasSbFields, _obrasApplyFilters);
 
-function _closeFilterOnOutside(e) {
- var panel = document.getElementById('obras-filter-panel');
- var btn = document.getElementById('btn-obras-filter');
- if (panel && !panel.contains(e.target) && btn && !btn.contains(e.target)) {
- _filterPanelOpen = false;
- panel.style.display = 'none';
- var b = document.getElementById('btn-obras-filter');
- if (b) b.style.borderColor = 'var(--border)';
- } else if (panel && (panel.contains(e.target) || (btn && btn.contains(e.target)))) {
- // Re-attach listener if click was inside panel
- document.addEventListener('click', _closeFilterOnOutside, { once: true });
- }
-}
-
-function addFilterCondition(field, op, value) {
- var id = ++_obrasCondId;
- field = field || 'tipo';
- op = op || 'is';
- value = value || '';
-
- _obrasConditions.push({ id: id, field: field, op: op, value: value });
- _renderConditions();
- filterObras();
-}
-
-function removeFilterCondition(id) {
- _obrasConditions = _obrasConditions.filter(function(c) { return c.id !== id; });
- _renderConditions();
- filterObras();
-}
-
-function _renderConditions() {
- var container = document.getElementById('filter-conditions');
- if (!container) return;
-
- if (_obrasConditions.length === 0) {
- container.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">Nenhum filtro aplicado. Clique em <b>Adicionar condição</b> para começar.</div>';
- return;
- }
-
- var ss = 'font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);height:30px;cursor:pointer';
-
- container.innerHTML = _obrasConditions.map(function(cond, idx) {
- var campoInfo = _obrasCampos[cond.field] || _obrasCampos['tipo'];
- var ops = _obrasOps[campoInfo.type] || _obrasOps['select'];
-
- var campoOpts = Object.keys(_obrasCampos).map(function(k) {
- return '<option value="' + k + '"' + (cond.field === k ? ' selected' : '') + '>' + _obrasCampos[k].label + '</option>';
- }).join('');
-
- // Dropdown de operador pesquisável (estilo Airtable)
- var opLabel = (ops.find(function(o){ return o.val === cond.op; }) || ops[0]).label;
- var opOpts = ops.map(function(o) {
- return '<option value="' + o.val + '"' + (cond.op === o.val ? ' selected' : '') + '>' + o.label + '</option>';
- }).join('');
-
- // is_empty / is_not_empty não precisam de campo value
- var needsValue = (cond.op !== 'is_empty' && cond.op !== 'is_not_empty');
- var valueEl = '';
- if (!needsValue) {
- valueEl = '<span style="flex:1"></span>'; // espaço vazio
- } else if (campoInfo.type === 'select') {
- var valOpts = ['<option value="">Selecionar...</option>'].concat(
- campoInfo.opts.map(function(v) {
- var label = v === 'sim' ? 'Com projeto' : v === 'nao' ? 'Sem projeto' : v;
- return '<option value="' + v + '"' + (cond.value === v ? ' selected' : '') + '>' + label + '</option>';
- })
- ).join('');
- valueEl = '<select data-cid="' + cond.id + '" data-key="value" onchange="_condChange(this)" style="flex:1;' + ss + '">' + valOpts + '</select>';
- } else {
- valueEl = '<input type="text" value="' + cond.value.replace(/"/g, '&quot;') + '" placeholder="Insira um valor..." data-cid="' + cond.id + '" data-key="value" oninput="_condChange(this)" style="flex:1;' + ss + '">';
- }
-
- var prefix = idx === 0
- ? '<span style="width:42px;font-size:11px;color:var(--muted);font-weight:500;flex-shrink:0">Onde</span>'
- : '<span style="width:42px;font-size:11px;color:var(--navy);font-weight:600;flex-shrink:0">E</span>';
-
- return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">'
- + prefix
- + '<select data-cid="' + cond.id + '" data-key="field" onchange="_condChange(this)" style="' + ss + '">' + campoOpts + '</select>'
- + '<div style="position:relative;flex-shrink:0">'
- + '<select data-cid="' + cond.id + '" data-key="op" onchange="_condChange(this)" style="' + ss + ';min-width:160px">' + opOpts + '</select>'
- + '</div>'
- + valueEl
- + '<button onclick="_condRemove(' + cond.id + ')" title="Remover" style="flex-shrink:0;border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;padding:0 4px;line-height:1;opacity:.6">×</button>'
- + '</div>';
- }).join('');
-}
-
-
-// Delegated handlers using data attributes (avoids inline quote conflicts)
-// AI-style natural language filter parser
-function _filterAiParse(text) {
- if (!text || text.trim().length < 3) return;
- var t = text.toLowerCase().trim();
- // Tenta reconhecer padrões: "telhados", "em andamento", "sem projeto", estado siglas
- var tipoMap = { 'telhados':'Telhados', 'modular':'Modular', 'steel frame':'Steel Frame', 'solar':'Solar' };
- var etapaMap = { 'andamento':'Em Andamento', 'pré-projeto':'Pré-projeto', 'concluído':'Concluído', 'análise':'Análise inicial', 'proposta':'Proposta' };
- var estadoMap = { '\bsp\b':'SP', '\bdf\b':'DF', '\bgo\b':'GO', '\bmg\b':'MG', '\bpr\b':'PR', '\brj\b':'RJ' };
-
- var matched = false;
- Object.keys(tipoMap).forEach(function(k) {
- if (t.includes(k)) { addFilterCondition('tipo', 'is', tipoMap[k]); matched = true; }
- });
- Object.keys(etapaMap).forEach(function(k) {
- if (t.includes(k)) { addFilterCondition('etapa', 'is', etapaMap[k]); matched = true; }
- });
- if (t.includes('sem projeto') || t.includes('sem projeto')) {
- addFilterCondition('projeto', 'is', 'nao'); matched = true;
- }
- Object.keys(estadoMap).forEach(function(k) {
- if (new RegExp(k).test(t)) { addFilterCondition('estado', 'is', estadoMap[k]); matched = true; }
- });
- if (matched) {
- var inp = document.getElementById('filter-ai-input');
- if (inp) inp.value = '';
- }
-}
-
-function _condChange(el) {
- var id = parseInt(el.dataset.cid);
- var key = el.dataset.key;
- _updateCond(id, key, el.value);
-}
-function _condRemove(id) {
- removeFilterCondition(id);
-}
-
-function _updateCond(id, key, val) {
- var cond = _obrasConditions.find(function(c) { return c.id === id; });
- if (!cond) return;
- cond[key] = val;
- // Se mudou o campo, resetar op e value
- if (key === 'field') {
- var campoInfo = _obrasCampos[val];
- var ops = _obrasOps[campoInfo.type];
- cond.op = ops[0].val;
- cond.value = '';
- _renderConditions();
- }
- filterObras();
-}
-
-function filterObras() {
- var busca = ((document.getElementById('obras-search') || {}).value || '').toLowerCase().trim();
- var activeConds = _obrasConditions.filter(function(c) { return !!c.value; }).length;
+function _obrasApplyFilters() {
+ var buscaRaw = ((document.getElementById('obras-search') || {}).value || '').trim();
+ var buscaNorm = _ssNormalize(buscaRaw);
+ var activeConds = _fbInstances.obras.state.conditions.filter(_fbConditionIsUsable).length;
  var visivel = 0;
 
- // ── Tabela ──────────────────────────────────────────────────────────────────
- var rows = document.querySelectorAll('#obras-tbody tr');
+ // ── Tabela ──────────────────────────────────────────────────────────────
+ var rows = Array.prototype.slice.call(document.querySelectorAll('#obras-tbody tr[data-id]'));
  rows.forEach(function(tr) {
- var ok = true;
- if (busca && !tr.textContent.toLowerCase().includes(busca)) ok = false;
- _obrasConditions.forEach(function(cond) {
-  var cellVal = (tr.dataset[cond.field] || '').toLowerCase().trim();
-  var condVal = (cond.value || '').toLowerCase().trim();
-  if (cond.op === 'is_empty' && cellVal !== '') ok = false;
-  if (cond.op === 'is_not_empty' && cellVal === '') ok = false;
-  if (!condVal && cond.op !== 'is_empty' && cond.op !== 'is_not_empty') return;
-  if (cond.op === 'is' && cellVal !== condVal) ok = false;
-  if (cond.op === 'is_not' && cellVal === condVal) ok = false;
-  if (cond.op === 'contains' && !cellVal.includes(condVal)) ok = false;
-  if (cond.op === 'not_contains' && cellVal.includes(condVal)) ok = false;
+  var ok = _fbEvaluate(tr.dataset, 'obras');
+  if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(tr.textContent), buscaNorm);
+  tr.style.display = ok ? '' : 'none';
+  if (ok) visivel++;
  });
- tr.style.display = ok ? '' : 'none';
- if (ok) visivel++;
- });
-
- // ── Kanban ───────────────────────────────────────────────────────────────────
- var cards = document.querySelectorAll('#obras-kanban .obra-card');
- cards.forEach(function(card) {
- var ok = true;
- if (busca && !(card.dataset.search || '').includes(busca)) ok = false;
- _obrasConditions.forEach(function(cond) {
-  var cellVal = (card.dataset[cond.field] || '').toLowerCase().trim();
-  var condVal = (cond.value || '').toLowerCase().trim();
-  if (cond.op === 'is_empty' && cellVal !== '') ok = false;
-  if (cond.op === 'is_not_empty' && cellVal === '') ok = false;
-  if (!condVal && cond.op !== 'is_empty' && cond.op !== 'is_not_empty') return;
-  if (cond.op === 'is' && cellVal !== condVal) ok = false;
-  if (cond.op === 'is_not' && cellVal === condVal) ok = false;
-  if (cond.op === 'contains' && !cellVal.includes(condVal)) ok = false;
-  if (cond.op === 'not_contains' && cellVal.includes(condVal)) ok = false;
- });
- card.style.display = ok ? '' : 'none';
- });
- // Atualiza contadores das colunas kanban após filtro
- document.querySelectorAll('#obras-kanban .kanban-col').forEach(function(col) {
- var badge = col.querySelector('.kc-count');
- if (badge) badge.textContent = col.querySelectorAll('.obra-card:not([style*="display: none"]):not([style*="display:none"])').length;
- });
-
- // ── Badge e contador ─────────────────────────────────────────────────────────
- var badge = document.getElementById('filter-badge');
- if (badge) {
- badge.textContent = activeConds;
- badge.style.display = activeConds > 0 ? 'inline' : 'none';
+ if (rows.length) {
+  rows.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'obras'); });
+  var tbody = rows[0].parentElement;
+  rows.forEach(function(tr) { tbody.appendChild(tr); });
  }
+
+ // ── Kanban ────────────────────────────────────────────────────────────────
+ var cards = Array.prototype.slice.call(document.querySelectorAll('#obras-kanban .obra-card'));
+ cards.forEach(function(card) {
+  var ok = _fbEvaluate(card.dataset, 'obras');
+  if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(card.dataset.search || ''), buscaNorm);
+  card.style.display = ok ? '' : 'none';
+ });
+ // Ordena as colunas do Kanban internamente (cada coluna já é o agrupamento por etapa).
+ // .kc-body não tem id — o id fica no .kanban-col pai (ex: #kc-andamento).
+ var byBody = new Map();
+ cards.forEach(function(card) {
+  var body = card.parentElement;
+  if (!byBody.has(body)) byBody.set(body, []);
+  byBody.get(body).push(card);
+ });
+ byBody.forEach(function(colCards, body) {
+  colCards.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'obras'); });
+  colCards.forEach(function(c) { body.appendChild(c); });
+ });
+ document.querySelectorAll('#obras-kanban .kanban-col').forEach(function(col) {
+  var badge = col.querySelector('.kc-count');
+  if (badge) badge.textContent = col.querySelectorAll('.obra-card:not([style*="display: none"]):not([style*="display:none"])').length;
+ });
+
+ // ── Badge e contador ──────────────────────────────────────────────────────
+ var fbBadge = document.getElementById('fb-badge-obras');
+ if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
  var countEl = document.getElementById('obras-filter-count');
  if (countEl) {
- if (activeConds > 0 || busca) {
-  countEl.textContent = visivel + (visivel === 1 ? ' resultado' : ' resultados');
-  countEl.style.display = 'inline';
- } else {
-  countEl.style.display = 'none';
- }
+  if (activeConds || buscaNorm) {
+   countEl.textContent = visivel + (visivel === 1 ? ' resultado' : ' resultados');
+   countEl.style.display = 'inline';
+  } else {
+   countEl.style.display = 'none';
+  }
  }
 }
-
-function limparFiltrosObras() {
- _obrasConditions = [];
- var s = document.getElementById('obras-search');
- if (s) s.value = '';
- _renderConditions();
- filterObras();
-}
-
-// Inicializar painel vazio ao carregar
-(function() {
- if (document.getElementById('filter-conditions')) {
- _renderConditions();
- }
-})();
 
 /* OBRAS VIEW TOGGLE */
 /* OBRAS VIEW TOGGLE */

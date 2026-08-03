@@ -11,19 +11,19 @@
  <title>MilaLab — Sistema Interno</title>
  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='%233D4FD1'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%239DA3B0'/%3E%3Cstop offset='45%25' stop-color='%23F5F6F8'/%3E%3Cstop offset='100%25' stop-color='%238E94A3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M50 20 L78 35 V65 L50 80 L22 65 V35 Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='10' fill='url(%23g)'/%3E%3C/svg%3E">
  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles/tokens.css?v=mldsv24">
-<link rel="stylesheet" href="styles/main.css?v=mldsv24">
+<link rel="stylesheet" href="styles/tokens.css?v=mldsv28">
+<link rel="stylesheet" href="styles/main.css?v=mldsv28">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="scripts/lib/supabase-client.js?v=mldsv24"></script>
-<script src="scripts/lib/ui-helpers.js?v=mldsv24"></script>
-<script src="scripts/lib/avatar-helpers.js?v=mldsv24"></script>
-<script src="scripts/lib/filtro-builder.js?v=mldsv24"></script>
-<script src="scripts/lib/sort-builder.js?v=mldsv24"></script>
-<script src="scripts/lib/group-builder.js?v=mldsv24"></script>
-<script src="scripts/lib/smart-search.js?v=mldsv24"></script>
-<script src="scripts/services/usuarios.service.js?v=mldsv24"></script>
-<script src="scripts/services/auth.service.js?v=mldsv24"></script>
-<script src="scripts/services/propostas.service.js?v=mldsv24"></script>
+<script src="scripts/lib/supabase-client.js?v=mldsv28"></script>
+<script src="scripts/lib/ui-helpers.js?v=mldsv28"></script>
+<script src="scripts/lib/avatar-helpers.js?v=mldsv28"></script>
+<script src="scripts/lib/filtro-builder.js?v=mldsv28"></script>
+<script src="scripts/lib/sort-builder.js?v=mldsv28"></script>
+<script src="scripts/lib/group-builder.js?v=mldsv28"></script>
+<script src="scripts/lib/smart-search.js?v=mldsv28"></script>
+<script src="scripts/services/usuarios.service.js?v=mldsv28"></script>
+<script src="scripts/services/auth.service.js?v=mldsv28"></script>
+<script src="scripts/services/propostas.service.js?v=mldsv28"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
@@ -274,7 +274,7 @@
 <!-- Design system unificado dos campos do wizard Nova Obra: todo select/input/checklist
      do modal usa a mesma geometria de .mf input,.mf select (padding 9px 12px, radius 7px,
      borda var(--border), foco navy com ring) para não ter dois estilos de campo coexistindo. -->
-<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv24">
+<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv28">
 <!-- MODAL NOVA OBRA — wizard 4 etapas (fluxo único, sem gate de tipo) -->
 <div class="modal-backdrop" id="modal-nova-obra" onclick="handleModalBackdrop(event)">
  <div class="modal" id="modal-obra-box" style="max-width:900px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh">
@@ -804,31 +804,29 @@
    <div class="gestor-hd-sub" id="gestor-sync-lbl">Carregando dados...</div>
   </div>
   <div class="gestor-hd-controls">
-   <!-- Ordem: Filtro → Organizar (ordenar+agrupar) → Pesquisar → Período
-        (discreto, mais à direita) → Visualizações → Atualizar. Regra fixa:
-        Pesquisar nunca vem antes do filtro de período. -->
+   <!-- Ordem pedida: Pesquisa (larga, 30-40% da toolbar) → Filtros → Agrupar →
+        Ordenar → Período (discreto) → Visualizações → Atualizar. -->
+   <div class="gestor-search-box gestor-search-wide">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="15" y2="15"/></svg>
+    <input id="gestor-search" placeholder="Pesquisar tarefas, responsável, obra, projeto..." oninput="_gestorApplyFilters()">
+   </div>
+
    <div class="fb-wrap" id="fb-wrap-gestor" style="position:relative;display:inline-block">
     <button type="button" class="gestor-sel" id="fb-btn-gestor" onclick="_fbToggle('gestor')">Filtro<span class="fb-badge" id="fb-badge-gestor" style="display:none"></span></button>
     <div class="fb-pop" id="fb-pop-gestor" style="display:none"></div>
    </div>
 
-   <!-- Organizar: ordenar + agrupar num único bloco visual, em vez de dois
-        controles soltos com um rótulo "Agrupar:" competindo por atenção -->
+   <!-- Organizar: agrupar + ordenar num único bloco visual -->
    <div class="gestor-organizar">
-    <div class="sb-wrap" id="sb-wrap-gestor" style="position:relative;display:inline-block">
-     <button type="button" class="gestor-sel gestor-sel-plain" id="sb-btn-gestor" onclick="_sbToggle('gestor')" title="Ordenar por">Ordenar<span class="fb-badge" id="sb-badge-gestor" style="display:none"></span></button>
-     <div class="fb-pop" id="sb-pop-gestor" style="display:none"></div>
-    </div>
-    <span class="gestor-organizar-div"></span>
     <div class="gb-wrap" id="gb-wrap-gestor" style="position:relative;display:inline-block">
      <button type="button" class="gestor-sel gestor-sel-plain" id="gb-btn-gestor" onclick="_gbToggle('gestor')" title="Agrupar por">Agrupar<span class="fb-badge" id="gb-badge-gestor" style="display:none"></span></button>
      <div class="fb-pop" id="gb-pop-gestor" style="display:none"></div>
     </div>
-   </div>
-
-   <div class="gestor-search-box">
-    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="15" y2="15"/></svg>
-    <input id="gestor-search" placeholder="Pesquisar..." oninput="_gestorApplyFilters()">
+    <span class="gestor-organizar-div"></span>
+    <div class="sb-wrap" id="sb-wrap-gestor" style="position:relative;display:inline-block">
+     <button type="button" class="gestor-sel gestor-sel-plain" id="sb-btn-gestor" onclick="_sbToggle('gestor')" title="Ordenar por">Ordenar<span class="fb-badge" id="sb-badge-gestor" style="display:none"></span></button>
+     <div class="fb-pop" id="sb-pop-gestor" style="display:none"></div>
+    </div>
    </div>
 
    <!-- Período: dropdown compacto, discreto, à direita da barra -->
@@ -1002,7 +1000,7 @@
 <div id="page-empresas" class="page" style="padding-top:8px">
 
  <!-- Estilos Notion para esta página -->
-<link rel="stylesheet" href="styles/empresas.css?v=mldsv24">
+<link rel="stylesheet" href="styles/empresas.css?v=mldsv28">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -1567,55 +1565,26 @@
  </button>
  </div>
  </div>
- <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;position:sticky;top:52px;z-index:8;background:var(--bg);padding:8px 0 4px;margin-top:-4px">
- <!-- Busca -->
- <div class="search" style="min-width:220px;flex:1">
- <input type="text" id="obras-search" placeholder="Buscar obra ou cliente..." oninput="filterObras()">
+ <!-- Toolbar: mesmos componentes reutilizáveis do Gestor de Tarefas
+      (filtro-builder/sort-builder/smart-search), só muda a config de campos.
+      Ordem: Pesquisa (larga) → Filtros → Ordenar → Contador → Nova Obra.
+      Agrupar/Visualizações deste módulo ficam para o próximo incremento
+      (ver nota em scripts/modules/obras.js perto de _obrasApplyFilters). -->
+ <div class="gestor-hd-controls" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;position:sticky;top:52px;z-index:8;background:var(--bg);padding:8px 0 4px;margin-top:-4px">
+ <div class="gestor-search-box gestor-search-wide">
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="15" y2="15"/></svg>
+  <input id="obras-search" placeholder="Buscar obra, empresa, cidade..." oninput="_obrasApplyFilters()">
  </div>
 
- <!-- Botão Filter estilo Airtable -->
- <div style="position:relative">
- <button id="btn-obras-filter" onclick="toggleFilterPanel()" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;height:34px">
- <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="2" y1="4" x2="14" y2="4"/><line x1="4" y1="8" x2="12" y2="8"/><line x1="6" y1="12" x2="10" y2="12"/></svg>
- Filtro
- <span id="filter-badge" style="display:none;background:#3D4FD1;color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:600"></span>
- </button>
-
- <!-- Painel de filtros estilo Airtable -->
- <div id="obras-filter-panel" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.18);width:560px;padding:16px;min-width:320px">
-
- <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
- <span style="font-size:13px;font-weight:600;color:var(--text)">Filtro</span>
+ <div class="fb-wrap" id="fb-wrap-obras" style="position:relative;display:inline-block">
+  <button type="button" class="gestor-sel" id="fb-btn-obras" onclick="_fbToggle('obras')">Filtro<span class="fb-badge" id="fb-badge-obras" style="display:none"></span></button>
+  <div class="fb-pop" id="fb-pop-obras" style="display:none"></div>
  </div>
 
- <!-- Describe what you want to see (AI-style) -->
- <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;background:var(--bg)">
- <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;opacity:.4"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 8c0-1.4 1.1-2.5 2.5-2.5s2.5 1.1 2.5 2.5-1.1 2.5-2.5 2.5" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="1" fill="currentColor"/></svg>
- <input id="filter-ai-input" type="text" placeholder="Descreva o que quer ver..." oninput="_filterAiParse(this.value)" style="border:none;outline:none;background:transparent;font-size:12px;color:var(--text);width:100%;placeholder-color:var(--muted)">
+ <div class="sb-wrap" id="sb-wrap-obras" style="position:relative;display:inline-block">
+  <button type="button" class="gestor-sel gestor-sel-plain" id="sb-btn-obras" onclick="_sbToggle('obras')" title="Ordenar por">Ordenar<span class="fb-badge" id="sb-badge-obras" style="display:none"></span></button>
+  <div class="fb-pop" id="sb-pop-obras" style="display:none"></div>
  </div>
-
- <!-- Linhas de condição -->
- <div id="filter-conditions"></div>
-
- <!-- Adicionar condição -->
- <button onclick="addFilterCondition()" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--navy);background:none;border:none;cursor:pointer;padding:4px 0;margin-top:6px;font-weight:500">
- <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
- Adicionar condição
- </button>
-
- <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
- <button onclick="limparFiltrosObras()" style="font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--muted);cursor:pointer">Limpar tudo</button>
- <button onclick="toggleFilterPanel()" style="font-size:12px;padding:5px 14px;border:none;border-radius:6px;background:#3D4FD1;color:#fff;cursor:pointer;font-weight:500">Aplicar</button>
- </div>
- </div>
- </div>
-
- <!-- Ordenar -->
- <button style="display:flex;align-items:center;gap:5px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-size:13px;cursor:pointer;height:34px">
- <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4h6M2 8h4M2 12h2"/><path d="M11 2v10m0 0l-3-3m3 3l3-3"/></svg>
- Ordenar
- <span style="background:#f0f0f0;color:#555;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:600">1</span>
- </button>
 
  <!-- Contador -->
  <span id="obras-filter-count" style="display:none;font-size:12px;color:var(--muted)"></span>
@@ -2062,7 +2031,7 @@
  <!-- ENTREGAS -->
  <div id="page-entregas" class="page">
 
-<link rel="stylesheet" href="styles/entregas.css?v=mldsv24">
+<link rel="stylesheet" href="styles/entregas.css?v=mldsv28">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -2688,20 +2657,20 @@
 
 </main>
 
-<script src="scripts/app.js?v=mldsv24"></script>
-<script src="scripts/modules/side-panel.js?v=mldsv24"></script>
-<script src="scripts/lib/atividades-vinculos.js?v=mldsv24"></script>
-<script src="scripts/modules/obras.js?v=mldsv24"></script>
-<script src="scripts/modules/projetos.js?v=mldsv24"></script>
-<script src="scripts/modules/entregas.js?v=mldsv24"></script>
-<script src="scripts/modules/instalacoes.js?v=mldsv24"></script>
-<script src="scripts/modules/empresas.js?v=mldsv24"></script>
-<script src="scripts/modules/wizard-nova-obra.js?v=mldsv24"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv24"></script>
-<script src="scripts/modules/melhorias.js?v=mldsv24"></script>
-<script src="scripts/modules/admin.js?v=mldsv24"></script>
-<script src="scripts/modules/exec-dashboard.js?v=mldsv24"></script>
-<script src="scripts/modules/tarefas.js?v=mldsv24"></script>
+<script src="scripts/app.js?v=mldsv28"></script>
+<script src="scripts/modules/side-panel.js?v=mldsv28"></script>
+<script src="scripts/lib/atividades-vinculos.js?v=mldsv28"></script>
+<script src="scripts/modules/obras.js?v=mldsv28"></script>
+<script src="scripts/modules/projetos.js?v=mldsv28"></script>
+<script src="scripts/modules/entregas.js?v=mldsv28"></script>
+<script src="scripts/modules/instalacoes.js?v=mldsv28"></script>
+<script src="scripts/modules/empresas.js?v=mldsv28"></script>
+<script src="scripts/modules/wizard-nova-obra.js?v=mldsv28"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv28"></script>
+<script src="scripts/modules/melhorias.js?v=mldsv28"></script>
+<script src="scripts/modules/admin.js?v=mldsv28"></script>
+<script src="scripts/modules/exec-dashboard.js?v=mldsv28"></script>
+<script src="scripts/modules/tarefas.js?v=mldsv28"></script>
 
  <!-- BACKDROP DRAWERS -->
  <div class="drw-backdrop" id="drw-backdrop-proj" onclick="_projDrawerClose()"></div>
@@ -3141,7 +3110,7 @@
 <!-- SISTEMA DE AUTENTICAÇÃO MILATEC v3.04 — Identidade Visual Grupo Mila      -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<link rel="stylesheet" href="styles/auth.css?v=mldsv24">
+<link rel="stylesheet" href="styles/auth.css?v=mldsv28">
 
 <!-- ═══════════════════════════════════════════════════════════════
      TELA 1 — LOGIN
