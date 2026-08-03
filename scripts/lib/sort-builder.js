@@ -32,9 +32,14 @@ function _sbToggle(instanceId) {
 // sem quebrar — no navegador `document` sempre existe, comportamento igual.
 if (typeof document !== 'undefined') {
  document.addEventListener('click', function(e) {
+  // composedPath(), não e.target.closest() — ver comentário equivalente em
+  // filtro-builder.js: qualquer ação que reconstrua o popover via innerHTML
+  // destaca o elemento clicado do DOM antes deste listener rodar.
+  var path = e.composedPath ? e.composedPath() : [e.target];
   Object.keys(_sbInstances).forEach(function(id) {
    var inst = _sbInstances[id];
-   if (inst.open && !e.target.closest('#sb-wrap-' + id)) { inst.open = false; _sbRenderVisibility(id); }
+   var wrap = document.getElementById('sb-wrap-' + id);
+   if (inst.open && wrap && path.indexOf(wrap) === -1) { inst.open = false; _sbRenderVisibility(id); }
   });
  });
 }
@@ -162,5 +167,6 @@ function _sbRender(instanceId) {
 
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _sbInstances, _sbInit, _sbCompare, _sbCompareOne };
+ module.exports = { _sbInstances, _sbInit, _sbCompare, _sbCompareOne,
+ _sbAddLevel, _sbRemoveLevel, _sbMoveLevel, _sbFieldChange, _sbDirChange, _sbClearAll };
 }

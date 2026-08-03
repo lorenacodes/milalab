@@ -131,6 +131,12 @@ body.light .dash-panel{
  .avatar img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:50%}
  /* MAIN */
  .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin-left .22s cubic-bezier(.4,0,.2,1);background:transparent}
+ /* Páginas .page-flex (ex: Gestor de Tarefas) precisam de um teto de altura real
+    pra que só a grade role e a toolbar fique fixa (item 8 do pedido). Sem isso,
+    .main só tem min-height:100vh — cresce com o conteúdo, o documento inteiro
+    passa a rolar e a toolbar sai da tela junto. :has() trava .main em 100vh só
+    quando existe uma .page-flex ativa, sem afetar as páginas de rolagem normal. */
+ .main:has(.page-flex.active){height:100vh;overflow:hidden}
  .main.sidebar-collapsed{margin-left:0}
  /* #page-dashboard ("Meu Painel") tem max-width:1600px inline pra não deixar as
     linhas de KPI/gráficos absurdamente esticadas em monitores ultrawide — mas
@@ -730,6 +736,13 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
 .gestor-search-box{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:var(--r-sm);padding:5px 10px;background:var(--surface2);width:180px}
 .gestor-search-box input{border:none;outline:none;background:transparent;font-size:12px;color:var(--text);width:100%}
 .gestor-search-box input::placeholder{color:var(--muted)}
+/* Pesquisa é o elemento principal da toolbar — ~30-40% da largura
+   disponível, cresce/encolhe com a tela, nunca fica menor que 220px
+   (senão o placeholder trunca demais) nem passa de 480px (fica exagerada
+   em telas muito largas). */
+.gestor-search-wide{flex:1 1 30%;min-width:220px;max-width:480px;width:auto;padding:7px 12px}
+.gestor-search-wide input{font-size:13px}
+.gestor-search-wide:focus-within{border-color:var(--navy);box-shadow:0 0 0 3px var(--navy-dim)}
 .gestor-sel{border:1px solid var(--border);border-radius:var(--r-sm);padding:4px 8px;background:var(--surface2);color:var(--text);font-size:11px;outline:none;cursor:pointer;font-family:inherit;height:30px;display:inline-flex;align-items:center;gap:5px}
 .gestor-sel.active{border-color:var(--navy);color:var(--navy)}
 .gestor-sel-caret{white-space:nowrap}
@@ -753,6 +766,7 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
 .gv-item-act:hover:not(:disabled){color:var(--navy)}
 .gv-item-act:disabled{opacity:.35;cursor:default}
 .gv-empty{font-size:11px;color:var(--muted);padding:8px;text-align:center}
+.gv-hint{font-size:10.5px;color:var(--muted);line-height:1.5;padding:2px 4px 8px;margin-bottom:6px;border-bottom:1px solid var(--border)}
 .gv-save-btn{width:100%;margin-top:6px;padding:7px;font-size:11px;font-weight:600;border:1px dashed var(--border);border-radius:var(--r-sm);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit}
 .gv-save-btn:hover{border-color:var(--navy);color:var(--navy)}
 

@@ -31,9 +31,14 @@ function _gbToggle(instanceId) {
 }
 if (typeof document !== 'undefined') {
  document.addEventListener('click', function(e) {
+  // composedPath(), não e.target.closest() — ver comentário equivalente em
+  // filtro-builder.js: qualquer ação que reconstrua o popover via innerHTML
+  // destaca o elemento clicado do DOM antes deste listener rodar.
+  var path = e.composedPath ? e.composedPath() : [e.target];
   Object.keys(_gbInstances).forEach(function(id) {
    var inst = _gbInstances[id];
-   if (inst.open && !e.target.closest('#gb-wrap-' + id)) { inst.open = false; _gbRenderVisibility(id); }
+   var wrap = document.getElementById('gb-wrap-' + id);
+   if (inst.open && wrap && path.indexOf(wrap) === -1) { inst.open = false; _gbRenderVisibility(id); }
   });
  });
 }
@@ -139,5 +144,6 @@ function _gbLevelFieldChange(instanceId, idx, fieldKey) {
 
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _gbInstances, _gbInit, _gbPrimaryField, _gbSetLevel, _gbAddLevel, _gbRemoveLevel };
+ module.exports = { _gbInstances, _gbInit, _gbPrimaryField, _gbSetLevel, _gbAddLevel, _gbRemoveLevel,
+ _gbClearAll, _gbLevelFieldChange, _gbToggle };
 }

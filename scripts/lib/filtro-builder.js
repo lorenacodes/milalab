@@ -45,9 +45,18 @@ function _fbToggle(instanceId) {
 // sem quebrar — no navegador `document` sempre existe, comportamento igual.
 if (typeof document !== 'undefined') {
  document.addEventListener('click', function(e) {
+  // composedPath(), não e.target.closest(): qualquer ação dentro do popover
+  // (adicionar/remover condição, trocar campo...) reconstrói o HTML via
+  // innerHTML, o que DESTACA o elemento clicado do DOM antes deste listener
+  // rodar — e.target.closest() num nó destacado sempre retorna null (parece
+  // "clique fora"), fechando o popover sozinho bem no meio da edição.
+  // composedPath() é montado no momento do disparo do evento, então continua
+  // válido mesmo depois do innerHTML trocar os nós.
+  var path = e.composedPath ? e.composedPath() : [e.target];
   Object.keys(_fbInstances).forEach(function(id) {
    var inst = _fbInstances[id];
-   if (inst.open && !e.target.closest('#fb-wrap-' + id)) { inst.open = false; _fbRenderPopoverVisibility(id); }
+   var wrap = document.getElementById('fb-wrap-' + id);
+   if (inst.open && wrap && path.indexOf(wrap) === -1) { inst.open = false; _fbRenderPopoverVisibility(id); }
   });
  });
 }
@@ -268,5 +277,6 @@ function _fbRenderValueInput(instanceId, c, f) {
 
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _fbInstances, _fbInit, _fbEvaluate, _fbEvalCondition, _fbConditionIsUsable, FB_OPS };
+ module.exports = { _fbInstances, _fbInit, _fbEvaluate, _fbEvalCondition, _fbConditionIsUsable, FB_OPS,
+ _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbOperatorChange, _fbValueChange, _fbSetLogic, _fbMoveCondition };
 }

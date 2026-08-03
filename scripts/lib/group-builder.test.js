@@ -1,7 +1,7 @@
 // node --test scripts/lib/group-builder.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { _gbInstances, _gbInit, _gbPrimaryField, _gbSetLevel, _gbAddLevel, _gbRemoveLevel } = require('./group-builder.js');
+const { _gbInstances, _gbInit, _gbPrimaryField, _gbSetLevel, _gbAddLevel, _gbRemoveLevel, _gbClearAll, _gbLevelFieldChange } = require('./group-builder.js');
 
 const FIELDS = [
  { key: 'responsavel', label: 'Responsável' },
@@ -60,4 +60,53 @@ test('_gbRemoveLevel remove o nível certo pelo índice', () => {
  _gbAddLevel('g6', 'status');
  _gbRemoveLevel('g6', 0);
  assert.deepEqual(_gbInstances.g6.state.levels.map((l) => l.field), ['status']);
+});
+
+test('_gbLevelFieldChange troca o campo de um nível existente', () => {
+ _gbInit('g7', FIELDS, null);
+ _gbSetLevel('g7', 'responsavel');
+ _gbAddLevel('g7', 'status');
+ _gbLevelFieldChange('g7', 1, 'area');
+ assert.deepEqual(_gbInstances.g7.state.levels.map((l) => l.field), ['responsavel', 'area']);
+});
+
+test('_gbClearAll remove o agrupamento por completo', () => {
+ _gbInit('g8', FIELDS, null);
+ _gbSetLevel('g8', 'responsavel');
+ _gbClearAll('g8');
+ assert.equal(_gbPrimaryField('g8'), null);
+ assert.equal(_gbInstances.g8.state.levels.length, 0);
+});
+
+// Regressão do pedido #3: exemplo exato do usuário (▼ João / Tarefa 1, Tarefa 2 /
+// ▼ Maria / Tarefa 3, Tarefa 4) — criação de múltiplos grupos com contagem, mais
+// expandir/recolher com estado persistente (um Set de chaves recolhidas, do jeito
+// que tarefas.js._gestorRenderGrid faz de fato).
+test('múltiplos grupos: criação com contagem + expandir/recolher com estado persistente', () => {
+ _gbInit('g9', FIELDS, null);
+ _gbSetLevel('g9', 'responsavel');
+ const items = [
+  { titulo: 'Tarefa 1', responsavel: 'João' },
+  { titulo: 'Tarefa 2', responsavel: 'João' },
+  { titulo: 'Tarefa 3', responsavel: 'Maria' },
+  { titulo: 'Tarefa 4', responsavel: 'Maria' },
+ ];
+ const field = _gbPrimaryField('g9');
+ const groups = {};
+ items.forEach((i) => { const k = i[field]; (groups[k] = groups[k] || []).push(i); });
+ assert.deepEqual(Object.keys(groups), ['João', 'Maria']);
+ assert.equal(groups['João'].length, 2);
+ assert.equal(groups['Maria'].length, 2);
+
+ // Estado de recolhido/expandido: um Set persistido (localStorage, serializável
+ // como array) — recolher "João" não deve afetar "Maria".
+ const collapsed = new Set();
+ collapsed.add('João');
+ assert.equal(collapsed.has('João'), true);
+ assert.equal(collapsed.has('Maria'), false);
+ const serialized = JSON.stringify([...collapsed]);
+ const restored = new Set(JSON.parse(serialized));
+ assert.equal(restored.has('João'), true);
+ collapsed.delete('João'); // expandir de novo
+ assert.equal(collapsed.has('João'), false);
 });

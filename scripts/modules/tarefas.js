@@ -189,8 +189,16 @@ function _gpToggle(force) {
  pop.style.display = open ? 'flex' : 'none';
 }
 document.addEventListener('click', function(e) {
- if (!e.target.closest('#gp-wrap')) _gpToggle(false);
- if (!e.target.closest('#gv-wrap')) _gviewsToggle(false);
+ // composedPath(), não e.target.closest(): ações dentro do painel de
+ // Visualizações (favoritar/renomear/duplicar/excluir) reconstroem o HTML
+ // via innerHTML, o que destaca o elemento clicado do DOM antes deste
+ // listener rodar — e.target.closest() num nó destacado sempre dá null
+ // (parece "clique fora"), fechando o painel sozinho no meio da ação.
+ var path = e.composedPath ? e.composedPath() : [e.target];
+ var gpWrap = document.getElementById('gp-wrap');
+ var gvWrap = document.getElementById('gv-wrap');
+ if (gpWrap && path.indexOf(gpWrap) === -1) _gpToggle(false);
+ if (gvWrap && path.indexOf(gvWrap) === -1) _gviewsToggle(false);
 });
 
 // ── Visualizações salvas (agrupamento + ordenação + período + filtro, com
@@ -235,8 +243,9 @@ function _gviewsRender() {
    + '<button type="button" class="gv-item-del" title="Excluir visualização" onclick="event.stopPropagation();_gviewsDelete(\'' + v.id + '\')">&times;</button>'
    + '</div>';
  }).join('');
- pop.innerHTML = (items || '<div class="gv-empty">Nenhuma visualização salva ainda</div>')
-  + '<button type="button" class="gv-save-btn" onclick="_gviewsSaveCurrent()">+ Salvar visualização atual</button>';
+ pop.innerHTML = '<div class="gv-hint">Salve combinações de filtros, pesquisa, agrupamento, ordenação e período para reutilizar depois.</div>'
+  + (items || '<div class="gv-empty">Nenhuma visualização salva ainda</div>')
+  + '<button type="button" class="gv-save-btn" onclick="_gviewsSaveCurrent()">+ Nova visualização</button>';
  pop.style.display = 'block';
 }
 
