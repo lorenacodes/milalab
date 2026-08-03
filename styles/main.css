@@ -504,6 +504,13 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
  .task-drw.open{transform:translateX(0)}
  .task-drw-hd{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0}
  .task-drw-ttl{font-size:14px;font-weight:700;flex:1;letter-spacing:-.2px}
+ /* Indicador de auto-save — "Salvando.../Alterações salvas/Erro ao salvar".
+    Fica vazio (sem alterar layout) fora do modo edição/quando não há nada
+    pra reportar; ver _taskAutoSave* em dashboard.js. */
+ .task-drw-savestatus{font-size:11px;margin-top:2px;min-height:14px;transition:opacity .2s}
+ .task-drw-savestatus.saving{color:var(--muted)}
+ .task-drw-savestatus.saved{color:var(--green)}
+ .task-drw-savestatus.error{color:var(--red);font-weight:600}
  .task-drw-close{background:none;border:none;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;padding:4px 8px;border-radius:var(--r-sm);transition:background .12s}
  .task-drw-close:hover{background:var(--surface2);color:var(--text)}
  .task-drw-body{flex:1;min-height:0;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px}

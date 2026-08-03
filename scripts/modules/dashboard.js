@@ -744,6 +744,70 @@ function _dashTaskPrazo(t) {
 // ID da tarefa em edição — null = modo criação, número = modo edição
 var _taskEditId = null;
 
+/* ── AUTO-SAVE (só no modo edição — criar uma atividade nova continua com
+   botão explícito, já que não existe linha no banco pra salvar em cima
+   antes de "Criar atividade" rodar uma vez). Mudanças de campo chamam
+   _taskAutoSaveQueue(patch, immediate); patches se acumulam e saem num
+   único .update(), debounced (700ms pra texto digitado, ~imediato pra
+   selects/datas/checkboxes) — evita uma request por tecla. ── */
+var _taskAutoSavePending = null;
+var _taskAutoSaveTimer = null;
+var _taskAutoSaveFadeTimer = null;
+
+function _taskAutoSaveStatus(state, msg) {
+ var el = document.getElementById('task-drw-savestatus');
+ if (!el) return;
+ el.className = 'task-drw-savestatus' + (state ? ' ' + state : '');
+ el.textContent = msg || '';
+ clearTimeout(_taskAutoSaveFadeTimer);
+ if (state === 'saved') {
+  _taskAutoSaveFadeTimer = setTimeout(function() {
+   if (el.classList.contains('saved')) { el.className = 'task-drw-savestatus'; el.textContent = ''; }
+  }, 2500);
+ }
+}
+
+function _taskAutoSaveQueue(patch, immediate) {
+ if (!_taskEditId) return; // modo criação: sem linha no banco ainda, nada a auto-salvar
+ _taskAutoSavePending = Object.assign(_taskAutoSavePending || {}, patch);
+ clearTimeout(_taskAutoSaveTimer);
+ _taskAutoSaveStatus('saving', 'Salvando…');
+ _taskAutoSaveTimer = setTimeout(_taskAutoSaveFlush, immediate ? 120 : 700);
+}
+
+function _taskAutoSaveFlush() {
+ if (!_taskEditId || !_taskAutoSavePending) return;
+ var id = _taskEditId, patch = _taskAutoSavePending;
+ _taskAutoSavePending = null;
+ patch.updated_at = new Date().toISOString();
+ _sb.from('atividades').update(patch).eq('id', id).then(function(res) {
+  // Usuário já fechou/trocou de atividade enquanto salvava — não mexe na UI
+  if (String(_taskEditId) !== String(id)) return;
+  if (res.error) {
+   _taskAutoSaveStatus('error', 'Erro ao salvar: ' + _supaErrPt(res.error.message));
+   console.error('[auto-save]', res.error);
+   return;
+  }
+  _taskAutoSaveStatus('saved', 'Alterações salvas');
+  // Reflete nas outras telas sem precisar de refresh (sem refetch — só
+  // aplica o mesmo patch nos caches em memória já carregados)
+  var gIdx = (typeof _gestorAllAt !== 'undefined') ? _gestorAllAt.findIndex(function(x){ return String(x.id) === String(id); }) : -1;
+  if (gIdx !== -1) { Object.assign(_gestorAllAt[gIdx], patch); if (typeof _gestorApplyFilters === 'function') _gestorApplyFilters(); }
+  var dIdx = (_dashAllAtRaw||[]).findIndex(function(x){ return String(x.id) === String(id); });
+  if (dIdx !== -1) Object.assign(_dashAllAtRaw[dIdx], patch);
+ }).catch(function(e) {
+  if (String(_taskEditId) !== String(id)) return;
+  _taskAutoSaveStatus('error', 'Erro: ' + e.message);
+  console.error('[auto-save]', e);
+ });
+}
+
+// Chamado ao fechar o drawer: se ainda houver um patch pendente (debounce não
+// disparou a tempo), salva na hora em vez de descartar a alteração.
+function _taskAutoSaveFlushNow() {
+ if (_taskAutoSavePending) { clearTimeout(_taskAutoSaveTimer); _taskAutoSaveFlush(); }
+}
+
 function _taskDrawerOpen(editId) {
  _taskEditId = editId || null;
  // Procura primeiro nas tarefas locais (sistema legado) e depois nas atividades reais
@@ -759,10 +823,15 @@ function _taskDrawerOpen(editId) {
 
  var ttlEl = document.getElementById('task-drw-ttl');
  var btnEl = document.getElementById('task-drw-submit-btn');
+ var cnlEl = document.getElementById('task-drw-cancel-btn');
  var delEl = document.getElementById('task-drw-del-btn');
  if (ttlEl) ttlEl.textContent = t ? 'Editar atividade' : 'Nova atividade';
- if (btnEl) btnEl.textContent = t ? 'Salvar alterações' : 'Criar atividade';
+ // Editar: tudo salva sozinho (ver _taskAutoSave*), então não existe mais
+ // botão "Salvar alterações" nem "Cancelar" (não há o que descartar).
+ if (btnEl) btnEl.style.display = t ? 'none' : '';
+ if (cnlEl) cnlEl.textContent = t ? 'Fechar' : 'Cancelar';
  if (delEl) delEl.style.display = t ? '' : 'none'; // só em modo edição local
+ _taskAutoSaveStatus(); // limpa qualquer status de uma edição anterior
 
  var get = function(id){ return document.getElementById(id); };
  var set = function(id, val){ var el = get(id); if (el) el.value = val || ''; };
@@ -975,6 +1044,13 @@ function _respRenderList(q) {
  }).join('');
 }
 
+function _respAutoSaveResponsaveis() {
+ if (!_taskEditId) return; // criação: fica só no estado local até "Criar atividade"
+ var emails = _respSelecionados.map(function(u){ return u.email; }).filter(Boolean);
+ _taskAutoSaveQueue({ responsavel: emails }, true);
+ _syncAtividadeResponsaveis(_taskEditId, emails);
+}
+
 function _respToggleUser(email, nome, iniciais) {
  var idx = _respSelecionados.findIndex(function(s){ return s.email === email; });
  if (idx >= 0) {
@@ -984,6 +1060,7 @@ function _respToggleUser(email, nome, iniciais) {
  }
  _respUpdateBox();
  _respRenderList(document.getElementById('nt-resp-search') ? document.getElementById('nt-resp-search').value : '');
+ _respAutoSaveResponsaveis();
 }
 
 function _respRemoveUser(email) {
@@ -993,6 +1070,7 @@ function _respRemoveUser(email) {
  _respUpdateBox();
  var search = document.getElementById('nt-resp-search');
  _respRenderList(search ? search.value : '');
+ _respAutoSaveResponsaveis();
 }
 
 /* ── PRIVACIDADE DA ATIVIDADE ("Pessoas específicas") ────────────────────── */
@@ -1046,6 +1124,7 @@ function _privToggleUser(id, email, nome, iniciais) {
  else { _privSelecionados.push({ id: id, email: email, nome: nome, iniciais: iniciais }); }
  _privUpdateBox();
  _privRenderList(document.getElementById('nt-priv-search') ? document.getElementById('nt-priv-search').value : '');
+ _ntAutoSavePrivacidade();
 }
 
 function _privRemoveUser(email) {
@@ -1053,6 +1132,19 @@ function _privRemoveUser(email) {
  if (idx === -1) return;
  _privSelecionados.splice(idx, 1);
  _privUpdateBox();
+ _ntAutoSavePrivacidade();
+}
+
+// visibilidade é coluna de atividades (vai por _taskAutoSaveQueue); a lista
+// de pessoas com acesso ("privada_especificos") vive em
+// atividades_compartilhamento, sincronizada à parte por _privSaveShares.
+function _ntAutoSavePrivacidade() {
+ if (!_taskEditId) return; // criação: sincroniza só depois de "Criar atividade"
+ var privModo = (document.getElementById('nt-privacidade') || {}).value || 'equipe';
+ var privVisibilidade = privModo === 'equipe' ? 'equipe' : 'privada';
+ var privShares = privModo === 'privada_especificos' ? _privSelecionados.slice() : [];
+ _taskAutoSaveQueue({ visibilidade: privVisibilidade }, true);
+ _privSaveShares(_taskEditId, privModo, privShares);
 }
 
 function _privUpdateBox() {
@@ -1188,6 +1280,10 @@ document.addEventListener('click', function(e) {
 });
 
 function _taskDrawerClose() {
+ // Fechar o painel não pode descartar uma alteração que ainda não tinha
+ // disparado o debounce do auto-save — força salvar agora, antes de zerar
+ // _taskEditId (senão _taskAutoSaveFlush não teria mais o id da atividade).
+ _taskAutoSaveFlushNow();
  var drw = document.getElementById('task-drw');
  var bd  = document.getElementById('drw-backdrop-task');
  if (drw) drw.classList.remove('open');
@@ -1311,11 +1407,22 @@ function _drwSubRender() {
  _drwAutoStatusFromSubs();
 }
 
+// Subtarefas são um jsonb (não uma tabela própria) — toda mudança reenvia
+// a lista inteira pra coluna atividades.subtasks.
+function _drwSubAutoSave() {
+ if (!_taskEditId) return; // criação: fica só no estado local até "Criar atividade"
+ var subtasksParaSalvar = _drwSubItems.map(function(s, n) {
+  return { id: s._id || (Date.now() + n), titulo: s.titulo, done: !!s.done };
+ });
+ _taskAutoSaveQueue({ subtasks: subtasksParaSalvar }, true);
+}
+
 function _drwSubToggleDone(idx) {
  if (!_drwSubItems[idx]) return;
  _drwSubItems[idx].done = !_drwSubItems[idx].done;
  _drwAutoStatusFromSubs();
  _drwSubRender();
+ _drwSubAutoSave();
 }
 
 function _drwSubBadge() {
@@ -1374,12 +1481,14 @@ function _drwSubTitleEdit(idx, isNew) {
 function _drwSubDelete(idx) {
  _drwSubItems.splice(idx, 1);
  _drwSubRender();
+ _drwSubAutoSave();
 }
 
 function _drwSubField(idx, field, value) {
  if (_drwSubItems[idx]) {
   _drwSubItems[idx][field] = value;
   _drwAutoStatusFromSubs();
+  _drwSubAutoSave();
  }
 }
 
@@ -1462,6 +1571,29 @@ function _obraSearchFilter(q) {
 function _obraSearchKey(e) {
  if (e.key === 'Escape') _obraSearchClose();
 }
+// Vínculos (obra/projeto/melhoria) não são colunas de atividades — vivem só
+// nas tabelas de junção, então não passam por _taskAutoSaveQueue (isso é só
+// pra colunas da própria linha); chamam _syncAtividadeVinculos direto.
+function _ntAutoSaveVinculos() {
+ if (!_taskEditId) return; // criação: sincroniza só depois de "Criar atividade"
+ var obraId = (document.getElementById('nt-obra')     || {}).value || null;
+ var projId = (document.getElementById('nt-projeto')  || {}).value || null;
+ var melhId = (document.getElementById('nt-melhoria-sel') || {}).value || null;
+ var id = _taskEditId;
+ _taskAutoSaveStatus('saving', 'Salvando…');
+ _syncAtividadeVinculos(id, obraId, projId, melhId).then(function() {
+  if (String(_taskEditId) !== String(id)) return;
+  _taskAutoSaveStatus('saved', 'Alterações salvas');
+  var gIdx = (typeof _gestorAllAt !== 'undefined') ? _gestorAllAt.findIndex(function(x){ return String(x.id) === String(id); }) : -1;
+  if (gIdx !== -1) {
+   _gestorAllAt[gIdx].obra_id = obraId; _gestorAllAt[gIdx].projeto_id = projId; _gestorAllAt[gIdx].melhoria_id = melhId;
+   _gestorAllAt[gIdx]._obraNome = obraId ? (_gestorObrasMap[String(obraId)] || '') : '';
+   _gestorAllAt[gIdx]._projNome = projId ? (_gestorProjMap[String(projId)] || '') : '';
+   if (typeof _gestorApplyFilters === 'function') _gestorApplyFilters();
+  }
+ });
+}
+
 function _obraSelectItem(id, nome) {
  _obraSelectedId = id;
  var hidEl = document.getElementById('nt-obra');
@@ -1473,6 +1605,7 @@ function _obraSelectItem(id, nome) {
  _obraSearchClose();
  _ntObraChange(id, null);
  _ntObraCardUpdate(id);
+ _ntAutoSaveVinculos();
 }
 function _obraClear() {
  _obraSelectedId = '';
@@ -1484,6 +1617,7 @@ function _obraClear() {
  if (clrEl) clrEl.style.display = 'none';
  _ntObraChange('', null);
  _ntObraCardUpdate('');
+ _ntAutoSaveVinculos();
 }
 function _obraSetValue(id, nome) {
  // Programaticamente define o valor do searchable select
@@ -1712,13 +1846,12 @@ function _ntMelhCardSync() {
 
 
 
+// Só roda em modo criação — editar uma atividade existente salva sozinho
+// (ver _taskAutoSave*/_ntAutoSave*/_drwSubAutoSave), o botão "Salvar
+// alterações" e toda a lógica de UPDATE que ele disparava foram removidos.
 function _submitNewTask() {
  // ── Validação ────────────────────────────────────────────────────
- // Em modo edição, tipo_atividade e area podem estar nulos no banco — não bloquear o save
- var isEdicao = !!_taskEditId;
- var camposObrig = isEdicao
-  ? ['nt-titulo','nt-dt-inicio','nt-dt-fim']
-  : ['nt-titulo','nt-tipo-atividade','nt-area','nt-dt-inicio','nt-dt-fim'];
+ var camposObrig = ['nt-titulo','nt-tipo-atividade','nt-area','nt-dt-inicio','nt-dt-fim'];
  var valido = true, primeiroInvalido = null;
  camposObrig.forEach(function(id) {
   var el = document.getElementById(id);
@@ -1811,60 +1944,7 @@ function _submitNewTask() {
   if (!Array.isArray(_dashTasks)) { _dashTasksInit(); }
   if (!Array.isArray(_dashTasks)) { _dashTasks = []; }
 
-  if (_taskEditId) {
-   // ── Modo edição ──────────────────────────────────────────────
-   var idx = _dashTasks.findIndex(function(x){ return x.id === _taskEditId; });
-
-   if (idx === -1) {
-    // ── Atividade do Supabase (não está em _dashTasks) — UPDATE direto ────
-    var _uuidRe55 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!_uuidRe55.test(String(_taskEditId))) {
-     _showToast('Erro: ID de atividade inválido', 'erro');
-     return;
-    }
-    var respEmails = _nomesStrToEmails(mae.responsavel);
-    var sbPayload = {
-     titulo:          mae.titulo,
-     status:          mae.status,
-     prioridade:      mae.prioridade,
-     area:            mae.area            || null,
-     tipo_atividade:  mae.tipo_atividade   || null,
-     data_inicio:     mae.data_inicio  || null,
-     data_prazo:      mae.data_fim     || null,
-     responsavel:     respEmails,
-     observacoes:     mae.observacoes  || null,
-     subtasks:        subtasksParaSalvar,
-     visibilidade:    privVisibilidade,
-     updated_at:      new Date().toISOString()
-    };
-    var _editIdSnapshot = _taskEditId;
-    _taskDrawerClose();
-    _showToast('Salvando...', 'ok');
-    _sb.from('atividades').update(sbPayload).eq('id', _editIdSnapshot)
-     .then(function(res) {
-      if (res.error) {
-       _showToast('Erro ao salvar: ' + _supaErrPt(res.error.message), 'erro');
-      } else {
-       _privSaveShares(_editIdSnapshot, privModo, privShares);
-       _syncAtividadeVinculos(_editIdSnapshot, mae.obra_id || null, mae.projeto_id || null, mae.melhoria_id || null);
-       _syncAtividadeResponsaveis(_editIdSnapshot, respEmails);
-       _showToast('Atividade atualizada no sistema!', 'ok');
-       _histLogAdd('editou', mae.titulo, 'Status: ' + mae.status + ' · Prazo: ' + (mae.data_fim || '—'));
-       _histBadgeUpdate();
-       var gIdx = _gestorAllAt.findIndex(function(x){ return String(x.id) === String(_editIdSnapshot); });
-       if (gIdx !== -1) {
-        Object.assign(_gestorAllAt[gIdx], sbPayload, { obra_id: mae.obra_id || null, projeto_id: mae.projeto_id || null, melhoria_id: mae.melhoria_id || null, responsavel: mae.responsavel });
-        _gestorAllAt[gIdx]._obraNome = mae.obra_id ? (_gestorObrasMap[String(mae.obra_id)] || '') : '';
-        _gestorAllAt[gIdx]._projNome = mae.projeto_id ? (_gestorProjMap[String(mae.projeto_id)] || '') : '';
-        _gestorApplyFilters();
-       }
-       _dashLoad();
-      }
-     })
-     .catch(function(e) { _showToast('Erro: ' + e.message, 'erro'); });
-    return;
-   }
-  } else {
+  {
    // ── Modo criação — insere atividade real no Supabase (tabela atividades) ──
    // Motivo: antes, novas atividades ficavam só no localStorage do navegador
    // (nunca chegavam ao banco), por isso ficavam invisíveis no Gestor de
