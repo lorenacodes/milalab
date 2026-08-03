@@ -211,11 +211,17 @@ function _gqdToggle(which, force) {
  var wrap = document.getElementById('gqd-wrap-' + which);
  if (!pop) return;
  var open = force !== undefined ? force : (pop.style.display === 'none');
- // Fecha o outro filtro rápido de data, pra não ter dois popovers abertos
- // ao mesmo tempo competindo por espaço na tela.
- var other = which === 'inicio' ? 'prazo' : 'inicio';
- var otherPop = document.getElementById('gqd-pop-' + other);
- if (otherPop) otherPop.style.display = 'none';
+ // Fecha o outro filtro rápido de data, mas só quando este está de fato
+ // ABRINDO — bug real: ao fechar 'prazo' pelo clique-fora (force=false), o
+ // "fecha o outro" também fechava 'inicio' mesmo quando o clique tinha sido
+ // NELE, porque essa lógica rodava incondicionalmente. Clicar em "Início"
+ // abria e fechava no mesmo evento (o listener de clique-fora, ao processar
+ // o "fecha o outro" de 'prazo', apagava o 'inicio' que acabara de abrir).
+ if (open) {
+  var other = which === 'inicio' ? 'prazo' : 'inicio';
+  var otherPop = document.getElementById('gqd-pop-' + other);
+  if (otherPop) otherPop.style.display = 'none';
+ }
  pop.style.display = open ? 'flex' : 'none';
  if (open && wrap && typeof _tsSmartPosition === 'function') _tsSmartPosition(wrap, pop);
 }
@@ -944,11 +950,25 @@ function _gestorSetView(v, btn) {
 // ══════════════════════════════════════════════════════════════════════════
 // GRADE (Grid)
 // ══════════════════════════════════════════════════════════════════════════
+// Campo de agrupamento → coluna real da tabela que fica redundante (o valor
+// já está no cabeçalho do grupo) — só existe mapeamento pra quem TEM uma
+// coluna própria (Status/Área/Prazo); Responsável, Individual/Coletiva e
+// Projeto→Obra não têm coluna dedicada na Grade, então não há o que ocultar.
+var _GESTOR_GROUP_COL_CLASS = { status: 'gb-hide-status', area: 'gb-hide-area', data_prazo: 'gb-hide-prazo' };
+function _gestorSyncGroupedColumn(groupBy) {
+ var table = document.querySelector('#gestor-panel-grid .gestor-tbl');
+ if (!table) return;
+ Object.keys(_GESTOR_GROUP_COL_CLASS).forEach(function(k){ table.classList.remove(_GESTOR_GROUP_COL_CLASS[k]); });
+ var cls = _GESTOR_GROUP_COL_CLASS[groupBy];
+ if (cls) table.classList.add(cls);
+}
+
 function _gestorRenderGrid() {
  var tbody = document.getElementById('gestor-tbl-body');
  if (!tbody) return;
 
  var groupBy = _gbPrimaryField('gestor') || 'responsavel';
+ _gestorSyncGroupedColumn(groupBy);
 
  // Agrupamento hierárquico Projeto → Obra: usa uma estrutura aninhada própria
  // (dois níveis de cabeçalho colapsável) em vez do grupo plano de 1 nível
