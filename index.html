@@ -11,19 +11,19 @@
  <title>MilaLab — Sistema Interno</title>
  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='%233D4FD1'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%239DA3B0'/%3E%3Cstop offset='45%25' stop-color='%23F5F6F8'/%3E%3Cstop offset='100%25' stop-color='%238E94A3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M50 20 L78 35 V65 L50 80 L22 65 V35 Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='10' fill='url(%23g)'/%3E%3C/svg%3E">
  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles/tokens.css?v=mldsv34">
-<link rel="stylesheet" href="styles/main.css?v=mldsv34">
+<link rel="stylesheet" href="styles/tokens.css?v=mldsv35">
+<link rel="stylesheet" href="styles/main.css?v=mldsv35">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="scripts/lib/supabase-client.js?v=mldsv34"></script>
-<script src="scripts/lib/ui-helpers.js?v=mldsv34"></script>
-<script src="scripts/lib/avatar-helpers.js?v=mldsv34"></script>
-<script src="scripts/lib/filtro-builder.js?v=mldsv34"></script>
-<script src="scripts/lib/sort-builder.js?v=mldsv34"></script>
-<script src="scripts/lib/group-builder.js?v=mldsv34"></script>
-<script src="scripts/lib/smart-search.js?v=mldsv34"></script>
-<script src="scripts/services/usuarios.service.js?v=mldsv34"></script>
-<script src="scripts/services/auth.service.js?v=mldsv34"></script>
-<script src="scripts/services/propostas.service.js?v=mldsv34"></script>
+<script src="scripts/lib/supabase-client.js?v=mldsv35"></script>
+<script src="scripts/lib/ui-helpers.js?v=mldsv35"></script>
+<script src="scripts/lib/avatar-helpers.js?v=mldsv35"></script>
+<script src="scripts/lib/filtro-builder.js?v=mldsv35"></script>
+<script src="scripts/lib/sort-builder.js?v=mldsv35"></script>
+<script src="scripts/lib/group-builder.js?v=mldsv35"></script>
+<script src="scripts/lib/smart-search.js?v=mldsv35"></script>
+<script src="scripts/services/usuarios.service.js?v=mldsv35"></script>
+<script src="scripts/services/auth.service.js?v=mldsv35"></script>
+<script src="scripts/services/propostas.service.js?v=mldsv35"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
@@ -274,7 +274,7 @@
 <!-- Design system unificado dos campos do wizard Nova Obra: todo select/input/checklist
      do modal usa a mesma geometria de .mf input,.mf select (padding 9px 12px, radius 7px,
      borda var(--border), foco navy com ring) para não ter dois estilos de campo coexistindo. -->
-<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv34">
+<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv35">
 <!-- MODAL NOVA OBRA — wizard 4 etapas (fluxo único, sem gate de tipo) -->
 <div class="modal-backdrop" id="modal-nova-obra" onclick="handleModalBackdrop(event)">
  <div class="modal" id="modal-obra-box" style="max-width:900px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh">
@@ -1000,7 +1000,7 @@
 <div id="page-empresas" class="page" style="padding-top:8px">
 
  <!-- Estilos Notion para esta página -->
-<link rel="stylesheet" href="styles/empresas.css?v=mldsv34">
+<link rel="stylesheet" href="styles/empresas.css?v=mldsv35">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -1753,14 +1753,28 @@
   </div>
  </div>
 
- <!-- Filtros -->
- <div class="filter-bar">
- <div class="search"><input type="text" placeholder="Buscar projeto ou obra..."></div>
- <span class="chip active" onclick="filterProjetos(this,'')">Todos</span>
- <span class="chip" onclick="filterProjetos(this,'Telhados')">Telhados</span>
- <span class="chip" onclick="filterProjetos(this,'Steel Frame')">Steel Frame</span>
- <span class="chip" onclick="filterProjetos(this,'Modular')">Modular</span>
- <span class="chip" onclick="filterProjetos(this,'Solar')">Solar</span>
+ <!-- Toolbar: mesmos componentes reutilizáveis do Gestor de Tarefas/Obras/
+      Empresas/Instalações/Entregas (filtro-builder/sort-builder/smart-
+      search) — o campo de busca antigo nem estava funcional (sem oninput),
+      e os chips fixos de tipo viram um Filtro completo. Aplica nas duas
+      visualizações (Tabela e Kanban), igual ao Obras. -->
+ <div class="gestor-hd-controls" style="position:sticky;top:52px;z-index:8;background:var(--bg);padding:8px 0;margin-bottom:12px">
+ <div class="gestor-search-box gestor-search-wide">
+  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="15" y2="15"/></svg>
+  <input id="proj-search" placeholder="Buscar projeto, obra, cliente..." oninput="_projApplyFilters()">
+ </div>
+
+ <div class="fb-wrap" id="fb-wrap-projetos" style="position:relative;display:inline-block">
+  <button type="button" class="gestor-sel" id="fb-btn-projetos" onclick="_fbToggle('projetos')">Filtro<span class="fb-badge" id="fb-badge-projetos" style="display:none"></span></button>
+  <div class="fb-pop" id="fb-pop-projetos" style="display:none"></div>
+ </div>
+
+ <div class="sb-wrap" id="sb-wrap-projetos" style="position:relative;display:inline-block">
+  <button type="button" class="gestor-sel gestor-sel-plain" id="sb-btn-projetos" onclick="_sbToggle('projetos')" title="Ordenar por">Ordenar<span class="fb-badge" id="sb-badge-projetos" style="display:none"></span></button>
+  <div class="fb-pop" id="sb-pop-projetos" style="display:none"></div>
+ </div>
+
+ <span id="proj-filter-count" style="display:none;font-size:12px;color:var(--muted)"></span>
  </div>
 
  <!-- Tabela de projetos -->
@@ -2019,7 +2033,7 @@
  <!-- ENTREGAS -->
  <div id="page-entregas" class="page">
 
-<link rel="stylesheet" href="styles/entregas.css?v=mldsv34">
+<link rel="stylesheet" href="styles/entregas.css?v=mldsv35">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -2674,20 +2688,20 @@
 
 </main>
 
-<script src="scripts/app.js?v=mldsv34"></script>
-<script src="scripts/modules/side-panel.js?v=mldsv34"></script>
-<script src="scripts/lib/atividades-vinculos.js?v=mldsv34"></script>
-<script src="scripts/modules/obras.js?v=mldsv34"></script>
-<script src="scripts/modules/projetos.js?v=mldsv34"></script>
-<script src="scripts/modules/entregas.js?v=mldsv34"></script>
-<script src="scripts/modules/instalacoes.js?v=mldsv34"></script>
-<script src="scripts/modules/empresas.js?v=mldsv34"></script>
-<script src="scripts/modules/wizard-nova-obra.js?v=mldsv34"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv34"></script>
-<script src="scripts/modules/melhorias.js?v=mldsv34"></script>
-<script src="scripts/modules/admin.js?v=mldsv34"></script>
-<script src="scripts/modules/exec-dashboard.js?v=mldsv34"></script>
-<script src="scripts/modules/tarefas.js?v=mldsv34"></script>
+<script src="scripts/app.js?v=mldsv35"></script>
+<script src="scripts/modules/side-panel.js?v=mldsv35"></script>
+<script src="scripts/lib/atividades-vinculos.js?v=mldsv35"></script>
+<script src="scripts/modules/obras.js?v=mldsv35"></script>
+<script src="scripts/modules/projetos.js?v=mldsv35"></script>
+<script src="scripts/modules/entregas.js?v=mldsv35"></script>
+<script src="scripts/modules/instalacoes.js?v=mldsv35"></script>
+<script src="scripts/modules/empresas.js?v=mldsv35"></script>
+<script src="scripts/modules/wizard-nova-obra.js?v=mldsv35"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv35"></script>
+<script src="scripts/modules/melhorias.js?v=mldsv35"></script>
+<script src="scripts/modules/admin.js?v=mldsv35"></script>
+<script src="scripts/modules/exec-dashboard.js?v=mldsv35"></script>
+<script src="scripts/modules/tarefas.js?v=mldsv35"></script>
 
  <!-- BACKDROP DRAWERS -->
  <div class="drw-backdrop" id="drw-backdrop-proj" onclick="_projDrawerClose()"></div>
@@ -3127,7 +3141,7 @@
 <!-- SISTEMA DE AUTENTICAÇÃO MILATEC v3.04 — Identidade Visual Grupo Mila      -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<link rel="stylesheet" href="styles/auth.css?v=mldsv34">
+<link rel="stylesheet" href="styles/auth.css?v=mldsv35">
 
 <!-- ═══════════════════════════════════════════════════════════════
      TELA 1 — LOGIN

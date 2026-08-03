@@ -200,7 +200,11 @@ async function _renderProjetosKanban() {
     ? 'R$ ' + (Number(p.valor_unitario) * Number(p.quantidade || 1)).toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})
     : null;
    var obraId   = p.obra_id || '';
-   return '<div class="proj-kn-card" onclick="if(obraId){_spObraById(\'' + obraId + '\')}" title="Abrir obra vinculada">'
+   var valorNum = (p.valor_unitario != null) ? Number(p.valor_unitario) * Number(p.quantidade || 1) : 0;
+   var pesoNum  = (p.peso_kg != null) ? Number(p.peso_kg) * Number(p.quantidade || 1) : 0;
+   var clienteStr = ((empNome ? empNome + ' — ' : '') + obraNome).replace(/"/g,'&quot;');
+   return '<div class="proj-kn-card" onclick="if(obraId){_spObraById(\'' + obraId + '\')}" title="Abrir obra vinculada"'
+    + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-compl="' + compl + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '">'
     + '<div class="proj-kn-title">' + (p.nome || '(sem nome)') + '</div>'
     + '<div class="proj-kn-obra" title="' + obraNome + '">'
     + (empNome ? empNome + ' — ' : '') + obraNome
@@ -260,12 +264,74 @@ function _spProjetos(row, tds) {
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 }
 
-function filterProjetos(chipEl, tipo) {
- document.querySelectorAll('.filter-bar .chip').forEach(c => c.classList.remove('active'));
- chipEl.classList.add('active');
- document.querySelectorAll('#proj-tbody tr').forEach(tr => {
- tr.style.display = (!tipo || tr.dataset.tipo === tipo) ? '' : 'none';
+// Filtro/Ordenação — mesmos componentes reutilizáveis do Gestor de Tarefas/
+// Obras/Empresas/Instalações/Entregas (filtro-builder/sort-builder/smart-
+// search). Aplica nas duas visualizações (Tabela e Kanban), igual ao Obras:
+// _fbEvaluate/_sbCompare recebem o .dataset de cada <tr>/.proj-kn-card
+// direto (ver data-* adicionados nos templates de _dbLoadProjetos/
+// _renderProjetosKanban).
+var _projFbFields = [
+ { key: 'tipo',    label: 'Tipo de orçamento', type: 'select', options: ['Telhados','Steel Frame','Modular','Solar'] },
+ { key: 'etapa',   label: 'Etapa',             type: 'text' },
+ { key: 'compl',   label: 'Complexidade',      type: 'text' },
+ { key: 'cliente', label: 'Cliente/Obra',      type: 'text' },
+];
+_fbInit('projetos', _projFbFields, _projApplyFilters);
+
+var _projSbFields = [
+ { key: 'cliente', label: 'Cliente/Obra', type: 'text' },
+ { key: 'etapa',   label: 'Etapa',        type: 'text' },
+ { key: 'valor',   label: 'Valor total',  type: 'number', getValue: function(ds) { return parseFloat(ds.valor) || 0; } },
+ { key: 'peso',    label: 'Peso total',   type: 'number', getValue: function(ds) { return parseFloat(ds.peso) || 0; } },
+];
+_sbInit('projetos', _projSbFields, _projApplyFilters);
+
+function _projApplyFilters() {
+ var buscaNorm = _ssNormalize(((document.getElementById('proj-search') || {}).value || '').trim());
+ var activeConds = _fbInstances.projetos.state.conditions.filter(_fbConditionIsUsable).length;
+ var visivel = 0;
+
+ var rows = Array.prototype.slice.call(document.querySelectorAll('#proj-tbody tr[data-id]'));
+ rows.forEach(function(tr) {
+  var ok = _fbEvaluate(tr.dataset, 'projetos');
+  if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(tr.textContent), buscaNorm);
+  tr.style.display = ok ? '' : 'none';
+  if (ok) visivel++;
  });
+ if (rows.length) {
+  rows.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'projetos'); });
+  var tbody = rows[0].parentElement;
+  rows.forEach(function(tr) { tbody.appendChild(tr); });
+ }
+
+ var cards = Array.prototype.slice.call(document.querySelectorAll('#proj-kanban .proj-kn-card'));
+ cards.forEach(function(card) {
+  var ok = _fbEvaluate(card.dataset, 'projetos');
+  if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(card.textContent), buscaNorm);
+  card.style.display = ok ? '' : 'none';
+ });
+ var byBody = new Map();
+ cards.forEach(function(card) {
+  var body = card.parentElement;
+  if (!byBody.has(body)) byBody.set(body, []);
+  byBody.get(body).push(card);
+ });
+ byBody.forEach(function(colCards, body) {
+  colCards.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'projetos'); });
+  colCards.forEach(function(c) { body.appendChild(c); });
+ });
+ document.querySelectorAll('#proj-kanban .proj-kn-col').forEach(function(col) {
+  var countEl = col.querySelector('.proj-kn-count');
+  if (countEl) countEl.textContent = col.querySelectorAll('.proj-kn-card:not([style*="display: none"]):not([style*="display:none"])').length;
+ });
+
+ var fbBadge = document.getElementById('fb-badge-projetos');
+ if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
+ var countEl2 = document.getElementById('proj-filter-count');
+ if (countEl2) {
+  if (activeConds || buscaNorm) { countEl2.textContent = visivel + (visivel === 1 ? ' resultado' : ' resultados'); countEl2.style.display = 'inline'; }
+  else { countEl2.style.display = 'none'; }
+ }
 }
 
 var _projetosArr    = [];
@@ -321,7 +387,8 @@ async function _dbLoadProjetos() {
   var empNome=obraInfo.empresa||'';
   var cliente=empNome||obraNome;
   if(vT)totV+=vT;if(pT)totP+=pT;if(_emAnd.indexOf(etapa)!==-1)cAnd++;
-  return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-tipo="'+tipo+'" data-id="'+(p.id||'')+'">'
+  return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-tipo="'+tipo+'" data-id="'+(p.id||'')+'"'
+   +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+(cliente||'').replace(/"/g,'&quot;')+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'">'
    +'<td style="font-weight:600;color:var(--navy)">'+cod+'</td>'
    +'<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+obraNome+'">'+cliente+'</td>'
    +'<td>'+(tipo?'<span class="badge '+(_tCls[tipo]||'bm')+'">'+tipo+'</span>':'—')+'</td>'
