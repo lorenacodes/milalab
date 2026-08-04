@@ -298,6 +298,17 @@ function _navBadgesStartRealtimeAll() {
  _navBadgeStartRealtime('entregas',    'nav-badge-entregas');
  _navBadgeStartRealtime('instalacoes', 'nav-badge-instalacoes');
  _navBadgeStartRealtime('melhorias',   'nav-badge-melhorias');
+ // Melhorias é a única dessas 6 tabelas cujo contador inicial só é
+ // preenchido dentro de _pageLoadMelhorias — ou seja, ficava em "—" até o
+ // usuário abrir a página Melhorias pelo menos uma vez na sessão (achado
+ // real, reportado como "cadê a tabela de Melhorias"). Busca a contagem
+ // aqui também, no boot, igual às outras 5.
+ var mb = document.getElementById('nav-badge-melhorias');
+ if (mb) {
+  _sb.from('melhorias').select('id', { count: 'exact', head: true }).then(function(r) {
+   if (r.count != null) mb.textContent = r.count;
+  }).catch(function(){});
+ }
 }
 
 // ── Realtime: receber lembretes em tempo real ─────────────────────────────

@@ -200,12 +200,26 @@ function _spEntregas(row, tds) {
 
 // ── Load Entregas ─────────────────────────────────────────────────────────────
 async function _dbLoadEntregas() {
- const { data, error } = await _sb
-  .from('entregas')
-  .select('*, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
-  .order('created_at', { ascending: false });
+ // Paginado em blocos de 1000 — sem isso, o Supabase corta silenciosamente
+ // em 1000 linhas (achado real: com 1495 entregas, a tela e o contador do
+ // menu mostravam só 1000, escondendo 495 entregas de verdade).
+ var data = [];
+ var from = 0;
+ var pageSize = 1000;
+ var error = null;
+ while (true) {
+  var res = await _sb
+   .from('entregas')
+   .select('*, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
+   .order('created_at', { ascending: false })
+   .range(from, from + pageSize - 1);
+  if (res.error) { error = res.error; break; }
+  data = data.concat(res.data || []);
+  if (!res.data || res.data.length < pageSize) break;
+  from += pageSize;
+ }
  const navBadge = document.getElementById('nav-badge-entregas');
- if (navBadge && !error) navBadge.textContent = (data || []).length;
+ if (navBadge && !error) navBadge.textContent = data.length;
  if (error || !data?.length) return;
  const tbody = document.getElementById('ent-tbody');
  if (!tbody) return;
