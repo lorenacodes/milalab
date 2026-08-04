@@ -2704,8 +2704,13 @@ var _dashAllAtRaw    = [];   // cache de todas as atividades (para re-render Sta
 var _dashFeedRaw      = [];   // cache do feed antes do filtro "Somente para mim"
 var _dashSomenteEu    = localStorage.getItem('milatec-dash-somente-eu') === '1';
 
-// "Somente para mim" — dentro do feed (já restrito a atividades onde o usuário
-// é responsável), mantém só as que não são compartilhadas com mais ninguém.
+// "Somente para mim" — dentro do feed (já restrito a atividades onde o
+// usuário é responsável), mantém só as que têm privacidade "Somente para
+// mim" de verdade (visibilidade = 'privada'). Achado real: antes contava o
+// número de responsáveis (<=1) em vez de checar a privacidade — uma
+// atividade PÚBLICA com um único responsável entrava aqui, e uma PRIVADA
+// compartilhada com várias pessoas ficava de fora. Ver
+// scripts/lib/privacidade-atividade.js.
 function _dashToggleSomenteEu() {
  _dashSomenteEu = !_dashSomenteEu;
  localStorage.setItem('milatec-dash-somente-eu', _dashSomenteEu ? '1' : '0');
@@ -2719,11 +2724,7 @@ function _dashToggleSomenteEu() {
 }
 function _dashApplySomenteEu(atividades) {
  if (!_dashSomenteEu) return atividades || [];
- return (atividades || []).filter(function(a) {
-  var respRaw = (a.responsavel || '').trim();
-  var respList = respRaw ? respRaw.split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean) : [];
-  return respList.length <= 1;
- });
+ return _filtrarSomentePraMim(atividades);
 }
 var _dashChartCfg    = (function(){
  try { return JSON.parse(localStorage.getItem('milatec-chart-cfg') || '{}'); } catch(e) { return {}; }
