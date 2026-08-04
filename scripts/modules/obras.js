@@ -487,9 +487,6 @@ async function _dbLoadObrasKanban() {
   const tipos = o.tipo_obra || [];
   const empNome = (o.empresa && o.empresa.nome) || '';
   const tagsHtml = tipos.map(t => `<span class="badge ${_tipoClsBd[t]||'bm'}" style="font-size:10px">${t}</span>`).join('');
-  const valorTxt = (o.valor != null) ? 'R$ ' + Number(o.valor).toLocaleString('pt-BR',{minimumFractionDigits:0}) : '—';
-  const qtdTxt = (o.quantidade != null) ? o.quantidade : '—';
-  const dataTxt = o.data_envio_proposta ? new Date(o.data_envio_proposta+'T00:00:00').toLocaleDateString('pt-BR') : '—';
   const criadoTxt = o.created_at ? new Date(o.created_at).toLocaleDateString('pt-BR') : '';
   const card  = document.createElement('div');
   card.className = 'obra-card';
@@ -508,14 +505,16 @@ async function _dbLoadObrasKanban() {
   card.draggable = true;
   card.addEventListener('dragstart', _onObraCardDragStart);
   card.addEventListener('dragend', _onObraCardDragEnd);
+  // Card simplificado (UX): só o essencial pra identificar a obra rápido —
+  // nome, categoria e data de criação. Cliente/canal/qtd./valor/cidade/
+  // estado continuam disponíveis na Tabela e no painel de detalhe; aqui
+  // ficariam de fora só pra reduzir a carga de leitura do Kanban. Os
+  // data-* abaixo (empresa/cidade/estado/canal/etc.) continuam intactos —
+  // são usados pelos filtros/busca, que não mudam nesta tarefa.
   card.innerHTML = `
    <div class="oc-title">${o.nome||''}</div>
-   <div class="oc-sub">${empNome||'—'}${o.cidade ? ' · ' + o.cidade + (o.estado?' - '+o.estado:'') : ''}</div>
    ${tagsHtml ? `<div class="oc-tags">${tagsHtml}</div>` : ''}
-   <div class="oc-row"><span>Canal</span><span class="oc-val">${o.canal_vendas||'—'}</span></div>
-   <div class="oc-row"><span>Qtd.</span><span class="oc-val">${qtdTxt}</span></div>
-   <div class="oc-row"><span>Valor</span><span class="oc-val">${valorTxt}</span></div>
-   <div class="oc-meta"><span class="oc-date">${dataTxt}</span>${criadoTxt ? `<span style="color:var(--muted);font-size:10px">Criado ${criadoTxt}</span>` : ''}</div>
+   ${criadoTxt ? `<div class="oc-date">Criado ${criadoTxt}</div>` : ''}
   `;
   card.onclick = () => _spObraById(o.id);
   body.appendChild(card);
