@@ -726,6 +726,20 @@ function _gestorSaveState() {
     ini: _gestorPeriodo.ini ? _gestorFmtDate(_gestorPeriodo.ini) : null,
     fim: _gestorPeriodo.fim ? _gestorFmtDate(_gestorPeriodo.fim) : null
    },
+   // Filtros rápidos de data (Início/Prazo) — item #7 do pedido de UX pedia
+   // persistência explícita pra esses dois; antes só o Filtro/Ordenar/
+   // Agrupar/Período (o "de sempre") era salvo, então Início/Prazo voltavam
+   // pra "Todas" sozinhos a cada F5.
+   qdInicio: {
+    preset: _gestorQuickDate.inicio.preset,
+    ini: _gestorQuickDate.inicio.ini ? _gestorFmtDate(_gestorQuickDate.inicio.ini) : null,
+    fim: _gestorQuickDate.inicio.fim ? _gestorFmtDate(_gestorQuickDate.inicio.fim) : null
+   },
+   qdPrazo: {
+    preset: _gestorQuickDate.prazo.preset,
+    ini: _gestorQuickDate.prazo.ini ? _gestorFmtDate(_gestorQuickDate.prazo.ini) : null,
+    fim: _gestorQuickDate.prazo.fim ? _gestorFmtDate(_gestorQuickDate.prazo.fim) : null
+   },
    busca: (document.getElementById('gestor-search') || {}).value || ''
   };
   localStorage.setItem(GESTOR_STATE_KEY, JSON.stringify(state));
@@ -759,6 +773,21 @@ function _gestorRestoreState() {
    if (btnId) _gestorPreset(state.periodo.preset, document.getElementById(btnId));
   }
  }
+ // Filtros rápidos de data (Início/Prazo) — mesmo padrão do Período acima,
+ // um pra cada campo independente.
+ ['inicio', 'prazo'].forEach(function(which) {
+  var qd = state['qd' + (which === 'inicio' ? 'Inicio' : 'Prazo')];
+  if (!qd || !qd.preset) return;
+  if (qd.preset === 'custom' && qd.ini && qd.fim) {
+   var qei = document.getElementById('gqd-dt-ini-' + which), qef = document.getElementById('gqd-dt-fim-' + which);
+   if (qei) qei.value = qd.ini;
+   if (qef) qef.value = qd.fim;
+   var qcd = document.getElementById('gqd-custom-dates-' + which); if (qcd) qcd.style.display = 'inline-flex';
+   _gqdPreset(which, 'custom', null);
+  } else if (qd.preset !== 'todas') {
+   _gqdPreset(which, qd.preset, null);
+  }
+ });
  // Re-render dos popovers com o estado restaurado (sem isso, só o dado
  // interno mudaria — o popover mostraria o padrão até a pessoa abrir/fechar).
  if (_fbInstances.gestor) _fbRender('gestor');
