@@ -209,6 +209,8 @@ body.light .dash-panel{
  .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
  .fg{display:flex;flex-direction:column;gap:5px}
  .fg.s2{grid-column:span 2}.fg.s3{grid-column:span 3}
+ .fn-erro-msg{font-size:11px;color:var(--red);margin-top:2px;min-height:0}
+ .fn-erro-msg:empty{display:none}
  label{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.4px}
  input,select,textarea{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;transition:border-color .15s}
  input:focus,select:focus{border-color:var(--green)}select{cursor:pointer}

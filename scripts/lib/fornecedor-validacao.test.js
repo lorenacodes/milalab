@@ -1,0 +1,96 @@
+// node --test scripts/lib/fornecedor-validacao.test.js
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { _fornecedorValidar, _fornecedorValidarProduto, _fornecedorCalcularValorTotal } = require('./fornecedor-validacao.js');
+
+function dadosValidos() {
+ return {
+  nome: 'Aço Premium Ltda',
+  estado: 'SE',
+  cidades: ['Aracaju'],
+  setores: ['Materiais e Insumos'],
+  segmentos: ['Aço'],
+  status_cotacao: 'Em análise',
+  experiencia: 'Positiva',
+  produtos: [{ nome: 'Perfil metálico', quantidade: 10, unidade_medida: 'metro linear', valor_unitario: 25.5 }],
+ };
+}
+
+test('_fornecedorValidar: dados completos passam', () => {
+ var r = _fornecedorValidar(dadosValidos());
+ assert.equal(r.valido, true);
+ assert.deepEqual(r.erros, {});
+});
+
+test('_fornecedorValidar: nome vazio é obrigatório', () => {
+ var d = dadosValidos(); d.nome = '   ';
+ var r = _fornecedorValidar(d);
+ assert.equal(r.valido, false);
+ assert.match(r.erros.nome, /nome/i);
+});
+
+test('_fornecedorValidar: estado e cidades são obrigatórios', () => {
+ var d = dadosValidos(); d.estado = ''; d.cidades = [];
+ var r = _fornecedorValidar(d);
+ assert.equal(r.valido, false);
+ assert.ok(r.erros.estado);
+ assert.ok(r.erros.cidades);
+});
+
+test('_fornecedorValidar: setores e segmentos precisam de ao menos 1 item', () => {
+ var d = dadosValidos(); d.setores = []; d.segmentos = [];
+ var r = _fornecedorValidar(d);
+ assert.equal(r.valido, false);
+ assert.ok(r.erros.setores);
+ assert.ok(r.erros.segmentos);
+});
+
+test('_fornecedorValidar: status da cotação e experiência são obrigatórios', () => {
+ var d = dadosValidos(); d.status_cotacao = ''; d.experiencia = '';
+ var r = _fornecedorValidar(d);
+ assert.equal(r.valido, false);
+ assert.ok(r.erros.status_cotacao);
+ assert.ok(r.erros.experiencia);
+});
+
+test('_fornecedorValidar: precisa de ao menos um produto orçado', () => {
+ var d = dadosValidos(); d.produtos = [];
+ var r = _fornecedorValidar(d);
+ assert.equal(r.valido, false);
+ assert.ok(r.erros.produtos);
+});
+
+test('_fornecedorValidarProduto: quantidade deve ser > 0', () => {
+ var erros = _fornecedorValidarProduto({ nome: 'X', quantidade: 0, unidade_medida: 'kg', valor_unitario: 10 }, 0);
+ assert.ok(erros['produtos.0.quantidade']);
+});
+
+test('_fornecedorValidarProduto: valor_unitario negativo é inválido, mas zero é permitido (brinde/cortesia)', () => {
+ var comZero = _fornecedorValidarProduto({ nome: 'X', quantidade: 1, unidade_medida: 'kg', valor_unitario: 0 }, 0);
+ assert.equal(comZero['produtos.0.valor_unitario'], undefined);
+ var comNegativo = _fornecedorValidarProduto({ nome: 'X', quantidade: 1, unidade_medida: 'kg', valor_unitario: -5 }, 0);
+ assert.ok(comNegativo['produtos.0.valor_unitario']);
+});
+
+test('_fornecedorValidar: aponta a linha certa quando há vários produtos', () => {
+ var d = dadosValidos();
+ d.produtos = [
+  { nome: 'OK', quantidade: 1, unidade_medida: 'kg', valor_unitario: 5 },
+  { nome: '', quantidade: 1, unidade_medida: 'kg', valor_unitario: 5 },
+ ];
+ var r = _fornecedorValidar(d);
+ assert.equal(r.valido, false);
+ assert.ok(r.erros['produtos.1.nome']);
+ assert.equal(r.erros['produtos.0.nome'], undefined);
+});
+
+test('_fornecedorCalcularValorTotal: quantidade × valor unitário', () => {
+ assert.equal(_fornecedorCalcularValorTotal(10, 25.5), 255);
+ assert.equal(_fornecedorCalcularValorTotal(0, 100), 0);
+ assert.equal(_fornecedorCalcularValorTotal('3', '2.5'), 7.5);
+});
+
+test('_fornecedorCalcularValorTotal: entrada inválida vira 0, não NaN', () => {
+ assert.equal(_fornecedorCalcularValorTotal('', 10), 0);
+ assert.equal(_fornecedorCalcularValorTotal(null, undefined), 0);
+});

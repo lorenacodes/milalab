@@ -372,26 +372,40 @@ function switchEmpTab(tab) {
 }
 
 // ── Fornecedores (Supabase: fornecedores + fornecedores_produtos) ─────────────
+// Cadastro completo de cotação: dados gerais, localização em cascata
+// (estado → cidades multiselect via IBGE), setor/segmento como listas
+// controladas (scripts/lib/fornecedor-opcoes.js) e produtos orçados com
+// cálculo automático de valor total (scripts/lib/fornecedor-validacao.js).
 var _fornecedoresArr = [];
 var _fornBusca       = '';
 var _fornProdutoCount = 0;
 var _editingFornId    = null;
+var _fornCidadesSel   = [];
+var _fornSetoresSel   = [];
+var _fornSegmentosSel = [];
+var _fornCidadesDisponiveis = []; // cidades do estado selecionado no momento
+var _fornCidadeCache  = {}; // cache por UF — mesmo padrão de _cidadeCache (wizard-nova-obra.js)
 
 async function _dbLoadFornecedores() {
  var tbody = document.getElementById('forn-tbody');
- if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
+ if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
  if (!_sb) return;
  var res = await _sb.from('fornecedores')
-  .select('id, nome, setor, cidade, estado, endereco, telefone, email, fornecedores_produtos(id, nome, preco)')
+  .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, segmentos, status_cotacao, experiencia, observacoes, fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total)')
   .order('nome');
  if (res.error) {
-  if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar fornecedores: ' + _supaErrPt(res.error.message) + '</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar fornecedores: ' + _supaErrPt(res.error.message) + '</td></tr>';
   return;
  }
  _fornecedoresArr = (res.data || []).map(function(f) {
-  return { id: f.id, nome: f.nome, setor: f.setor, cidade: f.cidade, estado: f.estado,
-   endereco: f.endereco, telefone: f.telefone, email: f.email,
-   produtos: (f.fornecedores_produtos || []).map(function(p){ return { id: p.id, nome: p.nome, preco: p.preco }; }) };
+  return {
+   id: f.id, nome: f.nome, cnpj: f.cnpj, contato: f.contato, telefone: f.telefone, email: f.email,
+   endereco: f.endereco, estado: f.estado, cidades: f.cidades || [], setores: f.setores || [], segmentos: f.segmentos || [],
+   status_cotacao: f.status_cotacao, experiencia: f.experiencia, observacoes: f.observacoes,
+   produtos: (f.fornecedores_produtos || []).map(function(p){
+    return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total };
+   }),
+  };
  });
  _renderFornecedores();
 }
@@ -400,6 +414,9 @@ function searchFornecedores(q) {
  _fornBusca = q;
  _renderFornecedores();
 }
+
+var _fornStatusCor = { 'Em análise': 'nt-tag-yellow', 'Aprovado': 'nt-tag-green', 'Recusado': 'nt-tag-red', 'Aguardando retorno': 'nt-tag-gray', 'Cancelado': 'nt-tag-red' };
+var _fornExperienciaCor = { 'Positiva': 'nt-tag-green', 'Negativa': 'nt-tag-red' };
 
 function _renderFornecedores() {
  var tbody = document.getElementById('forn-tbody');
@@ -411,14 +428,16 @@ function _renderFornecedores() {
  var qn = _fornBusca.toLowerCase().trim();
  var lista = qn
   ? _fornecedoresArr.filter(function(f){
-     return (f.nome||'').toLowerCase().includes(qn) || (f.setor||'').toLowerCase().includes(qn) || (f.cidade||'').toLowerCase().includes(qn);
+     return (f.nome||'').toLowerCase().includes(qn)
+      || (f.segmentos||[]).join(' ').toLowerCase().includes(qn)
+      || (f.cidades||[]).join(' ').toLowerCase().includes(qn);
     })
   : _fornecedoresArr;
 
  if (count) count.textContent = lista.length + ' fornecedor' + (lista.length !== 1 ? 'es' : '');
 
  if (lista.length === 0) {
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">' + (qn ? 'Nenhum fornecedor encontrado para essa busca.' : 'Nenhum fornecedor cadastrado. Use o botão acima para adicionar.') + '</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">' + (qn ? 'Nenhum fornecedor encontrado para essa busca.' : 'Nenhum fornecedor cadastrado. Use o botão acima para adicionar.') + '</td></tr>';
   return;
  }
 
@@ -426,18 +445,23 @@ function _renderFornecedores() {
   var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
   var bgColors = ['#6366f1','#2E5FD9','#059669','#d97706','#dc2626'];
   var bg = bgColors[idx % bgColors.length];
+  var segs = f.segmentos || [];
+  var cids = f.cidades || [];
   return '<tr>'
    + '<td><div class="nt-avatar" style="background:' + bg + ';font-size:10px;width:26px;height:26px;border-radius:6px">' + initials + '</div></td>'
    + '<td><div style="font-weight:600;font-size:13px;color:var(--text)">' + f.nome + '</div>'
    + (f.email ? '<div style="font-size:11px;color:var(--muted)">' + f.email + '</div>' : '')
    + '</td>'
-   + '<td><span class="nt-tag nt-tag-blue" style="font-size:11px">' + (f.setor || '—') + '</span></td>'
-   + '<td style="font-size:12px;color:var(--muted)">' + (f.cidade || '—') + (f.estado ? ' · ' + f.estado : '') + '</td>'
-   + '<td style="font-size:12px;color:var(--muted)">' + (f.telefone || '—') + '</td>'
+   + '<td>' + (segs.length
+      ? segs.slice(0,2).map(function(s){ return '<span class="nt-tag nt-tag-blue" style="font-size:11px;margin-right:3px">'+s+'</span>'; }).join('') + (segs.length>2 ? '<span style="font-size:11px;color:var(--muted)">+'+(segs.length-2)+'</span>' : '')
+      : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
+   + '<td style="font-size:12px;color:var(--muted)">' + (cids.length ? cids.join(', ') : '—') + (f.estado ? ' · ' + f.estado : '') + '</td>'
+   + '<td>' + (f.status_cotacao ? '<span class="nt-tag ' + (_fornStatusCor[f.status_cotacao]||'nt-tag-gray') + '" style="font-size:11px">' + f.status_cotacao + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
+   + '<td>' + (f.experiencia ? '<span class="nt-tag ' + (_fornExperienciaCor[f.experiencia]||'nt-tag-gray') + '" style="font-size:11px">' + f.experiencia + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
    + '<td>'
    + (f.produtos && f.produtos.length
       ? f.produtos.slice(0,2).map(function(p){
-          return '<span class="nt-tag nt-tag-gray" style="margin-right:3px;margin-bottom:2px">' + p.nome + ' · R$ ' + Number(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</span>';
+          return '<span class="nt-tag nt-tag-gray" style="margin-right:3px;margin-bottom:2px">' + p.nome + ' · ' + _moedaFormatarBRL(p.valor_total) + '</span>';
         }).join('')
         + (f.produtos.length > 2 ? '<span style="font-size:11px;color:var(--muted)">+' + (f.produtos.length-2) + ' mais</span>' : '')
       : '<span style="color:var(--muted);font-size:12px">Nenhum produto</span>')
@@ -450,37 +474,193 @@ function _renderFornecedores() {
  }).join('');
 }
 
+// ── Selects de opções fixas (status/experiência) ─────────────────────────────
+function _fornPreencherSelectsFixos() {
+ var st = document.getElementById('fn-status-cotacao');
+ if (st) st.innerHTML = '<option value="">Selecione...</option>' + STATUS_COTACAO_OPCOES.map(function(o){ return '<option>'+o+'</option>'; }).join('');
+ var ex = document.getElementById('fn-experiencia');
+ if (ex) ex.innerHTML = '<option value="">Selecione...</option>' + EXPERIENCIA_OPCOES.map(function(o){ return '<option>'+o+'</option>'; }).join('');
+}
+
+// ── Localização em cascata (Estado → Cidades, IBGE) ──────────────────────────
+// Mesma API e cache-por-UF de loadCidades (wizard-nova-obra.js), só que
+// alimenta um multiselect de cidades em vez de um <select> de cidade única —
+// um fornecedor pode atender várias cidades do mesmo estado. Modelagem já
+// pronta pra evoluir pra múltiplos estados no futuro (ver comentário da
+// coluna fornecedores.cidades na migration): bastaria trocar o <select>
+// único de estado por outro multiselect e iterar um _fornCarregarCidades por
+// UF selecionada.
+async function _fornCarregarCidades(uf) {
+ if (!uf) { _fornCidadesDisponiveis = []; return []; }
+ if (_fornCidadeCache[uf]) { _fornCidadesDisponiveis = _fornCidadeCache[uf]; return _fornCidadesDisponiveis; }
+ var loading = document.getElementById('fn-cidades-loading');
+ if (loading) loading.style.display = 'block';
+ try {
+  var isLocal = location.protocol === 'http:';
+  var url = isLocal
+   ? '/api/ibge/v1/localidades/estados/' + uf + '/municipios?orderBy=nome'
+   : 'https://servicodados.ibge.gov.br/api/v1/localidades/estados/' + uf + '/municipios?orderBy=nome';
+  var res = await fetch(url);
+  if (!res.ok) throw new Error('Falha na API IBGE');
+  var json = await res.json();
+  var nomes = json.map(function(c){ return c.nome; });
+  _fornCidadeCache[uf] = nomes;
+  _fornCidadesDisponiveis = nomes;
+  return nomes;
+ } catch (err) {
+  console.warn('IBGE API:', err.message, '— Use o servidor.py para habilitar a API do IBGE');
+  _fornCidadesDisponiveis = [];
+  return [];
+ } finally {
+  if (loading) loading.style.display = 'none';
+ }
+}
+
+async function _fornEstadoChange(uf, manterSelecao) {
+ if (!manterSelecao) _fornCidadesSel = [];
+ var wrap = document.getElementById('fn-cidades-dropdown');
+ if (wrap) wrap.innerHTML = uf
+  ? '<div style="font-size:12px;color:var(--muted)">Carregando...</div>'
+  : '<div style="font-size:12px;color:var(--muted)">Selecione primeiro o estado</div>';
+ await _fornCarregarCidades(uf);
+ // Descarta da seleção qualquer cidade que não pertença mais ao estado atual
+ // (troca de UF depois de já ter marcado cidades de outro estado).
+ _fornCidadesSel = _fornCidadesSel.filter(function(c){ return _fornCidadesDisponiveis.indexOf(c) !== -1; });
+ _fornRenderCidadesDropdown();
+}
+
+function _fornRenderCidadesDropdown() {
+ var wrap = document.getElementById('fn-cidades-dropdown');
+ if (!wrap) return;
+ if (!_fornCidadesDisponiveis.length) {
+  wrap.innerHTML = '<div style="font-size:12px;color:var(--muted)">Selecione primeiro o estado</div>';
+  return;
+ }
+ wrap.innerHTML = _msRenderDropdown('cidades', _fornCidadesDisponiveis, _fornCidadesSel, '_fornMultiToggle', 'Selecione a(s) cidade(s)');
+}
+
+function _fornRenderSetoresDropdown() {
+ var wrap = document.getElementById('fn-setores-dropdown');
+ if (wrap) wrap.innerHTML = _msRenderDropdown('setores', SETORES_OPCOES, _fornSetoresSel, '_fornMultiToggle', 'Selecione o(s) setor(es)');
+}
+
+function _fornRenderSegmentosDropdown() {
+ var wrap = document.getElementById('fn-segmentos-dropdown');
+ if (wrap) wrap.innerHTML = _msRenderDropdown('segmentos', SEGMENTOS_OPCOES, _fornSegmentosSel, '_fornMultiToggle', 'Selecione o(s) segmento(s)');
+}
+
+// Handler único chamado pelos 3 multiselects (cidades/setores/segmentos) —
+// atualiza o estado e só o rótulo do botão, sem re-renderizar o painel
+// inteiro (senão o dropdown fecharia a cada clique numa opção).
+var _FORN_MULTI_CAMPOS = {
+ cidades:   { get: function(){ return _fornCidadesSel; },   set: function(v){ _fornCidadesSel = v; },   placeholder: 'Selecione a(s) cidade(s)' },
+ setores:   { get: function(){ return _fornSetoresSel; },   set: function(v){ _fornSetoresSel = v; },   placeholder: 'Selecione o(s) setor(es)' },
+ segmentos: { get: function(){ return _fornSegmentosSel; }, set: function(v){ _fornSegmentosSel = v; }, placeholder: 'Selecione o(s) segmento(s)' },
+};
+function _fornMultiToggle(campo, valor, checked) {
+ var cfg = _FORN_MULTI_CAMPOS[campo];
+ if (!cfg) return;
+ cfg.set(_msToggle(cfg.get(), valor, checked));
+ var btn = document.querySelector('#fn-' + campo + '-dropdown .fb-msel-btn');
+ var atual = cfg.get();
+ if (btn) btn.textContent = atual.length ? atual.length + ' selecionado(s)' : cfg.placeholder;
+}
+
+// ── Produtos orçados (Produto/Serviço, Quantidade, Unidade, Valor unitário,
+// Valor total calculado automaticamente) ─────────────────────────────────────
+function _fornProdutoRecalcular(lid) {
+ var qtdEl = document.getElementById('fn-prod-qtd-' + lid);
+ var valEl = document.getElementById('fn-prod-valor-' + lid);
+ var totEl = document.getElementById('fn-prod-total-' + lid);
+ if (!qtdEl || !valEl || !totEl) return;
+ var qtd = Number(qtdEl.value) || 0;
+ var val = _moedaParaNumero(valEl.value);
+ totEl.textContent = _moedaFormatarBRL(_fornecedorCalcularValorTotal(qtd, val));
+}
+
+function _fornProdutoValorInput(lid, inputEl) {
+ inputEl.value = _moedaMascarar(inputEl.value);
+ _fornProdutoRecalcular(lid);
+}
+
+function addFornProdutoLinha(produto) {
+ produto = produto || {};
+ _fornProdutoCount++;
+ var id = _fornProdutoCount;
+ var line = document.createElement('div');
+ line.id = 'fn-prod-' + id;
+ line.style.cssText = 'display:grid;grid-template-columns:1fr 90px 110px 110px 110px 32px;gap:6px;align-items:center';
+ var inputStyle = 'border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text);font-size:13px;outline:none;font-family:inherit;width:100%;box-sizing:border-box';
+ var unidadeOpts = UNIDADES_OPCOES.map(function(u){ return '<option' + (produto.unidade_medida===u?' selected':'') + '>'+u+'</option>'; }).join('');
+ line.innerHTML =
+  '<input type="text" id="fn-prod-nome-' + id + '" placeholder="Ex: Chapa de aço 2mm" value="' + (produto.nome||'').replace(/"/g,'&quot;') + '" style="' + inputStyle + '">'
+  + '<input type="number" id="fn-prod-qtd-' + id + '" placeholder="0" min="0" step="any" value="' + (produto.quantidade!=null?produto.quantidade:'') + '" oninput="_fornProdutoRecalcular(' + id + ')" style="' + inputStyle + ';text-align:right">'
+  + '<select id="fn-prod-unidade-' + id + '" style="' + inputStyle + '"><option value="">Unidade</option>' + unidadeOpts + '</select>'
+  + '<input type="text" id="fn-prod-valor-' + id + '" placeholder="0,00" inputmode="numeric" value="' + (produto.valor_unitario!=null ? _moedaFormatar(produto.valor_unitario) : '') + '" oninput="_fornProdutoValorInput(' + id + ',this)" style="' + inputStyle + ';text-align:right">'
+  + '<div id="fn-prod-total-' + id + '" style="font-size:13px;color:var(--text);font-weight:600;text-align:right;padding:7px 4px">' + _moedaFormatarBRL(_fornecedorCalcularValorTotal(produto.quantidade||0, produto.valor_unitario||0)) + '</div>'
+  + '<button type="button" onclick="document.getElementById(\'fn-prod-' + id + '\').remove()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:5px" title="Remover">&times;</button>';
+ document.getElementById('fn-produtos-list').appendChild(line);
+ var cabecalho = document.getElementById('fn-produtos-cabecalho');
+ if (cabecalho) cabecalho.style.display = 'grid';
+ line.querySelector('input[type="text"]').focus();
+}
+
+function _fornLimparErros() {
+ document.querySelectorAll('#modal-novo-fornecedor .fn-erro-msg').forEach(function(el){ el.textContent = ''; });
+}
+
 function openNovoFornecedor() {
  _editingFornId = null;
  _fornProdutoCount = 0;
- document.getElementById('fn-nome').value = '';
- document.getElementById('fn-setor').value = '';
- document.getElementById('fn-cidade').value = '';
+ _fornCidadesSel = []; _fornSetoresSel = []; _fornSegmentosSel = []; _fornCidadesDisponiveis = [];
+ document.getElementById('fn-modal-title').textContent = 'Novo Fornecedor';
+ ['fn-nome','fn-cnpj','fn-contato','fn-tel','fn-email','fn-observacoes'].forEach(function(id){
+  var el = document.getElementById(id); if (el) el.value = '';
+ });
  document.getElementById('fn-estado').value = '';
- document.getElementById('fn-endereco').value = '';
- document.getElementById('fn-tel').value = '';
- document.getElementById('fn-email').value = '';
+ _fornPreencherSelectsFixos();
+ document.getElementById('fn-status-cotacao').value = '';
+ document.getElementById('fn-experiencia').value = '';
+ _fornRenderCidadesDropdown();
+ _fornRenderSetoresDropdown();
+ _fornRenderSegmentosDropdown();
+ _fornLimparErros();
  document.getElementById('fn-produtos-list').innerHTML = '';
+ var cabecalho = document.getElementById('fn-produtos-cabecalho');
+ if (cabecalho) cabecalho.style.display = 'none';
  addFornProdutoLinha(); // começa com uma linha vazia
  document.getElementById('modal-novo-fornecedor').classList.add('open');
 }
 
-function editFornecedor(id) {
+async function editFornecedor(id) {
  var f = _fornecedoresArr.find(function(x){return x.id === id;});
  if (!f) return;
  _editingFornId = id;
  _fornProdutoCount = 0;
- document.getElementById('fn-nome').value     = f.nome || '';
- document.getElementById('fn-setor').value    = f.setor || '';
- document.getElementById('fn-cidade').value   = f.cidade || '';
- document.getElementById('fn-estado').value   = f.estado || '';
- document.getElementById('fn-endereco').value = f.endereco || '';
- document.getElementById('fn-tel').value      = f.telefone || '';
- document.getElementById('fn-email').value    = f.email || '';
+ _fornCidadesSel = (f.cidades || []).slice();
+ _fornSetoresSel = (f.setores || []).slice();
+ _fornSegmentosSel = (f.segmentos || []).slice();
+ document.getElementById('fn-modal-title').textContent = 'Editar Fornecedor';
+ document.getElementById('fn-nome').value       = f.nome || '';
+ document.getElementById('fn-cnpj').value       = f.cnpj || '';
+ document.getElementById('fn-contato').value    = f.contato || '';
+ document.getElementById('fn-tel').value        = f.telefone || '';
+ document.getElementById('fn-email').value      = f.email || '';
+ document.getElementById('fn-observacoes').value = f.observacoes || '';
+ document.getElementById('fn-estado').value     = f.estado || '';
+ _fornPreencherSelectsFixos();
+ document.getElementById('fn-status-cotacao').value = f.status_cotacao || '';
+ document.getElementById('fn-experiencia').value    = f.experiencia || '';
+ _fornRenderSetoresDropdown();
+ _fornRenderSegmentosDropdown();
+ _fornLimparErros();
  document.getElementById('fn-produtos-list').innerHTML = '';
- (f.produtos || []).forEach(function(p){ addFornProdutoLinha(p.nome, p.preco); });
+ var cabecalho = document.getElementById('fn-produtos-cabecalho');
+ if (cabecalho) cabecalho.style.display = (f.produtos && f.produtos.length) ? 'grid' : 'none';
+ (f.produtos || []).forEach(function(p){ addFornProdutoLinha(p); });
  if (!f.produtos || !f.produtos.length) addFornProdutoLinha();
  document.getElementById('modal-novo-fornecedor').classList.add('open');
+ await _fornEstadoChange(f.estado, true); // mantém as cidades já cadastradas ao recarregar a lista do IBGE
 }
 
 function closeNovoFornecedor() {
@@ -496,44 +676,74 @@ async function excluirFornecedor(id) {
  _dbLoadFornecedores();
 }
 
-function addFornProdutoLinha(nome, preco) {
- _fornProdutoCount++;
- var id = _fornProdutoCount;
- var line = document.createElement('div');
- line.id = 'fn-prod-' + id;
- line.style.cssText = 'display:grid;grid-template-columns:1fr 130px 32px;gap:6px;align-items:center';
- line.innerHTML =
-  '<input type="text" id="fn-prod-nome-' + id + '" placeholder="Nome do produto..." value="' + (nome||'') + '" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;background:var(--surface);color:var(--text);font-size:13px;outline:none;font-family:inherit;width:100%;box-sizing:border-box">'
-  + '<input type="number" id="fn-prod-preco-' + id + '" placeholder="Preço (R$)" value="' + (preco||'') + '" min="0" step="0.01" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;background:var(--surface);color:var(--text);font-size:13px;outline:none;font-family:inherit;width:100%;box-sizing:border-box;text-align:right">'
-  + '<button onclick="document.getElementById(\'fn-prod-' + id + '\').remove()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:5px" title="Remover">&times;</button>';
- document.getElementById('fn-produtos-list').appendChild(line);
- line.querySelector('input[type="text"]').focus();
+function _fornColetarProdutos() {
+ var produtos = [];
+ document.querySelectorAll('#fn-produtos-list > [id^="fn-prod-"]').forEach(function(line) {
+  var lid = line.id.replace('fn-prod-', '');
+  var nomeEl = document.getElementById('fn-prod-nome-' + lid);
+  var qtdEl = document.getElementById('fn-prod-qtd-' + lid);
+  var unidEl = document.getElementById('fn-prod-unidade-' + lid);
+  var valEl = document.getElementById('fn-prod-valor-' + lid);
+  var nome = nomeEl ? nomeEl.value.trim() : '';
+  var quantidade = qtdEl ? qtdEl.value : '';
+  var unidade_medida = unidEl ? unidEl.value : '';
+  var valor_unitario = valEl ? _moedaParaNumero(valEl.value) : 0;
+  // Linha totalmente vazia (usuário adicionou e não preencheu) não entra na
+  // validação nem no payload — só conta linha que o usuário começou a usar.
+  if (!nome && !quantidade && !unidade_medida && !valEl.value) return;
+  produtos.push({ nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario });
+ });
+ return produtos;
+}
+
+function _fornMostrarErros(erros) {
+ _fornLimparErros();
+ Object.keys(erros).forEach(function(campo) {
+  var el = document.getElementById('fn-erro-' + campo);
+  if (el) { el.textContent = erros[campo]; return; }
+  // Erros de linha de produto (produtos.N.campo) — mostra no bloco geral de produtos.
+  if (campo.indexOf('produtos.') === 0) {
+   var geral = document.getElementById('fn-erro-produtos');
+   if (geral) geral.textContent = geral.textContent ? geral.textContent : erros[campo];
+  }
+ });
 }
 
 async function submitNovoFornecedor() {
- var nome = (document.getElementById('fn-nome').value || '').trim();
- if (!nome) { document.getElementById('fn-nome').focus(); return; }
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
- // Coleta produtos
- var produtos = [];
- document.querySelectorAll('#fn-produtos-list > [id^="fn-prod-"]').forEach(function(line) {
-  var lid   = line.id.replace('fn-prod-', '');
-  var nomeEl  = document.getElementById('fn-prod-nome-'  + lid);
-  var precoEl = document.getElementById('fn-prod-preco-' + lid);
-  var pNome   = nomeEl  ? nomeEl.value.trim()                          : '';
-  var pPreco  = precoEl ? (parseFloat(precoEl.value) || 0)             : 0;
-  if (pNome) produtos.push({ nome: pNome, preco: pPreco });
- });
+ var dados = {
+  nome: (document.getElementById('fn-nome').value || '').trim(),
+  estado: document.getElementById('fn-estado').value || '',
+  cidades: _fornCidadesSel,
+  setores: _fornSetoresSel,
+  segmentos: _fornSegmentosSel,
+  status_cotacao: document.getElementById('fn-status-cotacao').value || '',
+  experiencia: document.getElementById('fn-experiencia').value || '',
+  produtos: _fornColetarProdutos(),
+ };
+
+ var validacao = _fornecedorValidar(dados);
+ if (!validacao.valido) {
+  _fornMostrarErros(validacao.erros);
+  _showToast('Preencha os campos obrigatórios destacados antes de salvar.', 'erro');
+  return;
+ }
+ _fornLimparErros();
 
  var payload = {
-  nome:     nome,
-  setor:    document.getElementById('fn-setor').value.trim() || null,
-  cidade:   document.getElementById('fn-cidade').value.trim() || null,
-  estado:   document.getElementById('fn-estado').value.trim().toUpperCase() || null,
-  endereco: document.getElementById('fn-endereco').value.trim() || null,
-  telefone: document.getElementById('fn-tel').value.trim() || null,
-  email:    document.getElementById('fn-email').value.trim() || null,
+  nome: dados.nome,
+  cnpj: (document.getElementById('fn-cnpj').value || '').trim() || null,
+  contato: (document.getElementById('fn-contato').value || '').trim() || null,
+  telefone: (document.getElementById('fn-tel').value || '').trim() || null,
+  email: (document.getElementById('fn-email').value || '').trim() || null,
+  observacoes: (document.getElementById('fn-observacoes').value || '').trim() || null,
+  estado: dados.estado,
+  cidades: dados.cidades,
+  setores: dados.setores,
+  segmentos: dados.segmentos,
+  status_cotacao: dados.status_cotacao,
+  experiencia: dados.experiencia,
   criado_por: (_currentUser && _currentUser.email) || null,
  };
 
@@ -549,11 +759,13 @@ async function submitNovoFornecedor() {
 
  // Substitui os produtos do fornecedor pelos atuais (delete-then-insert, mesmo
  // padrão usado em _syncAtividadeVinculos para relações N:1 editadas em bloco).
+ // valor_total NUNCA é enviado — é coluna gerada pelo próprio Postgres
+ // (quantidade * valor_unitario), garantindo que nunca fica inconsistente.
  var delProd = await _sb.from('fornecedores_produtos').delete().eq('fornecedor_id', fornecedorId);
  if (delProd.error) { _showToast('Fornecedor salvo, mas houve erro ao atualizar produtos: ' + _supaErrPt(delProd.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
- if (produtos.length) {
+ if (dados.produtos.length) {
   var insProd = await _sb.from('fornecedores_produtos').insert(
-   produtos.map(function(p){ return { fornecedor_id: fornecedorId, nome: p.nome, preco: p.preco }; })
+   dados.produtos.map(function(p){ return { fornecedor_id: fornecedorId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario }; })
   );
   if (insProd.error) { _showToast('Fornecedor salvo, mas houve erro ao gravar produtos: ' + _supaErrPt(insProd.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
  }
