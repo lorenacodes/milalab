@@ -95,6 +95,10 @@ async function _pageLoadMelhorias() {
  // Reseta filtro/ordenação e renderiza
  _fbClearAll('melhorias');
  _sbClearAll('melhorias');
+
+ // Tempo real: recarrega sozinho quando a tabela mudar (sync do Airtable
+ // ou outro usuário editando) — sem precisar recarregar a página.
+ if (typeof _rtWatch === 'function') _rtWatch('melhorias', _pageLoadMelhorias);
 }
 
 function _melhRender() {
