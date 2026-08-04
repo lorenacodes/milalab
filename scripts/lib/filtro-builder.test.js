@@ -1,7 +1,14 @@
 // node --test scripts/lib/filtro-builder.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { _fbInstances, _fbInit, _fbEvaluate, _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbValueChange } = require('./filtro-builder.js');
+// _fbSearchableDropdown chama _ssNormalize (smart-search.js) — em produção os
+// dois carregam como scripts globais no navegador; aqui, como cada um é seu
+// próprio módulo Node, expõe as funções no objeto global antes de importar
+// filtro-builder.js pra reproduzir esse mesmo ambiente de execução.
+const smartSearch = require('./smart-search.js');
+global._ssNormalize = smartSearch._ssNormalize;
+global._ssMatch = smartSearch._ssMatch;
+const { _fbInstances, _fbInit, _fbEvaluate, _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbValueChange, _fbSearchableDropdown, _FB_SEARCH_THRESHOLD } = require('./filtro-builder.js');
 
 const ITEMS = [
  { id: 1, area: 'TI', prioridade: 'Alta', melhoria: '' },
@@ -129,4 +136,47 @@ test('persistência: state sobrevive a múltiplas edições em sequência (simul
  _fbInit('t13b', FIELDS, null);
  _fbInstances.t13b.state = snapshot;
  assert.deepEqual(ITEMS.filter((i) => _fbEvaluate(i, 't13b')).map((i) => i.id), [2]);
+});
+
+// ── Dropdown com busca (relacionamentos com muitos registros — Obra,
+// Projeto, Melhoria, Responsável, Empresa...) ────────────────────────────
+const MANY_OBRAS = Array.from({ length: 12 }, (_, i) => `Obra Teste ${i}`);
+const FEW_OPTS = ['Alta', 'Média', 'Baixa'];
+
+test('_fbSearchableDropdown: mostra campo de busca quando a lista é grande', () => {
+ _fbInit('d1', [{ key: 'obra', label: 'Obra', type: 'select', options: MANY_OBRAS }], null);
+ _fbAddCondition('d1');
+ const c = _fbInstances.d1.state.conditions[0];
+ _fbFieldChange('d1', c.id, 'obra');
+ const html = _fbSearchableDropdown('d1', _fbInstances.d1.state.conditions[0], { options: MANY_OBRAS }, false);
+ assert.ok(MANY_OBRAS.length > _FB_SEARCH_THRESHOLD);
+ assert.match(html, /fb-msel-search/);
+});
+
+test('_fbSearchableDropdown: não mostra busca em listas curtas (sem ruído desnecessário)', () => {
+ _fbInit('d2', [{ key: 'prioridade', label: 'Prioridade', type: 'select', options: FEW_OPTS }], null);
+ _fbAddCondition('d2');
+ const c = _fbInstances.d2.state.conditions[0];
+ _fbFieldChange('d2', c.id, 'prioridade');
+ const html = _fbSearchableDropdown('d2', _fbInstances.d2.state.conditions[0], { options: FEW_OPTS }, false);
+ assert.ok(FEW_OPTS.length <= _FB_SEARCH_THRESHOLD);
+ assert.doesNotMatch(html, /fb-msel-search/);
+});
+
+test('_fbSearchableDropdown: cada opção carrega data-norm (acento/caixa já resolvidos) pra busca instantânea', () => {
+ const html = _fbSearchableDropdown('d1', { id: 'c1', value: '' }, { options: ['Pré-Projeto Casacor', 'Obra Teste 3'] }, false);
+ // "pre projeto casacor" é o normalizado de "Pré-Projeto Casacor" (_ssNormalize)
+ assert.match(html, /data-norm="pre projeto casacor"/);
+ assert.match(html, /data-norm="obra teste 3"/);
+});
+
+test('_fbSearchableDropdown: seleção múltipla (anyof/noneof) marca os itens já selecionados', () => {
+ const html = _fbSearchableDropdown('d1', { id: 'c1', value: ['Obra Teste 2'] }, { options: MANY_OBRAS }, true);
+ assert.match(html, /value="Obra Teste 2" checked/);
+ assert.doesNotMatch(html, /value="Obra Teste 3" checked/);
+});
+
+test('_fbSearchableDropdown: seleção única (eq/is) destaca a opção ativa', () => {
+ const html = _fbSearchableDropdown('d1', { id: 'c1', value: 'Obra Teste 5' }, { options: MANY_OBRAS }, false);
+ assert.match(html, /fb-msel-item fb-msel-item-active" data-norm="obra teste 5"/);
 });

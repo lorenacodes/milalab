@@ -326,5 +326,6 @@ function _fbSelectValue(instanceId, condId, val) {
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
  module.exports = { _fbInstances, _fbInit, _fbEvaluate, _fbEvalCondition, _fbConditionIsUsable, FB_OPS,
- _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbOperatorChange, _fbValueChange, _fbSetLogic, _fbMoveCondition };
+ _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbOperatorChange, _fbValueChange, _fbSetLogic, _fbMoveCondition,
+ _fbSearchableDropdown, _FB_SEARCH_THRESHOLD };
 }
