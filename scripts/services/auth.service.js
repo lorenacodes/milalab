@@ -299,10 +299,12 @@ async function _changePwdSubmit() {
   document.getElementById('cpwd-confirm').classList.add('error');
   return;
  }
- if (newPwd === 'Caju2620*_') {
-  _authAlert('cpwd-alert','A nova senha não pode ser igual à senha temporária.');
-  return;
- }
+ // Checagem de "senha igual à temporária" removida: comparava contra uma
+ // string fixa hardcoded aqui (vazamento — qualquer um podia ler no código
+ // fonte publicado). O Supabase já recusa senha igual à atual no próprio
+ // servidor (ver tradução em supabase-client.js "A nova senha não pode ser
+ // igual à senha atual"), então essa checagem client-side era redundante
+ // além de perigosa.
  document.getElementById('cpwd-new').classList.remove('error');
  document.getElementById('cpwd-confirm').classList.remove('error');
  _authBtnLoad('cpwd-btn','cpwd-btn-txt','cpwd-spinner',true,'Salvando...');

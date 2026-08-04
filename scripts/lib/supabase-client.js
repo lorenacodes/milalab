@@ -26,6 +26,11 @@ function _supaErrPt(msg) {
   return 'Erro de conexão. Verifique sua internet e tente novamente.';
  if (m.includes('email link is invalid') || m.includes('otp'))
   return 'Link inválido ou expirado. Solicite um novo link.';
- // Retorna original como fallback, mas com prefixo em PT
- return 'Erro: ' + msg;
+ // Não expõe a mensagem crua do banco pro usuário — pode conter nome de
+ // tabela/coluna/função interna (achado real na auditoria: um erro de
+ // permissão chegou à tela como "permission denied for function
+ // is_atividade_owner"). Detalhe técnico só no console, pra quem for
+ // depurar; usuário final vê uma mensagem genérica.
+ console.error('[Supabase] erro não traduzido:', msg);
+ return 'Não foi possível concluir a ação. Se o problema continuar, entre em contato com o suporte.';
 }

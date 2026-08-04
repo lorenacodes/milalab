@@ -1208,7 +1208,11 @@ function _gestorRenderRow(a, rowNum, hoje) {
  // Título truncado por caracteres (não apenas CSS) — nome completo só no
  // tooltip, painel lateral e edição. Corta em espaço para não quebrar palavras.
  var tituloFull = (a.titulo || '—').trim();
- var tituloShort = tituloFull;
+ // Escapado ANTES de truncar: título é texto livre digitado pelo usuário —
+ // sem isso, um título como "<img src=x onerror=...>" executava no
+ // navegador de qualquer pessoa que visse essa linha (XSS armazenado real,
+ // achado na auditoria de segurança).
+ var tituloShort = _gestorSvgEsc(tituloFull);
  if (tituloShort.length > 36) {
   var cut = tituloShort.slice(0, 36);
   var lastSp = cut.lastIndexOf(' ');
@@ -1221,8 +1225,10 @@ function _gestorRenderRow(a, rowNum, hoje) {
 
  // Descrição resumida
  var descText = (a.descricao || a.observacoes || '').trim();
+ // Mesmo motivo do título acima: descrição/observações é texto livre,
+ // precisa ser escapado antes de virar HTML.
  var descHtml = descText
-  ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + descText.replace(/"/g,'&quot;') + '">' + (descText.length > 42 ? descText.slice(0,42) + '…' : descText) + '</div>'
+  ? '<div style="font-size:10px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + _gestorSvgEsc(descText) + '">' + _gestorSvgEsc(descText.length > 42 ? descText.slice(0,42) + '…' : descText) + '</div>'
   : '';
 
  return '<tr onclick="_gestorRowClick(\'' + a.id + '\')" style="' + (late ? 'background:rgba(207,34,46,.02)' : '') + '">'
