@@ -878,7 +878,7 @@ function _dashRerenderAllFromCache() {
   })
   .slice(0, 15);
  _dashFeedRaw = feedData;
- if (typeof _dashRenderFeed === 'function') _dashRenderFeed(_dashApplySomenteEu(_dashFeedRaw));
+ if (typeof _dashRenderFeed === 'function') _dashRenderFeed(_dashApplyPrivFiltro(_dashFeedRaw));
 
  if (typeof _dashUpdateKPIsFromDB === 'function') _dashUpdateKPIsFromDB(allAt);
  var amanha14 = new Date(hoje); amanha14.setDate(hoje.getDate()+14);
@@ -2381,104 +2381,6 @@ function _projDrawerRender() {
  }).join('');
 }
 
-/* ── SUB-ABAS DO MEU PAINEL ───────────────────────────────────────────────── */
-function _dashTabSwitch(tab) {
- var btns  = { geral: document.getElementById('dash-tab-btn-geral'), privadas: document.getElementById('dash-tab-btn-privadas') };
- var panes = { geral: document.getElementById('dash-tab-geral'), privadas: document.getElementById('dash-tab-privadas') };
- Object.keys(btns).forEach(function(k) {
-  if (btns[k]) btns[k].classList.toggle('active', k === tab);
-  if (panes[k]) panes[k].style.display = (k === tab) ? '' : 'none';
- });
- if (tab === 'privadas') _dashRenderPrivadas();
-}
-
-function _dashPrivItemHTML(a) {
- var hoje = new Date(); hoje.setHours(0,0,0,0);
- function prazoLabel(s) {
-  if (!s) return null;
-  var d = new Date(s + 'T00:00:00');
-  if (isNaN(d)) return null;
-  var dd = d.getDate() + '/' + (d.getMonth()+1) + '/' + String(d.getFullYear()).slice(2);
-  if (d < hoje) return { txt: 'ATRASADA · ' + dd, clr: '#D6433C', bg: 'rgba(239,68,68,.08)' };
-  if (d.toDateString() === hoje.toDateString()) return { txt: 'HOJE · ' + dd, clr: '#B8790A', bg: 'rgba(245,158,11,.08)' };
-  return { txt: 'Prazo: ' + dd, clr: 'var(--muted)', bg: '' };
- }
- var pi = prazoLabel(a.data_prazo);
- var stColors = { 'A fazer':'var(--muted)','Em progresso':'var(--navy)','Aguardando feedback':'var(--yellow)','Em andamento':'var(--navy)','Pendente':'var(--muted)' };
- var sc = stColors[a.status] || 'var(--muted)';
- return '<div onclick="_feedItemClick(this)" data-ativ=\'' + JSON.stringify(a).replace(/'/g,"&#39;") + '\''
-  + ' style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:background .12s" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
-  + '<span style="flex-shrink:0;margin-top:3px;color:var(--muted)"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg></span>'
-  + '<div style="flex:1;min-width:0">'
-  + '<div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">' + (a.titulo || '(sem título)') + '</div>'
-  + '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">'
-  + (a.area ? '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--surface2);color:var(--muted)">' + a.area + '</span>' : '')
-  + '<span style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--surface2);color:' + sc + ';font-weight:600">' + (a.status || '') + '</span>'
-  + (pi ? '<span style="font-size:10px;padding:1px 6px;border-radius:3px;' + (pi.bg ? 'background:'+pi.bg+';' : '') + 'color:' + pi.clr + ';font-weight:600">' + pi.txt + '</span>' : '')
-  + '</div>'
-  + '</div>'
-  + '</div>';
-}
-
-// Preenche uma lista da aba Privadas (ou mostra o estado vazio)
-function _dashPrivRenderList(listId, countId, ativs, vazioMsg) {
- var list = document.getElementById(listId);
- var cnt  = document.getElementById(countId);
- if (!list) return;
- if (cnt) cnt.textContent = ativs.length + ' atividade' + (ativs.length !== 1 ? 's' : '');
- if (!ativs.length) {
-  list.innerHTML = '<div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">' + vazioMsg + '</div>';
-  return;
- }
- list.innerHTML = ativs.map(_dashPrivItemHTML).join('');
-}
-
-// Achado real: "Somente para mim" e "Pessoas específicas" são as duas faces
-// de visibilidade='privada' — só o compartilhamento (atividades_compartilhamento)
-// diferencia uma da outra. Antes essa aba mostrava as duas juntas como
-// "Só para Mim". Ver scripts/lib/privacidade-atividade.js.
-async function _dashRenderPrivadas() {
- var listSoEu = document.getElementById('dash-priv-soeu-list');
- var listEspecificos = document.getElementById('dash-priv-especificos-list');
- if (!listSoEu || !listEspecificos) return;
- listSoEu.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Carregando...</div>';
- listEspecificos.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Carregando...</div>';
- if (!_dbOk || !_currentUser) {
-  var msgSemUsuario = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Usuário não identificado.</div>';
-  listSoEu.innerHTML = msgSemUsuario;
-  listEspecificos.innerHTML = msgSemUsuario;
-  return;
- }
- var userEmail = _currentUser.email || '';
- var userName  = _currentUser.name  || '';
- // Busca atividades privadas onde o usuário é responsável
- var { data, error } = await _sb.from('atividades')
-  .select('*')
-  .eq('visibilidade', 'privada')
-  .neq('status', 'Concluída')
-  .or('responsavel.ilike.%' + userEmail + '%,responsavel.ilike.%' + userName + '%')
-  .order('data_prazo', { ascending: true, nullsFirst: false });
- if (error) {
-  var msgErro = '<div style="padding:20px;text-align:center;color:var(--red);font-size:12px">Erro ao carregar.</div>';
-  listSoEu.innerHTML = msgErro;
-  listEspecificos.innerHTML = msgErro;
-  return;
- }
- var ativs = data || [];
- // Descobre quais dessas atividades têm compartilhamento com pessoas
- // específicas — só isso separa as duas seções.
- var idsComCompartilhamento = new Set();
- if (ativs.length) {
-  var ids = ativs.map(function(a){ return a.id; });
-  var comp = await _sb.from('atividades_compartilhamento').select('atividade_id').in('atividade_id', ids);
-  (comp.data || []).forEach(function(row){ idsComCompartilhamento.add(row.atividade_id); });
- }
- var soEu = _filtrarSomentePraMim(ativs, idsComCompartilhamento);
- var especificos = _filtrarPessoasEspecificas(ativs, idsComCompartilhamento);
- _dashPrivRenderList('dash-priv-soeu-list', 'dash-priv-soeu-count', soEu, 'Você não tem atividades "Somente para mim" abertas.');
- _dashPrivRenderList('dash-priv-especificos-list', 'dash-priv-especificos-count', especificos, 'Você não tem atividades compartilhadas com pessoas específicas abertas.');
-}
-
 function _projDrawerGoDetail(projId) {
  _projDrawerClose();
  // Navega para projetos e seleciona o projeto
@@ -2711,30 +2613,41 @@ function _dashRenderMelhorias(melhorias) {
 var _dashSemanasRaw  = [];   // cache de atividades concluídas (12 meses)
 var _dashAllAtRaw    = [];   // cache de todas as atividades (para re-render Status)
 var _dashFeedRaw      = [];   // cache do feed antes do filtro "Somente para mim"
-var _dashSomenteEu    = localStorage.getItem('milatec-dash-somente-eu') === '1';
+// '' | 'so_eu' | 'especificos' — os dois filtros são mutuamente exclusivos
+// (uma atividade privada é ou "Somente para mim" ou "Pessoas específicas",
+// nunca as duas). Antes existia uma aba "Privadas" separada mostrando as
+// duas categorias lado a lado; isso duplicava o mesmo filtro que já existia
+// aqui no feed — removida, os dois botões abaixo cobrem o mesmo caso.
+var _dashPrivFiltro = localStorage.getItem('milatec-dash-priv-filtro') || '';
 var _dashCompartilhadosIds = new Set(); // ids de atividades privadas do feed com compartilhamento ("Pessoas específicas")
 
-// "Somente para mim" — dentro do feed (já restrito a atividades onde o
-// usuário é responsável), mantém só as que têm privacidade "Somente para
-// mim" de verdade (visibilidade = 'privada'). Achado real: antes contava o
-// número de responsáveis (<=1) em vez de checar a privacidade — uma
-// atividade PÚBLICA com um único responsável entrava aqui, e uma PRIVADA
-// compartilhada com várias pessoas ficava de fora. Ver
-// scripts/lib/privacidade-atividade.js.
-function _dashToggleSomenteEu() {
- _dashSomenteEu = !_dashSomenteEu;
- localStorage.setItem('milatec-dash-somente-eu', _dashSomenteEu ? '1' : '0');
- var btn = document.getElementById('dash-feed-somente-eu');
- if (btn) {
-  btn.style.background = _dashSomenteEu ? 'var(--navy)' : 'var(--surface2)';
-  btn.style.color = _dashSomenteEu ? '#fff' : 'var(--muted)';
-  btn.style.borderColor = _dashSomenteEu ? 'var(--navy)' : 'var(--border)';
- }
- _dashRenderFeed(_dashApplySomenteEu(_dashFeedRaw));
+function _dashSyncPrivFiltroBotoes() {
+ var btnSoEu = document.getElementById('dash-feed-somente-eu');
+ var btnEspecificos = document.getElementById('dash-feed-especificos');
+ [[btnSoEu, 'so_eu'], [btnEspecificos, 'especificos']].forEach(function(pair) {
+  var btn = pair[0], modo = pair[1];
+  if (!btn) return;
+  var ativo = _dashPrivFiltro === modo;
+  btn.style.background = ativo ? 'var(--navy)' : 'var(--surface2)';
+  btn.style.color = ativo ? '#fff' : 'var(--muted)';
+  btn.style.borderColor = ativo ? 'var(--navy)' : 'var(--border)';
+ });
 }
-function _dashApplySomenteEu(atividades) {
- if (!_dashSomenteEu) return atividades || [];
- return _filtrarSomentePraMim(atividades, _dashCompartilhadosIds);
+
+// Achado real: o filtro contava número de responsáveis (<=1) em vez de
+// checar a privacidade de verdade — uma atividade PÚBLICA com um único
+// responsável entrava aqui, e uma PRIVADA compartilhada com várias pessoas
+// ficava de fora. Ver scripts/lib/privacidade-atividade.js.
+function _dashTogglePrivFiltro(modo) {
+ _dashPrivFiltro = (_dashPrivFiltro === modo) ? '' : modo;
+ localStorage.setItem('milatec-dash-priv-filtro', _dashPrivFiltro);
+ _dashSyncPrivFiltroBotoes();
+ _dashRenderFeed(_dashApplyPrivFiltro(_dashFeedRaw));
+}
+function _dashApplyPrivFiltro(atividades) {
+ if (_dashPrivFiltro === 'so_eu') return _filtrarSomentePraMim(atividades, _dashCompartilhadosIds);
+ if (_dashPrivFiltro === 'especificos') return _filtrarPessoasEspecificas(atividades, _dashCompartilhadosIds);
+ return atividades || [];
 }
 var _dashChartCfg    = (function(){
  try { return JSON.parse(localStorage.getItem('milatec-chart-cfg') || '{}'); } catch(e) { return {}; }
@@ -2881,9 +2794,9 @@ async function _dashLoad() {
  try {
   await _dashEnrichVinculos(feedData || []);
   _dashFeedRaw = feedData || [];
-  // Compartilhamento das privadas do feed — sem isso, o toggle "Somente
-  // para mim" trata "Pessoas específicas" como "Somente para mim" também
-  // (mesmo achado do _dashRenderPrivadas; ver privacidade-atividade.js).
+  // Compartilhamento das privadas do feed — sem isso, o filtro "Somente
+  // para mim" trata "Pessoas específicas" como "Somente para mim" também.
+  // Ver scripts/lib/privacidade-atividade.js.
   _dashCompartilhadosIds = new Set();
   var idsPrivadasFeed = _dashFeedRaw.filter(function(a){ return a.visibilidade === 'privada'; }).map(function(a){ return a.id; });
   if (idsPrivadasFeed.length) {
@@ -2892,13 +2805,8 @@ async function _dashLoad() {
     (compFeed.data || []).forEach(function(row){ _dashCompartilhadosIds.add(row.atividade_id); });
    } catch(eComp) {}
   }
-  var btnSe = document.getElementById('dash-feed-somente-eu');
-  if (btnSe) {
-   btnSe.style.background = _dashSomenteEu ? 'var(--navy)' : 'var(--surface2)';
-   btnSe.style.color = _dashSomenteEu ? '#fff' : 'var(--muted)';
-   btnSe.style.borderColor = _dashSomenteEu ? 'var(--navy)' : 'var(--border)';
-  }
-  _dashRenderFeed(_dashApplySomenteEu(_dashFeedRaw));
+  _dashSyncPrivFiltroBotoes();
+  _dashRenderFeed(_dashApplyPrivFiltro(_dashFeedRaw));
  } catch(errFeed) {
   console.error('[Dashboard] Erro ao renderizar feed:', errFeed);
  }
