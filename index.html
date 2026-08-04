@@ -11,23 +11,23 @@
  <title>MilaLab — Sistema Interno</title>
  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='%233D4FD1'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%239DA3B0'/%3E%3Cstop offset='45%25' stop-color='%23F5F6F8'/%3E%3Cstop offset='100%25' stop-color='%238E94A3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M50 20 L78 35 V65 L50 80 L22 65 V35 Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='10' fill='url(%23g)'/%3E%3C/svg%3E">
  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles/tokens.css?v=mldsv57">
-<link rel="stylesheet" href="styles/main.css?v=mldsv57">
+<link rel="stylesheet" href="styles/tokens.css?v=mldsv58">
+<link rel="stylesheet" href="styles/main.css?v=mldsv58">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="scripts/lib/supabase-client.js?v=mldsv57"></script>
-<script src="scripts/lib/realtime-sync.js?v=mldsv57"></script>
-<script src="scripts/lib/ui-helpers.js?v=mldsv57"></script>
-<script src="scripts/lib/avatar-helpers.js?v=mldsv57"></script>
-<script src="scripts/lib/toolbar-ui.js?v=mldsv57"></script>
-<script src="scripts/lib/filtro-builder.js?v=mldsv57"></script>
-<script src="scripts/lib/sort-builder.js?v=mldsv57"></script>
-<script src="scripts/lib/group-builder.js?v=mldsv57"></script>
-<script src="scripts/lib/group-tree.js?v=mldsv57"></script>
-<script src="scripts/lib/smart-search.js?v=mldsv57"></script>
-<script src="scripts/lib/privacidade-atividade.js?v=mldsv57"></script>
-<script src="scripts/services/usuarios.service.js?v=mldsv57"></script>
-<script src="scripts/services/auth.service.js?v=mldsv57"></script>
-<script src="scripts/services/propostas.service.js?v=mldsv57"></script>
+<script src="scripts/lib/supabase-client.js?v=mldsv58"></script>
+<script src="scripts/lib/realtime-sync.js?v=mldsv58"></script>
+<script src="scripts/lib/ui-helpers.js?v=mldsv58"></script>
+<script src="scripts/lib/avatar-helpers.js?v=mldsv58"></script>
+<script src="scripts/lib/toolbar-ui.js?v=mldsv58"></script>
+<script src="scripts/lib/filtro-builder.js?v=mldsv58"></script>
+<script src="scripts/lib/sort-builder.js?v=mldsv58"></script>
+<script src="scripts/lib/group-builder.js?v=mldsv58"></script>
+<script src="scripts/lib/group-tree.js?v=mldsv58"></script>
+<script src="scripts/lib/smart-search.js?v=mldsv58"></script>
+<script src="scripts/lib/privacidade-atividade.js?v=mldsv58"></script>
+<script src="scripts/services/usuarios.service.js?v=mldsv58"></script>
+<script src="scripts/services/auth.service.js?v=mldsv58"></script>
+<script src="scripts/services/propostas.service.js?v=mldsv58"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
@@ -278,7 +278,7 @@
 <!-- Design system unificado dos campos do wizard Nova Obra: todo select/input/checklist
      do modal usa a mesma geometria de .mf input,.mf select (padding 9px 12px, radius 7px,
      borda var(--border), foco navy com ring) para não ter dois estilos de campo coexistindo. -->
-<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv57">
+<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv58">
 <!-- MODAL NOVA OBRA — wizard 4 etapas (fluxo único, sem gate de tipo) -->
 <div class="modal-backdrop" id="modal-nova-obra" onclick="handleModalBackdrop(event)">
  <div class="modal" id="modal-obra-box" style="max-width:900px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh">
@@ -542,7 +542,7 @@
  <!-- ── Sub-abas do Meu Painel ──────────────────────────────────── -->
  <div class="dash-tabbar">
   <button class="dash-tab-btn active" id="dash-tab-btn-geral" onclick="_dashTabSwitch('geral')">Visão Geral</button>
-  <button class="dash-tab-btn" id="dash-tab-btn-privadas" onclick="_dashTabSwitch('privadas')" style="display:flex;align-items:center;gap:5px"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg> Só para Mim</button>
+  <button class="dash-tab-btn" id="dash-tab-btn-privadas" onclick="_dashTabSwitch('privadas')" style="display:flex;align-items:center;gap:5px"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/></svg> Privadas</button>
  </div>
 
  <div id="dash-tab-geral">
@@ -625,7 +625,7 @@
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border)">
      <span style="font-size:12px;font-weight:700;color:var(--text)">Minhas Atividades</span>
      <div style="display:flex;align-items:center;gap:8px">
-      <button id="dash-feed-somente-eu" onclick="_dashToggleSomenteEu()" title="Mostrar só atividades onde você é o único responsável" style="font-size:10px;padding:3px 10px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-weight:600">Somente para mim</button>
+      <button id="dash-feed-somente-eu" onclick="_dashToggleSomenteEu()" title="Mostrar só atividades com privacidade &quot;Somente para mim&quot;" style="font-size:10px;padding:3px 10px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-weight:600">Somente para mim</button>
       <span id="dash-feed-count" style="font-size:10px;color:var(--muted)"></span>
       <button onclick="_taskDrawerOpen()" style="font-size:10px;padding:3px 10px;background:var(--green);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">+ Nova</button>
      </div>
@@ -776,17 +776,31 @@
 
  </div><!-- /dash-tab-geral -->
 
- <!-- ── Sub-aba: Só para Mim (atividades privadas) ──────────────── -->
+ <!-- ── Sub-aba: Privadas (Somente para mim + Pessoas específicas) ── -->
  <div id="dash-tab-privadas" style="display:none">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-   <div>
-    <div style="font-size:13px;font-weight:700;color:var(--text)">Minhas atividades privadas</div>
-    <div style="font-size:11px;color:var(--muted);margin-top:2px">Visíveis apenas para você — ninguém mais vê estas tarefas.</div>
+  <div style="margin-bottom:20px">
+   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div>
+     <div style="font-size:13px;font-weight:700;color:var(--text)">Somente para mim</div>
+     <div style="font-size:11px;color:var(--muted);margin-top:2px">Visíveis apenas para você — ninguém mais vê estas tarefas.</div>
+    </div>
+    <span id="dash-priv-soeu-count" style="font-size:11px;color:var(--muted)"></span>
    </div>
-   <span id="dash-priv-count" style="font-size:11px;color:var(--muted)"></span>
+   <div id="dash-priv-soeu-list">
+    <div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Carregando...</div>
+   </div>
   </div>
-  <div id="dash-priv-list">
-   <div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Carregando...</div>
+  <div>
+   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div>
+     <div style="font-size:13px;font-weight:700;color:var(--text)">Pessoas específicas</div>
+     <div style="font-size:11px;color:var(--muted);margin-top:2px">Visíveis só para você e para quem foi adicionado na lista de acesso.</div>
+    </div>
+    <span id="dash-priv-especificos-count" style="font-size:11px;color:var(--muted)"></span>
+   </div>
+   <div id="dash-priv-especificos-list">
+    <div style="padding:30px;text-align:center;color:var(--muted);font-size:12px">Carregando...</div>
+   </div>
   </div>
  </div>
 
@@ -1057,7 +1071,7 @@
 <div id="page-empresas" class="page" style="padding-top:8px">
 
  <!-- Estilos Notion para esta página -->
-<link rel="stylesheet" href="styles/empresas.css?v=mldsv57">
+<link rel="stylesheet" href="styles/empresas.css?v=mldsv58">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -2090,7 +2104,7 @@
  <!-- ENTREGAS -->
  <div id="page-entregas" class="page">
 
-<link rel="stylesheet" href="styles/entregas.css?v=mldsv57">
+<link rel="stylesheet" href="styles/entregas.css?v=mldsv58">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -2754,20 +2768,20 @@
 
 </main>
 
-<script src="scripts/app.js?v=mldsv57"></script>
-<script src="scripts/modules/side-panel.js?v=mldsv57"></script>
-<script src="scripts/lib/atividades-vinculos.js?v=mldsv57"></script>
-<script src="scripts/modules/obras.js?v=mldsv57"></script>
-<script src="scripts/modules/projetos.js?v=mldsv57"></script>
-<script src="scripts/modules/entregas.js?v=mldsv57"></script>
-<script src="scripts/modules/instalacoes.js?v=mldsv57"></script>
-<script src="scripts/modules/empresas.js?v=mldsv57"></script>
-<script src="scripts/modules/wizard-nova-obra.js?v=mldsv57"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv57"></script>
-<script src="scripts/modules/melhorias.js?v=mldsv57"></script>
-<script src="scripts/modules/admin.js?v=mldsv57"></script>
-<script src="scripts/modules/exec-dashboard.js?v=mldsv57"></script>
-<script src="scripts/modules/tarefas.js?v=mldsv57"></script>
+<script src="scripts/app.js?v=mldsv58"></script>
+<script src="scripts/modules/side-panel.js?v=mldsv58"></script>
+<script src="scripts/lib/atividades-vinculos.js?v=mldsv58"></script>
+<script src="scripts/modules/obras.js?v=mldsv58"></script>
+<script src="scripts/modules/projetos.js?v=mldsv58"></script>
+<script src="scripts/modules/entregas.js?v=mldsv58"></script>
+<script src="scripts/modules/instalacoes.js?v=mldsv58"></script>
+<script src="scripts/modules/empresas.js?v=mldsv58"></script>
+<script src="scripts/modules/wizard-nova-obra.js?v=mldsv58"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv58"></script>
+<script src="scripts/modules/melhorias.js?v=mldsv58"></script>
+<script src="scripts/modules/admin.js?v=mldsv58"></script>
+<script src="scripts/modules/exec-dashboard.js?v=mldsv58"></script>
+<script src="scripts/modules/tarefas.js?v=mldsv58"></script>
 
  <!-- BACKDROP DRAWERS -->
  <div class="drw-backdrop" id="drw-backdrop-proj" onclick="_projDrawerClose()"></div>
@@ -3207,7 +3221,7 @@
 <!-- SISTEMA DE AUTENTICAÇÃO MILATEC v3.04 — Identidade Visual Grupo Mila      -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<link rel="stylesheet" href="styles/auth.css?v=mldsv57">
+<link rel="stylesheet" href="styles/auth.css?v=mldsv58">
 
 <!-- ═══════════════════════════════════════════════════════════════
      TELA 1 — LOGIN
