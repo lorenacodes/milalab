@@ -98,6 +98,9 @@ async function _dbLoadInstalacoes() {
   // Atualizar badge do nav
   var badge = document.getElementById('nav-badge-instalacoes');
   if (badge) badge.textContent = allData.length;
+  // Tempo real: recarrega sozinho quando a tabela mudar (sync do Airtable
+  // ou outro usuário editando) — sem precisar recarregar a página.
+  if (typeof _rtWatch === 'function') _rtWatch('instalacoes', _dbLoadInstalacoes);
   if (!tbody) return;
   if (!allData.length) {
    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Nenhuma instalação encontrada.</td></tr>';

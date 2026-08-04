@@ -587,6 +587,12 @@ async function _gestorLoad() {
    if (_gestorView === 'grid') _gestorRenderGrid();
   });
 
+  // Tempo real: qualquer INSERT/UPDATE/DELETE em atividades (inclusive vindo
+  // do sync do Airtable) recarrega a lista sozinho — sem precisar recarregar
+  // a página. _rtWatch já remove a inscrição anterior, então é seguro chamar
+  // de novo toda vez que o usuário reabre o Gestor de Tarefas.
+  if (typeof _rtWatch === 'function') _rtWatch('atividades', _gestorLoad);
+
  } catch(e) {
   var msg = e && e.message ? e.message : String(e);
   if (lbl)  lbl.textContent = 'Erro: ' + msg;

@@ -212,6 +212,16 @@ async function _dbInit() {
   _dbLoadEntregas();
   _dbLoadProjetos();
   _dbLoadObrasKanban();
+  // Tempo real: essas 5 tabelas carregam uma única vez aqui no boot (não a
+  // cada navegação) — sem isso, mudanças feitas por outro usuário ou pelo
+  // sync do Airtable só apareceriam depois de recarregar a página inteira.
+  if (typeof _rtWatch === 'function') {
+   _rtWatch('obras', function(){ _dbLoadObras(); _dbLoadObrasKanban(); });
+   _rtWatch('empresas', _dbLoadEmpresas);
+   _rtWatch('contatos', _dbLoadContatos);
+   _rtWatch('entregas', _dbLoadEntregas);
+   _rtWatch('projetos', _dbLoadProjetos);
+  }
  }
  // Motivo: _dashLoad() deve ser chamado sempre após _dbInit, independente
  // de _dbOk — quando sem conexão, ela limpa o "Carregando..." e exibe estado vazio.
