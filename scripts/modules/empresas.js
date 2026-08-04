@@ -382,7 +382,6 @@ var _fornProdutoCount = 0;
 var _editingFornId    = null;
 var _fornCidadesSel   = [];
 var _fornSetoresSel   = [];
-var _fornSegmentosSel = [];
 var _fornCidadesDisponiveis = []; // cidades do estado selecionado no momento
 var _fornCidadeCache  = {}; // cache por UF — mesmo padrão de _cidadeCache (wizard-nova-obra.js)
 
@@ -391,7 +390,7 @@ async function _dbLoadFornecedores() {
  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
  if (!_sb) return;
  var res = await _sb.from('fornecedores')
-  .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, segmentos, status_cotacao, experiencia, observacoes, fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total)')
+  .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, experiencia, observacoes, fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, status_cotacao)')
   .order('nome');
  if (res.error) {
   if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar fornecedores: ' + _supaErrPt(res.error.message) + '</td></tr>';
@@ -400,10 +399,10 @@ async function _dbLoadFornecedores() {
  _fornecedoresArr = (res.data || []).map(function(f) {
   return {
    id: f.id, nome: f.nome, cnpj: f.cnpj, contato: f.contato, telefone: f.telefone, email: f.email,
-   endereco: f.endereco, estado: f.estado, cidades: f.cidades || [], setores: f.setores || [], segmentos: f.segmentos || [],
-   status_cotacao: f.status_cotacao, experiencia: f.experiencia, observacoes: f.observacoes,
+   endereco: f.endereco, estado: f.estado, cidades: f.cidades || [], setores: f.setores || [],
+   experiencia: f.experiencia, observacoes: f.observacoes,
    produtos: (f.fornecedores_produtos || []).map(function(p){
-    return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total };
+    return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total, status_cotacao: p.status_cotacao };
    }),
   };
  });
@@ -429,7 +428,7 @@ function _renderFornecedores() {
  var lista = qn
   ? _fornecedoresArr.filter(function(f){
      return (f.nome||'').toLowerCase().includes(qn)
-      || (f.segmentos||[]).join(' ').toLowerCase().includes(qn)
+      || (f.setores||[]).join(' ').toLowerCase().includes(qn)
       || (f.cidades||[]).join(' ').toLowerCase().includes(qn);
     })
   : _fornecedoresArr;
@@ -445,18 +444,30 @@ function _renderFornecedores() {
   var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
   var bgColors = ['#6366f1','#2E5FD9','#059669','#d97706','#dc2626'];
   var bg = bgColors[idx % bgColors.length];
-  var segs = f.segmentos || [];
+  var setoresF = f.setores || [];
   var cids = f.cidades || [];
+  // status_cotacao agora é por produto — a coluna mostra os valores
+  // distintos entre os produtos orçados desse fornecedor (ou "Múltiplos"
+  // com tooltip quando há mais de um status diferente).
+  var statusDistintos = Array.from(new Set((f.produtos||[]).map(function(p){ return p.status_cotacao; }).filter(Boolean)));
+  var statusCell;
+  if (!statusDistintos.length) {
+   statusCell = '<span style="color:var(--muted);font-size:12px">—</span>';
+  } else if (statusDistintos.length === 1) {
+   statusCell = '<span class="nt-tag ' + (_fornStatusCor[statusDistintos[0]]||'nt-tag-gray') + '" style="font-size:11px">' + statusDistintos[0] + '</span>';
+  } else {
+   statusCell = '<span class="nt-tag nt-tag-gray" style="font-size:11px" title="' + statusDistintos.join(', ').replace(/"/g,'&quot;') + '">Múltiplos</span>';
+  }
   return '<tr>'
    + '<td><div class="nt-avatar" style="background:' + bg + ';font-size:10px;width:26px;height:26px;border-radius:6px">' + initials + '</div></td>'
    + '<td><div style="font-weight:600;font-size:13px;color:var(--text)">' + f.nome + '</div>'
    + (f.email ? '<div style="font-size:11px;color:var(--muted)">' + f.email + '</div>' : '')
    + '</td>'
-   + '<td>' + (segs.length
-      ? segs.slice(0,2).map(function(s){ return '<span class="nt-tag nt-tag-blue" style="font-size:11px;margin-right:3px">'+s+'</span>'; }).join('') + (segs.length>2 ? '<span style="font-size:11px;color:var(--muted)">+'+(segs.length-2)+'</span>' : '')
+   + '<td>' + (setoresF.length
+      ? setoresF.slice(0,2).map(function(s){ return '<span class="nt-tag nt-tag-blue" style="font-size:11px;margin-right:3px">'+s+'</span>'; }).join('') + (setoresF.length>2 ? '<span style="font-size:11px;color:var(--muted)">+'+(setoresF.length-2)+'</span>' : '')
       : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
    + '<td style="font-size:12px;color:var(--muted)">' + (cids.length ? cids.join(', ') : '—') + (f.estado ? ' · ' + f.estado : '') + '</td>'
-   + '<td>' + (f.status_cotacao ? '<span class="nt-tag ' + (_fornStatusCor[f.status_cotacao]||'nt-tag-gray') + '" style="font-size:11px">' + f.status_cotacao + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
+   + '<td>' + statusCell + '</td>'
    + '<td>' + (f.experiencia ? '<span class="nt-tag ' + (_fornExperienciaCor[f.experiencia]||'nt-tag-gray') + '" style="font-size:11px">' + f.experiencia + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
    + '<td>'
    + (f.produtos && f.produtos.length
@@ -474,10 +485,9 @@ function _renderFornecedores() {
  }).join('');
 }
 
-// ── Selects de opções fixas (status/experiência) ─────────────────────────────
+// ── Selects de opções fixas (experiência — status_cotacao agora é por
+// produto, ver addFornProdutoLinha) ──────────────────────────────────────────
 function _fornPreencherSelectsFixos() {
- var st = document.getElementById('fn-status-cotacao');
- if (st) st.innerHTML = '<option value="">Selecione...</option>' + STATUS_COTACAO_OPCOES.map(function(o){ return '<option>'+o+'</option>'; }).join('');
  var ex = document.getElementById('fn-experiencia');
  if (ex) ex.innerHTML = '<option value="">Selecione...</option>' + EXPERIENCIA_OPCOES.map(function(o){ return '<option>'+o+'</option>'; }).join('');
 }
@@ -544,18 +554,13 @@ function _fornRenderSetoresDropdown() {
  if (wrap) wrap.innerHTML = _msRenderDropdown('setores', SETORES_OPCOES, _fornSetoresSel, '_fornMultiToggle', 'Selecione o(s) setor(es)');
 }
 
-function _fornRenderSegmentosDropdown() {
- var wrap = document.getElementById('fn-segmentos-dropdown');
- if (wrap) wrap.innerHTML = _msRenderDropdown('segmentos', SEGMENTOS_OPCOES, _fornSegmentosSel, '_fornMultiToggle', 'Selecione o(s) segmento(s)');
-}
-
-// Handler único chamado pelos 3 multiselects (cidades/setores/segmentos) —
-// atualiza o estado e só o rótulo do botão, sem re-renderizar o painel
-// inteiro (senão o dropdown fecharia a cada clique numa opção).
+// Handler único chamado pelos 2 multiselects (cidades/setores) — atualiza o
+// estado e só o rótulo do botão, sem re-renderizar o painel inteiro (senão o
+// dropdown fecharia a cada clique numa opção). Em modo edição, também
+// dispara o autosave do campo correspondente.
 var _FORN_MULTI_CAMPOS = {
- cidades:   { get: function(){ return _fornCidadesSel; },   set: function(v){ _fornCidadesSel = v; },   placeholder: 'Selecione a(s) cidade(s)' },
- setores:   { get: function(){ return _fornSetoresSel; },   set: function(v){ _fornSetoresSel = v; },   placeholder: 'Selecione o(s) setor(es)' },
- segmentos: { get: function(){ return _fornSegmentosSel; }, set: function(v){ _fornSegmentosSel = v; }, placeholder: 'Selecione o(s) segmento(s)' },
+ cidades: { get: function(){ return _fornCidadesSel; }, set: function(v){ _fornCidadesSel = v; }, placeholder: 'Selecione a(s) cidade(s)' },
+ setores: { get: function(){ return _fornSetoresSel; }, set: function(v){ _fornSetoresSel = v; }, placeholder: 'Selecione o(s) setor(es)' },
 };
 function _fornMultiToggle(campo, valor, checked) {
  var cfg = _FORN_MULTI_CAMPOS[campo];
@@ -564,10 +569,11 @@ function _fornMultiToggle(campo, valor, checked) {
  var btn = document.querySelector('#fn-' + campo + '-dropdown .fb-msel-btn');
  var atual = cfg.get();
  if (btn) btn.textContent = atual.length ? atual.length + ' selecionado(s)' : cfg.placeholder;
+ _fornAutoSaveQueue(_fornAutoSaveObjFor(campo, atual), true);
 }
 
 // ── Produtos orçados (Produto/Serviço, Quantidade, Unidade, Valor unitário,
-// Valor total calculado automaticamente) ─────────────────────────────────────
+// Valor total calculado automaticamente, Status da cotação POR PRODUTO) ──────
 function _fornProdutoRecalcular(lid) {
  var qtdEl = document.getElementById('fn-prod-qtd-' + lid);
  var valEl = document.getElementById('fn-prod-valor-' + lid);
@@ -581,6 +587,7 @@ function _fornProdutoRecalcular(lid) {
 function _fornProdutoValorInput(lid, inputEl) {
  inputEl.value = _moedaMascarar(inputEl.value);
  _fornProdutoRecalcular(lid);
+ _fornAutoSaveProdutosQueue();
 }
 
 function addFornProdutoLinha(produto) {
@@ -589,16 +596,18 @@ function addFornProdutoLinha(produto) {
  var id = _fornProdutoCount;
  var line = document.createElement('div');
  line.id = 'fn-prod-' + id;
- line.style.cssText = 'display:grid;grid-template-columns:1fr 90px 110px 110px 110px 32px;gap:6px;align-items:center';
+ line.style.cssText = 'display:grid;grid-template-columns:1fr 80px 100px 100px 100px 140px 32px;gap:6px;align-items:center';
  var inputStyle = 'border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text);font-size:13px;outline:none;font-family:inherit;width:100%;box-sizing:border-box';
  var unidadeOpts = UNIDADES_OPCOES.map(function(u){ return '<option' + (produto.unidade_medida===u?' selected':'') + '>'+u+'</option>'; }).join('');
+ var statusOpts = STATUS_COTACAO_OPCOES.map(function(s){ return '<option' + (produto.status_cotacao===s?' selected':'') + '>'+s+'</option>'; }).join('');
  line.innerHTML =
-  '<input type="text" id="fn-prod-nome-' + id + '" placeholder="Ex: Chapa de aço 2mm" value="' + (produto.nome||'').replace(/"/g,'&quot;') + '" style="' + inputStyle + '">'
-  + '<input type="number" id="fn-prod-qtd-' + id + '" placeholder="0" min="0" step="any" value="' + (produto.quantidade!=null?produto.quantidade:'') + '" oninput="_fornProdutoRecalcular(' + id + ')" style="' + inputStyle + ';text-align:right">'
-  + '<select id="fn-prod-unidade-' + id + '" style="' + inputStyle + '"><option value="">Unidade</option>' + unidadeOpts + '</select>'
+  '<input type="text" id="fn-prod-nome-' + id + '" placeholder="Ex: Chapa de aço 2mm" value="' + (produto.nome||'').replace(/"/g,'&quot;') + '" oninput="_fornAutoSaveProdutosQueue()" style="' + inputStyle + '">'
+  + '<input type="number" id="fn-prod-qtd-' + id + '" placeholder="0" min="0" step="any" value="' + (produto.quantidade!=null?produto.quantidade:'') + '" oninput="_fornProdutoRecalcular(' + id + ');_fornAutoSaveProdutosQueue()" style="' + inputStyle + ';text-align:right">'
+  + '<select id="fn-prod-unidade-' + id + '" onchange="_fornAutoSaveProdutosQueue()" style="' + inputStyle + '"><option value="">Selecione...</option>' + unidadeOpts + '</select>'
   + '<input type="text" id="fn-prod-valor-' + id + '" placeholder="0,00" inputmode="numeric" value="' + (produto.valor_unitario!=null ? _moedaFormatar(produto.valor_unitario) : '') + '" oninput="_fornProdutoValorInput(' + id + ',this)" style="' + inputStyle + ';text-align:right">'
   + '<div id="fn-prod-total-' + id + '" style="font-size:13px;color:var(--text);font-weight:600;text-align:right;padding:7px 4px">' + _moedaFormatarBRL(_fornecedorCalcularValorTotal(produto.quantidade||0, produto.valor_unitario||0)) + '</div>'
-  + '<button type="button" onclick="document.getElementById(\'fn-prod-' + id + '\').remove()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:5px" title="Remover">&times;</button>';
+  + '<select id="fn-prod-status-' + id + '" onchange="_fornAutoSaveProdutosQueue()" style="' + inputStyle + '"><option value="">Selecione...</option>' + statusOpts + '</select>'
+  + '<button type="button" onclick="document.getElementById(\'fn-prod-' + id + '\').remove();_fornAutoSaveProdutosQueue()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:5px" title="Remover">&times;</button>';
  document.getElementById('fn-produtos-list').appendChild(line);
  var cabecalho = document.getElementById('fn-produtos-cabecalho');
  if (cabecalho) cabecalho.style.display = 'grid';
@@ -606,30 +615,45 @@ function addFornProdutoLinha(produto) {
 }
 
 function _fornLimparErros() {
- document.querySelectorAll('#modal-novo-fornecedor .fn-erro-msg').forEach(function(el){ el.textContent = ''; });
+ document.querySelectorAll('#forn-drw .fn-erro-msg').forEach(function(el){ el.textContent = ''; });
+}
+
+/* ── DRAWER NOVO/EDITAR FORNECEDOR — mesmo padrão visual/interativo do
+   drawer de Atividades (dashboard.js: _taskDrawerOpen/_taskAutoSaveQueue):
+   criação usa botão explícito ("Salvar fornecedor"); edição salva sozinha
+   (autosave debounced), sem botão de submit. ── */
+function _fornDrawerOpenShell(editando) {
+ var ttlEl = document.getElementById('fn-drw-ttl');
+ var submitBtn = document.getElementById('fn-drw-submit-btn');
+ var cancelBtn = document.getElementById('fn-drw-cancel-btn');
+ if (ttlEl) ttlEl.textContent = editando ? 'Editar Fornecedor' : 'Novo Fornecedor';
+ if (submitBtn) submitBtn.style.display = editando ? 'none' : '';
+ if (cancelBtn) cancelBtn.textContent = editando ? 'Fechar' : 'Cancelar';
+ _fornAutoSaveStatus();
+ var drw = document.getElementById('forn-drw');
+ var bd  = document.getElementById('forn-drw-bd');
+ if (drw) drw.classList.add('open');
+ if (bd)  bd.classList.add('open');
 }
 
 function openNovoFornecedor() {
  _editingFornId = null;
  _fornProdutoCount = 0;
- _fornCidadesSel = []; _fornSetoresSel = []; _fornSegmentosSel = []; _fornCidadesDisponiveis = [];
- document.getElementById('fn-modal-title').textContent = 'Novo Fornecedor';
+ _fornCidadesSel = []; _fornSetoresSel = []; _fornCidadesDisponiveis = [];
  ['fn-nome','fn-cnpj','fn-contato','fn-tel','fn-email','fn-observacoes'].forEach(function(id){
   var el = document.getElementById(id); if (el) el.value = '';
  });
  document.getElementById('fn-estado').value = '';
  _fornPreencherSelectsFixos();
- document.getElementById('fn-status-cotacao').value = '';
  document.getElementById('fn-experiencia').value = '';
  _fornRenderCidadesDropdown();
  _fornRenderSetoresDropdown();
- _fornRenderSegmentosDropdown();
  _fornLimparErros();
  document.getElementById('fn-produtos-list').innerHTML = '';
  var cabecalho = document.getElementById('fn-produtos-cabecalho');
  if (cabecalho) cabecalho.style.display = 'none';
  addFornProdutoLinha(); // começa com uma linha vazia
- document.getElementById('modal-novo-fornecedor').classList.add('open');
+ _fornDrawerOpenShell(false);
 }
 
 async function editFornecedor(id) {
@@ -639,8 +663,6 @@ async function editFornecedor(id) {
  _fornProdutoCount = 0;
  _fornCidadesSel = (f.cidades || []).slice();
  _fornSetoresSel = (f.setores || []).slice();
- _fornSegmentosSel = (f.segmentos || []).slice();
- document.getElementById('fn-modal-title').textContent = 'Editar Fornecedor';
  document.getElementById('fn-nome').value       = f.nome || '';
  document.getElementById('fn-cnpj').value       = f.cnpj || '';
  document.getElementById('fn-contato').value    = f.contato || '';
@@ -649,22 +671,145 @@ async function editFornecedor(id) {
  document.getElementById('fn-observacoes').value = f.observacoes || '';
  document.getElementById('fn-estado').value     = f.estado || '';
  _fornPreencherSelectsFixos();
- document.getElementById('fn-status-cotacao').value = f.status_cotacao || '';
- document.getElementById('fn-experiencia').value    = f.experiencia || '';
+ document.getElementById('fn-experiencia').value = f.experiencia || '';
  _fornRenderSetoresDropdown();
- _fornRenderSegmentosDropdown();
  _fornLimparErros();
  document.getElementById('fn-produtos-list').innerHTML = '';
  var cabecalho = document.getElementById('fn-produtos-cabecalho');
  if (cabecalho) cabecalho.style.display = (f.produtos && f.produtos.length) ? 'grid' : 'none';
  (f.produtos || []).forEach(function(p){ addFornProdutoLinha(p); });
  if (!f.produtos || !f.produtos.length) addFornProdutoLinha();
- document.getElementById('modal-novo-fornecedor').classList.add('open');
+ _fornDrawerOpenShell(true);
  await _fornEstadoChange(f.estado, true); // mantém as cidades já cadastradas ao recarregar a lista do IBGE
 }
 
 function closeNovoFornecedor() {
- document.getElementById('modal-novo-fornecedor').classList.remove('open');
+ // Se houver autosave pendente (debounce ainda não disparou), salva na hora
+ // em vez de descartar a alteração — mesmo padrão de _taskAutoSaveFlushNow.
+ _fornAutoSaveFlushNow();
+ _fornAutoSaveProdutosFlushNow();
+ document.getElementById('forn-drw').classList.remove('open');
+ document.getElementById('forn-drw-bd').classList.remove('open');
+ _editingFornId = null;
+}
+
+/* ── AUTO-SAVE (só em modo edição — criação usa o botão "Salvar fornecedor"
+   normal, já que ainda não existe linha no banco pra salvar em cima). Mesmo
+   padrão de _taskAutoSaveQueue/_taskAutoSaveFlush (dashboard.js). ── */
+var _fornAutoSavePending = null;
+var _fornAutoSaveTimer = null;
+var _fornAutoSaveFadeTimer = null;
+
+function _fornAutoSaveStatus(state, msg) {
+ var el = document.getElementById('forn-drw-savestatus');
+ if (!el) return;
+ el.className = 'task-drw-savestatus' + (state ? ' ' + state : '');
+ el.textContent = msg || '';
+ clearTimeout(_fornAutoSaveFadeTimer);
+ if (state === 'saved') {
+  _fornAutoSaveFadeTimer = setTimeout(function() {
+   if (el.classList.contains('saved')) { el.className = 'task-drw-savestatus'; el.textContent = ''; }
+  }, 2500);
+ }
+}
+
+function _fornAutoSaveObjFor(campo, valor) {
+ var patch = {};
+ patch[campo] = valor;
+ return patch;
+}
+
+// Chamado pelo onblur/onchange dos campos simples do formulário.
+function _fornCampoAutoSave(campo, valor) {
+ if (typeof valor === 'string') valor = valor.trim() || null;
+ _fornAutoSaveQueue(_fornAutoSaveObjFor(campo, valor));
+}
+
+function _fornAutoSaveQueue(patch, immediate) {
+ if (!_editingFornId) return; // criação: sem linha no banco ainda, nada a auto-salvar
+ _fornAutoSavePending = Object.assign(_fornAutoSavePending || {}, patch);
+ clearTimeout(_fornAutoSaveTimer);
+ _fornAutoSaveStatus('saving', 'Salvando…');
+ _fornAutoSaveTimer = setTimeout(_fornAutoSaveFlush, immediate ? 120 : 700);
+}
+
+function _fornAutoSaveFlush() {
+ if (!_editingFornId || !_fornAutoSavePending) return;
+ var id = _editingFornId, patch = _fornAutoSavePending;
+ _fornAutoSavePending = null;
+ patch.updated_at = new Date().toISOString();
+ _sb.from('fornecedores').update(patch).eq('id', id).then(function(res) {
+  if (String(_editingFornId) !== String(id)) return;
+  if (res.error) {
+   _fornAutoSaveStatus('error', 'Erro ao salvar: ' + _supaErrPt(res.error.message));
+   console.error('[auto-save fornecedor]', res.error);
+   return;
+  }
+  _fornAutoSaveStatus('saved', 'Alterações salvas');
+  var idx = _fornecedoresArr.findIndex(function(x){ return String(x.id) === String(id); });
+  if (idx !== -1) Object.assign(_fornecedoresArr[idx], patch);
+  _renderFornecedores();
+ }).catch(function(e) {
+  if (String(_editingFornId) !== String(id)) return;
+  _fornAutoSaveStatus('error', 'Erro: ' + e.message);
+  console.error('[auto-save fornecedor]', e);
+ });
+}
+
+function _fornAutoSaveFlushNow() {
+ if (_fornAutoSavePending) { clearTimeout(_fornAutoSaveTimer); _fornAutoSaveFlush(); }
+}
+
+// Produtos vivem numa tabela à parte (fornecedores_produtos) — o autosave
+// deles roda separado do autosave dos campos do fornecedor, mas com a mesma
+// UX de debounce + indicador "Salvando…"/"Alterações salvas". Usa o mesmo
+// padrão delete-then-insert do submit manual (produtos não têm PATCH
+// incremental na UI — a lista inteira é substituída a cada alteração).
+var _fornAutoSaveProdutosTimer = null;
+var _fornAutoSaveProdutosPending = false;
+
+function _fornAutoSaveProdutosQueue() {
+ if (!_editingFornId) return; // criação: produtos só entram no banco no submit
+ _fornAutoSaveProdutosPending = true;
+ clearTimeout(_fornAutoSaveProdutosTimer);
+ _fornAutoSaveStatus('saving', 'Salvando…');
+ _fornAutoSaveProdutosTimer = setTimeout(_fornAutoSaveProdutosFlush, 700);
+}
+
+async function _fornAutoSaveProdutosFlush() {
+ if (!_editingFornId || !_fornAutoSaveProdutosPending) return;
+ var id = _editingFornId;
+ _fornAutoSaveProdutosPending = false;
+ var produtos = _fornColetarProdutos();
+ var delProd = await _sb.from('fornecedores_produtos').delete().eq('fornecedor_id', id);
+ if (delProd.error) {
+  if (String(_editingFornId) === String(id)) _fornAutoSaveStatus('error', 'Erro ao salvar produtos: ' + _supaErrPt(delProd.error.message));
+  return;
+ }
+ if (produtos.length) {
+  var insProd = await _sb.from('fornecedores_produtos').insert(
+   produtos.map(function(p){ return { fornecedor_id: id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, status_cotacao: p.status_cotacao || null }; })
+  );
+  if (insProd.error) {
+   if (String(_editingFornId) === String(id)) _fornAutoSaveStatus('error', 'Erro ao salvar produtos: ' + _supaErrPt(insProd.error.message));
+   return;
+  }
+ }
+ if (String(_editingFornId) !== String(id)) return;
+ _fornAutoSaveStatus('saved', 'Alterações salvas');
+ var idx = _fornecedoresArr.findIndex(function(x){ return String(x.id) === String(id); });
+ if (idx !== -1) {
+  // valor_total é coluna gerada no banco — recalcula aqui só pra refletir
+  // na tabela instantaneamente, sem precisar de um refetch completo.
+  _fornecedoresArr[idx].produtos = produtos.map(function(p){
+   return Object.assign({}, p, { valor_total: _fornecedorCalcularValorTotal(p.quantidade, p.valor_unitario) });
+  });
+ }
+ _renderFornecedores();
+}
+
+function _fornAutoSaveProdutosFlushNow() {
+ if (_fornAutoSaveProdutosPending) { clearTimeout(_fornAutoSaveProdutosTimer); _fornAutoSaveProdutosFlush(); }
 }
 
 async function excluirFornecedor(id) {
@@ -672,6 +817,14 @@ async function excluirFornecedor(id) {
  if (!_sb) return;
  var res = await _sb.from('fornecedores').delete().eq('id', id);
  if (res.error) { _showToast('Erro ao excluir fornecedor: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ // Se o fornecedor excluído era o que estava aberto no drawer, fecha (sem
+ // tentar dar flush de autosave numa linha que não existe mais).
+ if (String(_editingFornId) === String(id)) {
+  _fornAutoSavePending = null; _fornAutoSaveProdutosPending = false;
+  document.getElementById('forn-drw').classList.remove('open');
+  document.getElementById('forn-drw-bd').classList.remove('open');
+  _editingFornId = null;
+ }
  _showToast('Fornecedor excluído.', 'ok');
  _dbLoadFornecedores();
 }
@@ -684,14 +837,16 @@ function _fornColetarProdutos() {
   var qtdEl = document.getElementById('fn-prod-qtd-' + lid);
   var unidEl = document.getElementById('fn-prod-unidade-' + lid);
   var valEl = document.getElementById('fn-prod-valor-' + lid);
+  var statusEl = document.getElementById('fn-prod-status-' + lid);
   var nome = nomeEl ? nomeEl.value.trim() : '';
   var quantidade = qtdEl ? qtdEl.value : '';
   var unidade_medida = unidEl ? unidEl.value : '';
   var valor_unitario = valEl ? _moedaParaNumero(valEl.value) : 0;
+  var status_cotacao = statusEl ? statusEl.value : '';
   // Linha totalmente vazia (usuário adicionou e não preencheu) não entra na
   // validação nem no payload — só conta linha que o usuário começou a usar.
-  if (!nome && !quantidade && !unidade_medida && !valEl.value) return;
-  produtos.push({ nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario });
+  if (!nome && !quantidade && !unidade_medida && !valEl.value && !status_cotacao) return;
+  produtos.push({ nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario, status_cotacao: status_cotacao });
  });
  return produtos;
 }
@@ -717,8 +872,6 @@ async function submitNovoFornecedor() {
   estado: document.getElementById('fn-estado').value || '',
   cidades: _fornCidadesSel,
   setores: _fornSetoresSel,
-  segmentos: _fornSegmentosSel,
-  status_cotacao: document.getElementById('fn-status-cotacao').value || '',
   experiencia: document.getElementById('fn-experiencia').value || '',
   produtos: _fornColetarProdutos(),
  };
@@ -741,8 +894,6 @@ async function submitNovoFornecedor() {
   estado: dados.estado,
   cidades: dados.cidades,
   setores: dados.setores,
-  segmentos: dados.segmentos,
-  status_cotacao: dados.status_cotacao,
   experiencia: dados.experiencia,
   criado_por: (_currentUser && _currentUser.email) || null,
  };
@@ -765,7 +916,7 @@ async function submitNovoFornecedor() {
  if (delProd.error) { _showToast('Fornecedor salvo, mas houve erro ao atualizar produtos: ' + _supaErrPt(delProd.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
  if (dados.produtos.length) {
   var insProd = await _sb.from('fornecedores_produtos').insert(
-   dados.produtos.map(function(p){ return { fornecedor_id: fornecedorId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario }; })
+   dados.produtos.map(function(p){ return { fornecedor_id: fornecedorId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, status_cotacao: p.status_cotacao || null }; })
   );
   if (insProd.error) { _showToast('Fornecedor salvo, mas houve erro ao gravar produtos: ' + _supaErrPt(insProd.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
  }

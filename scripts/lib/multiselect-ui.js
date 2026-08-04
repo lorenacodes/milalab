@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // MULTISELECT UI — dropdown de checkboxes com busca, reaproveitando o mesmo
 // visual do multiselect do Filtro (.fb-msel-*, ver filtro-builder.js) fora do
-// contexto de um filtro — pra campos de formulário como Cidade(s), Setor e
-// Segmento do cadastro de Fornecedor. Lógica de montar HTML/filtrar é pura
+// contexto de um filtro — pra campos de formulário como Cidade(s) e Setor do
+// cadastro de Fornecedor. Lógica de montar HTML/filtrar é pura
 // (testável); quem chama liga o onchange a uma função própria (ex.:
 // _fornMultiToggle no empresas.js).
 // ═══════════════════════════════════════════════════════════════════════════

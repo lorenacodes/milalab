@@ -9,10 +9,8 @@ function dadosValidos() {
   estado: 'SE',
   cidades: ['Aracaju'],
   setores: ['Materiais e Insumos'],
-  segmentos: ['Aço'],
-  status_cotacao: 'Em análise',
   experiencia: 'Positiva',
-  produtos: [{ nome: 'Perfil metálico', quantidade: 10, unidade_medida: 'metro linear', valor_unitario: 25.5 }],
+  produtos: [{ nome: 'Perfil metálico', quantidade: 10, unidade_medida: 'metro linear', valor_unitario: 25.5, status_cotacao: 'Em análise' }],
  };
 }
 
@@ -37,20 +35,25 @@ test('_fornecedorValidar: estado e cidades são obrigatórios', () => {
  assert.ok(r.erros.cidades);
 });
 
-test('_fornecedorValidar: setores e segmentos precisam de ao menos 1 item', () => {
- var d = dadosValidos(); d.setores = []; d.segmentos = [];
+test('_fornecedorValidar: setores precisa de ao menos 1 item', () => {
+ var d = dadosValidos(); d.setores = [];
  var r = _fornecedorValidar(d);
  assert.equal(r.valido, false);
  assert.ok(r.erros.setores);
- assert.ok(r.erros.segmentos);
 });
 
-test('_fornecedorValidar: status da cotação e experiência são obrigatórios', () => {
- var d = dadosValidos(); d.status_cotacao = ''; d.experiencia = '';
+test('_fornecedorValidar: experiência é obrigatória', () => {
+ var d = dadosValidos(); d.experiencia = '';
  var r = _fornecedorValidar(d);
  assert.equal(r.valido, false);
- assert.ok(r.erros.status_cotacao);
  assert.ok(r.erros.experiencia);
+});
+
+test('_fornecedorValidarProduto: status_cotacao é obrigatório por produto', () => {
+ var erros = _fornecedorValidarProduto({ nome: 'X', quantidade: 1, unidade_medida: 'kg', valor_unitario: 10, status_cotacao: '' }, 0);
+ assert.ok(erros['produtos.0.status_cotacao']);
+ var ok = _fornecedorValidarProduto({ nome: 'X', quantidade: 1, unidade_medida: 'kg', valor_unitario: 10, status_cotacao: 'Aprovado' }, 0);
+ assert.equal(ok['produtos.0.status_cotacao'], undefined);
 });
 
 test('_fornecedorValidar: precisa de ao menos um produto orçado', () => {

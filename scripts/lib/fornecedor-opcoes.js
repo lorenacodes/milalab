@@ -4,9 +4,9 @@
 // não exige migration nem mudança de schema.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Setor = categoria macro do fornecedor. Segmento = detalhe/especialidade
-// dentro dela — os dois são multiselect independentes (um fornecedor pode
-// ter mais de um setor e mais de um segmento).
+// Setor = categoria macro do fornecedor (Área de Atuação) — multiselect
+// (um fornecedor pode ter mais de um setor). O antigo "Segmento" (detalhe
+// dentro do setor) foi descontinuado no cadastro.
 var SETORES_OPCOES = [
  'Materiais e Insumos',
  'Produção e Fabricação',
@@ -18,14 +18,6 @@ var SETORES_OPCOES = [
  'Outros',
 ];
 
-var SEGMENTOS_OPCOES = [
- 'Gráficas', 'Comunicação Visual', 'Estruturas Metálicas', 'Aço', 'Alumínio',
- 'Vidros', 'Revestimentos', 'Marcenaria', 'Elétrica', 'Iluminação',
- 'Parafusos e Fixadores', 'Ferragens', 'Tintas', 'Impressão', 'Cenografia',
- 'Logística', 'Transporte', 'Locação de Equipamentos', 'Móveis', 'Tecnologia',
- 'EPIs', 'Ferramentas',
-];
-
 // Unidade de medida do item orçado — validada aqui no app (não é CHECK no
 // banco de propósito, pra nunca precisar de migration só pra adicionar uma
 // unidade nova).
@@ -33,10 +25,13 @@ var UNIDADES_OPCOES = [
  'unidade', 'm²', 'm³', 'kg', 'metro linear', 'litro', 'caixa', 'pacote', 'hora', 'diária',
 ];
 
+// Status da cotação: agora é POR PRODUTO (coluna fornecedores_produtos.status_cotacao),
+// não mais por fornecedor — produtos diferentes do mesmo fornecedor podem
+// estar em estágios de cotação diferentes.
 var STATUS_COTACAO_OPCOES = ['Em análise', 'Aprovado', 'Recusado', 'Aguardando retorno', 'Cancelado'];
 
 var EXPERIENCIA_OPCOES = ['Positiva', 'Negativa'];
 
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { SETORES_OPCOES, SEGMENTOS_OPCOES, UNIDADES_OPCOES, STATUS_COTACAO_OPCOES, EXPERIENCIA_OPCOES };
+ module.exports = { SETORES_OPCOES, UNIDADES_OPCOES, STATUS_COTACAO_OPCOES, EXPERIENCIA_OPCOES };
 }

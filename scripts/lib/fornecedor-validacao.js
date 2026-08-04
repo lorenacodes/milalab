@@ -17,11 +17,14 @@ function _fornecedorValidarProduto(p, index) {
  if (!p || p.valor_unitario === '' || p.valor_unitario == null || isNaN(valor) || valor < 0) {
   erros[prefixo + 'valor_unitario'] = 'Informe o valor unitário na linha ' + (index + 1) + '.';
  }
+ // status_cotacao agora é por produto (fornecedores_produtos.status_cotacao),
+ // não mais um campo único do fornecedor.
+ if (!p || !(p.status_cotacao || '').toString().trim()) erros[prefixo + 'status_cotacao'] = 'Selecione o status da cotação na linha ' + (index + 1) + '.';
  return erros;
 }
 
-// dados: { nome, estado, cidades, setores, segmentos, status_cotacao,
-//          experiencia, produtos: [{nome, quantidade, unidade_medida, valor_unitario}] }
+// dados: { nome, estado, cidades, setores, experiencia,
+//          produtos: [{nome, quantidade, unidade_medida, valor_unitario, status_cotacao}] }
 function _fornecedorValidar(dados) {
  dados = dados || {};
  var erros = {};
@@ -32,7 +35,6 @@ function _fornecedorValidar(dados) {
  if (!Array.isArray(dados.cidades) || dados.cidades.length === 0) erros.cidades = 'Selecione ao menos uma cidade.';
 
  if (!Array.isArray(dados.setores) || dados.setores.length === 0) erros.setores = 'Selecione ao menos um setor.';
- if (!Array.isArray(dados.segmentos) || dados.segmentos.length === 0) erros.segmentos = 'Selecione ao menos um segmento.';
 
  if (!Array.isArray(dados.produtos) || dados.produtos.length === 0) {
   erros.produtos = 'Adicione ao menos um produto/serviço orçado.';
@@ -42,7 +44,6 @@ function _fornecedorValidar(dados) {
   });
  }
 
- if (!(dados.status_cotacao || '').toString().trim()) erros.status_cotacao = 'Selecione o status da cotação.';
  if (!(dados.experiencia || '').toString().trim()) erros.experiencia = 'Selecione a experiência com o fornecedor.';
 
  return { valido: Object.keys(erros).length === 0, erros: erros };
