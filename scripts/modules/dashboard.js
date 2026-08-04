@@ -1075,45 +1075,24 @@ var _respUsuarios     = []; // lista carregada do Supabase
 
 async function _respLoadUsers() {
  if (_respUsuarios.length > 0) return;
+ // Lê direto da tabela `usuarios` (liberada pra qualquer autenticado) em vez
+ // da Edge Function auth-admin — achado real: listar-usuarios ali exige
+ // admin, então qualquer usuário comum via "Nenhum usuário encontrado" ao
+ // tentar escolher responsável ou compartilhar uma atividade privada.
  try {
-  var session = (await _sb.auth.getSession()).data.session;
-  if (!session) return;
-  var r = await fetch('https://pnecdbobhywfjdadylwt.supabase.co/functions/v1/auth-admin', {
-   method:'POST',
-   headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},
-   body:JSON.stringify({action:'listar-usuarios'})
+  var res = await _sb.from('usuarios').select('id, email, nome_display, avatar_url, cargo, departamento, created_at');
+  if (res.error || !res.data) return;
+  _respUsuarios = res.data.map(function(row) {
+   var nome = row.nome_display || (row.email || '').split('@')[0];
+   var iniciais = nome.split(' ').slice(0,2).map(function(p){return p[0]||'';}).join('').toUpperCase();
+   return {
+    id: row.id || '', email: row.email, nome: nome, iniciais: iniciais,
+    avatar: row.avatar_url || null,
+    // Usados pelo cartão de info do usuário (clique com botão direito no avatar)
+    cargo: row.cargo || '', departamento: row.departamento || '', criadoEm: row.created_at || '',
+   };
   });
-  var res = await r.json();
-  if (res.ok && res.users) {
-   _respUsuarios = res.users.map(function(u) {
-    var nome = u.user_metadata && u.user_metadata.full_name
-     ? u.user_metadata.full_name
-     : (u.email || '').split('@')[0];
-    var iniciais = nome.split(' ').slice(0,2).map(function(p){return p[0]||'';}).join('').toUpperCase();
-    return { id: u.id || '', email: u.email, nome: nome, iniciais: iniciais, avatar: null };
-   });
-   // Enriquecer com avatares da tabela usuarios
-   try {
-    var av = await _sb.from('usuarios').select('id, avatar_url, nome_display, cargo, departamento, created_at');
-    if (av.data) {
-     var avMap = {};
-     av.data.forEach(function(row){ avMap[row.id] = row; });
-     _respUsuarios.forEach(function(u) {
-      var row = avMap[u.id];
-      if (row) {
-       if (row.avatar_url) u.avatar = row.avatar_url;
-       if (row.nome_display) u.nome = row.nome_display;
-       u.iniciais = u.nome.split(' ').slice(0,2).map(function(p){return p[0]||'';}).join('').toUpperCase();
-       // Usados pelo cartao de info do usuario (clique com botao direito no avatar)
-       u.cargo = row.cargo || '';
-       u.departamento = row.departamento || '';
-       u.criadoEm = row.created_at || '';
-      }
-     });
-    }
-   } catch(e2) {}
-   _respRenderList('');
-  }
+  _respRenderList('');
  } catch(e) {}
 }
 
