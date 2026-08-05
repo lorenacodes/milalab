@@ -58,6 +58,18 @@ function _fornecedorCalcularValorTotal(quantidade, valorUnitario) {
  return q * v;
 }
 
+// Resumo agregado dos produtos orçados de um fornecedor — usado na listagem
+// no lugar de exibir cada produto lado a lado (não escala pra dezenas/
+// centenas de itens). Lógica pura pra poder testar sem DOM.
+function _fornecedorResumoProdutos(produtos) {
+ produtos = Array.isArray(produtos) ? produtos : [];
+ var total = produtos.reduce(function(soma, p) {
+  var v = Number(p && p.valor_total);
+  return soma + (isNaN(v) ? 0 : v);
+ }, 0);
+ return { quantidade: produtos.length, totalGasto: total };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _fornecedorValidar, _fornecedorValidarProduto, _fornecedorCalcularValorTotal };
+ module.exports = { _fornecedorValidar, _fornecedorValidarProduto, _fornecedorCalcularValorTotal, _fornecedorResumoProdutos };
 }

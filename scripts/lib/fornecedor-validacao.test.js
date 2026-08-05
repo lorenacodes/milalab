@@ -1,7 +1,7 @@
 // node --test scripts/lib/fornecedor-validacao.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { _fornecedorValidar, _fornecedorValidarProduto, _fornecedorCalcularValorTotal } = require('./fornecedor-validacao.js');
+const { _fornecedorValidar, _fornecedorValidarProduto, _fornecedorCalcularValorTotal, _fornecedorResumoProdutos } = require('./fornecedor-validacao.js');
 
 function dadosValidos() {
  return {
@@ -96,4 +96,30 @@ test('_fornecedorCalcularValorTotal: quantidade × valor unitário', () => {
 test('_fornecedorCalcularValorTotal: entrada inválida vira 0, não NaN', () => {
  assert.equal(_fornecedorCalcularValorTotal('', 10), 0);
  assert.equal(_fornecedorCalcularValorTotal(null, undefined), 0);
+});
+
+test('_fornecedorResumoProdutos: soma valor_total e conta itens', () => {
+ var r = _fornecedorResumoProdutos([
+  { nome: 'A', valor_total: 820 },
+  { nome: 'B', valor_total: 460.5 },
+ ]);
+ assert.equal(r.quantidade, 2);
+ assert.equal(r.totalGasto, 1280.5);
+});
+
+test('_fornecedorResumoProdutos: lista vazia/nula não quebra', () => {
+ assert.deepEqual(_fornecedorResumoProdutos([]), { quantidade: 0, totalGasto: 0 });
+ assert.deepEqual(_fornecedorResumoProdutos(null), { quantidade: 0, totalGasto: 0 });
+});
+
+test('_fornecedorResumoProdutos: escala com centenas de itens sem perder precisão de forma grosseira', () => {
+ var muitos = Array.from({ length: 500 }, function() { return { valor_total: 10 }; });
+ var r = _fornecedorResumoProdutos(muitos);
+ assert.equal(r.quantidade, 500);
+ assert.equal(r.totalGasto, 5000);
+});
+
+test('_fornecedorResumoProdutos: ignora valor_total inválido/ausente em vez de virar NaN', () => {
+ var r = _fornecedorResumoProdutos([{ nome: 'sem valor' }, { nome: 'ok', valor_total: 100 }]);
+ assert.equal(r.totalGasto, 100);
 });

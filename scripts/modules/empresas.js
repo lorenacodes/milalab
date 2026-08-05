@@ -469,20 +469,65 @@ function _renderFornecedores() {
    + '<td style="font-size:12px;color:var(--muted)">' + (cids.length ? cids.join(', ') : '—') + (f.estado ? ' · ' + f.estado : '') + '</td>'
    + '<td>' + statusCell + '</td>'
    + '<td>' + (f.experiencia ? '<span class="nt-tag ' + (_fornExperienciaCor[f.experiencia]||'nt-tag-gray') + '" style="font-size:11px">' + f.experiencia + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
-   + '<td>'
-   + (f.produtos && f.produtos.length
-      ? f.produtos.slice(0,2).map(function(p){
-          return '<span class="nt-tag nt-tag-gray" style="margin-right:3px;margin-bottom:2px">' + p.nome + ' · ' + _moedaFormatarBRL(p.valor_total) + '</span>';
-        }).join('')
-        + (f.produtos.length > 2 ? '<span style="font-size:11px;color:var(--muted)">+' + (f.produtos.length-2) + ' mais</span>' : '')
-      : '<span style="color:var(--muted);font-size:12px">Nenhum produto</span>')
-   + '</td>'
+   + '<td>' + _fornProdutosResumoHTML(f) + '</td>'
    + '<td style="display:flex;gap:4px">'
    + '<button class="nt-open-btn" onclick="editFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Editar</button>'
    + '<button class="nt-open-btn" onclick="excluirFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--red);background:rgba(207,34,46,.08);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Excluir</button>'
    + '</td>'
    + '</tr>';
  }).join('');
+}
+
+// Resumo agregado (não escala listar produto a produto na linha da tabela —
+// um fornecedor pode ter dezenas/centenas de itens orçados). Detalhes
+// completos só entram sob demanda, ver _fornVerProdutos.
+function _fornProdutosResumoHTML(f) {
+ var resumo = _fornecedorResumoProdutos(f.produtos);
+ if (!resumo.quantidade) return '<span style="color:var(--muted);font-size:12px">Nenhum produto</span>';
+ return '<button type="button" class="nt-open-btn" onclick="_fornVerProdutos(\'' + f.id + '\')" '
+  + 'style="font-size:11px;color:var(--text);background:var(--surface2);border:none;border-radius:5px;padding:4px 9px;cursor:pointer;font-weight:500;text-align:left;line-height:1.5">'
+  + '<div>' + resumo.quantidade + ' produto' + (resumo.quantidade !== 1 ? 's' : '') + ' orçado' + (resumo.quantidade !== 1 ? 's' : '') + '</div>'
+  + '<div style="color:var(--muted);font-weight:400">' + _moedaFormatarBRL(resumo.totalGasto) + ' no total</div>'
+  + '</button>';
+}
+
+// ── Modal "Ver produtos" — somente leitura, aberto sob demanda a partir do
+// resumo agregado da listagem. Separado do modal de edição (que também
+// mostra os produtos, mas editáveis) pra deixar claro quando a intenção é só
+// consultar. Uma tabela com rolagem própria (max-height) sustenta qualquer
+// quantidade de itens sem esticar o layout da página. ──
+function _fornVerProdutos(id) {
+ var f = _fornecedoresArr.find(function(x){ return String(x.id) === String(id); });
+ if (!f) return;
+ var ttl = document.getElementById('fpv-titulo');
+ if (ttl) ttl.textContent = 'Produtos orçados — ' + f.nome;
+ var resumo = _fornecedorResumoProdutos(f.produtos);
+ var sub = document.getElementById('fpv-subtitulo');
+ if (sub) sub.textContent = resumo.quantidade + ' produto' + (resumo.quantidade !== 1 ? 's' : '') + ' · ' + _moedaFormatarBRL(resumo.totalGasto) + ' no total';
+ var corpo = document.getElementById('fpv-tbody');
+ if (corpo) {
+  corpo.innerHTML = (f.produtos || []).map(function(p) {
+   var dataStr = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—';
+   var statusTag = p.status_cotacao ? '<span class="nt-tag ' + (_fornStatusCor[p.status_cotacao]||'nt-tag-gray') + '" style="font-size:11px">' + p.status_cotacao + '</span>' : '—';
+   var td = 'padding:7px 10px;border-bottom:1px solid var(--border)';
+   return '<tr>'
+    + '<td style="' + td + ';font-size:12px">' + (p.nome||'—') + '</td>'
+    + '<td style="' + td + ';font-size:12px;text-align:right">' + (p.quantidade!=null?p.quantidade:'—') + '</td>'
+    + '<td style="' + td + ';font-size:12px">' + (p.unidade_medida||'—') + '</td>'
+    + '<td style="' + td + ';font-size:12px;text-align:right">' + _moedaFormatarBRL(p.valor_unitario||0) + '</td>'
+    + '<td style="' + td + ';font-size:12px;text-align:right;font-weight:600">' + _moedaFormatarBRL(p.valor_total||0) + '</td>'
+    + '<td style="' + td + '">' + statusTag + '</td>'
+    + '<td style="' + td + ';font-size:12px;color:var(--muted)">' + dataStr + '</td>'
+    + '</tr>';
+  }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Nenhum produto orçado.</td></tr>';
+ }
+ var bd = document.getElementById('fpv-bd');
+ if (bd) bd.classList.add('open');
+}
+
+function _fornFecharProdutosView() {
+ var bd = document.getElementById('fpv-bd');
+ if (bd) bd.classList.remove('open');
 }
 
 // ── Selects de opções fixas (experiência — status_cotacao agora é por
