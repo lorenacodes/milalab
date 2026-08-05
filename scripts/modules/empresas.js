@@ -598,7 +598,7 @@ function addFornProdutoLinha(produto) {
  line.id = 'fn-prod-' + id;
  line.dataset.dbId = produto.id || '';
  line.dataset.createdAt = produto.created_at || '';
- line.style.cssText = 'display:grid;grid-template-columns:minmax(140px,1fr) 56px 84px 84px 84px 118px 84px 26px;gap:6px;align-items:center;min-width:660px';
+ line.style.cssText = 'display:grid;grid-template-columns:minmax(150px,1fr) 70px 100px 100px 100px 130px 90px 30px;gap:8px;align-items:center;min-width:800px';
  var inputStyle = 'border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text);font-size:13px;outline:none;font-family:inherit;width:100%;box-sizing:border-box';
  var unidadeOpts = UNIDADES_OPCOES.map(function(u){ return '<option' + (produto.unidade_medida===u?' selected':'') + '>'+u+'</option>'; }).join('');
  var statusOpts = STATUS_COTACAO_OPCOES.map(function(s){ return '<option' + (produto.status_cotacao===s?' selected':'') + '>'+s+'</option>'; }).join('');

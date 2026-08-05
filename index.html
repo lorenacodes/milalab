@@ -11,27 +11,27 @@
  <title>MilaLab — Sistema Interno</title>
  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='%233D4FD1'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%239DA3B0'/%3E%3Cstop offset='45%25' stop-color='%23F5F6F8'/%3E%3Cstop offset='100%25' stop-color='%238E94A3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M50 20 L78 35 V65 L50 80 L22 65 V35 Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='10' fill='url(%23g)'/%3E%3C/svg%3E">
  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles/tokens.css?v=mldsv63">
-<link rel="stylesheet" href="styles/main.css?v=mldsv63">
+<link rel="stylesheet" href="styles/tokens.css?v=mldsv64">
+<link rel="stylesheet" href="styles/main.css?v=mldsv64">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="scripts/lib/supabase-client.js?v=mldsv63"></script>
-<script src="scripts/lib/realtime-sync.js?v=mldsv63"></script>
-<script src="scripts/lib/ui-helpers.js?v=mldsv63"></script>
-<script src="scripts/lib/avatar-helpers.js?v=mldsv63"></script>
-<script src="scripts/lib/toolbar-ui.js?v=mldsv63"></script>
-<script src="scripts/lib/filtro-builder.js?v=mldsv63"></script>
-<script src="scripts/lib/sort-builder.js?v=mldsv63"></script>
-<script src="scripts/lib/group-builder.js?v=mldsv63"></script>
-<script src="scripts/lib/group-tree.js?v=mldsv63"></script>
-<script src="scripts/lib/smart-search.js?v=mldsv63"></script>
-<script src="scripts/lib/privacidade-atividade.js?v=mldsv63"></script>
-<script src="scripts/lib/moeda.js?v=mldsv63"></script>
-<script src="scripts/lib/fornecedor-opcoes.js?v=mldsv63"></script>
-<script src="scripts/lib/fornecedor-validacao.js?v=mldsv63"></script>
-<script src="scripts/lib/multiselect-ui.js?v=mldsv63"></script>
-<script src="scripts/services/usuarios.service.js?v=mldsv63"></script>
-<script src="scripts/services/auth.service.js?v=mldsv63"></script>
-<script src="scripts/services/propostas.service.js?v=mldsv63"></script>
+<script src="scripts/lib/supabase-client.js?v=mldsv64"></script>
+<script src="scripts/lib/realtime-sync.js?v=mldsv64"></script>
+<script src="scripts/lib/ui-helpers.js?v=mldsv64"></script>
+<script src="scripts/lib/avatar-helpers.js?v=mldsv64"></script>
+<script src="scripts/lib/toolbar-ui.js?v=mldsv64"></script>
+<script src="scripts/lib/filtro-builder.js?v=mldsv64"></script>
+<script src="scripts/lib/sort-builder.js?v=mldsv64"></script>
+<script src="scripts/lib/group-builder.js?v=mldsv64"></script>
+<script src="scripts/lib/group-tree.js?v=mldsv64"></script>
+<script src="scripts/lib/smart-search.js?v=mldsv64"></script>
+<script src="scripts/lib/privacidade-atividade.js?v=mldsv64"></script>
+<script src="scripts/lib/moeda.js?v=mldsv64"></script>
+<script src="scripts/lib/fornecedor-opcoes.js?v=mldsv64"></script>
+<script src="scripts/lib/fornecedor-validacao.js?v=mldsv64"></script>
+<script src="scripts/lib/multiselect-ui.js?v=mldsv64"></script>
+<script src="scripts/services/usuarios.service.js?v=mldsv64"></script>
+<script src="scripts/services/auth.service.js?v=mldsv64"></script>
+<script src="scripts/services/propostas.service.js?v=mldsv64"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
@@ -282,7 +282,7 @@
 <!-- Design system unificado dos campos do wizard Nova Obra: todo select/input/checklist
      do modal usa a mesma geometria de .mf input,.mf select (padding 9px 12px, radius 7px,
      borda var(--border), foco navy com ring) para não ter dois estilos de campo coexistindo. -->
-<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv63">
+<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv64">
 <!-- MODAL NOVA OBRA — wizard 4 etapas (fluxo único, sem gate de tipo) -->
 <div class="modal-backdrop" id="modal-nova-obra" onclick="handleModalBackdrop(event)">
  <div class="modal" id="modal-obra-box" style="max-width:900px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh">
@@ -1042,7 +1042,7 @@
 <div id="page-empresas" class="page" style="padding-top:8px">
 
  <!-- Estilos Notion para esta página -->
-<link rel="stylesheet" href="styles/empresas.css?v=mldsv63">
+<link rel="stylesheet" href="styles/empresas.css?v=mldsv64">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -1503,20 +1503,21 @@
  <div class="nt-count" id="forn-count">0 fornecedores</div>
  </div><!-- /tab-panel-fornecedores -->
 
- <!-- DRAWER NOVO/EDITAR FORNECEDOR (mesmo padrão visual do drawer de
-      Atividades do Gestor de Tarefas — task-drw* — reaproveita as classes,
-      sem inventar linguagem visual nova. Autosave só em modo edição, ver
+ <!-- MODAL NOVO/EDITAR FORNECEDOR (mesmo padrão visual dos demais modais do
+      sistema — modal-backdrop/modal/modal-header/modal-body/modal-footer,
+      ver Nova Obra/Novo Projeto — largura maior pra acomodar a grade de
+      produtos orçados sem apertar. Autosave só em modo edição, ver
       _fornAutoSaveQueue/_fornAutoSaveProdutosQueue em empresas.js.) -->
- <div class="task-drw-bd" id="forn-drw-bd" onclick="closeNovoFornecedor()"></div>
- <div class="task-drw" id="forn-drw" style="width:640px">
-  <div class="task-drw-hd">
+ <div class="modal-backdrop" id="forn-drw-bd" onclick="if(event.target===this)closeNovoFornecedor()">
+ <div class="modal" id="forn-drw" style="max-width:900px">
+  <div class="modal-header">
    <div style="flex:1">
-    <div class="task-drw-ttl" id="fn-drw-ttl">Novo Fornecedor</div>
-    <div id="forn-drw-savestatus" class="task-drw-savestatus"></div>
+    <div class="modal-title" id="fn-drw-ttl">Novo Fornecedor</div>
+    <div id="forn-drw-savestatus" class="task-drw-savestatus" style="margin-top:2px"></div>
    </div>
-   <button class="task-drw-close" onclick="closeNovoFornecedor()">&times;</button>
+   <button class="modal-close" onclick="closeNovoFornecedor()">&times;</button>
   </div>
-  <div class="task-drw-body">
+  <div class="modal-body">
 
    <div class="form-section-title">Informações Gerais</div>
    <div class="form-grid">
@@ -1582,17 +1583,20 @@
     Cotação
     <span style="font-weight:400;font-size:11px;color:var(--muted);text-transform:none;letter-spacing:0"> — produtos/serviços orçados com este fornecedor (status por item)</span>
    </div>
-   <div id="fn-produtos-cabecalho" style="display:none;grid-template-columns:1fr 80px 100px 100px 100px 140px 32px;gap:6px;padding:0 2px;margin-bottom:4px">
-    <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Produto/Serviço</span>
-    <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Qtd.</span>
-    <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Unidade</span>
-    <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Valor unit.</span>
-    <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Total</span>
-    <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Status cotação</span>
-    <span></span>
-   </div>
-   <div id="fn-produtos-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
-    <!-- linhas adicionadas dinamicamente -->
+   <div style="overflow-x:auto;margin-bottom:8px">
+    <div id="fn-produtos-cabecalho" style="display:none;grid-template-columns:minmax(150px,1fr) 70px 100px 100px 100px 130px 90px 30px;gap:8px;padding:0 2px;margin-bottom:4px">
+     <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Produto/Serviço</span>
+     <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Qtd.</span>
+     <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Unidade</span>
+     <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Valor unit.</span>
+     <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Total</span>
+     <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Status cotação</span>
+     <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px">Data</span>
+     <span></span>
+    </div>
+    <div id="fn-produtos-list" style="display:flex;flex-direction:column;gap:6px">
+     <!-- linhas adicionadas dinamicamente -->
+    </div>
    </div>
    <button type="button" onclick="addFornProdutoLinha()" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border:1px dashed var(--border);border-radius:6px;background:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text)'" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)'">
     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
@@ -1616,10 +1620,14 @@
    </div>
 
   </div>
-  <div class="task-drw-ft">
-   <button class="btn btn-ghost" id="fn-drw-cancel-btn" onclick="closeNovoFornecedor()">Cancelar</button>
-   <button class="btn btn-primary" id="fn-drw-submit-btn" onclick="submitNovoFornecedor()">Salvar fornecedor</button>
+  <div class="modal-footer">
+   <div></div>
+   <div class="modal-actions">
+    <button class="btn btn-ghost" id="fn-drw-cancel-btn" onclick="closeNovoFornecedor()">Cancelar</button>
+    <button class="btn btn-primary" id="fn-drw-submit-btn" onclick="submitNovoFornecedor()">Salvar fornecedor</button>
+   </div>
   </div>
+ </div>
  </div>
 
 </div>
@@ -2112,7 +2120,7 @@
  <!-- ENTREGAS -->
  <div id="page-entregas" class="page">
 
-<link rel="stylesheet" href="styles/entregas.css?v=mldsv63">
+<link rel="stylesheet" href="styles/entregas.css?v=mldsv64">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -2776,20 +2784,20 @@
 
 </main>
 
-<script src="scripts/app.js?v=mldsv63"></script>
-<script src="scripts/modules/side-panel.js?v=mldsv63"></script>
-<script src="scripts/lib/atividades-vinculos.js?v=mldsv63"></script>
-<script src="scripts/modules/obras.js?v=mldsv63"></script>
-<script src="scripts/modules/projetos.js?v=mldsv63"></script>
-<script src="scripts/modules/entregas.js?v=mldsv63"></script>
-<script src="scripts/modules/instalacoes.js?v=mldsv63"></script>
-<script src="scripts/modules/empresas.js?v=mldsv63"></script>
-<script src="scripts/modules/wizard-nova-obra.js?v=mldsv63"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv63"></script>
-<script src="scripts/modules/melhorias.js?v=mldsv63"></script>
-<script src="scripts/modules/admin.js?v=mldsv63"></script>
-<script src="scripts/modules/exec-dashboard.js?v=mldsv63"></script>
-<script src="scripts/modules/tarefas.js?v=mldsv63"></script>
+<script src="scripts/app.js?v=mldsv64"></script>
+<script src="scripts/modules/side-panel.js?v=mldsv64"></script>
+<script src="scripts/lib/atividades-vinculos.js?v=mldsv64"></script>
+<script src="scripts/modules/obras.js?v=mldsv64"></script>
+<script src="scripts/modules/projetos.js?v=mldsv64"></script>
+<script src="scripts/modules/entregas.js?v=mldsv64"></script>
+<script src="scripts/modules/instalacoes.js?v=mldsv64"></script>
+<script src="scripts/modules/empresas.js?v=mldsv64"></script>
+<script src="scripts/modules/wizard-nova-obra.js?v=mldsv64"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv64"></script>
+<script src="scripts/modules/melhorias.js?v=mldsv64"></script>
+<script src="scripts/modules/admin.js?v=mldsv64"></script>
+<script src="scripts/modules/exec-dashboard.js?v=mldsv64"></script>
+<script src="scripts/modules/tarefas.js?v=mldsv64"></script>
 
  <!-- BACKDROP DRAWERS -->
  <div class="drw-backdrop" id="drw-backdrop-proj" onclick="_projDrawerClose()"></div>
@@ -3229,7 +3237,7 @@
 <!-- SISTEMA DE AUTENTICAÇÃO MILATEC v3.04 — Identidade Visual Grupo Mila      -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<link rel="stylesheet" href="styles/auth.css?v=mldsv63">
+<link rel="stylesheet" href="styles/auth.css?v=mldsv64">
 
 <!-- ═══════════════════════════════════════════════════════════════
      TELA 1 — LOGIN
