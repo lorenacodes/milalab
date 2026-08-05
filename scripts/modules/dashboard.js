@@ -295,7 +295,13 @@ function _navBadgesLoadInitial() {
   var el = document.getElementById('nav-badge-' + k);
   if (el && !el.textContent.trim()) el.textContent = '—';
  });
- return _sb.rpc('rpc_sidebar_counts').then(function(r) {
+ var userEmail = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || '';
+ // Os badges de Gestor de Tarefas e Meu Painel usam a MESMA rpc_atividades_kpis
+ // já usada pelas barras de KPI de cada tela (global pra Gestor, escopada por
+ // e-mail pra Painel) — disparados junto com os 6 badges de entidade, em
+ // paralelo, pra todos carregarem ao mesmo tempo (não só depois que o
+ // usuário abrir cada aba).
+ var pSidebar = _sb.rpc('rpc_sidebar_counts').then(function(r) {
   if (r.error) throw r.error;
   var row = Array.isArray(r.data) ? r.data[0] : r.data;
   if (row) {
@@ -312,7 +318,28 @@ function _navBadgesLoadInitial() {
    var el = document.getElementById('nav-badge-' + k);
    if (el && !/^\d+$/.test(el.textContent.trim())) el.textContent = '—';
   });
- }).finally(function() { _navBadgesLoadInFlight = false; });
+ });
+ var pGestor = _sb.rpc('rpc_atividades_kpis', { p_responsavel: null }).then(function(r) {
+  if (r.error) throw r.error;
+  var row = Array.isArray(r.data) ? r.data[0] : r.data;
+  var el = document.getElementById('nav-badge-gestor');
+  if (el && row) el.textContent = row.a_fazer;
+ }).catch(function(e) {
+  console.error('[Badges] Erro ao carregar contador de Gestor de Tarefas:', e);
+  var el = document.getElementById('nav-badge-gestor');
+  if (el && !/^\d+$/.test(el.textContent.trim())) el.textContent = '—';
+ });
+ var pPainel = userEmail ? _sb.rpc('rpc_atividades_kpis', { p_responsavel: userEmail }).then(function(r) {
+  if (r.error) throw r.error;
+  var row = Array.isArray(r.data) ? r.data[0] : r.data;
+  var el = document.getElementById('nav-badge-painel');
+  if (el && row) el.textContent = row.a_fazer;
+ }).catch(function(e) {
+  console.error('[Badges] Erro ao carregar contador de Meu Painel:', e);
+  var el = document.getElementById('nav-badge-painel');
+  if (el && !/^\d+$/.test(el.textContent.trim())) el.textContent = '—';
+ }) : Promise.resolve();
+ return Promise.all([pSidebar, pGestor, pPainel]).finally(function() { _navBadgesLoadInFlight = false; });
 }
 
 function _navBadgeBump(badgeId, delta) {
@@ -3683,7 +3710,7 @@ async function _dashLoadKpisRpc() {
  if (_dashKpisRpcInFlight) return;
  if (!_sb) return;
  var userEmail = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || '';
- var ids = ['dash-kpi-atr', 'dash-kpi-andamento', 'dash-kpi-abertas'];
+ var ids = ['dash-kpi-atr', 'dash-kpi-andamento', 'dash-kpi-abertas', 'nav-badge-painel'];
  _dashKpisRpcInFlight = true;
  try {
   var r = await _sb.rpc('rpc_atividades_kpis', { p_responsavel: userEmail || null });
@@ -3696,6 +3723,8 @@ async function _dashLoadKpisRpc() {
   if (kAnd) kAnd.textContent = row.em_andamento;
   var kO = document.getElementById('dash-kpi-abertas');
   if (kO) kO.textContent = row.a_fazer;
+  var kBadge = document.getElementById('nav-badge-painel');
+  if (kBadge) kBadge.textContent = row.a_fazer; // mesma fonte do badge do menu lateral — nunca diverge
  } catch (e) {
   console.error('[Painel] Erro ao carregar KPIs (rpc_atividades_kpis):', e);
   ids.forEach(function(id) {

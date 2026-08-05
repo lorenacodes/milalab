@@ -490,7 +490,7 @@ async function _gestorLoadKpis() {
  if (_gestorKpisInFlight) return;
  if (!_sb) return;
  _gestorKpisInFlight = true;
- var ids = ['gst-total', 'gst-prog', 'gst-pend', 'gst-late', 'gst-afazer'];
+ var ids = ['gst-total', 'gst-prog', 'gst-pend', 'gst-late', 'gst-afazer', 'nav-badge-gestor'];
  try {
   var r = await _sb.rpc('rpc_atividades_kpis', { p_responsavel: null });
   if (r.error) throw r.error;
@@ -502,6 +502,7 @@ async function _gestorLoadKpis() {
   set('gst-pend',   row.pendente);
   set('gst-late',   row.atrasada);
   set('gst-afazer', row.a_fazer);
+  set('nav-badge-gestor', row.a_fazer); // mesma fonte do badge do menu lateral — nunca diverge
  } catch (e) {
   console.error('[Gestor] Erro ao carregar KPIs (rpc_atividades_kpis):', e);
   // Falha de conexão/RPC: mantém "—" em vez de travar ou mostrar número velho.
