@@ -7,6 +7,38 @@
 // novo só por causa disso — mesma tabela `fornecedores`/mesmas funções
 // _dbLoadFornecedores/_renderFornecedores/openNovoFornecedor de sempre).
 // ═══════════════════════════════════════════════════════════════════════════════
+// Opções fixas do <select> de Estado do painel de detalhe — só as 23 UFs que
+// o campo "Estado da Empresa" (singleSelect) tem configuradas de fato no
+// Airtable (fonte única da verdade), não as 27 UFs do Brasil. Não reusar a
+// lista completa de UF de Obras/Fornecedores aqui: o ponto é fidelidade ao
+// vocabulário real deste campo específico.
+var EMPRESA_ESTADO_OPCOES = ['AL','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RS','SC','SE','SP','TO'];
+// Fase do ciclo de vida (singleSelect) e Categoria (multipleSelects) — mesma
+// fonte (Airtable) que alimenta os campos de filtro (_empFbFields) mais
+// abaixo, aqui reaproveitados pro <select>/multiselect do painel de detalhe.
+var EMPRESA_FASE_OPCOES = ['Cliente','Cliente inativo','Cliente recorrente','Consumidor Final','Lead','Parceiro comercial'];
+var EMPRESA_CATEGORIA_OPCOES = ['Modular','Solar','Steel Frame','Telhados'];
+function _spEmpOptSelect(list, atual) {
+ return '<option value="">—</option>' + list.map(function(o) {
+  return '<option value="' + o + '"' + (o === atual ? ' selected' : '') + '>' + o + '</option>';
+ }).join('');
+}
+
+// Categoria (multipleSelects real no Airtable) — mesmo componente de
+// multiselect-ui.js já usado pra Setor/Cidade de Fornecedores
+// (_fornRenderSetoresDropdown), só que aqui dentro do painel lateral de
+// detalhe de Empresa em vez do formulário de cadastro.
+var _spEmpCategoriaSel = [];
+function _spEmpRenderCategoriaDropdown() {
+ var wrap = document.getElementById('sp-emp-categoria-dropdown');
+ if (wrap) wrap.innerHTML = _msRenderDropdown('sp-emp-categoria', EMPRESA_CATEGORIA_OPCOES, _spEmpCategoriaSel, '_spEmpCategoriaToggle', 'Selecione a(s) categoria(s)');
+}
+function _spEmpCategoriaToggle(campo, valor, checked) {
+ _spEmpCategoriaSel = _msToggle(_spEmpCategoriaSel, valor, checked);
+ var btn = document.querySelector('#sp-emp-categoria-dropdown .fb-msel-btn');
+ if (btn) btn.textContent = _spEmpCategoriaSel.length ? _spEmpCategoriaSel.length + ' selecionado(s)' : 'Selecione a(s) categoria(s)';
+}
+
 async function _spEmpresas(row, tds) {
  var d = row.dataset;
  var empId = d.id || '';
@@ -15,22 +47,44 @@ async function _spEmpresas(row, tds) {
  var emp = (_empresasArr || []).find(function(e){ return String(e.id) === String(empId); }) || {};
  var nome = emp.nome || d.nome || '';
  var cnpj = emp.cnpj || '';
- var estado = emp.estado || '';
+ var estado = (emp.estado || '').toUpperCase();
  var fase   = emp.fase_ciclo_vida || '';
- var cats   = (emp.categoria || []).join(', ');
+ _spEmpCategoriaSel = (emp.categoria || []).slice();
+
+ // Auditoria: created_at/updated_at NÃO são usados aqui de propósito — são
+ // timestamps de LOTE da migração (poucas dezenas de valores distintos pra
+ // 636 empresas, idênticos entre registros migrados juntos), não a data real
+ // de cada registro. ultima_modificacao é que carrega o "Última modificação"
+ // real do Airtable (lastModifiedTime, 294 valores distintos verificados por
+ // SQL) — por isso é essa a data mostrada, junto de quem criou/alterou por
+ // último. Não existe coluna com a data de criação real (Airtable tem
+ // "Data de criação" mas ela não foi migrada como coluna própria) — por isso
+ // "Criado por" aparece sem data ao lado.
+ var auditHtml = '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
+  + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Auditoria</div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">'+(emp.criado_por||'—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">'+(emp.ultima_alteracao_por||'—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última modificação</span><span class="drw-audit-val">'+(emp.ultima_modificacao ? new Date(emp.ultima_modificacao).toLocaleString('pt-BR') : '—')+'</span></div>'
+  + '</div>';
 
  _spSet('Empresa', nome,
   '<div class="sp-field"><div class="sp-label">Razão Social</div>'
   + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/"/g,'&quot;')+'"></div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-emp-cnpj" value="'+cnpj.replace(/"/g,'&quot;')+'"></div>'
-  + '<div class="sp-field"><div class="sp-label">Estado</div><input class="sp-inp" id="sp-emp-estado" maxlength="2" style="text-transform:uppercase" value="'+estado.toUpperCase()+'"></div>'
+  + '<div class="sp-field"><div class="sp-label">Estado</div><select class="sp-inp" id="sp-emp-estado">'+_spEmpOptSelect(EMPRESA_ESTADO_OPCOES, estado)+'</select></div>'
   + '</div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Categoria (separe por vírgula)</div><input class="sp-inp" id="sp-emp-categoria" value="'+cats.replace(/"/g,'&quot;')+'"></div>'
-  + '<div class="sp-field"><div class="sp-label">Fase</div><input class="sp-inp" id="sp-emp-fase" value="'+fase.replace(/"/g,'&quot;')+'"></div>'
+  + '<div class="sp-field"><div class="sp-label">Categoria</div><div id="sp-emp-categoria-dropdown"></div></div>'
+  + '<div class="sp-field"><div class="sp-label">Fase</div><select class="sp-inp" id="sp-emp-fase">'+_spEmpOptSelect(EMPRESA_FASE_OPCOES, fase)+'</select></div>'
   + '</div>'
   + '<input type="hidden" id="sp-emp-id" value="'+empId+'">'
+  + auditHtml
+  + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
+  + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Obras vinculadas</div>'
+  + '<div id="sp-emp-obras" style="display:flex;flex-direction:column;gap:6px">'
+  + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando obras...</div>'
+  + '</div></div>'
   + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
   + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Contatos vinculados</div>'
   + '<div id="sp-emp-contatos" style="display:flex;flex-direction:column;gap:8px">'
@@ -39,7 +93,31 @@ async function _spEmpresas(row, tds) {
   '<button class="btn btn-primary" id="sp-emp-save-btn" onclick="_spSaveEmpresa()">Salvar</button> <button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
  );
 
+ _spEmpRenderCategoriaDropdown();
+
  if (!_sb || !empId) return;
+
+ // Obras vinculadas — busca preguiçosa (só quando o painel de UMA empresa
+ // abre, não junto de _dbLoadEmpresas pra todas as 636 de uma vez): a
+ // relação empresa→obra vem da junction empresas_obras (verificada com 1561
+ // linhas reais em produção antes de escrever este código).
+ _sb.from('empresas_obras')
+  .select('obra:obra_id(id, nome)')
+  .eq('empresa_id', empId)
+  .then(function(res) {
+   var container = document.getElementById('sp-emp-obras');
+   if (!container) return;
+   if (res.error || !res.data || !res.data.length) {
+    container.innerHTML = '<div class="sp-empty">Nenhuma obra vinculada a esta empresa.</div>';
+    return;
+   }
+   container.innerHTML = res.data.map(function(link) {
+    var o = link.obra;
+    if (!o) return '';
+    return '<div style="font-size:12px;padding:6px 10px;background:rgba(0,0,0,.025);border:1px solid var(--border);border-radius:6px">'+(o.nome||'—')+'</div>';
+   }).join('');
+  });
+
  var res = await _sb.from('contatos_empresas')
   .select('is_primary, contato:contato_id(id, nome_completo, cargo, email, telefone)')
   .eq('empresa_id', empId)
@@ -149,7 +227,7 @@ async function _dbLoadEmpresas() {
  var allData = []; var from = 0; var more = true;
  while (more) {
   var res = await _sb.from('empresas')
-   .select('id, nome, cnpj, estado, fase_ciclo_vida, categoria, contatos_empresas(contato_id)')
+   .select('id, nome, cnpj, estado, fase_ciclo_vida, categoria, criado_por, ultima_alteracao_por, ultima_modificacao, contatos_empresas(contato_id)')
    .order('nome').range(from, from + 999);
   if (res.error || !res.data || !res.data.length) break;
   allData = allData.concat(res.data);
@@ -197,7 +275,7 @@ async function _dbLoadEmpresas() {
    + ' data-nome="'+(e.nome||'').toLowerCase()+'"'
    + ' data-fase="'+fase.toLowerCase()+'"'
    + ' data-estado="'+(e.estado||'').toLowerCase()+'"'
-   + ' data-setor="'+cats.join(',').toLowerCase()+'">'
+   + ' data-categoria="'+cats.join(',').toLowerCase()+'">'
    + '<td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>'
    + '<td><div style="display:flex;align-items:center;gap:10px">'
    + '<div class="nt-avatar" style="background:'+_empColor(e.nome)+'">'+initials+'</div>'
@@ -324,8 +402,8 @@ async function _spSaveEmpresa() {
   nome:            (document.getElementById('sp-emp-nome')    || {}).value.trim() || '',
   cnpj:            (document.getElementById('sp-emp-cnpj')    || {}).value.trim() || null,
   estado:          ((document.getElementById('sp-emp-estado') || {}).value || '').trim().toUpperCase() || null,
-  fase_ciclo_vida: (document.getElementById('sp-emp-fase')    || {}).value.trim() || null,
-  categoria:       ((document.getElementById('sp-emp-categoria') || {}).value || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean),
+  fase_ciclo_vida: ((document.getElementById('sp-emp-fase')    || {}).value || '').trim() || null,
+  categoria:       (_spEmpCategoriaSel || []).slice(),
   ultima_alteracao_por: (_currentUser && _currentUser.email) || null,
   ultima_modificacao: new Date().toISOString(),
  };
@@ -1146,18 +1224,34 @@ function openNovaEmpresa() { alert('Modal de nova empresa — a implementar'); }
 function openNovoContato() { alert('Modal de novo contato — a implementar'); }
 
 // ── Estado dos filtros (movido de dashboard.js) ──────────────────────────────
+// Cargo (singleSelect real no Airtable, tabela Contatos) — vocabulário
+// verificado direto no Airtable (fonte única da verdade), reproduzido aqui
+// fielmente. Inclui duplicatas quase-idênticas de grafia/caixa que já
+// existem nos dados reais (ex.: "COMPRAS"/"Compras", "SÓCIO"/"Sócio(a)") —
+// isso é um problema de qualidade de dado do Airtable histórico, não algo
+// pra "corrigir" silenciosamente aqui: deduplicar esconderia valores que
+// alguém pode ter escolhido de propósito. Ver relatório desta tarefa.
+var CONTATO_CARGO_OPCOES = [
+ 'Analista de compras/suprimentos', 'Auxiliar de engenharia', 'Chefe', 'COMPRAS', 'Compras',
+ 'Coordenador(a) de compras/suprimentos', 'DIRETOR', 'Diretor Comercial', 'Diretor de Operações',
+ 'Engenheira', 'Engenheiro da obra', 'Engenheiro(a)', 'Estagiário(a)', 'Financeiro(a)',
+ 'Gerente de projetos', 'Presidente', 'Projetista', 'Representante Comercial', 'Sócia',
+ 'SÓCIO', 'Sócio(a)', 'Técnico'
+];
 var _empCampos = {
  'nome': { label: 'Empresa', type: 'text' },
- 'setor': { label: 'Setor', type: 'select', opts: ['Construtoras','Incorporadoras','Indústria','Governo','Arquitetura'] },
- 'tipo': { label: 'Tipo', type: 'select', opts: ['Cliente','Parceiro','Fornecedor','Lead'] },
- 'fase': { label: 'Fase', type: 'select', opts: ['Prospect','Qualificado','Proposta','Negociação','Fechado'] },
- 'cidade': { label: 'Cidade', type: 'text' },
- 'estado': { label: 'Estado', type: 'select', opts: ['SP','DF','GO','MG','PR','RJ'] }
+ // type 'multitext' é o tipo que filtro-builder.js já entende pra campos
+ // array-valued comparados via string separada por vírgula (mesmo padrão de
+ // Setor/Cidade em _fornFbFields) — dataset.categoria é gravado como
+ // "modular,solar".toLowerCase() em _dbLoadEmpresas, exatamente o formato
+ // que _fbEvalCondition espera pra esse tipo.
+ 'categoria': { label: 'Categoria', type: 'multitext', opts: EMPRESA_CATEGORIA_OPCOES },
+ 'fase': { label: 'Fase', type: 'select', opts: EMPRESA_FASE_OPCOES },
+ 'estado': { label: 'Estado', type: 'select', opts: EMPRESA_ESTADO_OPCOES }
 };
 var _cttCampos = {
  'nome': { label: 'Nome', type: 'text' },
- 'cargo': { label: 'Cargo', type: 'text' },
- 'perfil': { label: 'Perfil', type: 'select', opts: ['Decisor','Técnico','Financeiro','Operacional'] },
+ 'cargo': { label: 'Cargo', type: 'select', opts: CONTATO_CARGO_OPCOES },
  'empresa': { label: 'Empresa', type: 'text' }
 };
 var _empCttOps = {
@@ -1196,7 +1290,7 @@ _fbInit('empresas', _empFbFields, _empApplyFilters);
 
 var _empSbFields = [
  { key: 'nome', label: 'Empresa', type: 'text' },
- { key: 'setor', label: 'Setor', type: 'text' },
+ { key: 'categoria', label: 'Categoria', type: 'text' },
  { key: 'fase', label: 'Fase', type: 'text' },
  { key: 'estado', label: 'Estado', type: 'text' },
 ];
