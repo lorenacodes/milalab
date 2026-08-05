@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const smartSearch = require('./smart-search.js');
 global._ssNormalize = smartSearch._ssNormalize;
 global._ssMatch = smartSearch._ssMatch;
-const { _fbInstances, _fbInit, _fbEvaluate, _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbValueChange, _fbSearchableDropdown, _FB_SEARCH_THRESHOLD } = require('./filtro-builder.js');
+const { _fbInstances, _fbInit, _fbEvaluate, _fbConditionIsUsable, _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbOperatorChange, _fbValueChange, _fbValueChangeRange, _fbSearchableDropdown, _FB_SEARCH_THRESHOLD } = require('./filtro-builder.js');
 
 const ITEMS = [
  { id: 1, area: 'TI', prioridade: 'Alta', melhoria: '' },
@@ -179,4 +179,48 @@ test('_fbSearchableDropdown: seleção múltipla (anyof/noneof) marca os itens j
 test('_fbSearchableDropdown: seleção única (eq/is) destaca a opção ativa', () => {
  const html = _fbSearchableDropdown('d1', { id: 'c1', value: 'Obra Teste 5' }, { options: MANY_OBRAS }, false);
  assert.match(html, /fb-msel-item fb-msel-item-active" data-norm="obra teste 5"/);
+});
+
+// ── Operador 'between' (intervalo de datas) — usado por Gestor de Tarefas
+// pra consolidar Início/Prazo como condições do filtro em vez de controles
+// à parte na toolbar (ver tarefas.js: campos data_inicio/data_prazo). ──
+const DATE_FIELDS = [{ key: 'data_prazo', label: 'Prazo', type: 'date' }];
+const DATE_ITEMS = [
+ { id: 1, data_prazo: '2026-01-05' },
+ { id: 2, data_prazo: '2026-01-15' },
+ { id: 3, data_prazo: '2026-02-01' },
+ { id: 4, data_prazo: null },
+];
+
+test("_fbConditionIsUsable: 'between' só é usável com as duas pontas preenchidas", () => {
+ assert.equal(_fbConditionIsUsable({ operator: 'between', value: ['', ''] }), false);
+ assert.equal(_fbConditionIsUsable({ operator: 'between', value: ['2026-01-01', ''] }), false);
+ assert.equal(_fbConditionIsUsable({ operator: 'between', value: ['2026-01-01', '2026-01-31'] }), true);
+});
+
+test("'between': filtra datas dentro do intervalo (inclusive nas duas pontas)", () => {
+ _fbInit('dt1', DATE_FIELDS, null);
+ _fbInstances.dt1.state.conditions = [{ id: 'c1', field: 'data_prazo', operator: 'between', value: ['2026-01-01', '2026-01-15'] }];
+ assert.deepEqual(DATE_ITEMS.filter((i) => _fbEvaluate(i, 'dt1')).map((i) => i.id), [1, 2]);
+});
+
+test("'between': data nula nunca entra no intervalo", () => {
+ _fbInit('dt2', DATE_FIELDS, null);
+ _fbInstances.dt2.state.conditions = [{ id: 'c1', field: 'data_prazo', operator: 'between', value: ['2020-01-01', '2030-01-01'] }];
+ assert.deepEqual(DATE_ITEMS.filter((i) => _fbEvaluate(i, 'dt2')).map((i) => i.id), [1, 2, 3]);
+});
+
+test("_fbOperatorChange: trocar pra 'between' inicializa value como par vazio", () => {
+ _fbInit('dt3', DATE_FIELDS, null);
+ _fbInstances.dt3.state.conditions = [{ id: 'c1', field: 'data_prazo', operator: 'eq', value: '2026-01-05' }];
+ _fbOperatorChange('dt3', 'c1', 'between');
+ assert.deepEqual(_fbInstances.dt3.state.conditions[0].value, ['', '']);
+});
+
+test("_fbValueChangeRange: seta cada ponta do intervalo independentemente", () => {
+ _fbInit('dt4', DATE_FIELDS, null);
+ _fbInstances.dt4.state.conditions = [{ id: 'c1', field: 'data_prazo', operator: 'between', value: ['', ''] }];
+ _fbValueChangeRange('dt4', 'c1', 0, '2026-01-01');
+ _fbValueChangeRange('dt4', 'c1', 1, '2026-01-31');
+ assert.deepEqual(_fbInstances.dt4.state.conditions[0].value, ['2026-01-01', '2026-01-31']);
 });

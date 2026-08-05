@@ -15,7 +15,7 @@ var FB_OPS = {
  text:      [['contains','contém'],['ncontains','não contém'],['eq','é'],['neq','não é'],['empty','está vazio'],['nempty','não está vazio']],
  select:    [['eq','é'],['neq','não é'],['anyof','é qualquer um de'],['noneof','não é nenhum de'],['empty','está vazio'],['nempty','não está vazio']],
  multitext: [['contains','contém'],['anyof','é qualquer um de'],['empty','está vazio'],['nempty','não está vazio']],
- date:      [['eq','é'],['before','é antes de'],['after','é depois de'],['empty','está vazio'],['nempty','não está vazio']],
+ date:      [['eq','é'],['before','é antes de'],['after','é depois de'],['between','está entre'],['empty','está vazio'],['nempty','não está vazio']],
 };
 
 // fields: [{key,label,type:'text'|'select'|'multitext'|'date', options:[]|fn, getValue:fn(item)}]
@@ -29,6 +29,10 @@ function _fbNewCondition(inst) {
 }
 function _fbConditionIsUsable(c) {
  if (c.operator==='empty' || c.operator==='nempty') return true;
+ // 'between' (intervalo de datas) só é usável com as DUAS pontas preenchidas
+ // — um intervalo aberto de um lado só não tem semântica definida aqui
+ // (diferente de anyof/noneof, onde qualquer opção marcada já basta).
+ if (c.operator==='between') return Array.isArray(c.value) && c.value.length===2 && !!c.value[0] && !!c.value[1];
  if (Array.isArray(c.value)) return c.value.length > 0;
  return c.value !== undefined && c.value !== null && String(c.value).trim() !== '';
 }
@@ -104,6 +108,7 @@ function _fbOperatorChange(instanceId, condId, op) {
  var f = _fbFieldByKey(inst, c.field);
  c.operator = op;
  if (op==='anyof' || op==='noneof') { if (!Array.isArray(c.value)) c.value = []; }
+ else if (op==='between') { if (!Array.isArray(c.value) || c.value.length!==2) c.value = ['','']; }
  else if (f.type==='select' && Array.isArray(c.value)) { c.value = ''; }
  _fbRender(instanceId);
  _fbApply(instanceId);
@@ -112,6 +117,14 @@ function _fbValueChange(instanceId, condId, val) {
  var inst = _fbInstances[instanceId];
  var c = inst.state.conditions.filter(function(x){ return x.id===condId; })[0];
  c.value = val;
+ _fbApply(instanceId);
+}
+// Uma ponta (De/Até) do operador 'between' — idx 0 = De, idx 1 = Até.
+function _fbValueChangeRange(instanceId, condId, idx, val) {
+ var inst = _fbInstances[instanceId];
+ var c = inst.state.conditions.filter(function(x){ return x.id===condId; })[0];
+ if (!Array.isArray(c.value) || c.value.length!==2) c.value = ['',''];
+ c.value[idx] = val;
  _fbApply(instanceId);
 }
 function _fbValueToggleOpt(instanceId, condId, opt, checked) {
@@ -180,6 +193,13 @@ function _fbEvalCondition(item, inst, c) {
   if (c.operator === 'empty')  return !d;
   if (c.operator === 'nempty') return !!d;
   if (!d) return false;
+  if (c.operator === 'between') {
+   // _fbConditionIsUsable já garante as duas pontas preenchidas antes de
+   // chegar aqui — sem checagem extra de null.
+   var cvIni = new Date(c.value[0] + 'T00:00:00');
+   var cvFim = new Date(c.value[1] + 'T00:00:00');
+   return d.getTime() >= cvIni.getTime() && d.getTime() <= cvFim.getTime();
+  }
   var cv = c.value ? new Date(c.value + 'T00:00:00') : null;
   if (!cv) return true;
   if (c.operator === 'eq')     return d.getTime() === cv.getTime();
@@ -265,6 +285,15 @@ function _fbRenderValueInput(instanceId, c, f) {
  if (f.type === 'select') {
   return _fbSearchableDropdown(instanceId, c, f, false);
  }
+ if (f.type === 'date' && c.operator === 'between') {
+  var rIni = (Array.isArray(c.value) && c.value[0]) || '';
+  var rFim = (Array.isArray(c.value) && c.value[1]) || '';
+  return '<span class="fb-val-range">'
+   + '<input type="date" class="fb-val-date" value="' + rIni + '" onchange="_fbValueChangeRange(\'' + instanceId + '\',\'' + c.id + '\',0,this.value)">'
+   + '<span class="fb-val-range-sep">até</span>'
+   + '<input type="date" class="fb-val-date" value="' + rFim + '" onchange="_fbValueChangeRange(\'' + instanceId + '\',\'' + c.id + '\',1,this.value)">'
+   + '</span>';
+ }
  if (f.type === 'date') {
   return '<input type="date" class="fb-val-date" value="' + (c.value||'') + '" onchange="_fbValueChange(\'' + instanceId + '\',\'' + c.id + '\',this.value)">';
  }
@@ -326,6 +355,6 @@ function _fbSelectValue(instanceId, condId, val) {
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
  module.exports = { _fbInstances, _fbInit, _fbEvaluate, _fbEvalCondition, _fbConditionIsUsable, FB_OPS,
- _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbOperatorChange, _fbValueChange, _fbSetLogic, _fbMoveCondition,
+ _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbOperatorChange, _fbValueChange, _fbValueChangeRange, _fbSetLogic, _fbMoveCondition,
  _fbSearchableDropdown, _FB_SEARCH_THRESHOLD };
 }

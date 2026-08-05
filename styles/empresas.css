@@ -7,7 +7,12 @@
  border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;
  margin-bottom:-1px;white-space:nowrap;transition:color .15s
  }
- .nt-view-btn.active { color:var(--text);border-bottom-color:var(--text) }
+ /* Era border-bottom-color:var(--text) — no tema claro --text é #0D1033 (navy
+    quase preto), o que rendia uma linha de 2px pesada e escura logo acima da
+    toolbar de filtro, destoando do resto do sistema (glass/silver-line). Todo
+    outro indicador de aba ativa do app usa var(--navy) (.dash-tab-btn,
+    .gestor-tab, .drw-tab, .spt-btn, .mc-db-tab...) — só esta ficara para trás. */
+ .nt-view-btn.active { color:var(--navy);border-bottom-color:var(--navy) }
  .nt-view-btn:hover:not(.active) { color:var(--text);background:rgba(0,0,0,.04) }
  body.light .nt-view-btn:hover:not(.active) { background:rgba(0,0,0,.04) }
  .nt-toolbar {

@@ -276,7 +276,7 @@ async function _remLoadSent() {
 // deste app, cobre os dois casos com o mesmo código — mesmo padrão já
 // usado em _remStartRealtime (lembretes).
 var _navBadgeChannels = {};
-var _NAV_BADGE_TABLES = ['empresas','obras','projetos','entregas','instalacoes','melhorias'];
+var _NAV_BADGE_TABLES = ['empresas','obras','projetos','entregas','instalacoes','melhorias','fornecedores'];
 var _navBadgesLoadInFlight = false; // guarda contra disparo duplicado (_dbInit rodando 2x, aba reaberta, etc.)
 
 // ── Carga inicial dos 6 badges — uma única RPC (rpc_sidebar_counts), COUNT

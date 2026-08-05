@@ -1,7 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// EMPRESAS — inclui as abas Contatos e Fornecedores (mesma página/UI,
-// switchEmpTab decide qual sub-aba mostrar). Contatos e Fornecedores não são
-// páginas próprias — por isso não têm módulo separado.
+// EMPRESAS — inclui a aba Contatos (mesma página/UI, switchEmpTab decide qual
+// sub-aba mostrar). Contatos não é página própria — por isso não tem módulo
+// separado. Fornecedores VIROU página própria de 1º nível (#page-fornecedores,
+// nav item + badge de sidebar dedicados — ver go('fornecedores') em app.js),
+// mas o código continua neste arquivo (nenhuma razão pra separar em módulo
+// novo só por causa disso — mesma tabela `fornecedores`/mesmas funções
+// _dbLoadFornecedores/_renderFornecedores/openNovoFornecedor de sempre).
 // ═══════════════════════════════════════════════════════════════════════════════
 async function _spEmpresas(row, tds) {
  var d = row.dataset;
@@ -344,16 +348,18 @@ async function _spSaveEmpresa() {
 }
 
 function switchEmpTab(tab) {
- var tabs = ['empresas', 'contatos', 'fornecedores'];
+ // Fornecedores saiu daqui — é página própria agora (#page-fornecedores,
+ // go('fornecedores') em app.js). Esta função só decide mais entre
+ // Empresas/Contatos, as duas sub-abas que sobraram dentro de #page-empresas.
+ var tabs = ['empresas', 'contatos'];
  tabs.forEach(function(t) {
   var panel = document.getElementById('tab-panel-' + t);
   if (panel) panel.style.display = (t === tab) ? 'block' : 'none';
  });
 
  var btns = {
-  'empresas':    document.getElementById('tab-emp-btn'),
-  'contatos':    document.getElementById('tab-ctt-btn'),
-  'fornecedores':document.getElementById('tab-forn-btn')
+  'empresas': document.getElementById('tab-emp-btn'),
+  'contatos': document.getElementById('tab-ctt-btn')
  };
  Object.keys(btns).forEach(function(k) {
   var b = btns[k];
@@ -363,11 +369,8 @@ function switchEmpTab(tab) {
   b.style.borderBottom = active ? '2px solid var(--navy)' : '2px solid transparent';
  });
 
- document.getElementById('btn-nova-empresa').style.display    = (tab === 'empresas')    ? 'inline-flex' : 'none';
- document.getElementById('btn-novo-contato').style.display    = (tab === 'contatos')    ? 'inline-flex' : 'none';
- document.getElementById('btn-novo-fornecedor').style.display = (tab === 'fornecedores') ? 'inline-flex' : 'none';
-
- if (tab === 'fornecedores') _dbLoadFornecedores();
+ document.getElementById('btn-nova-empresa').style.display = (tab === 'empresas') ? 'inline-flex' : 'none';
+ document.getElementById('btn-novo-contato').style.display = (tab === 'contatos') ? 'inline-flex' : 'none';
 }
 
 // ── Fornecedores (Supabase: fornecedores + fornecedores_produtos) ─────────────
@@ -416,21 +419,48 @@ function searchFornecedores(q) {
 var _fornStatusCor = { 'Em análise': 'nt-tag-yellow', 'Aprovado': 'nt-tag-green', 'Recusado': 'nt-tag-red', 'Aguardando retorno': 'nt-tag-gray', 'Cancelado': 'nt-tag-red' };
 var _fornExperienciaCor = { 'Positiva': 'nt-tag-green', 'Negativa': 'nt-tag-red' };
 
+// ── Filtro (filtro-builder.js) — mesmo padrão do Empresas/Gestor de Tarefas
+// (_fbInit + _fbEvaluate direto sobre o objeto do fornecedor, sem precisar
+// de dataset/DOM intermediário porque a tabela é re-renderizada do zero a
+// cada mudança, diferente de Empresas/Obras que só escondem/mostram <tr>). ──
+function _fornApplyFilters() { _renderFornecedores(); }
+
+var _fornFbFields = [
+ { key: 'nome',           label: 'Nome',           type: 'text' },
+ { key: 'setor',          label: 'Setor',          type: 'multitext', options: function(){ return SETORES_OPCOES; }, getValue: function(f){ return (f.setores||[]).join(', '); } },
+ { key: 'cidade',         label: 'Cidade',         type: 'multitext', options: function(){ return Array.from(new Set(_fornecedoresArr.reduce(function(a,f){ return a.concat(f.cidades||[]); }, []))).sort(); }, getValue: function(f){ return (f.cidades||[]).join(', '); } },
+ { key: 'estado',         label: 'Estado',         type: 'select', options: function(){ return Array.from(new Set(_fornecedoresArr.map(function(f){ return f.estado; }).filter(Boolean))).sort(); }, getValue: function(f){ return f.estado || ''; } },
+ { key: 'experiencia',    label: 'Experiência',    type: 'select', options: function(){ return EXPERIENCIA_OPCOES; }, getValue: function(f){ return f.experiencia || ''; } },
+ { key: 'status_cotacao', label: 'Status cotação', type: 'multitext', options: function(){ return STATUS_COTACAO_OPCOES; }, getValue: function(f){ return Array.from(new Set((f.produtos||[]).map(function(p){ return p.status_cotacao; }).filter(Boolean))).join(', '); } },
+];
+_fbInit('fornecedores', _fornFbFields, _fornApplyFilters);
+
 function _renderFornecedores() {
  var tbody = document.getElementById('forn-tbody');
  var count = document.getElementById('forn-count');
- var badge = document.getElementById('badge-forn');
  if (!tbody) return;
- if (badge) badge.textContent = _fornecedoresArr.length;
 
- var qn = _fornBusca.toLowerCase().trim();
- var lista = qn
-  ? _fornecedoresArr.filter(function(f){
-     return (f.nome||'').toLowerCase().includes(qn)
-      || (f.setores||[]).join(' ').toLowerCase().includes(qn)
-      || (f.cidades||[]).join(' ').toLowerCase().includes(qn);
-    })
-  : _fornecedoresArr;
+ var statTotal = document.getElementById('forn-stat-total');
+ if (statTotal) statTotal.textContent = _fornecedoresArr.length;
+
+ var qn = _ssNormalize(_fornBusca.trim());
+ var activeConds = (_fbInstances.fornecedores ? _fbInstances.fornecedores.state.conditions.filter(_fbConditionIsUsable).length : 0);
+ var lista = _fornecedoresArr.filter(function(f) {
+  var ok = _fbEvaluate(f, 'fornecedores');
+  if (ok && qn) {
+   var haystack = _ssNormalize([f.nome, (f.setores||[]).join(' '), (f.cidades||[]).join(' ')].filter(Boolean).join(' '));
+   ok = _ssMatch(haystack, qn);
+  }
+  return ok;
+ });
+
+ var fbBadge = document.getElementById('fb-badge-fornecedores');
+ if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
+ var filterCountEl = document.getElementById('forn-filter-count');
+ if (filterCountEl) {
+  if (activeConds || qn) { filterCountEl.textContent = lista.length + (lista.length === 1 ? ' resultado' : ' resultados'); filterCountEl.style.display = 'inline'; }
+  else { filterCountEl.style.display = 'none'; }
+ }
 
  if (count) count.textContent = lista.length + ' fornecedor' + (lista.length !== 1 ? 'es' : '');
 

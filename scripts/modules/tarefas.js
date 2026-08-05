@@ -190,103 +190,23 @@ function _gpToggle(force) {
  pop.style.display = open ? 'flex' : 'none';
  if (open && wrap && typeof _tsSmartPosition === 'function') _tsSmartPosition(wrap, pop);
 }
-// ── Filtros rápidos de data (Início / Prazo) na Toolbar — item #6 do pedido
-// de UX. Independentes do "Período" acima (_gestorPeriodo): aquele já existe
-// há mais tempo, usa OR entre início/prazo, e está entrelaçado com KPIs,
-// navegação da Timeline e o schema de Visualizações salvas (period_preset/
-// period_ini/period_fim em gestor_views) — mexer nele arriscava regressão
-// em ~15 pontos diferentes só pra adicionar 2 botões. Em vez disso, este é
-// um mecanismo NOVO e independente: mesma aparência/interação do "Período"
-// (reaproveita as classes .gp-wrap/.gp-pop/.gp-preset), estado próprio por
-// campo, e cada um vira uma condição AND extra em _gestorApplyFilters —
-// combináveis entre si e com o Filtro/Período existentes.
-var _gestorQuickDate = {
- inicio: { ini: null, fim: null, preset: null },
- prazo:  { ini: null, fim: null, preset: null },
-};
-var _gqdLabels = { semana:'Esta semana', prox2:'Próx. 2 semanas', mes:'Este mês', trim:'Trimestre', todas:'Todas', custom:'Personalizado' };
-
-function _gqdToggle(which, force) {
- var pop = document.getElementById('gqd-pop-' + which);
- var wrap = document.getElementById('gqd-wrap-' + which);
- if (!pop) return;
- var open = force !== undefined ? force : (pop.style.display === 'none');
- // Fecha o outro filtro rápido de data, mas só quando este está de fato
- // ABRINDO — bug real: ao fechar 'prazo' pelo clique-fora (force=false), o
- // "fecha o outro" também fechava 'inicio' mesmo quando o clique tinha sido
- // NELE, porque essa lógica rodava incondicionalmente. Clicar em "Início"
- // abria e fechava no mesmo evento (o listener de clique-fora, ao processar
- // o "fecha o outro" de 'prazo', apagava o 'inicio' que acabara de abrir).
- if (open) {
-  var other = which === 'inicio' ? 'prazo' : 'inicio';
-  var otherPop = document.getElementById('gqd-pop-' + other);
-  if (otherPop) otherPop.style.display = 'none';
- }
- pop.style.display = open ? 'flex' : 'none';
- if (open && wrap && typeof _tsSmartPosition === 'function') _tsSmartPosition(wrap, pop);
-}
-
-function _gqdSetInputDates(which, ini, fim) {
- var ei = document.getElementById('gqd-dt-ini-' + which);
- var ef = document.getElementById('gqd-dt-fim-' + which);
- if (ei) ei.value = _gestorFmtDate(ini);
- if (ef) ef.value = _gestorFmtDate(fim);
-}
-
-function _gqdToggleCustomDates(which) {
- var el = document.getElementById('gqd-custom-dates-' + which);
- if (!el) return;
- el.style.display = el.style.display === 'none' ? 'inline-flex' : 'none';
-}
-
-function _gqdPreset(which, preset, btn) {
- var pop = document.getElementById('gqd-pop-' + which);
- if (pop) pop.querySelectorAll('.gp-preset').forEach(function(b){ b.classList.remove('active'); });
- if (btn) btn.classList.add('active');
- if (btn) {
-  var cd = document.getElementById('gqd-custom-dates-' + which);
-  if (cd) cd.style.display = 'none';
- }
-
- var today = new Date(); today.setHours(0,0,0,0);
- var ini, fim;
- var lbl = document.getElementById('gqd-btn-lbl-' + which);
-
- if (preset === 'todas') {
-  _gestorQuickDate[which] = { ini: null, fim: null, preset: 'todas' };
-  if (lbl) lbl.textContent = which === 'inicio' ? 'Início' : 'Prazo';
-  var ei0 = document.getElementById('gqd-dt-ini-' + which), ef0 = document.getElementById('gqd-dt-fim-' + which);
-  if (ei0) ei0.value = ''; if (ef0) ef0.value = '';
-  _gestorApplyFilters();
-  _gqdToggle(which, false);
-  return;
- } else if (preset === 'semana') {
-  var r = _gestorWeekRange(0); ini = r.ini; fim = r.fim;
- } else if (preset === 'prox2') {
-  var r0 = _gestorWeekRange(0), r1 = _gestorWeekRange(1); ini = r0.ini; fim = r1.fim;
- } else if (preset === 'mes') {
-  ini = new Date(today.getFullYear(), today.getMonth(), 1);
-  fim = new Date(today.getFullYear(), today.getMonth()+1, 0);
- } else if (preset === 'trim') {
-  var qStart = Math.floor(today.getMonth()/3)*3;
-  ini = new Date(today.getFullYear(), qStart, 1);
-  fim = new Date(today.getFullYear(), qStart+3, 0);
- } else if (preset === 'custom') {
-  var ei = document.getElementById('gqd-dt-ini-' + which);
-  var ef = document.getElementById('gqd-dt-fim-' + which);
-  var vs = ei ? ei.value : '', ve = ef ? ef.value : '';
-  if (!vs || !ve) return; // aguarda as duas datas
-  ini = new Date(vs + 'T00:00:00'); fim = new Date(ve + 'T00:00:00');
- }
-
- _gestorQuickDate[which] = { ini: ini, fim: fim, preset: preset };
- if (ini && fim) _gqdSetInputDates(which, ini, fim);
- if (lbl && ini && fim) {
-  lbl.textContent = ini.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}) + ' – ' + fim.toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
- }
- _gestorApplyFilters();
- if (preset !== 'custom') _gqdToggle(which, false);
-}
+// ── Início/Prazo como filtros rápidos de data ──────────────────────────────
+// Existiu aqui um mecanismo à parte (_gqdToggle/_gqdPreset, dois botões
+// "Início"/"Prazo" na toolbar, com os mesmos presets do "Período") — removido
+// porque duplicava, com sua própria UI, o que os campos "Início"/"Prazo" já
+// deveriam ser: condições de data dentro do Filtro (filtro-builder.js). Em vez
+// de manter os dois caminhos, o filtro-builder ganhou um operador genérico
+// 'between' (intervalo — reutilizável por qualquer campo de data de qualquer
+// módulo, não só Gestor), e os campos data_inicio/data_prazo já registrados
+// em _fbInit('gestor', [...]) abaixo passam a cobrir esse caso: "Início está
+// entre X e Y" / "Prazo está entre X e Y" viram condições normais do Filtro,
+// combináveis com todas as outras (Responsável, Status, Obra...) via E/OU.
+// O "Período" (_gestorPeriodo/_gestorPreset) continua existindo à parte: ele
+// não é redundante com isso — filtra por QUALQUER UM dos dois campos ao mesmo
+// tempo (OR entre início/prazo) para resolver "o que cai nesta janela",
+// alimenta a navegação da Timeline (_gestorCalPrev/_gestorCalNext) e o schema
+// de Visualizações salvas (period_preset/period_ini/period_fim), papéis que
+// uma condição de um único campo no Filtro não cobre.
 
 document.addEventListener('click', function(e) {
  // composedPath(), não e.target.closest(): ações dentro do painel de
@@ -297,12 +217,8 @@ document.addEventListener('click', function(e) {
  var path = e.composedPath ? e.composedPath() : [e.target];
  var gpWrap = document.getElementById('gp-wrap');
  var gvWrap = document.getElementById('gv-wrap');
- var gqdIniWrap = document.getElementById('gqd-wrap-inicio');
- var gqdPrazoWrap = document.getElementById('gqd-wrap-prazo');
  if (gpWrap && path.indexOf(gpWrap) === -1) _gpToggle(false);
  if (gvWrap && path.indexOf(gvWrap) === -1) _gviewsToggle(false);
- if (gqdIniWrap && path.indexOf(gqdIniWrap) === -1) _gqdToggle('inicio', false);
- if (gqdPrazoWrap && path.indexOf(gqdPrazoWrap) === -1) _gqdToggle('prazo', false);
 });
 
 // ── Visualizações salvas (agrupamento + ordenação + período + filtro, com
@@ -775,20 +691,6 @@ function _gestorSaveState() {
     ini: _gestorPeriodo.ini ? _gestorFmtDate(_gestorPeriodo.ini) : null,
     fim: _gestorPeriodo.fim ? _gestorFmtDate(_gestorPeriodo.fim) : null
    },
-   // Filtros rápidos de data (Início/Prazo) — item #7 do pedido de UX pedia
-   // persistência explícita pra esses dois; antes só o Filtro/Ordenar/
-   // Agrupar/Período (o "de sempre") era salvo, então Início/Prazo voltavam
-   // pra "Todas" sozinhos a cada F5.
-   qdInicio: {
-    preset: _gestorQuickDate.inicio.preset,
-    ini: _gestorQuickDate.inicio.ini ? _gestorFmtDate(_gestorQuickDate.inicio.ini) : null,
-    fim: _gestorQuickDate.inicio.fim ? _gestorFmtDate(_gestorQuickDate.inicio.fim) : null
-   },
-   qdPrazo: {
-    preset: _gestorQuickDate.prazo.preset,
-    ini: _gestorQuickDate.prazo.ini ? _gestorFmtDate(_gestorQuickDate.prazo.ini) : null,
-    fim: _gestorQuickDate.prazo.fim ? _gestorFmtDate(_gestorQuickDate.prazo.fim) : null
-   },
    busca: (document.getElementById('gestor-search') || {}).value || ''
   };
   localStorage.setItem(GESTOR_STATE_KEY, JSON.stringify(state));
@@ -822,21 +724,6 @@ function _gestorRestoreState() {
    if (btnId) _gestorPreset(state.periodo.preset, document.getElementById(btnId));
   }
  }
- // Filtros rápidos de data (Início/Prazo) — mesmo padrão do Período acima,
- // um pra cada campo independente.
- ['inicio', 'prazo'].forEach(function(which) {
-  var qd = state['qd' + (which === 'inicio' ? 'Inicio' : 'Prazo')];
-  if (!qd || !qd.preset) return;
-  if (qd.preset === 'custom' && qd.ini && qd.fim) {
-   var qei = document.getElementById('gqd-dt-ini-' + which), qef = document.getElementById('gqd-dt-fim-' + which);
-   if (qei) qei.value = qd.ini;
-   if (qef) qef.value = qd.fim;
-   var qcd = document.getElementById('gqd-custom-dates-' + which); if (qcd) qcd.style.display = 'inline-flex';
-   _gqdPreset(which, 'custom', null);
-  } else if (qd.preset !== 'todas') {
-   _gqdPreset(which, qd.preset, null);
-  }
- });
  // Re-render dos popovers com o estado restaurado (sem isso, só o dado
  // interno mudaria — o popover mostraria o padrão até a pessoa abrir/fechar).
  if (_fbInstances.gestor) _fbRender('gestor');
@@ -853,10 +740,6 @@ function _gestorApplyFilters() {
  var pIni = _gestorPeriodo.ini; // Date ou null
  var pFim = _gestorPeriodo.fim; // Date ou null
 
- // Filtros rápidos de data (Toolbar) — independentes do Período acima,
- // cada um restringe SÓ o campo correspondente (não OR entre os dois).
- var qdIni = _gestorQuickDate.inicio, qdPrazo = _gestorQuickDate.prazo;
-
  _gestorFiltered = _gestorAllAt.filter(function(a) {
   // Filtro de período: inclui se data_prazo OU data_inicio cai no período
   if (pIni && pFim) {
@@ -869,14 +752,6 @@ function _gestorApplyFilters() {
    // atividade que atravessa o período (começa antes, termina depois)
    if (di && df && di <= pFim && df >= pIni) inPeriod = true;
    if (!inPeriod) return false;
-  }
-  if (qdIni.ini && qdIni.fim) {
-   var qdi = a.data_inicio ? new Date(a.data_inicio + 'T00:00:00') : null;
-   if (!qdi || qdi < qdIni.ini || qdi > qdIni.fim) return false;
-  }
-  if (qdPrazo.ini && qdPrazo.fim) {
-   var qdp = a.data_prazo ? new Date(a.data_prazo + 'T00:00:00') : null;
-   if (!qdp || qdp < qdPrazo.ini || qdp > qdPrazo.fim) return false;
   }
   // Busca inteligente: qualquer parte do texto, em vários campos de uma vez
   // (não só o título) — ignora acento/caixa/espaço duplo e cai pra fuzzy leve
