@@ -1403,6 +1403,33 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoContato()">Cancelar</button>'
   + '</div></div>'
 
+  // ── Registros vinculados (Obra→Empresa e Obra→Projeto) ────────────────────
+  // Empresa(s): vem direto de o.empresas_obras (já trazido junto pela query
+  // de _spObraById, ver linha ~626 — junction empresas_obras, mesma relação
+  // já usada pelo select acima; normalmente 1 empresa por obra, mas o schema
+  // permite mais de uma — mostra todas). Projetos: reverse FK
+  // (projetos.obra_id), já recebido como parâmetro `projetos` desta função —
+  // nenhuma query nova necessária. Ambos usam o chip clicável padrão
+  // (_spRelChipHTML, ver side-panel.js) pros mesmos já usados no painel de
+  // Empresa (Obras/Contatos vinculados).
+  + '<div class="sp-stitle">Empresa(s) vinculada(s)</div>'
+  + '<div class="sp-rel-chips-wrap" style="margin-bottom:16px">'
+  + ((o.empresas_obras || []).length
+     ? (o.empresas_obras || []).filter(function(link){ return link.empresa; }).map(function(link){
+        return _spRelChipHTML('empresas', link.empresa.id, link.empresa.nome || '—');
+       }).join('')
+     : '<div class="sp-empty">Nenhuma empresa vinculada a esta obra.</div>')
+  + '</div>'
+
+  + '<div class="sp-stitle">Projetos vinculados</div>'
+  + '<div class="sp-rel-chips-wrap" style="margin-bottom:16px">'
+  + (projetos.length
+     ? projetos.map(function(p){
+        return _spRelChipHTML('projetos', p.id, p.nome || '(sem nome)');
+       }).join('')
+     : '<div class="sp-empty">Nenhum projeto vinculado a esta obra.</div>')
+  + '</div>'
+
   + '<div class="sp-stitle">Resumo</div>'
   + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px">'
   + '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">'

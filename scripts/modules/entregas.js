@@ -144,39 +144,59 @@ function renderEntCal() {
   grid.innerHTML = html;
 }
 
+var _entregasArr = [];
+
 function _spEntregas(row, tds) {
- const nome   = tds[0]?.querySelector('div')?.innerText?.trim()||tds[0]?.innerText?.trim()||'';
- const num    = tds[0]?.querySelectorAll('div')[1]?.innerText?.trim()||'';
- const tipo   = tds[1]?.innerText?.trim()||'';
- const dtPrev = tds[2]?.innerText?.trim()||'';
- const dtFab  = tds[3]?.innerText?.trim()||'';
- const dtEntr = tds[4]?.innerText?.trim()||'';
- const transp = tds[5]?.innerText?.trim()||'';
- const qtd    = tds[6]?.innerText?.trim()||'';
- const status = tds[7]?.innerText?.trim()||'';
- const st     = row.dataset.status||'';
- _spSet('Entrega', nome||num, `
+ _spEntregaById(row.dataset.id);
+}
+
+// ── Renderer: Entrega por id ────────────────────────────────────────────────
+// Extraído do antigo _spEntregas(row, tds), que lia tds[N].innerText — mesmo
+// padrão já aplicado a _spObras/_spContatos/_spProjetos. Busca no cache
+// _entregasArr (preenchido por _dbLoadEntregas, que já traz obra:obra_id
+// aninhado); fallback de busca direta por id se o cache ainda não tiver sido
+// carregado (chip clicado antes de visitar a página Entregas).
+function _spEntregaById(id) {
+ if (!id) return;
+ var e = (_entregasArr || []).find(function(x){ return String(x.id) === String(id); });
+ if (e) { _spEntregaRender(e); return; }
+
+ _spSet('Entrega', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
+ document.getElementById('sp-overlay').classList.add('sp-open');
+ document.getElementById('sp-drawer').classList.add('sp-open');
+ if (!_sb) return;
+ _sb.from('entregas').select('*, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))').eq('id', id).single().then(function(res) {
+  if (res.error || !res.data) {
+   _spSet('Entrega', 'Erro', '<div style="color:var(--red);padding:20px">Entrega não encontrada.</div>', '');
+   return;
+  }
+  _spEntregaRender(res.data);
+ });
+}
+
+function _spEntregaRender(e) {
+ var stMap = {
+  'Aguardando produção':'aguardando','Em produção':'producao',
+  'Transporte':'transporte','Entregue':'entregue'
+ };
+ var st       = stMap[e.etapa] || 'aguardando';
+ var obraNome = (e.obra && e.obra.nome) || '—';
+ var obraId   = e.obra_id || '';
+ var num      = e.numero != null ? String(e.numero).padStart(3, '0') : '';
+ var transp   = e.transporte || '';
+ var qtd      = e.quantidade != null ? e.quantidade : '';
+ var dtPrev   = e.data_faturamento || '';
+
+ _spSet('Entrega', obraNome !== '—' ? obraNome : ('#' + num), `
   <div class="sp-field"><div class="sp-label">Obra / Cliente</div>
-   <input class="sp-inp" value="${(nome).replace(/"/g,'&quot;')}">
+   <input class="sp-inp" value="${(obraNome).replace(/"/g,'&quot;')}" readonly>
   </div>
   <div class="sp-g2">
    <div class="sp-field"><div class="sp-label">Pedido</div>
     <input class="sp-inp" value="${num}" readonly style="opacity:.6">
    </div>
-   <div class="sp-field"><div class="sp-label">Tipo</div>
-    <input class="sp-inp" value="${tipo}">
-   </div>
-  </div>
-  <div class="sp-stitle">Datas</div>
-  <div class="sp-g3">
-   <div class="sp-field"><div class="sp-label">Previsão</div>
+   <div class="sp-field"><div class="sp-label">Faturamento</div>
     <input class="sp-inp" type="text" value="${dtPrev}">
-   </div>
-   <div class="sp-field"><div class="sp-label">Fabricação</div>
-    <input class="sp-inp" type="text" value="${dtFab}">
-   </div>
-   <div class="sp-field"><div class="sp-label">Entrega</div>
-    <input class="sp-inp" type="text" value="${dtEntr}">
    </div>
   </div>
   <div class="sp-g2">
@@ -194,6 +214,10 @@ function _spEntregas(row, tds) {
     <option ${st==='transporte'?'selected':''}>transporte</option>
     <option ${st==='entregue'?'selected':''}>entregue</option>
    </select>
+  </div>
+  <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+   <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Obra vinculada</div>
+   <div class="sp-rel-chips-wrap">${obraId ? _spRelChipHTML('obras', obraId, obraNome) : '<div class="sp-empty">Nenhuma obra vinculada a esta entrega.</div>'}</div>
   </div>`,
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 }
@@ -218,6 +242,10 @@ async function _dbLoadEntregas() {
   if (!res.data || res.data.length < pageSize) break;
   from += pageSize;
  }
+ // Cache global por id — usado por _spEntregaById para abrir o painel de
+ // Entrega a partir de um chip clicado em OUTRA entidade (ex.: Obra), sem
+ // precisar reler tds[N].innerText da tabela.
+ _entregasArr = data || [];
  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  if (error || !data?.length) return;
  const tbody = document.getElementById('ent-tbody');

@@ -232,36 +232,97 @@ async function _renderProjetosKanban() {
 }
 
 function _spProjetos(row, tds) {
- const cod   = tds[0]?.innerText?.trim() || '';
- const obra  = tds[1]?.innerText?.trim() || '';
- const tipo  = tds[2]?.innerText?.trim() || '';
- const prod  = tds[3]?.innerText?.trim() || '';
- const qtd   = tds[4]?.innerText?.trim() || '';
- const vuni  = tds[5]?.innerText?.trim() || '';
- const vtot  = tds[6]?.innerText?.trim() || '';
- const etapa = tds[9]?.innerText?.trim() || '';
- const compl = tds[10]?.innerText?.trim() || '';
+ _spProjetoById(row.dataset.id);
+}
 
- let html = `
+// ── Renderer: Projeto por id ────────────────────────────────────────────────
+// Extraído do antigo _spProjetos(row, tds), que lia tds[N].innerText (texto de
+// célula formatado/truncado) — mesmo padrão já aplicado a _spObras/_spContatos
+// (ver obras.js/empresas.js). Busca no cache _projetosArr (preenchido por
+// _dbLoadProjetos); se o painel for aberto por um chip de OUTRA entidade antes
+// da página Projetos ter sido visitada (cache ainda vazio), cai para uma busca
+// direta no Supabase por id — mesma estratégia de fallback do _spObraById.
+function _spProjetoById(id) {
+ if (!id) return;
+ var idx = (_projetosArr || []).findIndex(function(x){ return String(x.id) === String(id); });
+ var p = idx !== -1 ? _projetosArr[idx] : null;
+ if (p) { _spProjetoRender(p, idx); return; }
+
+ _spSet('Projeto', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
+ document.getElementById('sp-overlay').classList.add('sp-open');
+ document.getElementById('sp-drawer').classList.add('sp-open');
+ if (!_sb) return;
+ _sb.from('projetos').select('*').eq('id', id).single().then(function(res) {
+  if (res.error || !res.data) {
+   _spSet('Projeto', 'Erro', '<div style="color:var(--red);padding:20px">Projeto não encontrado.</div>', '');
+   return;
+  }
+  if (Array.isArray(res.data.responsavel)) res.data.responsavel = _emailsToNomes(res.data.responsavel);
+  _spProjetoRender(res.data, -1);
+ });
+}
+
+function _spProjetoRender(p, idx) {
+ function pad3(n){ var s = String(n); while (s.length < 3) s = '0' + s; return s; }
+ var cod    = idx != null && idx > -1 ? 'PRJ-' + pad3(idx + 1) : '';
+ var obraInfo = p.obra_id ? (_obraIdMap[p.obra_id] || {}) : {};
+ var obraNome = obraInfo.nome || '—';
+ var tipo   = p.tipo_orcamento || '';
+ var prod   = Array.isArray(p.produto) ? (p.produto[0] || '') : (p.produto || '');
+ var qtd    = p.quantidade != null ? Number(p.quantidade) : null;
+ var vU     = p.valor_unitario != null ? Number(p.valor_unitario) : null;
+ var vT     = (vU != null && qtd != null) ? vU * qtd : vU;
+ var fmtBRL = function(v){ return v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2}) : ''; };
+ var etapa  = (p.etapa_projeto || '').trim();
+ var compl  = p.complexidade || '';
+
+ var html = `
   <div class="sp-g2">
    <div class="sp-field"><div class="sp-label">Código</div><input class="sp-inp" value="${cod}" readonly></div>
    <div class="sp-field"><div class="sp-label">Tipo</div><input class="sp-inp" value="${tipo}" readonly></div>
   </div>
-  <div class="sp-field"><div class="sp-label">Obra vinculada</div><input class="sp-inp" value="${obra}"></div>
+  <div class="sp-field"><div class="sp-label">Obra vinculada</div><input class="sp-inp" value="${(obraNome||'').replace(/"/g,'&quot;')}" readonly></div>
   <div class="sp-g2">
    <div class="sp-field"><div class="sp-label">Produto</div><input class="sp-inp" value="${prod}"></div>
    <div class="sp-field"><div class="sp-label">Etapa</div><input class="sp-inp" value="${etapa}"></div>
   </div>
   <div class="sp-g3">
-   <div class="sp-field"><div class="sp-label">Qtd.</div><input class="sp-inp" value="${qtd}"></div>
-   <div class="sp-field"><div class="sp-label">Valor unit.</div><input class="sp-inp" value="${vuni}"></div>
-   <div class="sp-field"><div class="sp-label">Valor total</div><input class="sp-inp" value="${vtot}" readonly></div>
+   <div class="sp-field"><div class="sp-label">Qtd.</div><input class="sp-inp" value="${qtd != null ? qtd : ''}"></div>
+   <div class="sp-field"><div class="sp-label">Valor unit.</div><input class="sp-inp" value="${fmtBRL(vU)}"></div>
+   <div class="sp-field"><div class="sp-label">Valor total</div><input class="sp-inp" value="${fmtBRL(vT)}" readonly></div>
   </div>
   <div class="sp-field"><div class="sp-label">Complexidade</div><input class="sp-inp" value="${compl}"></div>
+  <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+   <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Empresa vinculada</div>
+   <div id="sp-proj-empresa" class="sp-rel-chips-wrap">
+    <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando empresa...</div>
+   </div>
+  </div>
  `;
 
- _spSet('Projeto', cod + ' — ' + obra, html,
+ _spSet('Projeto', (cod ? cod + ' — ' : '') + obraNome, html,
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+
+ // Empresa vinculada — Projeto→Empresa é FK direta (projetos.empresa_id),
+ // sem join necessário (ver notas do módulo). Mesmo padrão de chip clicável
+ // (_spRelChipHTML) e carregamento preguiçoso já usado em Obras vinculadas/
+ // Contatos vinculados no painel de Empresa (ver empresas.js).
+ var container = document.getElementById('sp-proj-empresa');
+ if (!container) return;
+ if (!p.empresa_id) {
+  container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>';
+  return;
+ }
+ var empCache = (_empresasArr || []).find(function(e){ return String(e.id) === String(p.empresa_id); });
+ if (empCache) {
+  container.innerHTML = _spRelChipHTML('empresas', empCache.id, empCache.nome || '—');
+  return;
+ }
+ if (!_sb) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
+ _sb.from('empresas').select('id, nome').eq('id', p.empresa_id).single().then(function(res) {
+  if (res.error || !res.data) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
+  container.innerHTML = _spRelChipHTML('empresas', res.data.id, res.data.nome || '—');
+ });
 }
 
 // Filtro/Ordenação — mesmos componentes reutilizáveis do Gestor de Tarefas/
