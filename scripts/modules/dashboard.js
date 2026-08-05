@@ -276,6 +276,45 @@ async function _remLoadSent() {
 // deste app, cobre os dois casos com o mesmo código — mesmo padrão já
 // usado em _remStartRealtime (lembretes).
 var _navBadgeChannels = {};
+var _NAV_BADGE_TABLES = ['empresas','obras','projetos','entregas','instalacoes','melhorias'];
+var _navBadgesLoadInFlight = false; // guarda contra disparo duplicado (_dbInit rodando 2x, aba reaberta, etc.)
+
+// ── Carga inicial dos 6 badges — uma única RPC (rpc_sidebar_counts), COUNT
+// puro no banco, sem trazer nenhuma linha das tabelas. Substitui o padrão
+// antigo de "carregar a lista inteira e usar .length", que era a causa raiz
+// do badge de Instalações ficar preso em "—" (seu loader só roda quando a
+// aba é aberta) e da demora perceptível nos demais (presos atrás do
+// carregamento completo de milhares de linhas).
+function _navBadgesLoadInitial() {
+ if (_navBadgesLoadInFlight) return;
+ _navBadgesLoadInFlight = true;
+ // Skeleton: mantém "—" (já é o placeholder padrão no HTML) enquanto a
+ // requisição está em voo — não há o que trocar aqui além de garantir que
+ // nenhum badge fique com texto vazio.
+ _NAV_BADGE_TABLES.forEach(function(k){
+  var el = document.getElementById('nav-badge-' + k);
+  if (el && !el.textContent.trim()) el.textContent = '—';
+ });
+ return _sb.rpc('rpc_sidebar_counts').then(function(r) {
+  if (r.error) throw r.error;
+  var row = Array.isArray(r.data) ? r.data[0] : r.data;
+  if (row) {
+   _NAV_BADGE_TABLES.forEach(function(k){
+    var el = document.getElementById('nav-badge-' + k);
+    if (el && row[k] != null) el.textContent = row[k];
+   });
+  }
+ }).catch(function(e) {
+  console.error('[Badges] Erro ao carregar contadores do menu lateral:', e);
+  // Falha de conexão/RPC: mantém "—" em vez de travar pra sempre ou
+  // quebrar a UI — estado de erro visível, mas gracioso.
+  _NAV_BADGE_TABLES.forEach(function(k){
+   var el = document.getElementById('nav-badge-' + k);
+   if (el && !/^\d+$/.test(el.textContent.trim())) el.textContent = '—';
+  });
+ }).finally(function() { _navBadgesLoadInFlight = false; });
+}
+
 function _navBadgeBump(badgeId, delta) {
  var el = document.getElementById(badgeId);
  if (!el) return;
@@ -298,17 +337,8 @@ function _navBadgesStartRealtimeAll() {
  _navBadgeStartRealtime('entregas',    'nav-badge-entregas');
  _navBadgeStartRealtime('instalacoes', 'nav-badge-instalacoes');
  _navBadgeStartRealtime('melhorias',   'nav-badge-melhorias');
- // Melhorias é a única dessas 6 tabelas cujo contador inicial só é
- // preenchido dentro de _pageLoadMelhorias — ou seja, ficava em "—" até o
- // usuário abrir a página Melhorias pelo menos uma vez na sessão (achado
- // real, reportado como "cadê a tabela de Melhorias"). Busca a contagem
- // aqui também, no boot, igual às outras 5.
- var mb = document.getElementById('nav-badge-melhorias');
- if (mb) {
-  _sb.from('melhorias').select('id', { count: 'exact', head: true }).then(function(r) {
-   if (r.count != null) mb.textContent = r.count;
-  }).catch(function(){});
- }
+ // Contagem inicial das 6 tabelas: ver _navBadgesLoadInitial() (chamada
+ // direto de _dbInit em app.js, em paralelo, sem esperar por isso aqui).
 }
 
 // ── Realtime: receber lembretes em tempo real ─────────────────────────────
@@ -881,6 +911,10 @@ function _dashRerenderAllFromCache() {
  if (typeof _dashRenderFeed === 'function') _dashRenderFeed(_dashApplyPrivFiltro(_dashFeedRaw));
 
  if (typeof _dashUpdateKPIsFromDB === 'function') _dashUpdateKPIsFromDB(allAt);
+ // Reconsulta a RPC (barata, uma linha) em vez de recalcular Atrasadas/Em
+ // Andamento/A Fazer localmente aqui — mantém a mesma fonte de verdade do
+ // boot e do Gestor de Tarefas depois de um auto-save.
+ if (typeof _dashLoadKpisRpc === 'function') _dashLoadKpisRpc();
  var amanha14 = new Date(hoje); amanha14.setDate(hoje.getDate()+14);
  var prox14 = allAt.filter(function(a){
   var d = a.data_prazo ? new Date(a.data_prazo+'T00:00:00') : null;
@@ -2696,11 +2730,17 @@ async function _dashLoad() {
  }
  if (!_dbOk) {
   _dashRenderFeed([]); _dashRenderObras([]); _dashRenderMelhorias([]);
-  ['dash-kpi-hoje','dash-kpi-atr','dash-kpi-prox','dash-kpi-conclusao','dash-kpi-abertas','dash-proj-count'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent='0';});
+  // '—' (não '0'): sem conexão é "desconhecido", não "zero atrasadas".
+  ['dash-kpi-hoje','dash-kpi-atr','dash-kpi-andamento','dash-kpi-prox','dash-kpi-conclusao','dash-kpi-abertas','dash-proj-count'].forEach(function(id){var e=document.getElementById(id);if(e)e.textContent='—';});
   _dashSyncStatus(false, 'Sem conexão com Supabase');
   return;
  }
  var userEmail = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || '';
+
+ // Atrasadas/Em Andamento/A Fazer: RPC leve, disparada já e em paralelo —
+ // não espera a carga paginada completa de atividades abaixo (que existe
+ // pra alimentar feed/gráficos, não os 3 KPIs headline).
+ _dashLoadKpisRpc();
 
  await _loadUsuariosCache();
  await _loadAtividadeVinculosCache();
@@ -3631,6 +3671,42 @@ async function _ccRenderPanel(tab) {
  }).join('');
 }
 
+// ── Meu Painel: Atrasadas / Em Andamento / A Fazer via RPC ──────────────────
+// Mesma fonte de verdade do Gestor de Tarefas (rpc_atividades_kpis), só que
+// escopada ao usuário logado via p_responsavel — garante que os números
+// batam entre as duas telas (mesma regra: exclui Obsoleto de tudo, prioriza
+// atrasada sobre em_andamento pra não contar em dobro). Calculada em SQL
+// (COUNT/FILTER), não sobre o array _dashAllAtRaw já carregado — escala
+// independente de quantas atividades o usuário tenha.
+var _dashKpisRpcInFlight = false;
+async function _dashLoadKpisRpc() {
+ if (_dashKpisRpcInFlight) return;
+ if (!_sb) return;
+ var userEmail = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || '';
+ var ids = ['dash-kpi-atr', 'dash-kpi-andamento', 'dash-kpi-abertas'];
+ _dashKpisRpcInFlight = true;
+ try {
+  var r = await _sb.rpc('rpc_atividades_kpis', { p_responsavel: userEmail || null });
+  if (r.error) throw r.error;
+  var row = Array.isArray(r.data) ? r.data[0] : r.data;
+  if (!row) throw new Error('rpc_atividades_kpis sem retorno');
+  var kA = document.getElementById('dash-kpi-atr');
+  if (kA) { kA.textContent = row.atrasada; kA.style.color = row.atrasada > 0 ? 'var(--red)' : 'var(--green)'; }
+  var kAnd = document.getElementById('dash-kpi-andamento');
+  if (kAnd) kAnd.textContent = row.em_andamento;
+  var kO = document.getElementById('dash-kpi-abertas');
+  if (kO) kO.textContent = row.a_fazer;
+ } catch (e) {
+  console.error('[Painel] Erro ao carregar KPIs (rpc_atividades_kpis):', e);
+  ids.forEach(function(id) {
+   var el = document.getElementById(id);
+   if (el && !/^\d+$/.test((el.textContent || '').trim())) el.textContent = '—';
+  });
+ } finally {
+  _dashKpisRpcInFlight = false;
+ }
+}
+
 function _dashUpdateKPIsFromDB(atividades) {
  if(!atividades) return;
  var hoje=new Date();hoje.setHours(0,0,0,0);
@@ -3641,7 +3717,6 @@ function _dashUpdateKPIsFromDB(atividades) {
  var inicioMes=new Date(hoje.getFullYear(),hoje.getMonth(),1);
  function parseDate(s){return s?new Date(s+'T00:00:00'):null;}
  function isDone(a){return a.status==='Feito'||a.status==='Concluído';}
- var abertas   =atividades.filter(function(a){return !isDone(a)&&a.status!=='Obsoleto';});
  var paraHoje  =atividades.filter(function(a){var d=parseDate(a.data_prazo);return d&&d>=hoje&&d<amanha&&!isDone(a);}).length;
  var atrasadas =atividades.filter(function(a){var d=parseDate(a.data_prazo);return d&&d<hoje&&!isDone(a)&&a.status!=='Obsoleto';}).length;
  var semana    =atividades.filter(function(a){var d=parseDate(a.data_prazo);return d&&d>=seg&&d<=dom;});
@@ -3652,8 +3727,11 @@ function _dashUpdateKPIsFromDB(atividades) {
  var mesPct=mesTotal?Math.round(mesDone/mesTotal*100):0;
  var kH=document.getElementById('dash-kpi-hoje');if(kH)kH.textContent=paraHoje;
  var kS=document.getElementById('dash-kpi-semana');if(kS)kS.textContent=semanaePct+'%';
- var kA=document.getElementById('dash-kpi-atr');if(kA){kA.textContent=atrasadas;kA.style.color=atrasadas>0?'var(--red)':'var(--green)';}
- var kO=document.getElementById('dash-kpi-abertas');if(kO)kO.textContent=abertas.length;
+ // dash-kpi-atr / dash-kpi-andamento / dash-kpi-abertas NÃO são mais setados
+ // aqui — vêm de rpc_atividades_kpis via _dashLoadKpisRpc(), pra baterem
+ // exatamente com o Gestor de Tarefas (mesma regra, mesma fonte). `atrasadas`
+ // segue calculada acima só porque o anel mensal (ringLate) ainda usa esse
+ // número local.
  var fill=document.getElementById('dash-pb-fill');var pctEl=document.getElementById('dash-pb-pct');var countEl=document.getElementById('dash-pb-count');var labelEl=document.getElementById('dash-pb-label');
  var barClr=semanaePct>=80?'var(--green)':semanaePct>=40?'var(--navy)':'var(--yellow)';
  if(fill){fill.style.width=semanaePct+'%';fill.style.background=barClr;}if(pctEl){pctEl.textContent=semanaePct+'%';pctEl.style.color=barClr;}

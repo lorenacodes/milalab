@@ -156,8 +156,7 @@ async function _dbLoadEmpresas() {
  // Atualiza badges e stats
  var badge = document.getElementById('badge-emp');
  if (badge) badge.textContent = allData.length;
- var navBadge = document.getElementById('nav-badge-empresas');
- if (navBadge) navBadge.textContent = allData.length;
+ // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  if (!allData.length) return;
  var stTotal = document.getElementById('emp-stat-total');
  if (stTotal) stTotal.textContent = allData.length;

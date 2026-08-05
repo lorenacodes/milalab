@@ -401,7 +401,7 @@ async function _dbLoadProjetos() {
    +'<td>'+(etapa?'<span class="badge '+(_eCls[etapa]||'bm')+'">'+etapa+'</span>':'—')+'</td>'
    +'<td>'+(p.complexidade||'—')+'</td></tr>';
  }).join('');
- var nb=document.getElementById('nav-badge-projetos');if(nb)nb.textContent=allData.length;
+ // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  var kT=document.getElementById('proj-kpi-total');if(kT)kT.textContent=allData.length;
  var kA=document.getElementById('proj-kpi-andamento');if(kA)kA.textContent=cAnd;
  var kV=document.getElementById('proj-kpi-valor');if(kV)kV.textContent='R$ '+Math.round(totV).toLocaleString('pt-BR');

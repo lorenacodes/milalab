@@ -95,9 +95,9 @@ async function _dbLoadInstalacoes() {
    if (!res.data || res.data.length < 1000) break;
    from += 1000;
   }
-  // Atualizar badge do nav
-  var badge = document.getElementById('nav-badge-instalacoes');
-  if (badge) badge.textContent = allData.length;
+  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem no
+  // boot) — antes só era preenchido aqui, ou seja, só depois que o usuário
+  // abrisse a aba Instalações pelo menos uma vez (bug relatado).
   // Tempo real: recarrega sozinho quando a tabela mudar (sync do Airtable
   // ou outro usuário editando) — sem precisar recarregar a página.
   if (typeof _rtWatch === 'function') _rtWatch('instalacoes', _dbLoadInstalacoes);

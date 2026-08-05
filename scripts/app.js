@@ -206,6 +206,15 @@ async function _dbInit() {
  if (dot) dot.className = _dbOk ? 'ok' : 'err';
  if (lbl) lbl.textContent = _dbOk ? 'Banco conectado' : 'Sem conexão';
  if (_dbOk) {
+  // Badges do menu lateral (Empresas/Obras/Projetos/Entregas/Instalações/
+  // Melhorias): contagem via RPC única (rpc_sidebar_counts), disparada já,
+  // em paralelo com os carregamentos completos abaixo — NÃO espera por
+  // eles. Antes, cada badge só ganhava número como efeito colateral de
+  // carregar a lista inteira daquela tabela pra memória (ex.: obras.js
+  // setava nav-badge-obras só depois de baixar as 1589 obras), e
+  // Instalações nem tinha esse efeito colateral no boot — por isso ficava
+  // travada em "—" até o usuário abrir a aba manualmente.
+  if (typeof _navBadgesLoadInitial === 'function') _navBadgesLoadInitial();
   _dbLoadObras();
   _dbLoadEmpresas();
   _dbLoadContatos();

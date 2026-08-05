@@ -478,6 +478,42 @@ function _gviewsDelete(id) {
  }).catch(function(e){ _showToast('Erro: ' + e.message, 'erro'); });
 }
 
+// ── KPIs do topo (Total/Em andamento/Pendentes/Atrasadas/A fazer) ──────────
+// Fonte única: rpc_atividades_kpis(null) — visão global, calculada em SQL
+// (COUNT/FILTER, uma linha de resposta), NÃO client-side sobre um array já
+// carregado. Mesma função usada por Meu Painel (scripts/modules/dashboard.js),
+// só que lá com p_responsavel = email do usuário logado — garante que os
+// dois painéis nunca divirjam na regra de cálculo. Exclui Obsoleto de tudo,
+// inclusive do total (regra de negócio: obsoleto não deve afetar KPI nenhum).
+var _gestorKpisInFlight = false;
+async function _gestorLoadKpis() {
+ if (_gestorKpisInFlight) return;
+ if (!_sb) return;
+ _gestorKpisInFlight = true;
+ var ids = ['gst-total', 'gst-prog', 'gst-pend', 'gst-late', 'gst-afazer'];
+ try {
+  var r = await _sb.rpc('rpc_atividades_kpis', { p_responsavel: null });
+  if (r.error) throw r.error;
+  var row = Array.isArray(r.data) ? r.data[0] : r.data;
+  if (!row) throw new Error('rpc_atividades_kpis sem retorno');
+  var set = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
+  set('gst-total',  row.total);
+  set('gst-prog',   row.em_andamento);
+  set('gst-pend',   row.pendente);
+  set('gst-late',   row.atrasada);
+  set('gst-afazer', row.a_fazer);
+ } catch (e) {
+  console.error('[Gestor] Erro ao carregar KPIs (rpc_atividades_kpis):', e);
+  // Falha de conexão/RPC: mantém "—" em vez de travar ou mostrar número velho.
+  ids.forEach(function(id) {
+   var el = document.getElementById(id);
+   if (el && !/^\d+$/.test((el.textContent || '').trim())) el.textContent = '—';
+  });
+ } finally {
+  _gestorKpisInFlight = false;
+ }
+}
+
 // ── Carregar dados ─────────────────────────────────────────────────────────
 async function _gestorLoad() {
  var lbl  = document.getElementById('gestor-sync-lbl');
@@ -489,6 +525,12 @@ async function _gestorLoad() {
   if (spin) spin.style.display = 'none';
   return;
  }
+
+ // KPIs do topo: RPC leve, disparada em paralelo — não espera a carga
+ // completa e paginada de todas as atividades abaixo. Mesmo gatilho (esta
+ // função roda no boot do Gestor E em todo evento realtime de `atividades`,
+ // ver _rtWatch mais abaixo) cobre "inicial" e "dado mudou" sem poll extra.
+ _gestorLoadKpis();
 
  try {
   var t0 = Date.now();
@@ -856,14 +898,14 @@ function _gestorApplyFilters() {
   return dA - dB;
  });
 
- // Atualizar stats rápidos
- var hoje = new Date(); hoje.setHours(0,0,0,0);
- var total = _gestorFiltered.length;
- var done  = _gestorFiltered.filter(function(a){ return _gIsDone(a.status); }).length;
- var prog  = _gestorFiltered.filter(function(a){ return (a.status==='Em progresso'||a.status==='Em andamento') && !_gIsDone(a.status); }).length;
- var late  = _gestorFiltered.filter(function(a){ return _gIsLate(a); }).length;
- var set = function(id, v){ var el=document.getElementById(id); if(el) el.textContent=v; };
- set('gst-total', total); set('gst-done', done); set('gst-prog', prog); set('gst-late', late);
+ // Nota: os "stats rápidos" do topo (gst-total/prog/pend/late/afazer) NÃO
+ // são mais recalculados aqui a partir de _gestorFiltered — são KPIs
+ // globais (visão "Gestor" completa, independente de busca/filtro na tela),
+ // vindos de rpc_atividades_kpis via _gestorLoadKpis() (disparada em
+ // _gestorLoad, no boot e a cada evento realtime de `atividades`). Calcular
+ // isso aqui de novo a cada filtro re-sobrescreveria os KPIs globais com um
+ // subconjunto filtrado, o que é exatamente a inconsistência que motivou a
+ // migração pra RPC.
 
  if (_gestorView === 'grid')          _gestorRenderGrid();
  else if (_gestorView === 'timeline') _gestorRenderTimeline();

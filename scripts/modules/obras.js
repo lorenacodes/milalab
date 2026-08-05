@@ -458,7 +458,9 @@ async function _dbLoadObras() {
    +'<td style="font-weight:600">'+valor+'</td>'
    +'<td><button class="btn btn-ghost btn-sm" onclick="_spObraById(\''+o.id+'\')">Abrir</button></td></tr>';
  }).join('');
- var nb=document.getElementById('nav-badge-obras'); if(nb)nb.textContent=allObras.length;
+ // Badge do menu lateral: agora vem de _navBadgesLoadInitial() (RPC de
+ // contagem única, no boot) + realtime — não mais como efeito colateral
+ // de carregar a lista inteira aqui.
 }
 
 async function _dbLoadObrasKanban() {

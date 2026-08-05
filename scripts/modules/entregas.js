@@ -218,8 +218,7 @@ async function _dbLoadEntregas() {
   if (!res.data || res.data.length < pageSize) break;
   from += pageSize;
  }
- const navBadge = document.getElementById('nav-badge-entregas');
- if (navBadge && !error) navBadge.textContent = data.length;
+ // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  if (error || !data?.length) return;
  const tbody = document.getElementById('ent-tbody');
  if (!tbody) return;
