@@ -66,6 +66,46 @@ function _spSet(tag, title, bodyHTML, actionsHTML) {
  document.getElementById('sp-actions').innerHTML = actionsHTML || '';
 }
 
+// ── Navegação entre painéis por id (registros vinculados) ─────────────────────
+// Abre o painel de detalhe de qualquer entidade a partir só do seu id, sem
+// precisar de uma <tr> real na tabela — útil para chips de "registro
+// vinculado" renderizados dentro do painel de OUTRA entidade (ex.: Obras
+// vinculadas dentro do painel de Empresa). Funciona hoje para qualquer
+// section cujo renderer já delegue para uma busca por id (ver _spObras em
+// obras.js: `_spObras(row, tds) { _spObraById(row.dataset.id); }` — o mesmo
+// padrão foi replicado em _spContatos, ver empresas.js). Cria uma <tr>
+// "fake" (nunca anexada ao DOM) só para transportar o id pelo caminho já
+// existente de _spOpen → _spRender.
+function _spOpenEntityById(section, id) {
+ if (!id) return;
+ var row = document.createElement('tr');
+ row.dataset.id = id;
+ _spOpen(section, row);
+}
+
+// ── Chip de "registro vinculado" (padrão Airtable) ─────────────────────────────
+// Pequeno cartão arredondado e clicável — usado para listar registros de
+// OUTRA entidade dentro do painel atual (Obras/Contatos vinculados no painel
+// de Empresa, por ora — ver ponto 5 do pedido: pensado para ser reaproveitado
+// pelos próximos pares Obra↔Empresa/Projeto, Projeto↔Contato etc. no futuro,
+// sem precisar reinventar o componente). `section` decide a cor do
+// indicador (mesmas cores de badge já usadas em nt-tag-blue/nt-tag-green,
+// ver styles/empresas.css) e para onde o clique navega via
+// _spOpenEntityById. `sublabel` é opcional (ex.: cargo do contato).
+var _SP_REL_CHIP_DOT = { obras: '#1d4ed8', contatos: '#15803d', projetos: '#7c3aed', empresas: '#c2410c' };
+function _spRelChipHTML(section, id, label, sublabel) {
+ var dot = _SP_REL_CHIP_DOT[section] || '#8B8B94';
+ var idAttr = String(id == null ? '' : id).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+ var labelSafe = (label || '—').replace(/</g, '&lt;');
+ var titleSafe = (label || '—').replace(/"/g, '&quot;');
+ return '<div class="sp-rel-chip" onclick="_spOpenEntityById(\'' + section + '\',\'' + idAttr + '\')" title="' + titleSafe + '">'
+  + '<span class="sp-rel-chip-dot" style="background:' + dot + '"></span>'
+  + '<span class="sp-rel-chip-label">' + labelSafe + '</span>'
+  + (sublabel ? '<span class="sp-rel-chip-sub">' + sublabel + '</span>' : '')
+  + '<span class="sp-rel-chip-chevron">\u203a</span>'
+  + '</div>';
+}
+
 function _spRender(section, row) {
  const tds = [...row.querySelectorAll('td')];
  if (section === 'obras') _spObras(row, tds);

@@ -539,11 +539,27 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
  .drw-sub-inp:focus{border-color:var(--navy)}
  .drw-sub-add{margin-top:4px;font-size:11px;padding:6px 14px;background:none;border:1px dashed var(--border);border-radius:var(--r-sm);color:var(--muted);cursor:pointer;width:100%;text-align:left;transition:all .12s;font-family:inherit}
  .drw-sub-add:hover{border-color:var(--navy);color:var(--navy);background:var(--surface2)}
- /* Auditoria read-only */
- .drw-audit-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+ /* Auditoria read-only — de propósito discreto (rodapé do painel de
+    detalhe): texto pequeno e muted dos dois lados, não deve competir com
+    os campos de dados reais da entidade, que vêm sempre antes no layout. */
+ .drw-audit-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px}
  .drw-audit-row:last-child{border-bottom:none}
- .drw-audit-lbl{color:var(--muted);font-size:11px}
- .drw-audit-val{color:var(--text);font-weight:500}
+ .drw-audit-lbl{color:var(--muted);font-size:10.5px}
+ .drw-audit-val{color:var(--muted);font-weight:500}
+ /* Chip de registro vinculado (padrão Airtable) — usado dentro do painel de
+    detalhe para listar registros de OUTRA entidade (ex.: Obras/Contatos
+    vinculados no painel de Empresa, ver _spRelChipHTML em side-panel.js).
+    Mais leve que .nt-tag (pílula colorida cheia) e mais denso que a lista
+    de <div>s sem interação que existia antes — rounded-md, borda sutil,
+    fundo discreto, sem padding pesado. */
+ .sp-rel-chips-wrap{display:flex;flex-direction:column;gap:6px}
+ .sp-rel-chip{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface2);cursor:pointer;transition:background .12s,border-color .12s;max-width:100%;box-sizing:border-box}
+ .sp-rel-chip:hover{background:var(--surface);border-color:var(--navy)}
+ .sp-rel-chip-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+ .sp-rel-chip-label{font-size:12px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+ .sp-rel-chip-sub{font-size:10.5px;color:var(--muted);flex-shrink:0;white-space:nowrap}
+ .sp-rel-chip-chevron{font-size:13px;color:var(--muted);flex-shrink:0;transition:transform .12s,color .12s}
+ .sp-rel-chip:hover .sp-rel-chip-chevron{transform:translateX(2px);color:var(--navy)}
  /* Comunicação */
  .drw-comm-section{display:flex;flex-direction:column;gap:4px}
  .drw-comm-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px}

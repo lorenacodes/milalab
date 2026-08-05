@@ -51,18 +51,21 @@ async function _spEmpresas(row, tds) {
  var fase   = emp.fase_ciclo_vida || '';
  _spEmpCategoriaSel = (emp.categoria || []).slice();
 
- // Auditoria: created_at/updated_at NÃO são usados aqui de propósito — são
- // timestamps de LOTE da migração (poucas dezenas de valores distintos pra
- // 636 empresas, idênticos entre registros migrados juntos), não a data real
- // de cada registro. ultima_modificacao é que carrega o "Última modificação"
- // real do Airtable (lastModifiedTime, 294 valores distintos verificados por
- // SQL) — por isso é essa a data mostrada, junto de quem criou/alterou por
- // último. Não existe coluna com a data de criação real (Airtable tem
- // "Data de criação" mas ela não foi migrada como coluna própria) — por isso
- // "Criado por" aparece sem data ao lado.
- var auditHtml = '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
-  + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Auditoria</div>'
+ // Auditoria: criado_por/ultima_alteracao_por/created_at agora são mantidos
+ // pelo trigger set_audit_fields() (empresas/contatos) — não é mais a
+ // aplicação que precisa lembrar de setá-los, então created_at passou a ser
+ // confiável e finalmente pode aparecer aqui como "Data de criação". updated_at
+ // já era 100% confiável (trg_empresas_updated_at, de rodada anterior), mas
+ // quem alimenta "Última modificação" continua sendo ultima_modificacao (a
+ // data real migrada do Airtable — lastModifiedTime, 294 valores distintos
+ // verificados por SQL — fora do escopo desta rodada trocar essa fonte).
+ // Renderizado no FOOTER do painel, de propósito discreto (fonte pequena,
+ // cor muted) — dados da empresa vêm primeiro, auditoria é informação
+ // secundária de rodapé, não deve competir por atenção.
+ var auditHtml = '<div style="margin-top:24px;border-top:1px solid var(--border);padding-top:12px">'
+  + '<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;opacity:.85">Auditoria</div>'
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">'+(emp.criado_por||'—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de criação</span><span class="drw-audit-val">'+(emp.created_at ? new Date(emp.created_at).toLocaleDateString('pt-BR') : '—')+'</span></div>'
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">'+(emp.ultima_alteracao_por||'—')+'</span></div>'
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última modificação</span><span class="drw-audit-val">'+(emp.ultima_modificacao ? new Date(emp.ultima_modificacao).toLocaleString('pt-BR') : '—')+'</span></div>'
   + '</div>';
@@ -79,17 +82,17 @@ async function _spEmpresas(row, tds) {
   + '<div class="sp-field"><div class="sp-label">Fase</div><select class="sp-inp" id="sp-emp-fase">'+_spEmpOptSelect(EMPRESA_FASE_OPCOES, fase)+'</select></div>'
   + '</div>'
   + '<input type="hidden" id="sp-emp-id" value="'+empId+'">'
-  + auditHtml
   + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
   + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Obras vinculadas</div>'
-  + '<div id="sp-emp-obras" style="display:flex;flex-direction:column;gap:6px">'
+  + '<div id="sp-emp-obras" class="sp-rel-chips-wrap">'
   + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando obras...</div>'
   + '</div></div>'
   + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
   + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Contatos vinculados</div>'
-  + '<div id="sp-emp-contatos" style="display:flex;flex-direction:column;gap:8px">'
+  + '<div id="sp-emp-contatos" class="sp-rel-chips-wrap">'
   + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando contatos...</div>'
-  + '</div></div>',
+  + '</div></div>'
+  + auditHtml,
   '<button class="btn btn-primary" id="sp-emp-save-btn" onclick="_spSaveEmpresa()">Salvar</button> <button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
  );
 
@@ -100,7 +103,9 @@ async function _spEmpresas(row, tds) {
  // Obras vinculadas — busca preguiçosa (só quando o painel de UMA empresa
  // abre, não junto de _dbLoadEmpresas pra todas as 636 de uma vez): a
  // relação empresa→obra vem da junction empresas_obras (verificada com 1561
- // linhas reais em produção antes de escrever este código).
+ // linhas reais em produção antes de escrever este código). Renderizado como
+ // chip clicável (padrão Airtable, ver _spRelChipHTML em side-panel.js) —
+ // clicar abre o painel da própria Obra via _spOpenEntityById.
  _sb.from('empresas_obras')
   .select('obra:obra_id(id, nome)')
   .eq('empresa_id', empId)
@@ -114,7 +119,7 @@ async function _spEmpresas(row, tds) {
    container.innerHTML = res.data.map(function(link) {
     var o = link.obra;
     if (!o) return '';
-    return '<div style="font-size:12px;padding:6px 10px;background:rgba(0,0,0,.025);border:1px solid var(--border);border-radius:6px">'+(o.nome||'—')+'</div>';
+    return _spRelChipHTML('obras', o.id, o.nome || '—');
    }).join('');
   });
 
@@ -131,93 +136,47 @@ async function _spEmpresas(row, tds) {
   return;
  }
 
- var colors = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
- function _cttColorSp(name) {
-  var c = 0; for (var j = 0; j < (name||'').length; j++) c += name.charCodeAt(j);
-  return colors[c % colors.length];
- }
-
+ // Contatos vinculados — mesmo tratamento de chip clicável dos Obras acima
+ // (ver ponto 5 do pedido: componente único e reaproveitável, não um
+ // renderer dedicado por entidade). Clicar abre o painel do próprio Contato
+ // via _spOpenEntityById → _spContatoById (ver abaixo). O card rico com
+ // avatar/telefone/e-mail que existia aqui antes deu lugar a este chip mais
+ // leve — telefone/e-mail com ações (WhatsApp, copiar) continuam disponíveis
+ // dentro do painel do Contato, um clique adiante.
  container.innerHTML = res.data.map(function(link) {
   var c = link.contato;
   if (!c) return '';
   var nome = c.nome_completo || '—';
-  var initials = nome.split(' ').filter(Boolean).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase() || '?';
-  var isPrimary = link.is_primary;
-
-  var telHtml = '';
-  if (c.telefone) {
-   var waNum = _sanitizeTelWA(c.telefone);
-   var telSafe = c.telefone.replace(/'/g,'&#39;');
-   telHtml = '<div style="display:flex;align-items:center;gap:4px;margin-top:4px">'
-    + '<span style="font-size:11px;color:var(--muted)">'+c.telefone+'</span>'
-    + '<span style="display:flex;gap:2px;margin-left:2px">'
-    + (waNum ? '<a href="https://wa.me/'+waNum+'" target="_blank" class="ctt-act-btn wa" title="WhatsApp" style="width:18px;height:18px">'+_icoWA+'</a>' : '')
-    + '<button onclick="navigator.clipboard.writeText(\''+telSafe+'\');this.title=\'Copiado!\'" class="ctt-act-btn" title="Copiar" style="width:18px;height:18px">'+_icoCopy+'</button>'
-    + '</span></div>';
-  }
-
-  var emailHtml = '';
-  if (c.email) {
-   var emailSafe = c.email.replace(/'/g,'&#39;');
-   emailHtml = '<div style="display:flex;align-items:center;gap:4px;margin-top:3px">'
-    + '<span style="font-size:11px;color:var(--muted)">'+c.email+'</span>'
-    + '<span style="display:flex;gap:2px;margin-left:2px">'
-    + '<a href="mailto:'+c.email+'" class="ctt-act-btn" title="Enviar e-mail" style="width:18px;height:18px">'+_icoMail+'</a>'
-    + '<button onclick="navigator.clipboard.writeText(\''+emailSafe+'\');this.title=\'Copiado!\'" class="ctt-act-btn" title="Copiar" style="width:18px;height:18px">'+_icoCopy+'</button>'
-    + '</span></div>';
-  }
-
-  return '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:rgba(0,0,0,.025);border:1px solid var(--border);border-radius:8px">'
-   + '<div class="nt-avatar nt-avatar-circle" style="background:'+_cttColorSp(nome)+';flex-shrink:0;width:32px;height:32px;font-size:11px">'+initials+'</div>'
-   + '<div style="min-width:0;flex:1">'
-   + '<div style="display:flex;align-items:center;gap:6px">'
-   + '<span style="font-weight:600;font-size:13px">'+nome+'</span>'
-   + (isPrimary ? '<span style="font-size:10px;padding:1px 6px;background:var(--navy-dim);color:var(--navy);border-radius:3px;font-weight:600">Principal</span>' : '')
-   + '</div>'
-   + (c.cargo ? '<div style="font-size:11px;color:var(--muted);margin-top:1px">'+c.cargo+'</div>' : '')
-   + telHtml
-   + emailHtml
-   + '</div></div>';
+  var sub = link.is_primary ? 'Principal' : (c.cargo || '');
+  return _spRelChipHTML('contatos', c.id, nome, sub);
  }).join('');
 }
 
 // ── Renderer: Contatos ───────────────────────────────────────────────────────
 function _spContatos(row, tds) {
- const d = row.dataset;
- const nome = d.nome ? d.nome.replace(/\w/g,l=>l.toUpperCase()) : '';
- const cargo   = d.cargo   || '';
- const perfil  = d.perfil  || '';
- const empresa = d.empresa || '';
- const email   = tds[3]?.innerText?.trim()||'';
- const tel     = tds[4]?.innerText?.trim()||'';
- _spSet('Contato', nome, `
-  <div class="sp-field"><div class="sp-label">Nome</div>
-   <input class="sp-inp" value="${nome.replace(/"/g,'&quot;')}">
-  </div>
-  <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Cargo</div>
-    <input class="sp-inp" value="${cargo.replace(/\w/g,l=>l.toUpperCase())}">
-   </div>
-   <div class="sp-field"><div class="sp-label">Perfil</div>
-    <select class="sp-inp">
-     <option ${perfil==='decisor'?'selected':''}>decisor</option>
-     <option ${perfil==='técnico'?'selected':''}>técnico</option>
-     <option ${perfil==='operacional'?'selected':''}>operacional</option>
-     <option ${perfil==='financeiro'?'selected':''}>financeiro</option>
-    </select>
-   </div>
-  </div>
-  <div class="sp-field"><div class="sp-label">Empresa</div>
-   <input class="sp-inp" value="${empresa.replace(/\w/g,l=>l.toUpperCase())}">
-  </div>
-  <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">E-mail</div>
-    <input class="sp-inp" type="email" value="${email}">
-   </div>
-   <div class="sp-field"><div class="sp-label">Telefone</div>
-    <input class="sp-inp" type="tel" value="${tel}">
-   </div>
-  </div>`,
+ _spContatoById(row.dataset.id);
+}
+
+function _spContatoById(id) {
+ var c = (_contatosArr || []).find(function(x){ return String(x.id) === String(id); }) || {};
+ var nome  = c.nome_completo ? c.nome_completo.replace(/\w/g,function(l){return l.toUpperCase();}) : '';
+ var cargo = (c.cargo || '').replace(/\w/g,function(l){return l.toUpperCase();});
+ var links = c.contatos_empresas || [];
+ var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
+ var empresa = ((empLink && empLink.empresa && empLink.empresa.nome) || '').replace(/\w/g,function(l){return l.toUpperCase();});
+ var email = c.email || '';
+ var tel   = c.telefone || '';
+ _spSet('Contato', nome,
+  '<div class="sp-field"><div class="sp-label">Nome</div>'
+  + '<input class="sp-inp" value="'+nome.replace(/"/g,'&quot;')+'"></div>'
+  + '<div class="sp-g2">'
+  + '<div class="sp-field"><div class="sp-label">Cargo</div><input class="sp-inp" value="'+cargo.replace(/"/g,'&quot;')+'"></div>'
+  + '<div class="sp-field"><div class="sp-label">Empresa</div><input class="sp-inp" value="'+empresa.replace(/"/g,'&quot;')+'"></div>'
+  + '</div>'
+  + '<div class="sp-g2">'
+  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" type="email" value="'+email.replace(/"/g,'&quot;')+'"></div>'
+  + '<div class="sp-field"><div class="sp-label">Telefone</div><input class="sp-inp" type="tel" value="'+tel.replace(/"/g,'&quot;')+'"></div>'
+  + '</div>',
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 }
 
@@ -227,7 +186,7 @@ async function _dbLoadEmpresas() {
  var allData = []; var from = 0; var more = true;
  while (more) {
   var res = await _sb.from('empresas')
-   .select('id, nome, cnpj, estado, fase_ciclo_vida, categoria, criado_por, ultima_alteracao_por, ultima_modificacao, contatos_empresas(contato_id)')
+   .select('id, nome, cnpj, estado, fase_ciclo_vida, categoria, criado_por, ultima_alteracao_por, ultima_modificacao, created_at, contatos_empresas(contato_id)')
    .order('nome').range(from, from + 999);
   if (res.error || !res.data || !res.data.length) break;
   allData = allData.concat(res.data);
@@ -404,7 +363,12 @@ async function _spSaveEmpresa() {
   estado:          ((document.getElementById('sp-emp-estado') || {}).value || '').trim().toUpperCase() || null,
   fase_ciclo_vida: ((document.getElementById('sp-emp-fase')    || {}).value || '').trim() || null,
   categoria:       (_spEmpCategoriaSel || []).slice(),
-  ultima_alteracao_por: (_currentUser && _currentUser.email) || null,
+  // ultima_alteracao_por NÃO é mais setado aqui — o trigger
+  // set_audit_fields() (empresas/contatos) agora é a única fonte de verdade
+  // pra esse campo em todo UPDATE, então a app não precisa (e não deve)
+  // mandar esse valor manualmente. ultima_modificacao continua manual —
+  // é uma coluna separada, fora do escopo desta rodada (ver comentário em
+  // _spEmpresas acima).
   ultima_modificacao: new Date().toISOString(),
  };
  if (!payload.nome) { _showToast('Informe a Razão Social.', 'erro'); return; }
