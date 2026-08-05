@@ -390,7 +390,7 @@ async function _dbLoadFornecedores() {
  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
  if (!_sb) return;
  var res = await _sb.from('fornecedores')
-  .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, experiencia, observacoes, fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, status_cotacao)')
+  .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, experiencia, observacoes, fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, status_cotacao, created_at)')
   .order('nome');
  if (res.error) {
   if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar fornecedores: ' + _supaErrPt(res.error.message) + '</td></tr>';
@@ -402,7 +402,7 @@ async function _dbLoadFornecedores() {
    endereco: f.endereco, estado: f.estado, cidades: f.cidades || [], setores: f.setores || [],
    experiencia: f.experiencia, observacoes: f.observacoes,
    produtos: (f.fornecedores_produtos || []).map(function(p){
-    return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total, status_cotacao: p.status_cotacao };
+    return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total, status_cotacao: p.status_cotacao, created_at: p.created_at };
    }),
   };
  });
@@ -596,10 +596,13 @@ function addFornProdutoLinha(produto) {
  var id = _fornProdutoCount;
  var line = document.createElement('div');
  line.id = 'fn-prod-' + id;
- line.style.cssText = 'display:grid;grid-template-columns:1fr 80px 100px 100px 100px 140px 32px;gap:6px;align-items:center';
+ line.dataset.dbId = produto.id || '';
+ line.dataset.createdAt = produto.created_at || '';
+ line.style.cssText = 'display:grid;grid-template-columns:minmax(140px,1fr) 56px 84px 84px 84px 118px 84px 26px;gap:6px;align-items:center;min-width:660px';
  var inputStyle = 'border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text);font-size:13px;outline:none;font-family:inherit;width:100%;box-sizing:border-box';
  var unidadeOpts = UNIDADES_OPCOES.map(function(u){ return '<option' + (produto.unidade_medida===u?' selected':'') + '>'+u+'</option>'; }).join('');
  var statusOpts = STATUS_COTACAO_OPCOES.map(function(s){ return '<option' + (produto.status_cotacao===s?' selected':'') + '>'+s+'</option>'; }).join('');
+ var dataCadastro = produto.created_at ? new Date(produto.created_at).toLocaleDateString('pt-BR') : '—';
  line.innerHTML =
   '<input type="text" id="fn-prod-nome-' + id + '" placeholder="Ex: Chapa de aço 2mm" value="' + (produto.nome||'').replace(/"/g,'&quot;') + '" oninput="_fornAutoSaveProdutosQueue()" style="' + inputStyle + '">'
   + '<input type="number" id="fn-prod-qtd-' + id + '" placeholder="0" min="0" step="any" value="' + (produto.quantidade!=null?produto.quantidade:'') + '" oninput="_fornProdutoRecalcular(' + id + ');_fornAutoSaveProdutosQueue()" style="' + inputStyle + ';text-align:right">'
@@ -607,7 +610,8 @@ function addFornProdutoLinha(produto) {
   + '<input type="text" id="fn-prod-valor-' + id + '" placeholder="0,00" inputmode="numeric" value="' + (produto.valor_unitario!=null ? _moedaFormatar(produto.valor_unitario) : '') + '" oninput="_fornProdutoValorInput(' + id + ',this)" style="' + inputStyle + ';text-align:right">'
   + '<div id="fn-prod-total-' + id + '" style="font-size:13px;color:var(--text);font-weight:600;text-align:right;padding:7px 4px">' + _moedaFormatarBRL(_fornecedorCalcularValorTotal(produto.quantidade||0, produto.valor_unitario||0)) + '</div>'
   + '<select id="fn-prod-status-' + id + '" onchange="_fornAutoSaveProdutosQueue()" style="' + inputStyle + '"><option value="">Selecione...</option>' + statusOpts + '</select>'
-  + '<button type="button" onclick="document.getElementById(\'fn-prod-' + id + '\').remove();_fornAutoSaveProdutosQueue()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:5px" title="Remover">&times;</button>';
+  + '<div id="fn-prod-data-' + id + '" style="font-size:12px;color:var(--muted);text-align:center;padding:7px 4px" title="Data de cadastro do orçamento">' + dataCadastro + '</div>'
+  + '<button type="button" onclick="document.getElementById(\'fn-prod-' + id + '\').remove();_fornAutoSaveProdutosQueue()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px" title="Remover">&times;</button>';
  document.getElementById('fn-produtos-list').appendChild(line);
  var cabecalho = document.getElementById('fn-produtos-cabecalho');
  if (cabecalho) cabecalho.style.display = 'grid';
@@ -781,19 +785,10 @@ async function _fornAutoSaveProdutosFlush() {
  var id = _editingFornId;
  _fornAutoSaveProdutosPending = false;
  var produtos = _fornColetarProdutos();
- var delProd = await _sb.from('fornecedores_produtos').delete().eq('fornecedor_id', id);
- if (delProd.error) {
-  if (String(_editingFornId) === String(id)) _fornAutoSaveStatus('error', 'Erro ao salvar produtos: ' + _supaErrPt(delProd.error.message));
+ var salvarRes = await _fornSalvarProdutos(id, produtos);
+ if (salvarRes.error) {
+  if (String(_editingFornId) === String(id)) _fornAutoSaveStatus('error', 'Erro ao salvar produtos: ' + _supaErrPt(salvarRes.error.message));
   return;
- }
- if (produtos.length) {
-  var insProd = await _sb.from('fornecedores_produtos').insert(
-   produtos.map(function(p){ return { fornecedor_id: id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, status_cotacao: p.status_cotacao || null }; })
-  );
-  if (insProd.error) {
-   if (String(_editingFornId) === String(id)) _fornAutoSaveStatus('error', 'Erro ao salvar produtos: ' + _supaErrPt(insProd.error.message));
-   return;
-  }
  }
  if (String(_editingFornId) !== String(id)) return;
  _fornAutoSaveStatus('saved', 'Alterações salvas');
@@ -829,6 +824,30 @@ async function excluirFornecedor(id) {
  _dbLoadFornecedores();
 }
 
+// Grava produtos por diff (update por id existente / insert pro que é novo /
+// delete pro que sumiu da lista) em vez de delete-then-insert — preserva o
+// created_at original de cada produto (pedido: "data de cadastro de cada
+// orçamento"), que um delete+insert resetaria a cada autosave.
+async function _fornSalvarProdutos(fornecedorId, produtos) {
+ var existentes = await _sb.from('fornecedores_produtos').select('id').eq('fornecedor_id', fornecedorId);
+ if (existentes.error) return existentes;
+ var idsAtuais = produtos.filter(function(p){ return p.id; }).map(function(p){ return p.id; });
+ var idsRemover = (existentes.data || []).map(function(r){ return r.id; }).filter(function(rid){ return idsAtuais.indexOf(rid) === -1; });
+ if (idsRemover.length) {
+  var delRes = await _sb.from('fornecedores_produtos').delete().in('id', idsRemover);
+  if (delRes.error) return delRes;
+ }
+ for (var i = 0; i < produtos.length; i++) {
+  var p = produtos[i];
+  var campos = { fornecedor_id: fornecedorId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, status_cotacao: p.status_cotacao || null };
+  var res = p.id
+   ? await _sb.from('fornecedores_produtos').update(campos).eq('id', p.id)
+   : await _sb.from('fornecedores_produtos').insert(campos);
+  if (res.error) return res;
+ }
+ return { error: null };
+}
+
 function _fornColetarProdutos() {
  var produtos = [];
  document.querySelectorAll('#fn-produtos-list > [id^="fn-prod-"]').forEach(function(line) {
@@ -846,7 +865,7 @@ function _fornColetarProdutos() {
   // Linha totalmente vazia (usuário adicionou e não preencheu) não entra na
   // validação nem no payload — só conta linha que o usuário começou a usar.
   if (!nome && !quantidade && !unidade_medida && !valEl.value && !status_cotacao) return;
-  produtos.push({ nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario, status_cotacao: status_cotacao });
+  produtos.push({ id: line.dataset.dbId || null, nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario, status_cotacao: status_cotacao, created_at: line.dataset.createdAt || null });
  });
  return produtos;
 }
@@ -908,18 +927,12 @@ async function submitNovoFornecedor() {
   fornecedorId = ins.data.id;
  }
 
- // Substitui os produtos do fornecedor pelos atuais (delete-then-insert, mesmo
- // padrão usado em _syncAtividadeVinculos para relações N:1 editadas em bloco).
- // valor_total NUNCA é enviado — é coluna gerada pelo próprio Postgres
- // (quantidade * valor_unitario), garantindo que nunca fica inconsistente.
- var delProd = await _sb.from('fornecedores_produtos').delete().eq('fornecedor_id', fornecedorId);
- if (delProd.error) { _showToast('Fornecedor salvo, mas houve erro ao atualizar produtos: ' + _supaErrPt(delProd.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
- if (dados.produtos.length) {
-  var insProd = await _sb.from('fornecedores_produtos').insert(
-   dados.produtos.map(function(p){ return { fornecedor_id: fornecedorId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, status_cotacao: p.status_cotacao || null }; })
-  );
-  if (insProd.error) { _showToast('Fornecedor salvo, mas houve erro ao gravar produtos: ' + _supaErrPt(insProd.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
- }
+ // Grava produtos por diff (update/insert/delete) em vez de substituir tudo —
+ // preserva o created_at original de cada produto já existente. valor_total
+ // NUNCA é enviado — é coluna gerada pelo próprio Postgres (quantidade *
+ // valor_unitario), garantindo que nunca fica inconsistente.
+ var salvarProdRes = await _fornSalvarProdutos(fornecedorId, dados.produtos);
+ if (salvarProdRes.error) { _showToast('Fornecedor salvo, mas houve erro ao gravar produtos: ' + _supaErrPt(salvarProdRes.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
 
  _showToast('Fornecedor salvo com sucesso!', 'ok');
  closeNovoFornecedor();
