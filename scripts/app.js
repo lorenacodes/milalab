@@ -290,7 +290,6 @@ var _obrasCampos = {
  'etapa': { label: 'Etapa', type: 'select', opts: ['Orçamento','Atualização de orçamento','Follow-up','Negociação','Aprovação de projeto','Piloto','Projeto aprovado','Em Andamento','Pós-vendas','Concluído','Negócio perdido'] },
  'estado': { label: 'Estado', type: 'select', opts: ['SP','DF','GO','MG','PR','RJ'] },
  'empresa': { label: 'Empresa', type: 'select', opts: ['Construtora Vega','Grupo Delta Engenharia','Prefeitura de Jundiaí','Log Brasil S.A.','MilaTec'] },
- 'projeto': { label: 'Projeto Revit', type: 'select', opts: ['sim','nao'] },
  'cidade': { label: 'Cidade', type: 'text' },
  'dataEnvio': { label: 'Envio da proposta', type: 'date' }
 };

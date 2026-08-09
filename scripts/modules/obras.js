@@ -447,7 +447,7 @@ async function _dbLoadObras() {
   // "Gerar Orçamento" vive só dentro do painel da Obra (Calculadora Modular
   // para Modular, Proposta Comercial para Solar) — aqui só abre o painel.
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'obras\',this)"'
-   +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'" data-projeto="sim"'
+   +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'"'
    +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'">'
    +'<td><div style="font-weight:500">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
    +'<td><div class="oc-tags" style="margin-bottom:0">'+catBadges+'</div></td>'
@@ -499,7 +499,6 @@ async function _dbLoadObrasKanban() {
   card.dataset.empresa = empNome;
   card.dataset.cidade = o.cidade || '';
   card.dataset.estado = o.estado || '';
-  card.dataset.projeto = 'sim';
   card.dataset.nome = o.nome || '';
   card.dataset.valor = o.valor != null ? o.valor : 0;
   card.dataset.dataEnvio = o.data_envio_proposta || '';
