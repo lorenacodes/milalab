@@ -267,39 +267,19 @@ function _adminMostrarLink(email, link) {
  el.addEventListener('click', function(e){ if(e.target===el) el.remove(); });
 }
 
-// ── Modal Convidar / Criar ────────────────────────────────────────────────────
-var _adminInviteMode = 'invite';
-
-function _adminSetMode(mode) {
- _adminInviteMode = mode;
- var btnInvite = document.getElementById('adm-mode-invite');
- var btnPwd    = document.getElementById('adm-mode-pwd');
- var pwdRow    = document.getElementById('adm-inv-pwd-row');
- var submitBtn = document.getElementById('adm-inv-btn-txt');
- if (mode === 'invite') {
-  btnInvite.style.background = 'var(--green)'; btnInvite.style.color = '#fff';
-  btnPwd.style.background    = 'none';         btnPwd.style.color    = 'var(--muted)';
-  if (pwdRow)    pwdRow.style.display    = 'none';
-  if (submitBtn) submitBtn.textContent   = 'Enviar convite por e-mail';
- } else {
-  btnPwd.style.background    = 'var(--navy)';  btnPwd.style.color    = '#fff';
-  btnInvite.style.background = 'none';         btnInvite.style.color = 'var(--muted)';
-  if (pwdRow)    pwdRow.style.display    = '';
-  if (submitBtn) submitBtn.textContent   = 'Criar acesso com senha';
- }
-}
-
+// ── Modal Convidar ─────────────────────────────────────────────────────────
+// Só convite por e-mail — sem modo "definir senha na hora": o usuário nunca
+// deve receber senha provisória, o primeiro acesso é sempre pelo link oficial
+// de convite/redefinição (ver auth-admin edge function, ação 'convidar').
 function _adminConvidarAbrir() {
  var m = document.getElementById('adm-invite-modal');
  if (!m) return;
  m.style.display = 'flex';
- // Reset campos
- ['adm-inv-nome','adm-inv-email','adm-inv-pwd'].forEach(function(id){
+ ['adm-inv-nome','adm-inv-email'].forEach(function(id){
   var el = document.getElementById(id); if (el) el.value = '';
  });
  var al = document.getElementById('adm-invite-alert');
  if (al) { al.style.display = 'none'; al.textContent = ''; }
- _adminSetMode('invite');
  setTimeout(function(){ var el=document.getElementById('adm-inv-nome'); if(el)el.focus(); }, 50);
 }
 
@@ -312,8 +292,6 @@ async function _adminConvidarEnviar() {
  var email = ((document.getElementById('adm-inv-email')||{}).value||'').trim().toLowerCase();
  var role  = ((document.getElementById('adm-inv-role') ||{}).value||'usuario');
  var area  = ((document.getElementById('adm-inv-area') ||{}).value||'');
- var pwd   = ((document.getElementById('adm-inv-pwd')  ||{}).value||'').trim();
- var mode  = _adminInviteMode || 'invite';
 
  var alertEl = document.getElementById('adm-invite-alert');
  var btn     = document.getElementById('adm-inv-btn');
@@ -330,8 +308,7 @@ async function _adminConvidarEnviar() {
  }
 
  if (!nome)  { showAlert('Informe o nome completo.', true); return; }
- if (!email.endsWith('@milatec.ind.br')) { showAlert('E-mail deve ser @milatec.ind.br.', true); return; }
- if (mode === 'pwd' && pwd.length < 8)  { showAlert('Senha deve ter no mínimo 8 caracteres.', true); return; }
+ if (!_isAllowedEmailDomain(email)) { showAlert('E-mail deve ser @milatec.ind.br ou @mila.ind.br.', true); return; }
 
  if (btn)    btn.disabled         = true;
  if (spinner) spinner.style.display = '';
@@ -340,30 +317,23 @@ async function _adminConvidarEnviar() {
  var session = (await _sb.auth.getSession()).data.session;
  if (!session) {
   showAlert('Sessão expirada. Faça login novamente.', true);
-  if(btn)btn.disabled=false; if(spinner)spinner.style.display='none'; if(btnTxt)btnTxt.textContent='Criar acesso'; return;
+  if(btn)btn.disabled=false; if(spinner)spinner.style.display='none'; if(btnTxt)btnTxt.textContent='Enviar convite'; return;
  }
-
- var actionBody = mode === 'pwd'
-  ? {action:'criar-usuario-com-senha', email, nome, role, area, password: pwd}
-  : {action:'convidar', email, nome, role, area};
 
  var r = await fetch('https://pnecdbobhywfjdadylwt.supabase.co/functions/v1/auth-admin', {
   method: 'POST',
   headers: {'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},
-  body: JSON.stringify(actionBody)
+  body: JSON.stringify({action:'convidar', email, nome, role, area})
  });
  var res = await r.json();
 
  if (btn)    btn.disabled         = false;
  if (spinner) spinner.style.display = 'none';
- if (btnTxt) btnTxt.textContent   = mode === 'pwd' ? 'Criar acesso com senha' : 'Enviar convite por e-mail';
+ if (btnTxt) btnTxt.textContent   = 'Enviar convite';
 
  if (res.error) { showAlert(_supaErrPt(res.error), true); return; }
 
- var msg = mode === 'pwd'
-  ? '✓ Acesso criado para ' + email + '. Comunique a senha ao usuário por canal seguro.'
-  : '✓ Convite enviado para ' + email + '. Válido por 24h.';
- showAlert(msg, false);
+ showAlert('✓ Convite enviado para ' + email + '. Válido por 24h.', false);
  setTimeout(function(){ _adminConvidarFechar(); _adminLoadUsers(); }, 2500);
 }
 // ── Solicitações (legado) ─────────────────────────────────────────────────────

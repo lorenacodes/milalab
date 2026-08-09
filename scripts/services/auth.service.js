@@ -3,7 +3,17 @@
 // primeiro acesso / convite, troca de senha voluntária.
 // ═══════════════════════════════════════════════════════════════════════════════
 var _ALLOWED_EMAILS = ['lorena@milatec.ind.br', 'aloisio@milatec.ind.br'];
-var _ALLOWED_DOMAIN = '@milatec.ind.br';
+// Domínios corporativos aceitos — Grupo Mila inteiro, não só a MilaTec.
+// Única fonte de verdade no cliente (login, esqueci-senha, criação de
+// usuário no admin todos chamam esta função em vez de repetir a lista).
+// A edge function auth-admin tem a MESMA lista, independente (não dá pra
+// compartilhar código entre o app e uma edge function sem bundler) — se
+// mudar aqui, mudar lá também.
+var _ALLOWED_DOMAINS = ['@milatec.ind.br', '@mila.ind.br'];
+function _isAllowedEmailDomain(email) {
+ email = (email || '').toLowerCase().trim();
+ return _ALLOWED_DOMAINS.some(function(d) { return email.endsWith(d); });
+}
 var _currentUser    = null;
 
 // Lógica central pós-login (perfil, badge de admin, dbInit). Chamada
@@ -243,8 +253,8 @@ async function _loginSubmit() {
  var email = ((document.getElementById('login-email')||{}).value||'').trim().toLowerCase();
  var pass  = ((document.getElementById('login-pass') ||{}).value||'');
  _authAlert('login-err', '');
- if (!email.endsWith(_ALLOWED_DOMAIN)) {
-  _authAlert('login-err', 'Use seu e-mail corporativo @milatec.ind.br');
+ if (!_isAllowedEmailDomain(email)) {
+  _authAlert('login-err', 'Use seu e-mail corporativo (@milatec.ind.br ou @mila.ind.br)');
   document.getElementById('login-email').classList.add('error');
   return;
  }
@@ -274,7 +284,7 @@ async function _forgotPwdSubmit() {
  var email = ((document.getElementById('forgot-email')||{}).value||'').trim().toLowerCase();
  _authAlert('forgot-alert',''); _authAlert('forgot-ok','');
  if (!email) { _authAlert('forgot-alert','Informe seu e-mail.'); return; }
- if (!email.endsWith(_ALLOWED_DOMAIN)) { _authAlert('forgot-alert','Use seu e-mail @milatec.ind.br.'); return; }
+ if (!_isAllowedEmailDomain(email)) { _authAlert('forgot-alert','Use seu e-mail corporativo (@milatec.ind.br ou @mila.ind.br).'); return; }
  _authBtnLoad('forgot-btn','forgot-btn-txt','forgot-spinner',true,'Enviando...');
  var redirectUrl = window.location.origin + window.location.pathname + '?reset=1';
  var res = await _sb.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl });

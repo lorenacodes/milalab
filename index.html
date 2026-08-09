@@ -2719,15 +2719,9 @@
   <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">
    <div>
     <div style="font-size:16px;font-weight:700">Adicionar usuário</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:3px">Escolha como o usuário vai receber o acesso</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:3px">Um convite é enviado por e-mail — o usuário define a própria senha no primeiro acesso</div>
    </div>
    <button onclick="_adminConvidarFechar()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:20px;line-height:1;padding:0;margin-top:-2px">✕</button>
-  </div>
-
-  <!-- Tabs -->
-  <div style="display:flex;gap:2px;background:var(--surface2);border-radius:8px;padding:3px;margin-bottom:20px">
-   <button id="adm-mode-invite" onclick="_adminSetMode('invite')" style="flex:1;padding:7px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;background:var(--green);color:#fff">Convidar por e-mail</button>
-   <button id="adm-mode-pwd" onclick="_adminSetMode('pwd')" style="flex:1;padding:7px;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;background:none;color:var(--muted)">Definir senha</button>
   </div>
 
   <div id="adm-invite-alert" style="display:none;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px"></div>
@@ -2739,19 +2733,7 @@
    </div>
    <div>
     <label style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;display:block;margin-bottom:6px">E-MAIL CORPORATIVO</label>
-    <input id="adm-inv-email" class="auth-inp" type="email" placeholder="colaborador@milatec.ind.br" style="width:100%;box-sizing:border-box">
-   </div>
-
-   <!-- Senha (só no modo pwd) -->
-   <div id="adm-inv-pwd-row" style="display:none">
-    <label style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;display:block;margin-bottom:6px">SENHA DE ACESSO</label>
-    <div style="position:relative">
-     <input id="adm-inv-pwd" class="auth-inp auth-inp-pwd" type="password" placeholder="Mínimo 8 caracteres" style="width:100%;box-sizing:border-box;padding-right:42px">
-     <button type="button" onclick="_togglePwd('adm-inv-pwd',this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted);padding:4px">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-     </button>
-    </div>
-    <div style="font-size:11px;color:var(--muted);margin-top:5px">Atenção: informe a senha ao usuário por canal seguro</div>
+    <input id="adm-inv-email" class="auth-inp" type="email" placeholder="colaborador@milatec.ind.br ou @mila.ind.br" style="width:100%;box-sizing:border-box">
    </div>
 
    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -3307,7 +3289,7 @@
       <div class="auth-form-header">
         <div class="auth-form-eyebrow">Sistema Interno</div>
         <h1 class="auth-form-title">Entrar na sua conta</h1>
-        <p class="auth-form-subtitle">Use seu e-mail corporativo @milatec.ind.br</p>
+        <p class="auth-form-subtitle">Use seu e-mail corporativo (@milatec.ind.br ou @mila.ind.br)</p>
       </div>
 
       <div id="login-err" class="auth-alert err"></div>
