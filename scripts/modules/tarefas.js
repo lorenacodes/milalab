@@ -1412,42 +1412,10 @@ function _gestorRenderTimeline() {
 
 function _gestorSvgEsc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-function _gestorTimelineTip(evt, id) {
- var a = _gestorAllAt.find(function(x){ return String(x.id) === String(id); });
- var tip = document.getElementById('gestor-timeline-tooltip');
- if (!tip || !a) return;
- var late   = _gIsLate(a);
- var sc     = _gStatusCls(a.status||'A fazer');
- var prazo  = a.data_prazo  ? new Date(a.data_prazo +'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'}) : '—';
- var inicio = a.data_inicio ? new Date(a.data_inicio+'T00:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'}) : '—';
- // Duração em dias
- var durStr = '';
- if (a.data_inicio && a.data_prazo) {
-  var dur = Math.round((new Date(a.data_prazo+'T00:00:00') - new Date(a.data_inicio+'T00:00:00')) / 86400000) + 1;
-  durStr = '<span style="color:var(--muted)">' + dur + ' dias</span>';
- }
- var resp = (a.responsavel||'').split(/[,;]+/).map(function(r){return r.trim();}).filter(Boolean).slice(0,3).join(', ') || '—';
- tip.innerHTML =
-  '<div style="font-weight:700;font-size:12px;margin-bottom:6px;color:var(--text);max-width:220px;word-break:break-word">' + (a.titulo||'—') + '</div>'
-  + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">'
-  + '<span class="gs-badge ' + sc.cls + '">' + (a.status||'A fazer') + '</span>'
-  + (late ? '<span class="gs-badge gs-atrasado" style="margin-left:4px">Atrasada</span>' : '')
-  + (a.prioridade ? '<span class="' + ({'Alta':'tag-priority-high','Média':'tag-priority-med','Baixa':'tag-priority-low'}[a.prioridade]||'') + '">' + a.prioridade + '</span>' : '')
-  + '</div>'
-  + '<div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:10px;margin-bottom:6px">'
-  + '<span style="color:var(--muted)">Início</span><b>' + inicio + '</b>'
-  + '<span style="color:var(--muted)">Prazo</span><b style="color:' + (late?'#D6433C':'var(--text)') + '">' + prazo + '</b>'
-  + (durStr ? '<span style="color:var(--muted)">Duração</span>' + durStr : '')
-  + '</div>'
-  + '<div style="font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:5px">Resp.: ' + resp + '</div>';
- tip.style.display = '';
- tip.style.left = (evt.clientX + 16) + 'px';
- tip.style.top  = (evt.clientY - 20) + 'px';
-}
-function _gestorTimelineTipHide() {
- var tip = document.getElementById('gestor-timeline-tooltip');
- if (tip) tip.style.display = 'none';
-}
+// _gestorTimelineTip/_gestorTimelineTipHide removidas (limpeza técnica):
+// nenhuma barra do Timeline tinha onmouseover/onmouseout chamando essas
+// funções (confirmado — as barras usam só o atributo title nativo do
+// navegador pra mostrar informação ao passar o mouse, já funcionando).
 
 // ══════════════════════════════════════════════════════════════════════════
 // MÉTRICAS
@@ -1541,13 +1509,8 @@ function _gestorRenderMetricas() {
   slices.forEach(function(sl){ if(!sl.v)return; var sw=(sl.v/tot)*2*Math.PI,x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle),x2=cx+r*Math.cos(angle+sw),y2=cy+r*Math.sin(angle+sw),lg=sw>Math.PI?1:0; paths+='<path d="M '+cx+' '+cy+' L '+x1.toFixed(1)+' '+y1.toFixed(1)+' A '+r+' '+r+' 0 '+lg+' 1 '+x2.toFixed(1)+' '+y2.toFixed(1)+' Z" fill="'+sl.c+'" opacity=".9"/>'; angle+=sw; });
   return paths+'<circle cx="'+cx+'" cy="'+cy+'" r="'+(r-stroke)+'" fill="var(--surface)"/>';
  }
- function miniArc(pct,clr,sz){
-  sz=sz||42; var r=sz/2-5,cx=sz/2,cy=sz/2,angle=(pct/100)*2*Math.PI-Math.PI/2,x=cx+r*Math.cos(angle),y=cy+r*Math.sin(angle),lg=pct>50?1:0;
-  var bg='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="var(--border)" stroke-width="3.5"/>';
-  if(pct<=0) return '<svg width="'+sz+'" height="'+sz+'">'+bg+'</svg>';
-  if(pct>=100) return '<svg width="'+sz+'" height="'+sz+'">'+bg+'<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="none" stroke="'+clr+'" stroke-width="3.5"/></svg>';
-  return '<svg width="'+sz+'" height="'+sz+'">'+bg+'<path d="M '+cx+' '+(cy-r)+' A '+r+' '+r+' 0 '+lg+' 1 '+x.toFixed(1)+' '+y.toFixed(1)+'" fill="none" stroke="'+clr+'" stroke-width="3.5" stroke-linecap="round"/></svg>';
- }
+ // miniArc removida (limpeza técnica): helper local sem nenhum caller dentro
+ // desta função — svgDonut cobre os gráficos de anel realmente usados aqui.
 
  // ==========================================================================
  // RENDER
@@ -1865,13 +1828,5 @@ function _gestorRenderMetricas() {
  wrap.innerHTML=s;
 }
 
-function _gestorKpiCard(title, value, color, icon, hint) {
- return '<div class="gestor-metric-card">'
-  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'
-  + '<span class="gestor-kpi-lbl">' + title + '</span>'
-  + '<span style="color:' + color + ';opacity:.6">' + icon + '</span>'
-  + '</div>'
-  + '<div class="gestor-kpi-num" style="color:' + color + '">' + value + '</div>'
-  + '<div style="font-size:10px;color:var(--muted)">' + hint + '</div>'
-  + '</div>';
-}
+// _gestorKpiCard removida (limpeza técnica): sem nenhum caller — _gestorRenderMetricas
+// usa o helper local kpiBox(), com o mesmo propósito, pra tudo.

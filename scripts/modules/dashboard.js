@@ -170,33 +170,10 @@ function _dashBuildAlertsFromDB(allAt) {
 
 
 
-/* ── DASHBOARD — NOTAS PESSOAIS ─────────────────────────────────────── */
-var _dashNotesTimer = null;
-
-function _dashNotesChange() {
- var status = document.getElementById('dash-notes-status');
- if (status) status.textContent = 'Salvando...';
- clearTimeout(_dashNotesTimer);
- _dashNotesTimer = setTimeout(function() {
-  try {
-   var area = document.getElementById('dash-notes-area');
-   var key = 'milatec-notes-' + (localStorage.getItem('pp-name') || 'Lorena').split(' ')[0].toLowerCase();
-   localStorage.setItem(key, area ? area.value : '');
-   if (status) {
-    status.textContent = 'Salvo';
-    setTimeout(function(){ if (status) status.textContent = ''; }, 2000);
-   }
-  } catch(e) {}
- }, 700);
-}
-
-function _dashLoadNotes() {
- try {
-  var key = 'milatec-notes-' + (localStorage.getItem('pp-name') || 'Lorena').split(' ')[0].toLowerCase();
-  var area = document.getElementById('dash-notes-area');
-  if (area) area.value = localStorage.getItem(key) || '';
- } catch(e) {}
-}
+/* Widget "Notas Pessoais" do Meu Painel foi removido do HTML (sem
+   #dash-notes-area/#dash-notes-status em index.html) — _dashNotesChange/
+   _dashLoadNotes/_dashNotesTimer removidos junto (limpeza técnica; ver
+   docs/ para o registro completo). */
 
 /* ── MEU PAINEL — LEMBRETES (Supabase + Realtime) ───────────────────────── */
 var _remCurrentTab    = 'inbox';
@@ -2197,258 +2174,26 @@ function _submitNewTask() {
  }
 }
 
-function _dashUpdateProgress() {
- // Motivo: filtra apenas tarefas com data_fim na semana atual (seg–dom).
- // Isso dá uma visão operacional do que precisa ser entregue agora,
- // em vez de diluir o progresso com todas as tarefas do histórico.
- var hoje   = new Date();
- var diaSem = hoje.getDay(); // 0=dom, 1=seg...
- var seg    = new Date(hoje);
- seg.setDate(hoje.getDate() - ((diaSem + 6) % 7)); // segunda-feira desta semana
- seg.setHours(0,0,0,0);
- var dom    = new Date(seg);
- dom.setDate(seg.getDate() + 6); // domingo
- dom.setHours(23,59,59,999);
+// _dashUpdateProgress removida (limpeza técnica): calculava a partir de
+// _dashTasks, que está sempre vazio (widget legado retirado — ver
+// dashboard.js linhas iniciais). Os mesmos elementos (#dash-pb-*,
+// #dash-ring-*) já são preenchidos de verdade por _dashUpdateKPIsFromDB,
+// com dados reais do Supabase — essa função nunca era chamada.
 
- var tasksSemana = _dashTasks.filter(function(t) {
-  if (!t.data_fim) return false;
-  var df = new Date(t.data_fim + 'T00:00:00');
-  return df >= seg && df <= dom;
- });
-
- // Se não há tarefas desta semana, exibe total geral para não ficar vazio
- var usar = tasksSemana.length > 0 ? tasksSemana : _dashTasks;
- var total = usar.length;
- var done  = usar.filter(function(t){ return t.done; }).length;
- var late  = _dashTasks.filter(function(t){
-  if (t.done) return false;
-  var p = _dashTaskPrazo(t);
-  return p && p.cls === 'prazo-atrasado';
- }).length;
- var pct = total ? Math.round((done / total) * 100) : 0;
-
- var fill    = document.getElementById('dash-pb-fill');
- var pctEl   = document.getElementById('dash-pb-pct');
- var countEl = document.getElementById('dash-pb-count');
- var labelEl = document.getElementById('dash-pb-label');
- if (fill)    fill.style.width = pct + '%';
- if (pctEl)   pctEl.textContent = pct + '%';
- if (countEl) countEl.textContent = done + '/' + total + (tasksSemana.length > 0 ? ' esta semana' : ' total');
- if (labelEl) labelEl.textContent = 'Tarefas da semana';
- // stats extras do novo card semanal
- var doneEl  = document.getElementById('dash-pb-done');
- var totalEl = document.getElementById('dash-pb-total');
- var lateEl  = document.getElementById('dash-pb-late');
- if (doneEl)  doneEl.textContent  = done;
- if (totalEl) totalEl.textContent = total;
- if (lateEl)  lateEl.textContent  = late;
-
- var CIRCUNF = 226.2;
- var ring    = document.getElementById('dash-ring-fill');
- var ringPct = document.getElementById('dash-ring-pct');
- var ringSub = document.getElementById('dash-ring-sub');
- var ringDone= document.getElementById('dash-ring-done');
- var ringLate= document.getElementById('dash-ring-late');
- if (ring)     ring.style.strokeDashoffset = (CIRCUNF - (pct / 100) * CIRCUNF);
- if (ringPct)  ringPct.textContent = pct + '%';
- if (ringSub)  ringSub.textContent = done + ' de ' + total + ' tarefas';
- if (ringDone) ringDone.textContent = done;
- if (ringLate) ringLate.textContent = late;
-}
-
-function _dashRenderAgenda() {
- var list = document.getElementById('dash-agenda-list');
- if (!list) return;
- var diasAbrev = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
- var hojeAbrev = diasAbrev[new Date().getDay()];
- var prioColor = { alta:'var(--red)', media:'var(--yellow)', baixa:'var(--navy)' };
- function _normP(p){ return (p||'').toLowerCase().replace('é','e').replace('á','a'); }
- var pending   = _dashTasks.filter(function(t){ return !t.done; });
- // Classifica cada tarefa pelo prazo derivado
- var atrasadas = [], hoje = [], futuras = [];
- pending.forEach(function(t) {
-  var p = _dashTaskPrazo(t);
-  if (!p) return;
-  if (p.cls === 'prazo-atrasado') atrasadas.push(t);
-  else if (p.cls === 'prazo-hoje') hoje.push(t);
-  else futuras.push(t);
- });
- var html = '';
- atrasadas.slice(0, 2).forEach(function(t) {
-  html += '<div class="agenda-item">'
-   + '<div class="agenda-day" style="color:var(--red);font-size:9px">ATR</div>'
-   + '<div class="agenda-dot" style="background:var(--red)"></div>'
-   + '<div style="flex:1"><div class="agenda-title">' + t.titulo + '</div>'
-   + '<div class="agenda-sub">Atrasada' + (t.area ? ' · ' + t.area : '') + '</div></div></div>';
- });
- hoje.forEach(function(t) {
-  html += '<div class="agenda-item">'
-   + '<div class="agenda-day hoje">' + hojeAbrev + '</div>'
-   + '<div class="agenda-dot" style="background:var(--red)"></div>'
-   + '<div style="flex:1"><div class="agenda-title">' + t.titulo + '</div>'
-   + '<div class="agenda-sub">Hoje' + (t.area ? ' · ' + t.area : '') + '</div></div></div>';
- });
- futuras.slice(0, 3).forEach(function(t) {
-  var p   = _dashTaskPrazo(t);
-  var cor = prioColor[_normP(t.prioridade)] || 'var(--navy)';
-  var tipoAgenda = t.tipo_atividade || t.tipo || '';
-  html += '<div class="agenda-item">'
-   + '<div class="agenda-day">' + (p ? p.label : '') + '</div>'
-   + '<div class="agenda-dot" style="background:' + cor + '"></div>'
-   + '<div style="flex:1"><div class="agenda-title">' + t.titulo + '</div>'
-   + '<div class="agenda-sub">' + (t.area || '') + (tipoAgenda ? ' · ' + tipoAgenda : '') + '</div></div></div>';
- });
- if (!html) {
-  html = '<div style="font-size:12px;color:var(--muted);padding:14px 0;text-align:center">Nenhuma pendência para esta semana.</div>';
- }
- list.innerHTML = html;
-}
+// _dashRenderAgenda removida (limpeza técnica): alvo (#dash-agenda-list)
+// não existe mais em index.html — o widget "Agenda" foi removido da tela,
+// função nunca era chamada.
 
 /* ── DASHBOARD — DADOS AO VIVO ──────────────────────────────────────── */
-/* ── DRAWER LATERAL DE PROJETOS ─────────────────────────────────────── */
-var _projDrawerData     = [];  // todos os projetos do usuário
-var _projDrawerFilters  = { status: '' };
 
-function _projDrawerOpen() {
- var drw = document.getElementById('proj-drw');
- var bd  = document.getElementById('drw-backdrop-proj');
- if (drw) drw.classList.add('open');
- if (bd)  bd.classList.add('open');
- // Limpa busca
- var si = document.getElementById('proj-drw-search');
- if (si) si.value = '';
- _projDrawerFilters = { status: '' };
- // Reseta chips de filtro
- document.querySelectorAll('.proj-fc').forEach(function(fc){ fc.classList.remove('active'); });
- var allChip = document.querySelector('.proj-fc[data-val=""]');
- if (allChip) allChip.classList.add('active');
- // Carrega dados
- _projDrawerLoad();
-}
-
-function _projDrawerClose() {
- var drw = document.getElementById('proj-drw');
- var bd  = document.getElementById('drw-backdrop-proj');
- if (drw) drw.classList.remove('open');
- if (bd)  bd.classList.remove('open');
-}
-
-function _projDrawerLoad() {
- var list = document.getElementById('proj-drw-list');
- if (!list) return;
- // Usa cache do _dashLoad se disponível
- if (window._projDrawerCache && window._projDrawerCache.length) {
-  _projDrawerData = window._projDrawerCache;
-  _projDrawerRender();
-  return;
- }
- if (!_dbOk) {
-  list.innerHTML = '<div class="proj-drw-empty">Banco de dados indisponível.</div>';
-  return;
- }
- list.innerHTML = '<div class="proj-drw-empty">Carregando projetos...</div>';
- var userEmail = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || '';
- var projQDrw = _sb.from('projetos')
-  .select('id, nome, etapa_projeto, complexidade, responsavel, obra_id, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
-  .order('created_at', { ascending: false })
-  .limit(100);
- if (userEmail) projQDrw = projQDrw.contains('responsavel', [userEmail]);
- projQDrw.then(function(res) {
-   if (res.error || !res.data) {
-    list.innerHTML = '<div class="proj-drw-empty">Erro ao carregar projetos.</div>';
-    return;
-   }
-   res.data.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
-   _projDrawerData = res.data;
-   window._projDrawerCache = res.data;
-   _projDrawerRender();
-  });
-}
-
-function _projFc(btn, filterKey) {
- // Toggle filtro exclusivo por grupo
- document.querySelectorAll('.proj-fc[data-filter="' + filterKey + '"]').forEach(function(fc){ fc.classList.remove('active'); });
- btn.classList.add('active');
- _projDrawerFilters[filterKey] = btn.getAttribute('data-val') || '';
- _projDrawerFilter();
-}
-
-function _projDrawerFilter() {
- _projDrawerRender();
-}
-
-function _projDrawerRender() {
- var list = document.getElementById('proj-drw-list');
- if (!list) return;
- var search  = ((document.getElementById('proj-drw-search') || {}).value || '').toLowerCase().trim();
- var stFilter = _projDrawerFilters.status || '';
-
- var etapaColor = {
-  'Orçamento':'var(--yellow)', 'Aguardando Aprovação':'var(--yellow)',
-  'Análise Inicial':'var(--navy)', 'Pré-Projeto':'var(--navy)',
-  'Projeto para aprovação':'var(--navy)', 'Revisão Executivo':'var(--yellow)',
-  'Projeto Executivo':'var(--green)', 'Ajuste de Piloto':'var(--purple)',
-  'Revisão Pré-Projeto':'var(--yellow)'
- };
- var etapaBg = {
-  'Orçamento':'var(--yellow-dim)', 'Aguardando Aprovação':'var(--yellow-dim)',
-  'Análise Inicial':'var(--blue-dim)', 'Pré-Projeto':'var(--blue-dim)',
-  'Projeto para aprovação':'var(--blue-dim)', 'Revisão Executivo':'var(--yellow-dim)',
-  'Projeto Executivo':'var(--green-dim)', 'Ajuste de Piloto':'rgba(137,87,229,.12)',
-  'Revisão Pré-Projeto':'var(--yellow-dim)'
- };
-
- var filtered = _projDrawerData.filter(function(p) {
-  if (stFilter && (p.etapa_projeto || '') !== stFilter) return false;
-  if (search) {
-   var nome   = (p.nome || '').toLowerCase();
-   var obra   = (p.obra && p.obra.nome ? p.obra.nome : '').toLowerCase();
-   var etapa  = (p.etapa_projeto || '').toLowerCase();
-   var resp   = (p.responsavel || '').toLowerCase();
-   if (nome.indexOf(search) < 0 && obra.indexOf(search) < 0 && etapa.indexOf(search) < 0 && resp.indexOf(search) < 0) return false;
-  }
-  return true;
- });
-
- var countEl = document.getElementById('proj-drw-count');
- if (countEl) countEl.textContent = filtered.length + ' projeto' + (filtered.length !== 1 ? 's' : '');
-
- if (!filtered.length) {
-  list.innerHTML = '<div class="proj-drw-empty">Nenhum projeto encontrado.</div>';
-  return;
- }
-
- list.innerHTML = filtered.map(function(p) {
-  var obraStr    = p.obra && p.obra.nome ? p.obra.nome : '';
-  var empresaStr = p.obra?.empresas_obras?.[0]?.empresa?.nome || '';
-  var etapa      = p.etapa_projeto || '—';
-  var cor        = etapaColor[etapa] || 'var(--muted)';
-  var bg         = etapaBg[etapa]    || 'var(--surface2)';
-  var complex    = p.complexidade ? p.complexidade : '';
-
-  return '<div class="proj-card" onclick="_projDrawerGoDetail(\'' + p.id + '\')">'
-   + '<div class="proj-card-prio-bar" style="background:' + cor + '"></div>'
-   + '<div class="proj-card-body">'
-   + '<div class="proj-card-nome">' + (p.nome || 'Sem nome') + '</div>'
-   + (obraStr ? '<div class="proj-card-obra">' + (empresaStr ? empresaStr + ' — ' : '') + obraStr + '</div>' : '')
-   + '<div class="proj-card-sub">'
-   + '<span class="proj-card-tag" style="background:' + bg + ';color:' + cor + '">' + etapa + '</span>'
-   + (complex ? '<span style="font-size:10px;color:var(--muted)">' + complex + '</span>' : '')
-   + (p.responsavel ? '<span style="font-size:10px;color:var(--muted)">' + p.responsavel + '</span>' : '')
-   + '</div>'
-   + '</div>'
-   + '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" style="color:var(--muted);flex-shrink:0;margin-top:4px"><polyline points="4,2 8,6 4,10"/></svg>'
-   + '</div>';
- }).join('');
-}
-
-function _projDrawerGoDetail(projId) {
- _projDrawerClose();
- // Navega para projetos e seleciona o projeto
- go('projetos');
- // Tenta abrir o detalhe após a navegação
- setTimeout(function(){ if(typeof _spById === 'function') _spById(projId); }, 300);
-}
+// _projDrawerOpen/_projDrawerClose/_projDrawerLoad/_projFc/_projDrawerFilter/
+// _projDrawerRender/_projDrawerGoDetail removidas (limpeza técnica): esse
+// drawer de busca de "Meus Projetos" (#proj-drw) ficou sem nenhum gatilho
+// que o abrisse — _projDrawerOpen() não tinha caller em lugar nenhum, então
+// toda a cadeia (fechar/filtrar/renderizar, que só existiam pra servir esse
+// drawer) ficou inalcançável junto. Confirmado que não é regressão: clicar
+// num projeto em "Meus Projetos" hoje já usa outro caminho, _spProjetoGoto
+// (abaixo), que navega pra página Projetos e abre a linha — funcionando.
 
 // Abre o painel do Projeto pelo id, navegando até a tabela de Projetos
 function _spProjetoGoto(id) {

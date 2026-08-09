@@ -65,7 +65,6 @@ function go(id) {
  if (id === 'dashboard' && _prevRoute !== 'dashboard') {
   buildGreeting();
   _dashTasksInit();
-  _dashLoadNotes();
   _dashRenderInbox();
   if (typeof _dashLoad === 'function' && _dbOk) _dashLoad();
  }
@@ -747,12 +746,17 @@ function _histInit() {
  _histBadgeUpdate();
 }
 
-_dashTasksInit();
-_dashLoadNotes();
-_dashRenderInbox();
-_dashLoad();
-
-go('dashboard');
+// Bloco de boot direto removido (correção de fluxo, não limpeza): rodava no
+// nível superior do arquivo, então executava assim que app.js terminasse de
+// ser parseado — ANTES de dashboard.js (que define _dashTasksInit/
+// _dashRenderInbox/_dashLoad) mesmo carregar, já que ele vem depois no
+// <script src> do index.html. Sempre lançava "ReferenceError:
+// _dashTasksInit is not defined" e nunca chegava a rodar _dashLoad()/
+// go('dashboard') de verdade — confirmado que já quebrava assim antes desta
+// limpeza também. A inicialização real do app já acontece por outro caminho
+// (_checkSession, registrado no DOMContentLoaded em auth.service.js, chama
+// _loginSuccess → _dbInit, que já dispara tudo isso certo depois do login),
+// então remover este bloco elimina o erro sem mudar nenhum comportamento.
 
 /* ── SIDEBAR: TOGGLE E RESIZE ──────────────────────────────────────── */
 // Motivo: sidebar ajustável melhora muito usabilidade em telas menores ou
