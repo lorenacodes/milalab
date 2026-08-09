@@ -252,7 +252,11 @@ body.light .dash-panel{
  /* VIEW TOGGLE */
  .view-toggle{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden}
  .vt-btn{padding:5px 10px;font-size:12px;font-weight:500;color:var(--muted);background:transparent;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s;font-family:inherit}
- .vt-btn.active{background:var(--surface);color:var(--text);box-shadow:inset 0 0 0 1px var(--border)}
+ /* Modo ativo precisa se destacar de cara (mesmo acento var(--navy) usado em
+    .gestor-sel.active/.gestor-tab.active pro resto do sistema) — o
+    box-shadow sutil antigo (só a cor de fundo mudando um tom) não deixava
+    claro qual dos dois modos estava ativo numa primeira olhada. */
+ .vt-btn.active{background:var(--navy-dim);color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);font-weight:700}
  .vt-btn:hover:not(.active){color:var(--text)}
  /* KANBAN OBRAS — mesma linguagem visual da aba Empresas: fundo limpo,
     bordas discretas (var(--border), 1px), sombras suaves (--shadow-1/2),
@@ -271,7 +275,15 @@ body.light .dash-panel{
  .obra-card:last-child{margin-bottom:0}
  .obra-card.dragging{opacity:.4}
  .oc-title{font-size:13px;font-weight:600;line-height:1.4;color:var(--text)}
- .oc-date{font-size:11px;color:var(--muted);margin-top:8px}
+ /* Mesma info (empresa/local, valor, canal) que a Tabela mostra por linha —
+    ver comentário em _dbLoadObrasKanban (obras.js): Kanban e Tabela precisam
+    mostrar o mesmo conteúdo, só a forma muda. */
+ .oc-sub{font-size:11px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .oc-sub b{color:var(--text);font-weight:500}
+ .oc-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+ .oc-valor{font-size:12px;font-weight:600;color:var(--text)}
+ .oc-canal{font-size:11px;color:var(--muted)}
+ .oc-date{font-size:11px;color:var(--muted);margin-top:4px}
  /* PERFIL PANEL */
  .profile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;backdrop-filter:blur(2px)}
  .profile-overlay.open{display:block}

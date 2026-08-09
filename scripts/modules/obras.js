@@ -449,7 +449,7 @@ async function _dbLoadObras() {
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'obras\',this)"'
    +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'"'
    +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'">'
-   +'<td><div style="font-weight:500">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
+   +'<td><div style="font-weight:600">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
    +'<td><div class="oc-tags" style="margin-bottom:0">'+catBadges+'</div></td>'
    +'<td style="text-align:center;color:var(--muted)">'+qtd+'</td>'
    +'<td style="color:var(--muted)">'+(o.canal_vendas||'—')+'</td>'
@@ -488,10 +488,13 @@ async function _dbLoadObrasKanban() {
   if (!body) return;
   const tipos = o.tipo_obra || [];
   const empNome = (o.empresa && o.empresa.nome) || '';
+  const loc = [o.cidade, o.estado].filter(Boolean).join(' - ');
   const tagsHtml = tipos.map(t => `<span class="badge ${_tipoClsBd[t]||'bm'}" style="font-size:10px">${t}</span>`).join('');
-  const criadoTxt = o.created_at ? new Date(o.created_at).toLocaleDateString('pt-BR') : '';
+  const dataEnvioTxt = o.data_envio_proposta ? new Date(o.data_envio_proposta+'T00:00:00').toLocaleDateString('pt-BR') : '';
+  const valorTxt = (o.valor != null) ? 'R$ ' + Number(o.valor).toLocaleString('pt-BR', {minimumFractionDigits:0}) : '';
   const card  = document.createElement('div');
   card.className = 'obra-card';
+  card.style.borderLeft = '3px solid ' + (_etapaDot[o.etapa_negocio] || 'transparent');
   card.dataset.id = o.id;
   card.dataset.etapa = o.etapa_negocio || '';
   card.dataset.tipo = (o.tipo_obra || []).join(', ');
@@ -506,16 +509,18 @@ async function _dbLoadObrasKanban() {
   card.draggable = true;
   card.addEventListener('dragstart', _onObraCardDragStart);
   card.addEventListener('dragend', _onObraCardDragEnd);
-  // Card simplificado (UX): só o essencial pra identificar a obra rápido —
-  // nome, categoria e data de criação. Cliente/canal/qtd./valor/cidade/
-  // estado continuam disponíveis na Tabela e no painel de detalhe; aqui
-  // ficariam de fora só pra reduzir a carga de leitura do Kanban. Os
-  // data-* abaixo (empresa/cidade/estado/canal/etc.) continuam intactos —
-  // são usados pelos filtros/busca, que não mudam nesta tarefa.
+  // Kanban e Tabela mostram as MESMAS informações (nome+empresa/local,
+  // categoria, valor, canal, envio da proposta) — só a forma muda. Antes o
+  // card só trazia nome/categoria/data de criação, forçando quem usa Kanban
+  // a abrir a Tabela pra ver o resto; a borda esquerda usa a mesma cor de
+  // _etapaDot que colore o badge de Etapa na Tabela, reforçando que é a
+  // mesma etapa representada de duas formas (posição da coluna + cor).
   card.innerHTML = `
    <div class="oc-title">${o.nome||''}</div>
+   ${(empNome || loc) ? `<div class="oc-sub">${empNome||'—'}${loc ? ' · <b>'+loc+'</b>' : ''}</div>` : ''}
    ${tagsHtml ? `<div class="oc-tags">${tagsHtml}</div>` : ''}
-   ${criadoTxt ? `<div class="oc-date">Criado ${criadoTxt}</div>` : ''}
+   ${(valorTxt || o.canal_vendas) ? `<div class="oc-meta">${valorTxt ? `<span class="oc-valor">${valorTxt}</span>` : ''}${o.canal_vendas ? `<span class="oc-canal">${o.canal_vendas}</span>` : ''}</div>` : ''}
+   ${dataEnvioTxt ? `<div class="oc-date">Envio ${dataEnvioTxt}</div>` : ''}
   `;
   card.onclick = () => _spObraById(o.id);
   body.appendChild(card);
