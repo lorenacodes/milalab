@@ -1073,11 +1073,13 @@ function _taskDrawerOpen(editId) {
   _taskRecorrenciaChange();
  }
 
- // ── Aba Auditoria (só no modo edição) ──
- var auditTab = get('drw-tab-auditoria');
+ // ── Seção Auditoria (só no modo edição — atividade nova ainda não existe) ──
+ var auditTab  = get('drw-tab-auditoria');
+ var auditPane = get('drw-pane-auditoria');
  var auditBody = get('drw-audit-body');
  if (t && auditTab && auditBody) {
   auditTab.style.display = '';
+  if (auditPane) auditPane.style.display = '';
   var criador  = t.created_by  || t.responsavel || '—';
   var updBy    = t.updated_by  || '—';
   var origem   = t.origem      || 'Dashboard';
@@ -1087,16 +1089,22 @@ function _taskDrawerOpen(editId) {
    + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de criação</span><span class="drw-audit-val">' + criadoEm + '</span></div>'
    + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">' + updBy + '</span></div>'
    + '<div class="drw-audit-row"><span class="drw-audit-lbl">Origem</span><span class="drw-audit-val">' + origem + '</span></div>';
- } else if (auditTab) {
-  auditTab.style.display = 'none';
+ } else {
+  if (auditTab) auditTab.style.display = 'none';
+  if (auditPane) auditPane.style.display = 'none';
  }
 
- // ── Reset: voltar para aba Geral, limpar erros ──
- _drwTab('geral', document.querySelector('.drw-tab'));
+ // ── Reset: voltar ao topo (seção Geral), limpar erros ──
+ var body0 = get('task-drw-body');
+ if (body0) body0.scrollTop = 0;
+ document.querySelectorAll('.drw-tab').forEach(function(b){ b.classList.remove('active'); });
+ var firstTab = document.querySelector('.drw-tab');
+ if (firstTab) firstTab.classList.add('active');
  ['nt-titulo','nt-tipo-atividade','nt-area','nt-dt-inicio','nt-dt-fim'].forEach(function(id){
   var el = get(id);
   if (el) { el.style.borderColor = ''; el.style.boxShadow = ''; }
  });
+ _drwSpyInit();
  var respBoxReset = get('nt-resp-box');
  if (respBoxReset) { respBoxReset.style.borderColor = ''; respBoxReset.style.boxShadow = ''; }
 
@@ -1487,13 +1495,42 @@ function _recorrenciaPreview() {
  el.textContent = msg;
 }
 
-/* ── TABS DO DRAWER ──────────────────────────────────────────────────────── */
-function _drwTab(name, btn) {
+/* ── TABS DO DRAWER: página única com scroll — as abas são atalhos que
+   rolam suavemente até a seção correspondente, sem trocar conteúdo ── */
+function _drwAnchor(name, btn) {
+ var body = document.getElementById('task-drw-body');
+ var target = document.getElementById('drw-anchor-' + name);
+ if (body && target) {
+  body.scrollTo({ top: target.offsetTop - body.offsetTop, behavior: 'smooth' });
+ }
  document.querySelectorAll('.drw-tab').forEach(function(b){ b.classList.remove('active'); });
- document.querySelectorAll('.drw-tab-pane').forEach(function(p){ p.classList.remove('active'); });
  if (btn) btn.classList.add('active');
- var pane = document.getElementById('drw-pane-' + name);
- if (pane) pane.classList.add('active');
+ else {
+  var fallback = document.querySelector('.drw-tab[onclick*="\'' + name + '\'"]');
+  if (fallback) fallback.classList.add('active');
+ }
+}
+
+/* ── Scrollspy: destaca no topo a aba correspondente à seção visível ── */
+var _drwSpyObserver = null;
+function _drwSpyInit() {
+ if (_drwSpyObserver) { _drwSpyObserver.disconnect(); _drwSpyObserver = null; }
+ var body = document.getElementById('task-drw-body');
+ if (!body || typeof IntersectionObserver === 'undefined') return;
+ var anchors = Array.prototype.slice.call(body.querySelectorAll('.drw-page-hd[id^="drw-anchor-"]'));
+ if (!anchors.length) return;
+ _drwSpyObserver = new IntersectionObserver(function(entries) {
+  var mostVisible = null;
+  entries.forEach(function(e) {
+   if (e.isIntersecting && (!mostVisible || e.intersectionRatio > mostVisible.intersectionRatio)) mostVisible = e;
+  });
+  if (!mostVisible) return;
+  var name = mostVisible.target.id.replace('drw-anchor-', '');
+  document.querySelectorAll('.drw-tab').forEach(function(b){ b.classList.remove('active'); });
+  var btn = document.querySelector('.drw-tab[onclick*="\'' + name + '\'"]');
+  if (btn) btn.classList.add('active');
+ }, { root: body, threshold: [0, .5, 1], rootMargin: '-8px 0px -70% 0px' });
+ anchors.forEach(function(a){ _drwSpyObserver.observe(a); });
 }
 
 /* ── SUBTAREFAS NO DRAWER ────────────────────────────────────────────────── */
@@ -2010,8 +2047,8 @@ function _submitNewTask() {
   valido = false;
  }
  if (!valido) {
-  // Voltar para aba Geral para mostrar erros
-  _drwTab('geral', document.querySelector('.drw-tab'));
+  // Rolar até o primeiro campo com erro (seção Geral já está sempre visível)
+  if (primeiroInvalido && primeiroInvalido.scrollIntoView) primeiroInvalido.scrollIntoView({ block: 'center', behavior: 'smooth' });
   if (primeiroInvalido && primeiroInvalido.focus) primeiroInvalido.focus();
   _showToast('Preencha todos os campos obrigatórios (*)', 'erro');
   return;

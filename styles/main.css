@@ -480,8 +480,9 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
  .drw-tab{font-size:11px;font-weight:600;padding:6px 12px;border:none;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .12s,border-color .12s;text-transform:uppercase;letter-spacing:.4px}
  .drw-tab.active{color:var(--text);border-bottom-color:var(--navy)}
  .drw-tab:hover:not(.active){color:var(--text)}
- .drw-tab-pane{display:none;flex-direction:column;gap:12px}
- .drw-tab-pane.active{display:flex}
+ .drw-tab-pane{display:flex;flex-direction:column;gap:12px}
+ .drw-page-hd{font-size:12px;font-weight:700;color:var(--text);letter-spacing:-.1px;padding-bottom:6px;border-bottom:1px solid var(--border);scroll-margin-top:8px}
+ .drw-tab-pane+.drw-tab-pane{border-top:1px solid var(--border);margin-top:4px;padding-top:16px}
  /* Subtarefas no drawer */
  .drw-sub-list{display:flex;flex-direction:column;gap:4px}
  .drw-sub-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:7px 10px;display:flex;align-items:center;gap:8px}
