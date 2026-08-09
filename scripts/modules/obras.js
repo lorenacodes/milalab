@@ -1740,17 +1740,16 @@ async function _spCriarContato() {
  _spToggleNovoContato();
 }
 
-// ── Filtro/Ordenação de Obras — mesmos componentes reutilizáveis do Gestor
-// de Tarefas (filtro-builder.js/sort-builder.js/smart-search.js), só troca a
-// config de campos. _fbEvaluate/_sbCompare recebem direto o `.dataset` da
-// <tr>/.obra-card como "item": como esses elementos já gravam tipo/etapa/
-// empresa/cidade/estado/nome/valor em data-* (ver _dbLoadObras/
-// _dbLoadObrasKanban), field.key bate 1:1 com a chave do dataset — nenhum
-// adaptador precisa existir. Agrupar/Visualizações deste módulo ficam para
-// o próximo incremento (o Gestor de Tarefas trabalha sobre um array em
-// memória; Obras filtra o DOM direto pra não duplicar a lógica de
-// renderização do Kanban/Tabela — agrupar por aqui exigiria decidir se
-// agrupamento e as colunas do Kanban, que já agrupam por etapa, coexistem).
+// ── Filtro/Ordenação/Agrupamento/Período/Visualizações de Obras — mesmos
+// componentes reutilizáveis do Gestor de Tarefas (filtro-builder.js/
+// sort-builder.js/group-builder.js/smart-search.js/period-picker.js/
+// saved-views.js), só troca a config de campos. _fbEvaluate/_sbCompare
+// recebem direto o `.dataset` da <tr>/.obra-card como "item": como esses
+// elementos já gravam tipo/etapa/empresa/cidade/estado/nome/valor/dataEnvio
+// em data-* (ver _dbLoadObras/_dbLoadObrasKanban), field.key bate 1:1 com a
+// chave do dataset — nenhum adaptador precisa existir. Agrupar só reflete na
+// Tabela (o Kanban já agrupa visualmente por etapa nas próprias colunas —
+// aplicar um segundo agrupamento ali seria redundante/confuso).
 var _obrasFbFields = Object.keys(_obrasCampos).map(function(k) {
  var c = _obrasCampos[k];
  return { key: k, label: c.label, type: c.type, options: c.opts || [] };
@@ -1767,24 +1766,97 @@ var _obrasSbFields = [
 ];
 _sbInit('obras', _obrasSbFields, _obrasApplyFilters);
 
+// Agrupar: campos categóricos só (nome/valor/data não fazem sentido como
+// "balde" de agrupamento) — 1 nível só, igual ao que a Tabela hoje sabe
+// desenhar (ver bloco de agrupamento dentro de _obrasApplyFilters abaixo).
+var _obrasGbFields = [
+ { key: 'etapa',   label: 'Etapa' },
+ { key: 'tipo',    label: 'Categoria da obra' },
+ { key: 'empresa', label: 'Empresa' },
+ { key: 'estado',  label: 'Estado' },
+ { key: 'cidade',  label: 'Cidade' },
+];
+_gbInit('obras', _obrasGbFields, _obrasApplyFilters, 1);
+
+// Período: dropdown "Período" igual ao do Gestor (period-picker.js), filtra
+// pela data de envio da proposta — único campo de data relevante de Obras.
+_ppInit('obras', { onChange: _obrasApplyFilters, defaultPreset: 'todas' });
+
+// Visualizações salvas: mesma mecânica do Gestor (saved-views.js), gravando
+// modulo='obras' na tabela gestor_views (RLS já libera qualquer usuário
+// autenticado a ler/escrever, independente do módulo).
+_vwInit('obras', {
+ modulo: 'obras',
+ getState: function() {
+  return {
+   filtro: _fbInstances.obras ? _fbInstances.obras.state : { logic: 'AND', conditions: [] },
+   sort:   _sbInstances.obras ? _sbInstances.obras.state : { levels: [] },
+   group:  _gbInstances.obras ? _gbInstances.obras.state : { levels: [] },
+   period: _ppGetState('obras')
+  };
+ },
+ applyState: function(state) {
+  if (_sbInstances.obras) { _sbInstances.obras.state = state.sort || { levels: [] }; _sbRender('obras'); }
+  if (_gbInstances.obras) { _gbInstances.obras.state = state.group || { levels: [] }; _gbRender('obras'); }
+  _ppRestoreState('obras', state.period);
+  if (_fbInstances.obras) { _fbInstances.obras.state = state.filtro || { logic: 'AND', conditions: [] }; _fbRender('obras'); _fbApply('obras'); }
+  _obrasApplyFilters();
+ }
+});
+
 function _obrasApplyFilters() {
  var buscaRaw = ((document.getElementById('obras-search') || {}).value || '').trim();
  var buscaNorm = _ssNormalize(buscaRaw);
  var activeConds = _fbInstances.obras.state.conditions.filter(_fbConditionIsUsable).length;
  var visivel = 0;
 
+ // ── Período (envio da proposta) ──────────────────────────────────────────
+ var per = _ppGetState('obras');
+ var pIni = per.ini, pFim = per.fim; // Date ou null (null = "Todas")
+
  // ── Tabela ──────────────────────────────────────────────────────────────
+ // Remove cabeçalhos de grupo da renderização anterior antes de reconsultar
+ // as linhas — eles não têm data-id, então não entram no seletor abaixo.
+ Array.prototype.slice.call(document.querySelectorAll('#obras-tbody tr.obras-group-row')).forEach(function(tr){ tr.remove(); });
  var rows = Array.prototype.slice.call(document.querySelectorAll('#obras-tbody tr[data-id]'));
  rows.forEach(function(tr) {
   var ok = _fbEvaluate(tr.dataset, 'obras');
   if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(tr.textContent), buscaNorm);
+  if (ok && pIni && pFim) {
+   var d = tr.dataset.dataEnvio ? new Date(tr.dataset.dataEnvio + 'T00:00:00') : null;
+   ok = !!(d && d >= pIni && d <= pFim);
+  }
   tr.style.display = ok ? '' : 'none';
   if (ok) visivel++;
  });
  if (rows.length) {
   rows.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'obras'); });
   var tbody = rows[0].parentElement;
-  rows.forEach(function(tr) { tbody.appendChild(tr); });
+  var groupField = _gbPrimaryField('obras');
+  if (groupField) {
+   // Agrupa preservando a ordenação já calculada dentro de cada grupo;
+   // grupos em si ficam em ordem alfabética (pt-BR).
+   var buckets = {}, order = [];
+   rows.forEach(function(tr) {
+    var val = tr.dataset[groupField] || 'Sem valor';
+    if (!buckets[val]) { buckets[val] = []; order.push(val); }
+    buckets[val].push(tr);
+   });
+   var fieldLabel = (_obrasGbFields.filter(function(f){ return f.key === groupField; })[0] || {}).label || groupField;
+   order.slice().sort(function(a, b){ return a.localeCompare(b, 'pt-BR'); }).forEach(function(key) {
+    var bucketRows = buckets[key];
+    var visCount = bucketRows.filter(function(tr){ return tr.style.display !== 'none'; }).length;
+    var hd = document.createElement('tr');
+    hd.className = 'gestor-group-hd obras-group-row';
+    hd.style.position = 'static'; // sticky faria sentido só dentro de um scroll interno (não é o caso de Obras)
+    if (!visCount) hd.style.display = 'none';
+    hd.innerHTML = '<td colspan="8" style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.3px">' + fieldLabel + ': ' + (key || '—') + ' <span style="font-weight:400;text-transform:none;color:var(--muted)">(' + visCount + ')</span></td>';
+    tbody.appendChild(hd);
+    bucketRows.forEach(function(tr){ tbody.appendChild(tr); });
+   });
+  } else {
+   rows.forEach(function(tr) { tbody.appendChild(tr); });
+  }
  }
 
  // ── Kanban ────────────────────────────────────────────────────────────────
@@ -1792,6 +1864,10 @@ function _obrasApplyFilters() {
  cards.forEach(function(card) {
   var ok = _fbEvaluate(card.dataset, 'obras');
   if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(card.dataset.search || ''), buscaNorm);
+  if (ok && pIni && pFim) {
+   var dCard = card.dataset.dataEnvio ? new Date(card.dataset.dataEnvio + 'T00:00:00') : null;
+   ok = !!(dCard && dCard >= pIni && dCard <= pFim);
+  }
   card.style.display = ok ? '' : 'none';
  });
  // Ordena as colunas do Kanban internamente (cada coluna já é o agrupamento por etapa).

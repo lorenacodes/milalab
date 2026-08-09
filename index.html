@@ -11,27 +11,29 @@
  <title>MilaLab — Sistema Interno</title>
  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='%233D4FD1'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%239DA3B0'/%3E%3Cstop offset='45%25' stop-color='%23F5F6F8'/%3E%3Cstop offset='100%25' stop-color='%238E94A3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M50 20 L78 35 V65 L50 80 L22 65 V35 Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='10' fill='url(%23g)'/%3E%3C/svg%3E">
  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles/tokens.css?v=mldsv76">
-<link rel="stylesheet" href="styles/main.css?v=mldsv76">
+<link rel="stylesheet" href="styles/tokens.css?v=mldsv77">
+<link rel="stylesheet" href="styles/main.css?v=mldsv77">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="scripts/lib/supabase-client.js?v=mldsv76"></script>
-<script src="scripts/lib/realtime-sync.js?v=mldsv76"></script>
-<script src="scripts/lib/ui-helpers.js?v=mldsv76"></script>
-<script src="scripts/lib/avatar-helpers.js?v=mldsv76"></script>
-<script src="scripts/lib/toolbar-ui.js?v=mldsv76"></script>
-<script src="scripts/lib/filtro-builder.js?v=mldsv76"></script>
-<script src="scripts/lib/sort-builder.js?v=mldsv76"></script>
-<script src="scripts/lib/group-builder.js?v=mldsv76"></script>
-<script src="scripts/lib/group-tree.js?v=mldsv76"></script>
-<script src="scripts/lib/smart-search.js?v=mldsv76"></script>
-<script src="scripts/lib/privacidade-atividade.js?v=mldsv76"></script>
-<script src="scripts/lib/moeda.js?v=mldsv76"></script>
-<script src="scripts/lib/fornecedor-opcoes.js?v=mldsv76"></script>
-<script src="scripts/lib/fornecedor-validacao.js?v=mldsv76"></script>
-<script src="scripts/lib/multiselect-ui.js?v=mldsv76"></script>
-<script src="scripts/services/usuarios.service.js?v=mldsv76"></script>
-<script src="scripts/services/auth.service.js?v=mldsv76"></script>
-<script src="scripts/services/propostas.service.js?v=mldsv76"></script>
+<script src="scripts/lib/supabase-client.js?v=mldsv77"></script>
+<script src="scripts/lib/realtime-sync.js?v=mldsv77"></script>
+<script src="scripts/lib/ui-helpers.js?v=mldsv77"></script>
+<script src="scripts/lib/avatar-helpers.js?v=mldsv77"></script>
+<script src="scripts/lib/toolbar-ui.js?v=mldsv77"></script>
+<script src="scripts/lib/filtro-builder.js?v=mldsv77"></script>
+<script src="scripts/lib/sort-builder.js?v=mldsv77"></script>
+<script src="scripts/lib/group-builder.js?v=mldsv77"></script>
+<script src="scripts/lib/period-picker.js?v=mldsv77"></script>
+<script src="scripts/lib/saved-views.js?v=mldsv77"></script>
+<script src="scripts/lib/group-tree.js?v=mldsv77"></script>
+<script src="scripts/lib/smart-search.js?v=mldsv77"></script>
+<script src="scripts/lib/privacidade-atividade.js?v=mldsv77"></script>
+<script src="scripts/lib/moeda.js?v=mldsv77"></script>
+<script src="scripts/lib/fornecedor-opcoes.js?v=mldsv77"></script>
+<script src="scripts/lib/fornecedor-validacao.js?v=mldsv77"></script>
+<script src="scripts/lib/multiselect-ui.js?v=mldsv77"></script>
+<script src="scripts/services/usuarios.service.js?v=mldsv77"></script>
+<script src="scripts/services/auth.service.js?v=mldsv77"></script>
+<script src="scripts/services/propostas.service.js?v=mldsv77"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
@@ -285,7 +287,7 @@
 <!-- Design system unificado dos campos do wizard Nova Obra: todo select/input/checklist
      do modal usa a mesma geometria de .mf input,.mf select (padding 9px 12px, radius 7px,
      borda var(--border), foco navy com ring) para não ter dois estilos de campo coexistindo. -->
-<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv76">
+<link rel="stylesheet" href="styles/wizard-nova-obra.css?v=mldsv77">
 <!-- MODAL NOVA OBRA — wizard 4 etapas (fluxo único, sem gate de tipo) -->
 <div class="modal-backdrop" id="modal-nova-obra" onclick="handleModalBackdrop(event)">
  <div class="modal" id="modal-obra-box" style="max-width:900px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:92vh">
@@ -1004,7 +1006,7 @@
 <div id="page-empresas" class="page" style="padding-top:8px">
 
  <!-- Estilos Notion para esta página -->
-<link rel="stylesheet" href="styles/empresas.css?v=mldsv76">
+<link rel="stylesheet" href="styles/empresas.css?v=mldsv77">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -1438,7 +1440,7 @@
       Notion, rodapé "+ Novo"). -->
  <div id="page-fornecedores" class="page" style="padding-top:8px">
 
- <link rel="stylesheet" href="styles/empresas.css?v=mldsv76">
+ <link rel="stylesheet" href="styles/empresas.css?v=mldsv77">
 
  <div style="padding:8px 0 0">
   <div class="nt-title">Fornecedores</div>
@@ -1669,24 +1671,59 @@
  <div id="page-obras" class="page">
  <div class="ph" style="margin-bottom:14px"><h1>Obras</h1><p>Projetos por cliente · Telhados, Modular e Steel Frame possuem geração de orçamento</p></div>
 
- <!-- Toolbar: mesmos componentes reutilizáveis do Gestor de Tarefas
-      (filtro-builder/sort-builder/smart-search), só muda a config de campos.
-      Numa barra sticky só (título fica fora, pode rolar) — Kanban/Tabela e
-      + Nova Obra entraram aqui dentro porque item #3 do pedido de UX pediu
-      que ambos fiquem fixos junto com pesquisa/filtro/ordenar, não só um
-      dos dois. Ordem: Pesquisa (larga) → Filtros → Ordenar → Contador →
-      Kanban/Tabela → Nova Obra. Agrupar/Visualizações deste módulo ficam
-      para o próximo incremento (ver nota em scripts/modules/obras.js perto
-      de _obrasApplyFilters). -->
- <div class="gestor-hd-controls" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;position:sticky;top:52px;z-index:8;background:var(--surface);padding:8px 0 4px;margin-top:-4px">
+ <!-- Toolbar: MESMO padrão do Gestor de Tarefas (Filtro → Agrupar/Ordenar →
+      Período → Visualizações → Pesquisa), reaproveitando os componentes
+      genéricos (filtro-builder/sort-builder/group-builder/smart-search) mais
+      period-picker.js/saved-views.js (versões parametrizadas por instanceId
+      dos mecanismos de Período/Visualizações do Gestor — ver esses arquivos
+      em scripts/lib/). Kanban/Tabela e + Nova Obra continuam dentro da mesma
+      barra sticky (pedido de UX anterior: ambos fixos junto dos controles).
+      Este bloco é o padrão de referência pra replicar nas próximas abas. -->
+ <div class="gestor-hd-controls obras-toolbar-sticky" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;background:var(--surface);padding:8px 0 4px;margin-top:-4px">
  <div class="fb-wrap" id="fb-wrap-obras" style="position:relative;display:inline-block">
   <button type="button" class="gestor-sel" id="fb-btn-obras" onclick="_fbToggle('obras')">Filtro<span class="fb-badge" id="fb-badge-obras" style="display:none"></span></button>
   <div class="fb-pop" id="fb-pop-obras" style="display:none"></div>
  </div>
 
- <div class="sb-wrap" id="sb-wrap-obras" style="position:relative;display:inline-block">
-  <button type="button" class="gestor-sel gestor-sel-plain" id="sb-btn-obras" onclick="_sbToggle('obras')" title="Ordenar por">Ordenar<span class="fb-badge" id="sb-badge-obras" style="display:none"></span></button>
-  <div class="fb-pop" id="sb-pop-obras" style="display:none"></div>
+ <div class="gestor-organizar">
+  <div class="gb-wrap" id="gb-wrap-obras" style="position:relative;display:inline-block">
+   <button type="button" class="gestor-sel gestor-sel-plain" id="gb-btn-obras" onclick="_gbToggle('obras')" title="Agrupar por">Agrupar<span class="fb-badge" id="gb-badge-obras" style="display:none"></span></button>
+   <div class="fb-pop" id="gb-pop-obras" style="display:none"></div>
+  </div>
+  <span class="gestor-organizar-div"></span>
+  <div class="sb-wrap" id="sb-wrap-obras" style="position:relative;display:inline-block">
+   <button type="button" class="gestor-sel gestor-sel-plain" id="sb-btn-obras" onclick="_sbToggle('obras')" title="Ordenar por">Ordenar<span class="fb-badge" id="sb-badge-obras" style="display:none"></span></button>
+   <div class="fb-pop" id="sb-pop-obras" style="display:none"></div>
+  </div>
+ </div>
+
+ <div class="gp-wrap" id="pp-wrap-obras">
+  <button type="button" class="gestor-sel gestor-sel-caret" onclick="_ppToggle('obras')">
+   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="12" height="13" rx="2"/><path d="M5 1v2M11 1v2M2 6h12" stroke-linecap="round"/></svg>
+   <span id="pp-btn-lbl-obras">Todas</span>
+  </button>
+  <div class="gp-pop" id="pp-pop-obras" style="display:none">
+   <button class="gp-preset active" id="pp-todas-obras" onclick="_ppPreset('obras','todas',this)">Todas</button>
+   <button class="gp-preset" id="pp-semana-obras" onclick="_ppPreset('obras','semana',this)">Esta semana</button>
+   <button class="gp-preset" id="pp-prox2-obras" onclick="_ppPreset('obras','prox2',this)">Próx. 2 semanas</button>
+   <button class="gp-preset" id="pp-mes-obras" onclick="_ppPreset('obras','mes',this)">Este mês</button>
+   <button class="gp-preset" id="pp-trim-obras" onclick="_ppPreset('obras','trim',this)">Trimestre</button>
+   <button type="button" onclick="_ppToggleCustomDates('obras')" class="gp-custom-link">Personalizado (envio da proposta)…</button>
+   <div id="pp-custom-obras" style="display:none">
+    <label>De</label>
+    <input type="date" class="gp-date-inp" id="pp-dt-ini-obras" onchange="_ppPreset('obras','custom',null)">
+    <label>até</label>
+    <input type="date" class="gp-date-inp" id="pp-dt-fim-obras" onchange="_ppPreset('obras','custom',null)">
+   </div>
+  </div>
+ </div>
+
+ <div class="gv-wrap" id="gv-wrap-obras">
+  <button type="button" class="gestor-sel gestor-sel-caret" onclick="_vwToggle('obras')">
+   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4h12M2 8h8M2 12h10" stroke-linecap="round"/></svg>
+   Visualizações
+  </button>
+  <div class="gv-pop" id="gv-pop-obras" style="display:none"></div>
  </div>
 
  <div class="ts-search" id="ts-search-obras" onclick="_tsSearchExpand('obras')">
@@ -2153,7 +2190,7 @@
  <!-- ENTREGAS -->
  <div id="page-entregas" class="page">
 
-<link rel="stylesheet" href="styles/entregas.css?v=mldsv76">
+<link rel="stylesheet" href="styles/entregas.css?v=mldsv77">
 
  <!-- Título Notion -->
  <div style="padding:8px 0 0">
@@ -2799,20 +2836,20 @@
 
 </main>
 
-<script src="scripts/app.js?v=mldsv76"></script>
-<script src="scripts/modules/side-panel.js?v=mldsv76"></script>
-<script src="scripts/lib/atividades-vinculos.js?v=mldsv76"></script>
-<script src="scripts/modules/obras.js?v=mldsv76"></script>
-<script src="scripts/modules/projetos.js?v=mldsv76"></script>
-<script src="scripts/modules/entregas.js?v=mldsv76"></script>
-<script src="scripts/modules/instalacoes.js?v=mldsv76"></script>
-<script src="scripts/modules/empresas.js?v=mldsv76"></script>
-<script src="scripts/modules/wizard-nova-obra.js?v=mldsv76"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv76"></script>
-<script src="scripts/modules/melhorias.js?v=mldsv76"></script>
-<script src="scripts/modules/admin.js?v=mldsv76"></script>
-<script src="scripts/modules/exec-dashboard.js?v=mldsv76"></script>
-<script src="scripts/modules/tarefas.js?v=mldsv76"></script>
+<script src="scripts/app.js?v=mldsv77"></script>
+<script src="scripts/modules/side-panel.js?v=mldsv77"></script>
+<script src="scripts/lib/atividades-vinculos.js?v=mldsv77"></script>
+<script src="scripts/modules/obras.js?v=mldsv77"></script>
+<script src="scripts/modules/projetos.js?v=mldsv77"></script>
+<script src="scripts/modules/entregas.js?v=mldsv77"></script>
+<script src="scripts/modules/instalacoes.js?v=mldsv77"></script>
+<script src="scripts/modules/empresas.js?v=mldsv77"></script>
+<script src="scripts/modules/wizard-nova-obra.js?v=mldsv77"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv77"></script>
+<script src="scripts/modules/melhorias.js?v=mldsv77"></script>
+<script src="scripts/modules/admin.js?v=mldsv77"></script>
+<script src="scripts/modules/exec-dashboard.js?v=mldsv77"></script>
+<script src="scripts/modules/tarefas.js?v=mldsv77"></script>
 
  <!-- BACKDROP DRAWERS -->
  <div class="task-drw-bd" id="drw-backdrop-task" onclick="_taskDrawerClose()"></div>
@@ -3240,7 +3277,7 @@
 <!-- SISTEMA DE AUTENTICAÇÃO MILATEC v3.04 — Identidade Visual Grupo Mila      -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<link rel="stylesheet" href="styles/auth.css?v=mldsv76">
+<link rel="stylesheet" href="styles/auth.css?v=mldsv77">
 
 <!-- ═══════════════════════════════════════════════════════════════
      TELA 1 — LOGIN

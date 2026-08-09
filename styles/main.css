@@ -191,6 +191,18 @@ body.light .dash-panel{
  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
    .tbl-box{ background: var(--surface); }
  }
+ /* Obras: barra de controles fixa (Filtro/Agrupar/Ordenar/Período/
+    Visualizações/Pesquisa) — padrão de referência pra replicar nas próximas
+    abas. position:sticky sozinho só resolve o eixo vertical: se QUALQUER
+    conteúdo da página ganhar largura maior que a viewport, o documento
+    inteiro passa a rolar no eixo X e a barra sticky (sem left/right)
+    acompanha esse scroll horizontal — é exatamente o bug relatado ("só
+    aparece se arrastar a barra de rolagem horizontal"). #page-obras trava
+    overflow-x:hidden como rede de segurança: a tabela e o kanban já contêm
+    sua própria rolagem horizontal internamente (.tbl-box/.kanban-obras),
+    então nada de conteúdo largo deveria ultrapassar a borda da página. */
+ #page-obras{overflow-x:hidden}
+ .obras-toolbar-sticky{position:sticky;top:52px;z-index:8}
  .tbl-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
  .tbl-title{font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;letter-spacing:-.1px}.tbl-acts{margin-left:auto;display:flex;gap:8px}
  table{width:100%;border-collapse:collapse}
