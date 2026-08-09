@@ -3616,9 +3616,14 @@ function _kpiDrawerRender(filter) {
  var statusClr = { 'Feito':'var(--green)', 'Concluído':'var(--green)', 'Em progresso':'var(--navy)', 'A fazer':'var(--muted)' };
 
  body.innerHTML = filtered.map(function(a) {
+  var statusTrim = (a.status || '').trim();
+  var isDone = statusTrim === 'Feito' || statusTrim === 'Concluído' || statusTrim === 'Concluida';
   var prazoStr = '';
   var dp = a.data_prazo || a.data_fim || '';
-  if (dp) {
+  // "Atraso"/"Hoje"/"Em Xd" só faz sentido pra quem ainda não terminou —
+  // uma tarefa já concluída não está "atrasada" só porque o prazo passou
+  // depois que ela foi feita.
+  if (dp && !isDone) {
    var d = new Date(dp+'T00:00:00');
    var diff = Math.floor((d - hoje) / 86400000);
    if (diff < 0)     prazoStr = '<span style="color:#D6433C;font-weight:600">' + Math.abs(diff) + 'd atraso</span>';
