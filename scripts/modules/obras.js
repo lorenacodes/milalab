@@ -1749,6 +1749,23 @@ async function _spCriarContato() {
 // chave do dataset — nenhum adaptador precisa existir. Agrupar só reflete na
 // Tabela (o Kanban já agrupa visualmente por etapa nas próprias colunas —
 // aplicar um segundo agrupamento ali seria redundante/confuso).
+
+// Opções calculadas a partir dos dados reais já carregados na Tabela — mesmo
+// padrão do Gestor de Tarefas (_gestorOptionsFrom em tarefas.js), só que
+// lendo do DOM em vez de um array em memória (Obras não mantém um). Usado
+// pelos campos cuja lista de valores possíveis não é um vocabulário fixo do
+// negócio (Estado, Empresa): uma lista hardcoded ali ficaria desatualizada
+// (ou, no caso de Empresa antes desta correção, nem batia com nenhuma
+// empresa real) assim que a base de obras crescesse.
+function _obrasOptionsFromDom(datasetKey) {
+ var set = {};
+ document.querySelectorAll('#obras-tbody tr[data-id]').forEach(function(tr) {
+  var v = tr.dataset[datasetKey];
+  if (v) set[v] = 1;
+ });
+ return Object.keys(set).sort(function(a, b){ return a.localeCompare(b, 'pt-BR'); });
+}
+
 var _obrasFbFields = Object.keys(_obrasCampos).map(function(k) {
  var c = _obrasCampos[k];
  return { key: k, label: c.label, type: c.type, options: c.opts || [] };

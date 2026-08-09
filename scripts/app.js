@@ -288,8 +288,12 @@ document.addEventListener('keydown', e => {
 var _obrasCampos = {
  'tipo': { label: 'Categoria da obra', type: 'select', opts: ['Telhados','Modular','Steel Frame','Solar','Misto (LSF+A36)'] },
  'etapa': { label: 'Etapa', type: 'select', opts: ['Orçamento','Atualização de orçamento','Follow-up','Negociação','Aprovação de projeto','Piloto','Projeto aprovado','Em Andamento','Pós-vendas','Concluído','Negócio perdido'] },
- 'estado': { label: 'Estado', type: 'select', opts: ['SP','DF','GO','MG','PR','RJ'] },
- 'empresa': { label: 'Empresa', type: 'select', opts: ['Construtora Vega','Grupo Delta Engenharia','Prefeitura de Jundiaí','Log Brasil S.A.','MilaTec'] },
+ // Estado/Empresa: lista de opções calculada dos dados reais (ver
+ // _obrasOptionsFromDom em obras.js) — uma lista fixa aqui ficaria
+ // desatualizada (era literalmente o caso de Empresa antes desta correção:
+ // as 5 opções fixas não batiam com nenhuma empresa real cadastrada).
+ 'estado': { label: 'Estado', type: 'select', opts: function(){ return _obrasOptionsFromDom('estado'); } },
+ 'empresa': { label: 'Empresa', type: 'select', opts: function(){ return _obrasOptionsFromDom('empresa'); } },
  'cidade': { label: 'Cidade', type: 'text' },
  'dataEnvio': { label: 'Envio da proposta', type: 'date' }
 };
