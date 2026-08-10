@@ -202,7 +202,17 @@ body.light .dash-panel{
     sua própria rolagem horizontal internamente (.tbl-box/.kanban-obras),
     então nada de conteúdo largo deveria ultrapassar a borda da página. */
  #page-obras{overflow-x:hidden}
- .obras-toolbar-sticky{position:sticky;top:52px;z-index:8}
+ /* Barra de Filtro/Agrupar/Ordenar/Período/Visualizações/Pesquisa — igual às
+    ações (comentário abaixo), position:fixed em vez de sticky: sticky só
+    resolve o eixo vertical, então se algum ancestral ganhasse scroll
+    horizontal a barra acompanhava e "desaparecia" da vista. top:129px é
+    onde ela já ficava naturalmente (medido com a página no topo, logo
+    abaixo do título "Obras" + subtítulo); left/right replicam o padding de
+    .page (24px) já que um elemento fixed não herda mais esse padding do
+    ancestral. #obras-tabela/#obras-kanban ganham margin-top equivalente à
+    altura da barra + respiro, pra compensar ela ter saído do fluxo normal. */
+ .obras-toolbar-sticky{position:fixed;top:129px;left:var(--sidebar-w);right:0;z-index:14;padding:8px 24px 4px}
+ #obras-tabela,#obras-kanban{margin-top:54px}
  /* Ações fixas de Obras (Kanban/Tabela + Nova Obra) — position:fixed em vez
     de sticky de propósito: sticky só resolve o eixo vertical (acompanha
     scroll horizontal de qualquer ancestral, é o que causava o botão
