@@ -955,6 +955,21 @@ function _taskAutoSaveFlushNow() {
  if (_taskAutoSavePending) { clearTimeout(_taskAutoSaveTimer); _taskAutoSaveFlush(); }
 }
 
+// Mostra a data selecionada em dd/mm/yyyy explícito ao lado do input nativo
+// type="date" — a formatação exibida DENTRO do input nativo segue o locale
+// do navegador/SO (não é controlável via lang/CSS), então este label garante
+// leitura em pt-BR independente do ambiente do usuário.
+function _ntDateFmtSync(inputId) {
+ var el  = document.getElementById(inputId);
+ var out = document.getElementById(inputId + '-fmt');
+ if (!el || !out) return;
+ var v = el.value; // sempre yyyy-mm-dd (ISO), independente do locale de exibição
+ if (!v) { out.textContent = ''; return; }
+ var d = new Date(v + 'T00:00:00');
+ if (isNaN(d.getTime())) { out.textContent = ''; return; }
+ out.textContent = d.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
 function _taskDrawerOpen(editId) {
  _taskEditId = editId || null;
  // Procura primeiro nas tarefas locais (sistema legado) e depois nas atividades reais
@@ -987,7 +1002,9 @@ function _taskDrawerOpen(editId) {
  set('nt-titulo',        t ? t.titulo        : '');
  set('nt-observacoes',   t ? t.observacoes   : '');
  set('nt-dt-inicio',     t ? t.data_inicio   : '');
- set('nt-dt-fim',        t ? t.data_fim      : '');
+ set('nt-dt-fim',        t ? t.data_prazo    : '');
+ _ntDateFmtSync('nt-dt-inicio');
+ _ntDateFmtSync('nt-dt-fim');
  var respVal = t ? (t.responsavel || '') : (localStorage.getItem('pp-name') || 'Lorena').split(' ')[0];
  _respLoadUsers().then(function(){ _respSetFromString(respVal); }).catch(function(){ _respSetFromString(respVal); });
  if (!t) _respSetFromString(respVal);
@@ -1811,6 +1828,95 @@ function _obraSetValue(id, nome) {
  if (clrEl) clrEl.style.display = (id ? '' : 'none');
 }
 
+/* ── Dados do searchable-select de projetos (mesmo padrão da Obra) ── */
+var _projetosAtuais = []; // [{id, nome, etapa_projeto, liberado_execucao}] — projetos da obra atual
+var _projSelectedId = '';
+var _projSearchQ = '';
+var _projDisabled = true; // sem obra selecionada / sem projetos → dropdown não abre
+
+function _projSearchToggle() {
+ if (_projDisabled) return;
+ var drop = document.getElementById('nt-projeto-drop');
+ var box  = document.getElementById('nt-projeto-box');
+ if (!drop) return;
+ var isOpen = drop.classList.contains('open');
+ if (isOpen) { _projSearchClose(); return; }
+ drop.classList.add('open');
+ box.classList.add('open');
+ var inp = document.getElementById('nt-projeto-inp');
+ if (inp) { inp.value = ''; inp.focus(); }
+ _projSearchFilter('');
+}
+function _projSearchClose() {
+ var drop = document.getElementById('nt-projeto-drop');
+ var box  = document.getElementById('nt-projeto-box');
+ if (drop) drop.classList.remove('open');
+ if (box)  box.classList.remove('open');
+}
+function _projSearchFilter(q) {
+ _projSearchQ = (q || '').toLowerCase();
+ var list = document.getElementById('nt-projeto-list');
+ if (!list) return;
+ var matches = _projetosAtuais.filter(function(p){
+  return p.nome.toLowerCase().indexOf(_projSearchQ) !== -1;
+ });
+ if (!matches.length) {
+  list.innerHTML = '<div class="srch-sel-empty">Nenhum projeto encontrado.</div>';
+  return;
+ }
+ list.innerHTML = matches.map(function(p){
+  var sel = p.id === _projSelectedId ? ' selected' : '';
+  return '<div class="srch-sel-opt' + sel + '" onclick="_projSelectItem(\'' + p.id + '\',\'' + p.nome.replace(/'/g,'\\\'') + '\')">' + p.nome + '</div>';
+ }).join('');
+}
+function _projSearchKey(e) {
+ if (e.key === 'Escape') _projSearchClose();
+}
+function _projSelectItem(id, nome) {
+ _projSelectedId = id;
+ var hidEl = document.getElementById('nt-projeto');
+ var valEl = document.getElementById('nt-projeto-val');
+ var clrEl = document.getElementById('nt-projeto-clr');
+ if (hidEl) hidEl.value = id;
+ if (valEl) { valEl.textContent = nome; valEl.classList.remove('placeholder'); }
+ if (clrEl) clrEl.style.display = id ? '' : 'none';
+ _projSearchClose();
+ _ntProjCardSync();
+ _ntAutoSaveVinculos();
+}
+function _projClear() {
+ _projSelectedId = '';
+ var hidEl = document.getElementById('nt-projeto');
+ var valEl = document.getElementById('nt-projeto-val');
+ var clrEl = document.getElementById('nt-projeto-clr');
+ if (hidEl) hidEl.value = '';
+ if (valEl) { valEl.textContent = 'Nenhum'; valEl.classList.add('placeholder'); }
+ if (clrEl) clrEl.style.display = 'none';
+ _ntProjCardSync();
+ _ntAutoSaveVinculos();
+}
+function _projSetValue(id, nome) {
+ // Programaticamente define o valor do searchable select (ex: restaurar edição)
+ _projSelectedId = id || '';
+ var hidEl = document.getElementById('nt-projeto');
+ var valEl = document.getElementById('nt-projeto-val');
+ var clrEl = document.getElementById('nt-projeto-clr');
+ if (hidEl) hidEl.value = id || '';
+ if (valEl) {
+  if (id && nome) { valEl.textContent = nome; valEl.classList.remove('placeholder'); }
+  else { valEl.textContent = 'Nenhum'; valEl.classList.add('placeholder'); }
+ }
+ if (clrEl) clrEl.style.display = (id ? '' : 'none');
+}
+function _projSetDisabled(disabled) {
+ _projDisabled = disabled;
+ var box = document.getElementById('nt-projeto-box');
+ if (!box) return;
+ box.style.opacity = disabled ? '.5' : '1';
+ box.style.cursor  = disabled ? 'not-allowed' : 'pointer';
+ if (disabled) _projSearchClose();
+}
+
 /* ── Toggle de seções colapsáveis no drawer ── */
 function _drwToggleSection(name) {
  var body    = document.getElementById('drw-sec-body-' + name);
@@ -1859,12 +1965,10 @@ function _ntPopulateVinculos(t) {
   })();
  }
  // Projetos: só habilitado após selecionar obra — não popular aqui
- var selProj = document.getElementById('nt-projeto');
- if (selProj && !(t && t.obra_id)) {
-  selProj.innerHTML = '<option value="">Nenhum</option>';
-  selProj.disabled = true;
-  selProj.style.opacity = '.5';
-  selProj.style.cursor = 'not-allowed';
+ if (!(t && t.obra_id)) {
+  _projetosAtuais = [];
+  _projSetValue('', '');
+  _projSetDisabled(true);
   _ntProjCardSync();
  }
  // ── Melhorias — sem limit ──
@@ -1901,20 +2005,19 @@ function _ntPopulateVinculos(t) {
 
 /* ── Obra selecionada → carregar projetos filtrados ──────────────────────── */
 function _ntObraChange(obraId, taskCtx) {
- var selProj = document.getElementById('nt-projeto');
- var hint    = document.getElementById('nt-projeto-hint');
- if (!selProj) return;
+ var hint = document.getElementById('nt-projeto-hint');
  if (!obraId) {
-  selProj.innerHTML = '<option value="">Nenhum</option>';
-  selProj.disabled = true;
-  selProj.style.opacity = '.5';
-  selProj.style.cursor = 'not-allowed';
+  _projetosAtuais = [];
+  _projSetValue('', '');
+  _projSetDisabled(true);
   if (hint) hint.textContent = '(selecione uma obra primeiro)';
   return;
  }
- selProj.innerHTML = '<option value="">Carregando...</option>';
- selProj.disabled = true;
- if (!_dbOk) { selProj.innerHTML = '<option value="">Sem conexão</option>'; return; }
+ _projetosAtuais = [];
+ _projSetValue('', '');
+ _projSetDisabled(true);
+ if (hint) hint.textContent = 'Carregando...';
+ if (!_dbOk) { if (hint) hint.textContent = '(sem conexão)'; return; }
  // Tentar campo obra_id nos projetos (ajuste o nome da coluna se necessário)
  _sb.from('projetos').select('id, nome, etapa_projeto, liberado_execucao').eq('obra_id', obraId).order('nome')
  .then(function(res) {
@@ -1931,26 +2034,27 @@ function _ntObraChange(obraId, taskCtx) {
  }).then(function(projetos) {
   if (!projetos) return;
   if (!projetos.length) {
-   selProj.innerHTML = '<option value="">Nenhum projeto nesta obra</option>';
-   selProj.disabled = true;
+   _projetosAtuais = [];
+   _projSetDisabled(true);
    if (hint) hint.textContent = '(nenhum projeto nesta obra)';
    _ntProjCardSync();
    return;
   }
-  selProj.innerHTML = '<option value="">Selecione um projeto...</option>'
-   + projetos.map(function(p){
-    var liberado = p.liberado_execucao === true ? 'true' : (p.liberado_execucao === false ? 'false' : '');
-    return '<option value="' + p.id + '" data-etapa="' + (p.etapa_projeto || '').replace(/"/g,'&quot;') + '" data-liberado="' + liberado + '">' + p.nome + '</option>';
-   }).join('');
-  selProj.disabled = false;
-  selProj.style.opacity = '1';
-  selProj.style.cursor = '';
+  _projetosAtuais = projetos;
+  _projSearchFilter('');
+  _projSetDisabled(false);
   if (hint) hint.textContent = '';
   // Restaurar valor se editando
-  if (taskCtx && taskCtx.projeto_id) selProj.value = taskCtx.projeto_id;
+  if (taskCtx && taskCtx.projeto_id) {
+   var pj = projetos.find(function(p){ return String(p.id) === String(taskCtx.projeto_id); });
+   var pjNome = (pj && pj.nome) || taskCtx._projNome || (_gestorProjMap && _gestorProjMap[String(taskCtx.projeto_id)]) || taskCtx.projeto_id;
+   _projSetValue(taskCtx.projeto_id, pjNome);
+  }
   _ntProjCardSync();
  }).catch(function() {
-  selProj.innerHTML = '<option value="">Erro ao carregar</option>';
+  _projetosAtuais = [];
+  _projSetDisabled(true);
+  if (hint) hint.textContent = '(erro ao carregar)';
   _ntProjCardSync();
  });
 }
@@ -1971,16 +2075,16 @@ function _ntObraCardUpdate(obraId) {
 
 /* ── Card "Projeto" — preenchido a partir do Projeto selecionado ── */
 function _ntProjCardSync() {
- var selProj = document.getElementById('nt-projeto');
  var card = document.getElementById('nt-proj-card');
- if (!selProj || !card) return;
- var opt = selProj.options[selProj.selectedIndex];
- if (!opt || !opt.value) { card.style.display = 'none'; return; }
- var etapa = opt.getAttribute('data-etapa') || '';
- var liberado = opt.getAttribute('data-liberado') || '';
+ var hidEl = document.getElementById('nt-projeto');
+ if (!hidEl || !card) return;
+ var pid = hidEl.value;
+ var p = pid ? _projetosAtuais.find(function(x){ return String(x.id) === String(pid); }) : null;
+ if (!p) { card.style.display = 'none'; return; }
+ var liberado = p.liberado_execucao === true ? 'true' : (p.liberado_execucao === false ? 'false' : '');
  var status = liberado === 'true' ? 'Liberado para execução' : (liberado === 'false' ? 'Aguardando liberação' : '—');
- document.getElementById('nt-proj-card-nome').textContent = opt.textContent || '—';
- document.getElementById('nt-proj-card-etapa').textContent = etapa || '—';
+ document.getElementById('nt-proj-card-nome').textContent = p.nome || '—';
+ document.getElementById('nt-proj-card-etapa').textContent = p.etapa_projeto || '—';
  document.getElementById('nt-proj-card-status').textContent = status;
  card.style.display = '';
 }
