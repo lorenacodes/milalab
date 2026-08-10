@@ -16,7 +16,9 @@ var routes = {
  'dashboard': { bc: `<span>Meu Painel</span>`, nav: 'dashboard', btn: null },
  'empresas': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Empresas &amp; Contatos</span>`, nav: 'empresas', btn: { label: '+ Nova Empresa', fn: 'openNovaEmpresa' } },
  'fornecedores': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Fornecedores</span>`, nav: 'fornecedores', btn: { label: '+ Novo Fornecedor', fn: 'openNovoFornecedor' } },
- 'obras': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Obras</span>`, nav: 'obras', btn: { label: '+ Nova Obra', fn: 'openNovaObra' } },
+ // btn:null — Obras já tem seu próprio "+ Nova Obra" fixo na tela
+ // (#obras-fixed-actions, index.html), o botão da topbar ficaria duplicado.
+ 'obras': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Obras</span>`, nav: 'obras', btn: null },
  'projetos': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Projetos</span>`, nav: 'projetos', btn: { label: '+ Novo Projeto', fn: 'openNovoProjeto' } },
  'entregas': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Entregas</span>`, nav: 'entregas', btn: { label: '+ Nova Entrega', fn: 'openNovaEntrega' } },
  'instalacoes': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Instalações</span>`, nav: 'instalacoes', btn: { label: '+ Nova Instalação', fn: 'openNovaInstalacao' } },
