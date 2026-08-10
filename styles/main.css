@@ -203,6 +203,17 @@ body.light .dash-panel{
     então nada de conteúdo largo deveria ultrapassar a borda da página. */
  #page-obras{overflow-x:hidden}
  .obras-toolbar-sticky{position:sticky;top:52px;z-index:8}
+ /* Ações fixas de Obras (Kanban/Tabela + Nova Obra) — position:fixed em vez
+    de sticky de propósito: sticky só resolve o eixo vertical (acompanha
+    scroll horizontal de qualquer ancestral, é o que causava o botão
+    "desaparecer" ao rolar a tabela pro lado). position:fixed ancora direto
+    na viewport, imune a QUALQUER scroll (vertical da página ou horizontal
+    da tabela/kanban) por definição — não depende de nenhum container ser
+    bem comportado. right:24px alinha com o padding de .page; top:63px fica
+    logo abaixo do .topbar (52px) com a mesma respiração visual da barra de
+    filtros. Exibido/ocultado via _obrasFixedActionsSync (chamada por go(),
+    em app.js) — só existe enquanto #page-obras estiver ativo. */
+ .obras-fixed-actions{position:fixed;top:63px;right:24px;z-index:15;display:flex;gap:8px;align-items:center}
  .tbl-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
  .tbl-title{font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;letter-spacing:-.1px}.tbl-acts{margin-left:auto;display:flex;gap:8px}
  table{width:100%;border-collapse:collapse}

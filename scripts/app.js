@@ -59,6 +59,10 @@ function go(id) {
  }
  _currentRoute = id;
  window.scrollTo(0, 0);
+ // Ações fixas de Obras (Kanban/Tabela + Nova Obra, position:fixed na
+ // viewport — ver #obras-fixed-actions em index.html) só existem enquanto
+ // a tela de Obras estiver ativa; em qualquer outra tela ficam ocultas.
+ if (typeof _obrasFixedActionsSync === 'function') _obrasFixedActionsSync(id);
  // Recarrega dados do dashboard ao navegar para ele a partir de outra página
  // Motivo: _prevRoute guarda a rota anterior real; sem isso a checagem falha
  // porque _currentRoute já foi atualizado para 'dashboard' antes da condição
