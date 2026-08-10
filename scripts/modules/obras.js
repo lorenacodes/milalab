@@ -1933,10 +1933,3 @@ function setObrasView(view) {
  if (saved === 'kanban') setObrasView('kanban');
 })();
 
-// Ações fixas de Obras (Kanban/Tabela + Nova Obra) só existem enquanto a
-// tela de Obras estiver ativa — chamada por go() (scripts/app.js) a cada
-// navegação, pra nunca aparecer em nenhuma outra aba do sistema.
-function _obrasFixedActionsSync(routeId) {
- var el = document.getElementById('obras-fixed-actions');
- if (el) el.style.display = (routeId === 'obras') ? 'flex' : 'none';
-}

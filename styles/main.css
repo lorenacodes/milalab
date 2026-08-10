@@ -202,28 +202,27 @@ body.light .dash-panel{
     sua própria rolagem horizontal internamente (.tbl-box/.kanban-obras),
     então nada de conteúdo largo deveria ultrapassar a borda da página. */
  #page-obras{overflow-x:hidden}
- /* Barra de Filtro/Agrupar/Ordenar/Período/Visualizações/Pesquisa — igual às
-    ações (comentário abaixo), position:fixed em vez de sticky: sticky só
-    resolve o eixo vertical, então se algum ancestral ganhasse scroll
-    horizontal a barra acompanhava e "desaparecia" da vista. top:129px é
-    onde ela já ficava naturalmente (medido com a página no topo, logo
-    abaixo do título "Obras" + subtítulo); left/right replicam o padding de
-    .page (24px) já que um elemento fixed não herda mais esse padding do
-    ancestral. #obras-tabela/#obras-kanban ganham margin-top equivalente à
-    altura da barra + respiro, pra compensar ela ter saído do fluxo normal. */
- .obras-toolbar-sticky{position:fixed;top:129px;left:var(--sidebar-w);right:0;z-index:14;padding:8px 24px 4px}
+ /* Barra fixa única de Obras (Filtro/Agrupar/Ordenar/Período/Visualizações/
+    Pesquisa + Kanban/Tabela/Nova Obra, na mesma linha) — position:fixed em
+    vez de sticky de propósito: sticky só resolve o eixo vertical, então se
+    algum ancestral ganhasse scroll horizontal a barra acompanhava e
+    "desaparecia" da vista (bug relatado). position:fixed ancora direto na
+    viewport, imune a QUALQUER scroll (vertical da página OU horizontal da
+    tabela/kanban) por definição. top:63px é onde a barra já ficava (mesma
+    altura do título "Obras"); left/right replicam o padding de .page
+    (24px), que um elemento fixed deixa de herdar do ancestral. Sem
+    background: cada botão já tem o próprio fundo — um fundo no container
+    inteiro virava uma faixa sólida cobrindo até os espaços vazios entre
+    grupos de botões (também já reportado). Some/aparece de graça, sem JS:
+    é descendente de #page-obras, que já vira display:none inteiro (com
+    tudo dentro) ao navegar pra outra tela. */
+ .obras-toolbar-fixed{position:fixed;top:63px;left:var(--sidebar-w);right:0;z-index:14;display:flex;align-items:center;gap:12px;padding:8px 24px}
+ .obras-toolbar-filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;min-width:0}
+ .obras-fixed-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+ /* #obras-tabela/#obras-kanban ganham margin-top equivalente à altura da
+    barra + respiro, pra compensar ela ter saído do fluxo normal (position:
+    fixed não empurra o conteúdo abaixo como sticky/static fariam). */
  #obras-tabela,#obras-kanban{margin-top:54px}
- /* Ações fixas de Obras (Kanban/Tabela + Nova Obra) — position:fixed em vez
-    de sticky de propósito: sticky só resolve o eixo vertical (acompanha
-    scroll horizontal de qualquer ancestral, é o que causava o botão
-    "desaparecer" ao rolar a tabela pro lado). position:fixed ancora direto
-    na viewport, imune a QUALQUER scroll (vertical da página ou horizontal
-    da tabela/kanban) por definição — não depende de nenhum container ser
-    bem comportado. right:24px alinha com o padding de .page; top:63px fica
-    logo abaixo do .topbar (52px) com a mesma respiração visual da barra de
-    filtros. Exibido/ocultado via _obrasFixedActionsSync (chamada por go(),
-    em app.js) — só existe enquanto #page-obras estiver ativo. */
- .obras-fixed-actions{position:fixed;top:63px;right:24px;z-index:15;display:flex;gap:8px;align-items:center}
  .tbl-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
  .tbl-title{font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;letter-spacing:-.1px}.tbl-acts{margin-left:auto;display:flex;gap:8px}
  table{width:100%;border-collapse:collapse}
