@@ -208,21 +208,24 @@ body.light .dash-panel{
     algum ancestral ganhasse scroll horizontal a barra acompanhava e
     "desaparecia" da vista (bug relatado). position:fixed ancora direto na
     viewport, imune a QUALQUER scroll (vertical da página OU horizontal da
-    tabela/kanban) por definição. top:63px é onde a barra já ficava (mesma
-    altura do título "Obras"); left/right replicam o padding de .page
-    (24px), que um elemento fixed deixa de herdar do ancestral. Sem
-    background: cada botão já tem o próprio fundo — um fundo no container
-    inteiro virava uma faixa sólida cobrindo até os espaços vazios entre
-    grupos de botões (também já reportado). Some/aparece de graça, sem JS:
-    é descendente de #page-obras, que já vira display:none inteiro (com
-    tudo dentro) ao navegar pra outra tela. */
+    tabela/kanban) por definição. top:63px fica logo abaixo do .topbar
+    (52px); left/right replicam o padding de .page (24px), que um elemento
+    fixed deixa de herdar do ancestral. Sem background: cada botão já tem o
+    próprio fundo — um fundo no container inteiro virava uma faixa sólida
+    cobrindo até os espaços vazios entre grupos de botões (também já
+    reportado). Some/aparece de graça, sem JS: é descendente de #page-obras,
+    que já vira display:none inteiro (com tudo dentro) ao navegar pra outra
+    tela. IMPORTANTE: a barra ocupa o MESMO x que o título "Obras" (mesmo
+    left:24px de .page) — sem empurrar o título pra baixo dela primeiro,
+    a barra desenha por CIMA do título (bug relatado: "sobrepôs outro
+    item"). #page-obras .ph abaixo resolve isso. */
  .obras-toolbar-fixed{position:fixed;top:63px;left:var(--sidebar-w);right:0;z-index:14;display:flex;align-items:center;gap:12px;padding:8px 24px}
  .obras-toolbar-filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;min-width:0}
  .obras-fixed-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
- /* #obras-tabela/#obras-kanban ganham margin-top equivalente à altura da
-    barra + respiro, pra compensar ela ter saído do fluxo normal (position:
-    fixed não empurra o conteúdo abaixo como sticky/static fariam). */
- #obras-tabela,#obras-kanban{margin-top:54px}
+ /* Título "Obras" + subtítulo descem pra abaixo da barra fixa (54px =
+    altura da barra + respiro) — sem isso eles renderizam ATRÁS/sob a barra,
+    já que ambos começam no mesmo canto superior esquerdo do conteúdo. */
+ #page-obras .ph{margin-top:54px}
  .tbl-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
  .tbl-title{font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;letter-spacing:-.1px}.tbl-acts{margin-left:auto;display:flex;gap:8px}
  table{width:100%;border-collapse:collapse}
