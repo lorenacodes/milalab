@@ -224,18 +224,23 @@ body.light .dash-panel{
     linha da tabela atravessando o Filtro/Agrupar/Ordenar — reportado).
     Um fundo sólido (var(--surface)) virava a "faixa preta" já rejeitada
     antes. Solução: mesmo vidro fosco (blur) que a .topbar já usa — cobre o
-    conteúdo que passa por baixo sem ser uma chapa opaca. */
- .obras-toolbar-fixed{position:fixed;top:63px;left:var(--sidebar-w);right:0;z-index:14;display:flex;align-items:center;gap:12px;padding:8px 24px;border-bottom:1px solid rgba(255,255,255,.16);background:linear-gradient(rgba(10,11,16,.72),rgba(10,11,16,.72)), rgba(255,255,255,.07);-webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5)}
+    conteúdo que passa por baixo sem ser uma chapa opaca.
+    top:52px (não 63px): colada direto na .topbar (que termina em 52px),
+    sem gap nenhum entre as duas — um intervalo ali mostrava o fundo da
+    página (cor diferente) entre a topbar e esta barra, parecendo duas
+    faixas separadas em vez de uma peça só (reportado). */
+ .obras-toolbar-fixed{position:fixed;top:52px;left:var(--sidebar-w);right:0;z-index:14;display:flex;align-items:center;gap:12px;padding:8px 24px;border-bottom:1px solid rgba(255,255,255,.16);background:linear-gradient(rgba(10,11,16,.72),rgba(10,11,16,.72)), rgba(255,255,255,.07);-webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5)}
  body.light .obras-toolbar-fixed{background:linear-gradient(rgba(250,250,252,.72),rgba(250,250,252,.72)), rgba(255,255,255,.3);-webkit-backdrop-filter:blur(10px) saturate(1.7);backdrop-filter:blur(10px) saturate(1.7);border-bottom-color:rgba(255,255,255,.65)}
  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .obras-toolbar-fixed{background:var(--surface)}
  }
  .obras-toolbar-filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;min-width:0}
  .obras-fixed-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
- /* Título "Obras" + subtítulo descem pra abaixo da barra fixa (54px =
-    altura da barra + respiro) — sem isso eles renderizam ATRÁS/sob a barra,
-    já que ambos começam no mesmo canto superior esquerdo do conteúdo. */
- #page-obras .ph{margin-top:54px}
+ /* Título "Obras" + subtítulo descem pra abaixo da barra fixa (44px =
+    altura da barra + respiro, recalculado pro novo top:52px acima) — sem
+    isso eles renderizam ATRÁS/sob a barra, já que ambos começam no mesmo
+    canto superior esquerdo do conteúdo. */
+ #page-obras .ph{margin-top:44px}
  .tbl-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
  .tbl-title{font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;letter-spacing:-.1px}.tbl-acts{margin-left:auto;display:flex;gap:8px}
  table{width:100%;border-collapse:collapse}
