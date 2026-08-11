@@ -260,6 +260,48 @@ function _spContatoById(id) {
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 }
 
+var _empColorPalette = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
+function _empColor(name) {
+ var c = 0; for (var j = 0; j < (name||'').length; j++) c += name.charCodeAt(j);
+ return _empColorPalette[c % _empColorPalette.length];
+}
+function _empFaseTag(fase) {
+ var f = (fase||'').toLowerCase();
+ if (!fase || fase === '—') return '<span class="nt-tag nt-tag-gray">—</span>';
+ if (f.includes('cliente') || f.includes('parceiro') || f.includes('ativo')) return '<span class="nt-tag nt-tag-green">'+fase+'</span>';
+ if (f.includes('negoci') || f.includes('proposta') || f.includes('qualif')) return '<span class="nt-tag nt-tag-blue">'+fase+'</span>';
+ if (f.includes('lead') || f.includes('prospect') || f.includes('contato')) return '<span class="nt-tag nt-tag-yellow">'+fase+'</span>';
+ if (f.includes('inativ') || f.includes('perdid') || f.includes('cancel')) return '<span class="nt-tag nt-tag-gray">'+fase+'</span>';
+ return '<span class="nt-tag nt-tag-gray">'+fase+'</span>';
+}
+// Extraído de _dbLoadEmpresas (era closure local ao map) pra ser reaproveitado
+// também por _empRenderGrouped abaixo — mesmo <tr>, dataset idêntico, tanto
+// na renderização flat quanto na agrupada.
+function _empRowHTML(e) {
+ var initials = (e.nome||'?').split(' ').filter(Boolean).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();
+ var nCtt = (e.contatos_empresas||[]).length;
+ var cats = (e.categoria||[]);
+ var fase = e.fase_ciclo_vida || '—';
+ return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'empresas\',this)"'
+  + ' data-id="'+e.id+'"'
+  + ' data-nome="'+(e.nome||'').toLowerCase()+'"'
+  + ' data-fase="'+fase.toLowerCase()+'"'
+  + ' data-estado="'+(e.estado||'').toLowerCase()+'"'
+  + ' data-categoria="'+cats.join(',').toLowerCase()+'">'
+  + '<td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>'
+  + '<td><div style="display:flex;align-items:center;gap:10px">'
+  + '<div class="nt-avatar" style="background:'+_empColor(e.nome)+'">'+initials+'</div>'
+  + '<div><div style="font-weight:500;font-size:13px">'+e.nome+'</div>'
+  + '<div style="font-size:11px;color:var(--muted)">'+(e.cnpj||'—')+'</div></div>'
+  + '</div></td>'
+  + '<td style="font-size:12px;color:var(--muted)">'+(cats.join(', ')||'—')+'</td>'
+  + '<td style="font-size:12px;color:var(--muted)">'+(e.estado||'—')+'</td>'
+  + '<td>'+_empFaseTag(fase)+'</td>'
+  + '<td style="text-align:center;font-weight:'+(nCtt>0?'600':'400')+';color:'+(nCtt>0?'var(--text)':'var(--muted)')+'">'+nCtt+'</td>'
+  + '<td><button class="nt-open-btn" onclick="event.stopPropagation();_spOpen(\'empresas\',this.closest(\'tr\'))" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500;opacity:0;transition:opacity .12s">Abrir →</button></td>'
+  + '</tr>';
+}
+
 async function _dbLoadEmpresas() {
  var tbody0 = document.getElementById('emp-tbody');
  if (tbody0) tbody0.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Carregando...</td></tr>';
@@ -289,45 +331,12 @@ async function _dbLoadEmpresas() {
  var tbody = document.getElementById('emp-tbody');
  if (!tbody) return;
 
- var colors = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
- function _empColor(name) {
-  var c = 0; for (var j = 0; j < (name||'').length; j++) c += name.charCodeAt(j);
-  return colors[c % colors.length];
- }
- function _faseTag(fase) {
-  var f = (fase||'').toLowerCase();
-  if (!fase || fase === '—') return '<span class="nt-tag nt-tag-gray">—</span>';
-  if (f.includes('cliente') || f.includes('parceiro') || f.includes('ativo')) return '<span class="nt-tag nt-tag-green">'+fase+'</span>';
-  if (f.includes('negoci') || f.includes('proposta') || f.includes('qualif')) return '<span class="nt-tag nt-tag-blue">'+fase+'</span>';
-  if (f.includes('lead') || f.includes('prospect') || f.includes('contato')) return '<span class="nt-tag nt-tag-yellow">'+fase+'</span>';
-  if (f.includes('inativ') || f.includes('perdid') || f.includes('cancel')) return '<span class="nt-tag nt-tag-gray">'+fase+'</span>';
-  return '<span class="nt-tag nt-tag-gray">'+fase+'</span>';
- }
-
- tbody.innerHTML = allData.map(function(e) {
-  var initials = (e.nome||'?').split(' ').filter(Boolean).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();
-  var nCtt = (e.contatos_empresas||[]).length;
-  var cats = (e.categoria||[]);
-  var fase = e.fase_ciclo_vida || '—';
-  return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'empresas\',this)"'
-   + ' data-id="'+e.id+'"'
-   + ' data-nome="'+(e.nome||'').toLowerCase()+'"'
-   + ' data-fase="'+fase.toLowerCase()+'"'
-   + ' data-estado="'+(e.estado||'').toLowerCase()+'"'
-   + ' data-categoria="'+cats.join(',').toLowerCase()+'">'
-   + '<td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>'
-   + '<td><div style="display:flex;align-items:center;gap:10px">'
-   + '<div class="nt-avatar" style="background:'+_empColor(e.nome)+'">'+initials+'</div>'
-   + '<div><div style="font-weight:500;font-size:13px">'+e.nome+'</div>'
-   + '<div style="font-size:11px;color:var(--muted)">'+(e.cnpj||'—')+'</div></div>'
-   + '</div></td>'
-   + '<td style="font-size:12px;color:var(--muted)">'+(cats.join(', ')||'—')+'</td>'
-   + '<td style="font-size:12px;color:var(--muted)">'+(e.estado||'—')+'</td>'
-   + '<td>'+_faseTag(fase)+'</td>'
-   + '<td style="text-align:center;font-weight:'+(nCtt>0?'600':'400')+';color:'+(nCtt>0?'var(--text)':'var(--muted)')+'">'+nCtt+'</td>'
-   + '<td><button class="nt-open-btn" onclick="event.stopPropagation();_spOpen(\'empresas\',this.closest(\'tr\'))" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500;opacity:0;transition:opacity .12s">Abrir →</button></td>'
-   + '</tr>';
- }).join('');
+ tbody.innerHTML = allData.map(_empRowHTML).join('');
+ // Reaplica filtro/busca/ordenação/agrupamento atuais (se algum estiver
+ // ativo) — sem isso, um recarregamento em segundo plano (realtime, ou o
+ // refresh disparado por obras.js) reverteria silenciosamente pra visão
+ // flat/sem filtro até a pessoa interagir de novo com a toolbar.
+ if (typeof _empApplyFilters === 'function') _empApplyFilters();
 }
 
 // ── Sanitiza telefone para link WhatsApp ─────────────────────────────────────
@@ -344,6 +353,67 @@ var _icoWA   = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentCol
 var _icoCall = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5.1 2.2A1 1 0 0 0 4 2H2.5A1 1 0 0 0 1.5 3C1.5 9.35 6.65 14.5 13 14.5a1 1 0 0 0 1-1V12a1 1 0 0 0-.8-.98l-2.5-.5a1 1 0 0 0-.98.3l-1.1 1.1a10.07 10.07 0 0 1-4.54-4.54l1.1-1.1a1 1 0 0 0 .3-.98z"/></svg>';
 var _icoCopy = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M3 11H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v1"/></svg>';
 var _icoMail = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="1" y="3" width="14" height="10" rx="1.5"/><polyline points="1,4 8,9 15,4"/></svg>';
+
+function _cttColor(name) {
+ var c = 0; for (var j = 0; j < (name||'').length; j++) c += name.charCodeAt(j);
+ return _empColorPalette[c % _empColorPalette.length];
+}
+// Empresa primária de um contato via junction contatos_empresas (mesma regra
+// em todo lugar que precisa disso: is_primary, senão a primeira vinculada).
+function _cttEmpresaPrimaria(c) {
+ var links = c.contatos_empresas || [];
+ var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
+ return (empLink && empLink.empresa && empLink.empresa.nome) || '';
+}
+// Extraído de _dbLoadContatos (era closure local ao map) pra ser reaproveitado
+// também por _cttRenderGrouped abaixo.
+function _cttRowHTML(c) {
+ var nome = c.nome_completo || '—';
+ var initials = nome.split(' ').filter(Boolean).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase() || '?';
+ var empNome = _cttEmpresaPrimaria(c) || '—';
+
+ // Telefone + ações hover
+ var telCell = '<span style="font-size:12px;color:var(--muted)">—</span>';
+ if (c.telefone) {
+  var waNum = _sanitizeTelWA(c.telefone);
+  var telSafe = c.telefone.replace(/'/g, '&#39;');
+  telCell = '<div class="ctt-contact-cell">'
+   + '<span class="ctt-val">'+c.telefone+'</span>'
+   + '<span class="ctt-acts">'
+   + (waNum ? '<a href="https://wa.me/'+waNum+'" target="_blank" class="ctt-act-btn wa" title="WhatsApp">'+_icoWA+'</a>' : '')
+   + '<button onclick="navigator.clipboard.writeText(\''+telSafe+'\');var t=this;t.title=\'Copiado!\';setTimeout(function(){t.title=\'Copiar\'},1500)" class="ctt-act-btn" title="Copiar">'+_icoCopy+'</button>'
+   + '</span></div>';
+ }
+
+ // Email + ações hover
+ var emailCell = '<span style="font-size:12px;color:var(--muted)">—</span>';
+ if (c.email) {
+  var emailSafe = c.email.replace(/'/g, '&#39;');
+  emailCell = '<div class="ctt-contact-cell">'
+   + '<span class="ctt-val">'+c.email+'</span>'
+   + '<span class="ctt-acts">'
+   + '<a href="mailto:'+c.email+'" class="ctt-act-btn" title="Enviar e-mail">'+_icoMail+'</a>'
+   + '<button onclick="navigator.clipboard.writeText(\''+emailSafe+'\');var t=this;t.title=\'Copiado!\';setTimeout(function(){t.title=\'Copiar\'},1500)" class="ctt-act-btn" title="Copiar">'+_icoCopy+'</button>'
+   + '</span></div>';
+ }
+
+ return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'contatos\',this)"'
+  + ' data-id="'+c.id+'"'
+  + ' data-nome="'+nome.toLowerCase()+'"'
+  + ' data-cargo="'+(c.cargo||'').toLowerCase()+'"'
+  + ' data-empresa="'+empNome.toLowerCase()+'">'
+  + '<td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>'
+  + '<td><div style="display:flex;align-items:center;gap:9px">'
+  + '<div class="nt-avatar nt-avatar-circle" style="background:'+_cttColor(nome)+'">'+initials+'</div>'
+  + '<div style="font-weight:500;font-size:13px">'+nome+'</div>'
+  + '</div></td>'
+  + '<td style="font-size:12px;color:var(--muted)">'+(c.cargo||'—')+'</td>'
+  + '<td style="font-size:12px;color:var(--muted)">'+empNome+'</td>'
+  + '<td>'+telCell+'</td>'
+  + '<td>'+emailCell+'</td>'
+  + '<td><button class="nt-open-btn" onclick="event.stopPropagation();_spOpen(\'contatos\',this.closest(\'tr\'))" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500;opacity:0;transition:opacity .12s">Abrir →</button></td>'
+  + '</tr>';
+}
 
 // ── Load Contatos (cache global + renderiza tabela) ───────────────────────────
 async function _dbLoadContatos() {
@@ -374,63 +444,10 @@ async function _dbLoadContatos() {
  var tbody = document.getElementById('ctt-tbody');
  if (!tbody) return;
 
- var colors = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
- function _cttColor(name) {
-  var c = 0; for (var j = 0; j < (name||'').length; j++) c += name.charCodeAt(j);
-  return colors[c % colors.length];
- }
-
- tbody.innerHTML = allData.map(function(c) {
-  var nome = c.nome_completo || '—';
-  var initials = nome.split(' ').filter(Boolean).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase() || '?';
-
-  // Empresa primária via junction
-  var links = c.contatos_empresas || [];
-  var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
-  var empNome = (empLink && empLink.empresa && empLink.empresa.nome) || '—';
-
-  // Telefone + ações hover
-  var telCell = '<span style="font-size:12px;color:var(--muted)">—</span>';
-  if (c.telefone) {
-   var waNum = _sanitizeTelWA(c.telefone);
-   var telSafe = c.telefone.replace(/'/g, '&#39;');
-   telCell = '<div class="ctt-contact-cell">'
-    + '<span class="ctt-val">'+c.telefone+'</span>'
-    + '<span class="ctt-acts">'
-    + (waNum ? '<a href="https://wa.me/'+waNum+'" target="_blank" class="ctt-act-btn wa" title="WhatsApp">'+_icoWA+'</a>' : '')
-    + '<button onclick="navigator.clipboard.writeText(\''+telSafe+'\');var t=this;t.title=\'Copiado!\';setTimeout(function(){t.title=\'Copiar\'},1500)" class="ctt-act-btn" title="Copiar">'+_icoCopy+'</button>'
-    + '</span></div>';
-  }
-
-  // Email + ações hover
-  var emailCell = '<span style="font-size:12px;color:var(--muted)">—</span>';
-  if (c.email) {
-   var emailSafe = c.email.replace(/'/g, '&#39;');
-   emailCell = '<div class="ctt-contact-cell">'
-    + '<span class="ctt-val">'+c.email+'</span>'
-    + '<span class="ctt-acts">'
-    + '<a href="mailto:'+c.email+'" class="ctt-act-btn" title="Enviar e-mail">'+_icoMail+'</a>'
-    + '<button onclick="navigator.clipboard.writeText(\''+emailSafe+'\');var t=this;t.title=\'Copiado!\';setTimeout(function(){t.title=\'Copiar\'},1500)" class="ctt-act-btn" title="Copiar">'+_icoCopy+'</button>'
-    + '</span></div>';
-  }
-
-  return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'contatos\',this)"'
-   + ' data-id="'+c.id+'"'
-   + ' data-nome="'+nome.toLowerCase()+'"'
-   + ' data-cargo="'+(c.cargo||'').toLowerCase()+'"'
-   + ' data-empresa="'+empNome.toLowerCase()+'">'
-   + '<td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>'
-   + '<td><div style="display:flex;align-items:center;gap:9px">'
-   + '<div class="nt-avatar nt-avatar-circle" style="background:'+_cttColor(nome)+'">'+initials+'</div>'
-   + '<div style="font-weight:500;font-size:13px">'+nome+'</div>'
-   + '</div></td>'
-   + '<td style="font-size:12px;color:var(--muted)">'+(c.cargo||'—')+'</td>'
-   + '<td style="font-size:12px;color:var(--muted)">'+empNome+'</td>'
-   + '<td>'+telCell+'</td>'
-   + '<td>'+emailCell+'</td>'
-   + '<td><button class="nt-open-btn" onclick="event.stopPropagation();_spOpen(\'contatos\',this.closest(\'tr\'))" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500;opacity:0;transition:opacity .12s">Abrir →</button></td>'
-   + '</tr>';
- }).join('');
+ tbody.innerHTML = allData.map(_cttRowHTML).join('');
+ // Reaplica filtro/busca/ordenação/agrupamento atuais — mesmo motivo do
+ // _empApplyFilters() em _dbLoadEmpresas acima.
+ if (typeof _cttApplyFilters === 'function') _cttApplyFilters();
 }
 
 // ── Salvar Empresa (painel lateral) ────────────────────────────────────────────
@@ -1135,7 +1152,116 @@ async function submitNovoFornecedor() {
  _dbLoadFornecedores();
 }
 
+// ── Agrupamento (Agrupar — group-builder.js/group-tree.js) ──────────────────
+// Empresas/Contatos filtram ESCONDENDO/MOSTRANDO <tr> já renderizados no DOM
+// (_empApplyFilters normal, abaixo) — diferente do Gestor de Tarefas, que
+// re-renderiza a tbody do zero a partir de um array a cada mudança. Esse
+// esquema de esconder/mostrar não dá pra representar agrupamento (não tem
+// como inserir cabeçalhos de grupo nem reordenar itens só com display:none).
+// Por isso, quando HÁ campo de agrupamento ativo (_gbPrimaryField), a rota é
+// outra: _empRenderGrouped relê _empresasArr (fonte completa, já em cache),
+// filtra/ordena com os MESMOS _fbEvaluate/_sbCompare de sempre (só que sobre
+// um pseudo-dataset — ver _empPseudoDataset — em vez de tr.dataset, porque
+// ainda não existe <tr> nenhum nesse momento) e gera a tbody inteira já com
+// cabeçalhos de grupo + contagem, replicando _gestorRenderGroupNode do Gestor
+// de Tarefas. Sem grupo ativo, cai no comportamento de sempre (sem nenhuma
+// mudança), garantindo zero regressão no caso não-agrupado.
+var _empGroupCollapsed = {};
+// categoria é multipleSelects (uma empresa pode ter várias) — pra não
+// fragmentar em grupos combinatórios (uma "categoria" por combinação
+// distinta), colapsa qualquer empresa com 2+ categorias num único bucket
+// "Múltiplas categorias", mesmo espírito de _gestorGroupKeyFor colapsando
+// responsável multi-valorado em "Tarefas Coletivas".
+function _empGroupKeyFor(e, field) {
+ if (field === 'fase') return { key: e.fase_ciclo_vida || '— Sem fase', sortKey: null };
+ if (field === 'estado') return { key: (e.estado || '— Sem estado').toUpperCase(), sortKey: null };
+ if (field === 'categoria') {
+  var cats = e.categoria || [];
+  if (!cats.length) return { key: '— Sem categoria', sortKey: null };
+  if (cats.length === 1) return { key: cats[0], sortKey: null };
+  return { key: 'Múltiplas categorias', sortKey: null };
+ }
+ return { key: '— Sem grupo', sortKey: null };
+}
+// Pseudo-dataset: mesmos campos/mesma normalização (lowercase) que o <tr>
+// real carregaria em data-* — assim _fbEvaluate/_sbCompare (que leem
+// item[key] por padrão) funcionam idêntico com ou sem DOM.
+function _empPseudoDataset(e) {
+ return {
+  nome: (e.nome || '').toLowerCase(),
+  fase: (e.fase_ciclo_vida || '').toLowerCase(),
+  estado: (e.estado || '').toLowerCase(),
+  categoria: (e.categoria || []).join(',').toLowerCase(),
+ };
+}
+function _empToggleGroup(key) {
+ _empGroupCollapsed[key] = !_empGroupCollapsed[key];
+ _empApplyFilters();
+}
+function _empRenderGroupNode(node, path, rowsArr) {
+ if (node.leaf) {
+  node.items.forEach(function(e) { rowsArr.push(_empRowHTML(e)); });
+  return;
+ }
+ node.order.forEach(function(k) {
+  var child = node.children[k];
+  var nodePath = 'empresas::' + path.concat(k).join(' :: ');
+  var isCollapsed = !!_empGroupCollapsed[nodePath];
+  var total = _gtTreeCount(child);
+  rowsArr.push(
+   '<tr class="gestor-group-hd" onclick="_empToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
+   + '<td colspan="7" style="padding-left:12px">'
+   + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
+   + '<strong>' + k + '</strong>'
+   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' empresa' + (total !== 1 ? 's' : '') + '</span>'
+   + '</td></tr>'
+  );
+  if (!isCollapsed) _empRenderGroupNode(child, path.concat(k), rowsArr);
+ });
+}
+function _empRenderGrouped(groupField) {
+ var tbody = document.getElementById('emp-tbody');
+ if (!tbody) return;
+ var buscaNorm = _ssNormalize(((document.getElementById('emp-search') || {}).value || '').trim());
+ var activeConds = _fbInstances.empresas.state.conditions.filter(_fbConditionIsUsable).length;
+
+ var filtered = (_empresasArr || []).filter(function(e) {
+  var ok = _fbEvaluate(_empPseudoDataset(e), 'empresas');
+  if (ok && buscaNorm) {
+   var haystack = _ssNormalize([e.nome, e.cnpj, (e.categoria||[]).join(' '), e.estado, e.fase_ciclo_vida].filter(Boolean).join(' '));
+   ok = _ssMatch(haystack, buscaNorm);
+  }
+  return ok;
+ });
+ filtered.sort(function(a, b) { return _sbCompare(_empPseudoDataset(a), _empPseudoDataset(b), 'empresas'); });
+
+ var tree = _gtBuildTree(filtered, [{ field: groupField }], _empGroupKeyFor, null, 0);
+ var rowsArr = [];
+ _empRenderGroupNode(tree, [], rowsArr);
+ tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma empresa encontrada.</td></tr>';
+
+ var fbBadge = document.getElementById('fb-badge-empresas');
+ if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
+ var countEl = document.getElementById('emp-filter-count');
+ if (countEl) {
+  if (activeConds || buscaNorm) { countEl.textContent = filtered.length + (filtered.length === 1 ? ' resultado' : ' resultados'); countEl.style.display = 'inline'; }
+  else { countEl.style.display = 'none'; }
+ }
+}
+
 function _empApplyFilters() {
+ var groupField = _gbPrimaryField('empresas');
+ if (groupField) { _empRenderGrouped(groupField); return; }
+
+ // Saindo do modo agrupado: a tbody ainda tem as <tr class="gestor-group-hd">
+ // inseridas por _empRenderGrouped (o caminho flat abaixo só ESCONDE/MOSTRA/
+ // REORDENA <tr> já existentes, nunca as remove) — sem isso, os cabeçalhos de
+ // grupo ficariam pra sempre na tabela depois de limpar o agrupamento.
+ var tbody0 = document.getElementById('emp-tbody');
+ if (tbody0 && tbody0.querySelector('tr.gestor-group-hd')) {
+  tbody0.innerHTML = (_empresasArr || []).map(_empRowHTML).join('');
+ }
+
  var buscaNorm = _ssNormalize(((document.getElementById('emp-search') || {}).value || '').trim());
  var activeConds = _fbInstances.empresas.state.conditions.filter(_fbConditionIsUsable).length;
  var rows = Array.prototype.slice.call(document.querySelectorAll('#emp-tbody tr'));
@@ -1169,7 +1295,88 @@ function _empApplyFilters() {
 // na toolbar nem tinham onclick — não funcionavam. _cttCampos (mais abaixo)
 // já tinha o formato certo (label+type+opts), só precisou virar array pro
 // _fbInit, igual _empFbFields.
+// ── Agrupamento de Contatos — mesmo esquema/motivo de _empRenderGrouped
+// acima (ver comentário lá): esconder/mostrar <tr> não representa grupo, então
+// com campo ativo a tbody é reconstruída do zero a partir de _contatosArr.
+var _cttGroupCollapsed = {};
+function _cttGroupKeyFor(c, field) {
+ if (field === 'cargo') return { key: c.cargo || '— Sem cargo', sortKey: null };
+ if (field === 'empresa') return { key: _cttEmpresaPrimaria(c) || '— Sem empresa', sortKey: null };
+ return { key: '— Sem grupo', sortKey: null };
+}
+function _cttPseudoDataset(c) {
+ return {
+  nome: (c.nome_completo || '').toLowerCase(),
+  cargo: (c.cargo || '').toLowerCase(),
+  empresa: (_cttEmpresaPrimaria(c) || '').toLowerCase(),
+ };
+}
+function _cttToggleGroup(key) {
+ _cttGroupCollapsed[key] = !_cttGroupCollapsed[key];
+ _cttApplyFilters();
+}
+function _cttRenderGroupNode(node, path, rowsArr) {
+ if (node.leaf) {
+  node.items.forEach(function(c) { rowsArr.push(_cttRowHTML(c)); });
+  return;
+ }
+ node.order.forEach(function(k) {
+  var child = node.children[k];
+  var nodePath = 'contatos::' + path.concat(k).join(' :: ');
+  var isCollapsed = !!_cttGroupCollapsed[nodePath];
+  var total = _gtTreeCount(child);
+  rowsArr.push(
+   '<tr class="gestor-group-hd" onclick="_cttToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
+   + '<td colspan="7" style="padding-left:12px">'
+   + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
+   + '<strong>' + k + '</strong>'
+   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' contato' + (total !== 1 ? 's' : '') + '</span>'
+   + '</td></tr>'
+  );
+  if (!isCollapsed) _cttRenderGroupNode(child, path.concat(k), rowsArr);
+ });
+}
+function _cttRenderGrouped(groupField) {
+ var tbody = document.getElementById('ctt-tbody');
+ if (!tbody) return;
+ var buscaNorm = _ssNormalize(((document.getElementById('ctt-search') || {}).value || '').trim());
+ var activeConds = _fbInstances.contatos.state.conditions.filter(_fbConditionIsUsable).length;
+
+ var filtered = (_contatosArr || []).filter(function(c) {
+  var ok = _fbEvaluate(_cttPseudoDataset(c), 'contatos');
+  if (ok && buscaNorm) {
+   var haystack = _ssNormalize([c.nome_completo, c.cargo, _cttEmpresaPrimaria(c), c.email, c.telefone].filter(Boolean).join(' '));
+   ok = _ssMatch(haystack, buscaNorm);
+  }
+  return ok;
+ });
+ filtered.sort(function(a, b) { return _sbCompare(_cttPseudoDataset(a), _cttPseudoDataset(b), 'contatos'); });
+
+ var tree = _gtBuildTree(filtered, [{ field: groupField }], _cttGroupKeyFor, null, 0);
+ var rowsArr = [];
+ _cttRenderGroupNode(tree, [], rowsArr);
+ tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhum contato encontrado.</td></tr>';
+
+ var fbBadge = document.getElementById('fb-badge-contatos');
+ if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
+ var countEl = document.getElementById('ctt-filter-count');
+ if (countEl) {
+  if (activeConds || buscaNorm) { countEl.textContent = filtered.length + (filtered.length === 1 ? ' resultado' : ' resultados'); countEl.style.display = 'inline'; }
+  else { countEl.style.display = 'none'; }
+ }
+}
+
 function _cttApplyFilters() {
+ var groupField = _gbPrimaryField('contatos');
+ if (groupField) { _cttRenderGrouped(groupField); return; }
+
+ // Mesmo motivo do _empApplyFilters acima: remove os cabeçalhos de grupo
+ // deixados por _cttRenderGrouped ao sair do modo agrupado.
+ var tbody0 = document.getElementById('ctt-tbody');
+ if (tbody0 && tbody0.querySelector('tr.gestor-group-hd')) {
+  tbody0.innerHTML = (_contatosArr || []).map(_cttRowHTML).join('');
+ }
+
  var buscaNorm = _ssNormalize(((document.getElementById('ctt-search') || {}).value || '').trim());
  var activeConds = _fbInstances.contatos.state.conditions.filter(_fbConditionIsUsable).length;
  var rows = Array.prototype.slice.call(document.querySelectorAll('#ctt-tbody tr'));
@@ -1250,6 +1457,15 @@ var _empSbFields = [
 ];
 _sbInit('empresas', _empSbFields, _empApplyFilters);
 
+// Agrupamento — travado em 1 nível (maxLevels:1, o pedido não envolvia
+// múltiplos níveis como o Gestor de Tarefas tem). Campos mínimos pedidos:
+// Fase, Estado, Categoria (ver _empGroupKeyFor acima pra semântica de cada).
+_gbInit('empresas', [
+ { key: 'fase',      label: 'Fase' },
+ { key: 'estado',    label: 'Estado' },
+ { key: 'categoria', label: 'Categoria' },
+], _empApplyFilters, 1);
+
 /* Filtro/Ordenação de Contatos — mesma migração acima, reaproveitando
    _cttCampos que já existia (nome/cargo/empresa, com o vocabulário real de
    Cargo verificado no Airtable). */
@@ -1265,3 +1481,10 @@ var _cttSbFields = [
  { key: 'empresa', label: 'Empresa', type: 'text' },
 ];
 _sbInit('contatos', _cttSbFields, _cttApplyFilters);
+
+// Agrupamento — travado em 1 nível, mesma engine de Empresas/Gestor de
+// Tarefas. Campos mínimos pedidos: Cargo, Empresa (ver _cttGroupKeyFor acima).
+_gbInit('contatos', [
+ { key: 'cargo',   label: 'Cargo' },
+ { key: 'empresa', label: 'Empresa' },
+], _cttApplyFilters, 1);
