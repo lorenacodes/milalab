@@ -767,6 +767,10 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
 .gestor-sel{border:1px solid var(--border);border-radius:var(--r-sm);padding:4px 8px;background:var(--surface2);color:var(--text);font-size:11px;outline:none;cursor:pointer;font-family:inherit;height:30px;display:inline-flex;align-items:center;gap:5px}
 .gestor-sel.active{border-color:var(--navy);color:var(--navy)}
 .gestor-sel-caret{white-space:nowrap}
+/* Botão de um clique "Atrasadas" — vermelho quando ligado (urgência), não
+   navy como os demais toggles, pra reforçar visualmente que é um alerta,
+   não só uma seleção qualquer. */
+.gestor-quick-toggle.active{border-color:var(--red);color:var(--red);background:var(--red-dim)}
 /* Organizar: ordenar+agrupar como um bloco visual único, não dois selects
    soltos com rótulo próprio competindo por atenção. */
 /* SEM overflow:hidden aqui: os popovers de Agrupar/Ordenar (.fb-pop,

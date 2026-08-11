@@ -9,6 +9,17 @@ var _gestorView     = 'grid';   // 'grid' | 'timeline' | 'metricas'
 var _gestorCollapsed    = {};   // { groupKey: true } = colapsado
 var _gestorWeekExpanded = {};   // { 'YYYY-MM-DD': true } = semana expandida
 var _gestorPeriodo  = { ini: null, fim: null, preset: 'semana' };
+// Botão de um clique "Atrasadas" (fora do Filtro — ver comentário em
+// _gestorPopulateFilters). true = mostra só as atrasadas; combina com o
+// Filtro e a Busca por AND, mesmo padrão do Período.
+var _gestorSomenteAtrasadas = false;
+function _gestorToggleAtrasadas() {
+ _gestorSomenteAtrasadas = !_gestorSomenteAtrasadas;
+ var btn = document.getElementById('gestor-btn-atrasadas');
+ if (btn) btn.classList.toggle('active', _gestorSomenteAtrasadas);
+ _gestorApplyFilters();
+ _gestorSaveState();
+}
 var _gestorTimelineAnchor = new Date(); _gestorTimelineAnchor.setHours(0,0,0,0); // data-base de navegacao da Timeline
 // Lookups para enriquecer vínculos (id → nome)
 var _gestorObrasMap = {};    // { obraId: 'Nome da Obra' }
@@ -619,25 +630,15 @@ function _gestorPopulateFilters() {
   { key: 'titulo',      label: 'Tarefa',                type: 'text' },
   { key: 'responsavel', label: 'Responsável',           type: 'multitext', options: _gestorRespOptions },
   // Status = só o valor real gravado na atividade, nunca sobrescrito.
-  // "Atrasado" não é status — é a condição calculada por _gIsLate (prazo
-  // vencido + não concluída), filtrável separadamente pelo campo "Somente
-  // atrasadas" logo abaixo. Os dois combinam com AND normalmente (o motor de
-  // filtro já faz isso): Status=Obsoleto + Somente atrasadas=Sim retorna só
-  // as obsoletas que também estão vencidas.
+  // "Atrasada" NÃO é um campo do filtro — é um cálculo do sistema (_gIsLate:
+  // prazo vencido + não concluída), sem sentido real de "campo é valor" (o
+  // Sim/Não dentro do Filtro parecia uma pergunta redundante, já que a
+  // pessoa só entra ali querendo ver as atrasadas). Virou um botão de um
+  // clique na toolbar (_gestorToggleAtrasadas), fora do popover de Filtro,
+  // que combina com ele por AND — igual ao Período, que também não é uma
+  // condição do Filtro e sim um pré-filtro à parte.
   { key: 'status',      label: 'Status',                type: 'select', options: _gestorStatusOptions,
     getValue: function(a) { return a.status || ''; } },
-  // Rótulo "Atrasada" (não "Somente atrasadas") — o campo já é um Sim/Não,
-  // "Onde Somente atrasadas é Sim" soava redundante (o "somente" já sugere
-  // que só apareceriam as atrasadas, sem precisar escolher Sim/Não pra
-  // confirmar). "Onde Atrasada é Sim/Não" lê com a mesma gramática dos
-  // outros campos (Status/Prioridade) e mantém a opção "Não" (filtrar as
-  // NÃO atrasadas), que "somente atrasadas" não deixava claro que existia.
-  // defaultValue:'Sim' — escolher este campo já assume que a intenção é ver
-  // as atrasadas (o caso de longe mais comum); não obriga abrir o dropdown
-  // de valor pra confirmar algo que a própria escolha do campo já expressa.
-  // Ainda dá pra trocar pra "Não" se for esse o caso raro.
-  { key: 'atrasada',    label: 'Atrasada',              type: 'select', options: ['Sim', 'Não'], defaultValue: 'Sim',
-    getValue: function(a) { return _gIsLate(a) ? 'Sim' : 'Não'; } },
   { key: 'prioridade',  label: 'Prioridade',            type: 'select', options: ['Alta','Média','Baixa'] },
   { key: 'area',        label: 'Área',                  type: 'select', options: function(){ return _gestorOptionsFrom(function(a){ return a.area; }); } },
   { key: 'tipo',        label: 'Tipo de Atividade',     type: 'select', options: function(){ return _gestorOptionsFrom(_gTipoAtividade); }, getValue: _gTipoAtividade },
@@ -707,7 +708,8 @@ function _gestorSaveState() {
     ini: _gestorPeriodo.ini ? _gestorFmtDate(_gestorPeriodo.ini) : null,
     fim: _gestorPeriodo.fim ? _gestorFmtDate(_gestorPeriodo.fim) : null
    },
-   busca: (document.getElementById('gestor-search') || {}).value || ''
+   busca: (document.getElementById('gestor-search') || {}).value || '',
+   somenteAtrasadas: _gestorSomenteAtrasadas
   };
   localStorage.setItem(GESTOR_STATE_KEY, JSON.stringify(state));
  } catch (e) { /* localStorage indisponível (modo privado etc.) — ignora */ }
@@ -726,6 +728,11 @@ function _gestorRestoreState() {
  if (state.busca) {
   var si = document.getElementById('gestor-search');
   if (si) si.value = state.busca;
+ }
+ if (state.somenteAtrasadas) {
+  _gestorSomenteAtrasadas = true;
+  var abtn = document.getElementById('gestor-btn-atrasadas');
+  if (abtn) abtn.classList.add('active');
  }
  if (state.periodo && state.periodo.preset) {
   if (state.periodo.preset === 'custom' && state.periodo.ini && state.periodo.fim) {
@@ -769,6 +776,7 @@ function _gestorApplyFilters() {
    if (di && df && di <= pFim && df >= pIni) inPeriod = true;
    if (!inPeriod) return false;
   }
+  if (_gestorSomenteAtrasadas && !_gIsLate(a)) return false;
   // Busca inteligente: qualquer parte do texto, em vários campos de uma vez
   // (não só o título) — ignora acento/caixa/espaço duplo e cai pra fuzzy leve
   // em queries de 4+ caracteres (scripts/lib/smart-search.js).
