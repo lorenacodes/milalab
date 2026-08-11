@@ -70,7 +70,12 @@ function _entCidadeUf(e) {
 // group-builder/smart-search/saved-views), sobre campos REAIS (ver auditoria
 // acima) em vez dos 4 chips fixos de status ou de colunas fantasma.
 var _entFbFields = [
- { key: 'status',     label: 'Status',      type: 'select', options: ['aguardando','producao','transporte','entregue'] },
+ // options em português (via _entBucketLabel) — o filtro comparava/exibia a
+ // chave interna crua (aguardando/producao/transporte/entregue), que nunca
+ // deveria aparecer pra usuária, só serve de índice interno pro bucket.
+ { key: 'status',     label: 'Status',      type: 'select',
+   options: ['aguardando','producao','transporte','entregue'].map(function(k){ return _entBucketLabel[k]; }),
+   getValue: function(ds) { return _entBucketLabel[ds.status] || ds.status; } },
  { key: 'nomeEntrega', label: 'Entrega',     type: 'text' },
  { key: 'obra',        label: 'Obra',        type: 'text' },
  { key: 'empresa',     label: 'Empresa',     type: 'text' },
