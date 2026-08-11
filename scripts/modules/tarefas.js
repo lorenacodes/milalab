@@ -84,8 +84,14 @@ var _gStatusStyle = {
 };
 function _gStatusCls(s) { return (_gStatusStyle[s] || { cls:'gs-afazer', dot:'#9ca3af' }); }
 function _gIsDone(s)   { return s === 'Feito' || s === 'Concluído' || s === 'Concluida'; }
+// "Obsoleto" nunca conta como atrasada — mesma regra de rpc_atividades_kpis
+// (Postgres), que exclui Obsoleto de TODO bucket, inclusive atrasada. Achado
+// real: sem essa exclusão aqui, uma atividade Obsoleta com prazo vencido
+// (ex.: "Mapeamento de Interfaces", id 6899a1ab-b310-4a13-9e13-f1273754b38d,
+// status Obsoleto, prazo 2026-06-22) aparecia como "Somente atrasadas = Sim"
+// no Gestor de Tarefas mesmo divergindo do KPI do topo, que já a excluía.
 function _gIsLate(a)   {
- if (_gIsDone(a.status) || !a.data_prazo) return false;
+ if (_gIsDone(a.status) || a.status === 'Obsoleto' || !a.data_prazo) return false;
  return new Date(a.data_prazo + 'T00:00:00') < new Date(new Date().setHours(0,0,0,0));
 }
 

@@ -627,21 +627,16 @@ function _drwColabReqToggleForm() {
  var isOpen = form.classList.contains('open');
  if (isOpen) { form.classList.remove('open'); return; }
  form.classList.add('open');
- // Preencher select de receptores
- var sel = document.getElementById('drw-colab-receptor');
- if (sel) {
-  var meEmail = (_currentUser && _currentUser.email) || '';
-  sel.innerHTML = '<option value="">Selecione o colaborador...</option>'
-   + (_respUsuarios || []).filter(function(r){ return r.email !== meEmail; })
-     .map(function(r){ return '<option value="' + r.email + '">' + (r.nome || r.email) + '</option>'; }).join('');
-  sel.value = '';
- }
+ // Preencher lista de receptores do searchable-select (mesmo padrão do Projeto)
+ var meEmail = (_currentUser && _currentUser.email) || '';
+ _colabReceptLista = (_respUsuarios || []).filter(function(r){ return r.email !== meEmail; });
+ _colabReceptClear();
  var motivo = document.getElementById('drw-colab-motivo');
  if (motivo) motivo.value = '';
  var prazo = document.getElementById('drw-colab-prazo');
  if (prazo) prazo.value = '';
  var msg = document.getElementById('drw-colab-msg');
- if (msg) { msg.value = ''; setTimeout(function(){ sel && sel.focus(); }, 80); }
+ if (msg) msg.value = '';
 }
 function _drwColabReqCancel() {
  var form = document.getElementById('drw-colab-form');
@@ -1915,6 +1910,74 @@ function _projSetDisabled(disabled) {
  box.style.opacity = disabled ? '.5' : '1';
  box.style.cursor  = disabled ? 'not-allowed' : 'pointer';
  if (disabled) _projSearchClose();
+}
+
+/* ── Searchable-select do campo "Colaborador" (Colaboração formal) ──
+   Mesmo padrão do Projeto/Obra acima — converte o antigo <select> simples
+   (sem busca, difícil de usar com a lista de usuários crescendo) mantendo o
+   mesmo contrato: .value do #drw-colab-receptor (agora um <input type=hidden>)
+   continua sendo o e-mail do colaborador, lido por _drwColabReqEnviar(). */
+var _colabReceptLista = []; // [{email, nome}] — preenchida em _drwColabReqToggleForm()
+var _colabReceptSelectedEmail = '';
+var _colabReceptSearchQ = '';
+
+function _colabReceptSearchToggle() {
+ var drop = document.getElementById('drw-colab-receptor-drop');
+ var box  = document.getElementById('drw-colab-receptor-box');
+ if (!drop) return;
+ var isOpen = drop.classList.contains('open');
+ if (isOpen) { _colabReceptSearchClose(); return; }
+ drop.classList.add('open');
+ if (box) box.classList.add('open');
+ var inp = document.getElementById('drw-colab-receptor-inp');
+ if (inp) { inp.value = ''; inp.focus(); }
+ _colabReceptSearchFilter('');
+}
+function _colabReceptSearchClose() {
+ var drop = document.getElementById('drw-colab-receptor-drop');
+ var box  = document.getElementById('drw-colab-receptor-box');
+ if (drop) drop.classList.remove('open');
+ if (box)  box.classList.remove('open');
+}
+function _colabReceptSearchFilter(q) {
+ _colabReceptSearchQ = (q || '').toLowerCase();
+ var list = document.getElementById('drw-colab-receptor-list');
+ if (!list) return;
+ var matches = _colabReceptLista.filter(function(r){
+  return (r.nome || r.email || '').toLowerCase().indexOf(_colabReceptSearchQ) !== -1
+   || (r.email || '').toLowerCase().indexOf(_colabReceptSearchQ) !== -1;
+ });
+ if (!matches.length) {
+  list.innerHTML = '<div class="srch-sel-empty">Nenhum colaborador encontrado.</div>';
+  return;
+ }
+ list.innerHTML = matches.map(function(r){
+  var nome = r.nome || r.email;
+  var sel = r.email === _colabReceptSelectedEmail ? ' selected' : '';
+  return '<div class="srch-sel-opt' + sel + '" onclick="_colabReceptSelectItem(\'' + r.email.replace(/'/g,'\\\'') + '\',\'' + nome.replace(/'/g,'\\\'') + '\')">' + nome + '</div>';
+ }).join('');
+}
+function _colabReceptSearchKey(e) {
+ if (e.key === 'Escape') _colabReceptSearchClose();
+}
+function _colabReceptSelectItem(email, nome) {
+ _colabReceptSelectedEmail = email;
+ var hidEl = document.getElementById('drw-colab-receptor');
+ var valEl = document.getElementById('drw-colab-receptor-val');
+ var clrEl = document.getElementById('drw-colab-receptor-clr');
+ if (hidEl) hidEl.value = email;
+ if (valEl) { valEl.textContent = nome; valEl.classList.remove('placeholder'); }
+ if (clrEl) clrEl.style.display = email ? '' : 'none';
+ _colabReceptSearchClose();
+}
+function _colabReceptClear() {
+ _colabReceptSelectedEmail = '';
+ var hidEl = document.getElementById('drw-colab-receptor');
+ var valEl = document.getElementById('drw-colab-receptor-val');
+ var clrEl = document.getElementById('drw-colab-receptor-clr');
+ if (hidEl) hidEl.value = '';
+ if (valEl) { valEl.textContent = 'Selecione o colaborador...'; valEl.classList.add('placeholder'); }
+ if (clrEl) clrEl.style.display = 'none';
 }
 
 /* ── Toggle de seções colapsáveis no drawer ── */

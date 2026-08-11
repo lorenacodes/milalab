@@ -4,7 +4,9 @@
 // Compartilhado entre Dashboard e Gestor de Tarefas.
 // ═══════════════════════════════════════════════════════════════════════════════
 async function _loadAtividadeVinculosCache() {
- if (_avObraMap) return;
+ // Recarrega sempre (não memoiza para sempre): _gestorLoad() chama isto a cada
+ // boot, refresh manual e evento realtime de `atividades`, e vínculos podem
+ // mudar entre uma chamada e outra (edição no sistema ou sync do Airtable).
  _avObraMap = {}; _avProjMap = {}; _avMelhMap = {};
  async function pageAll(table, col) {
   var map = {}, pg = 0, sz = 1000;
