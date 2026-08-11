@@ -45,43 +45,33 @@
     radial-gradient(circle at 90% 100%, rgba(63,191,180,.1) 0%, transparent 45%),
     var(--bg);
 }
+/* Vidro fosco (backdrop-filter:blur) removido de todo o sistema — pesava
+   demais (recomposição contínua em elementos sempre visíveis/sticky/fixed
+   como sidebar e topbar), deixando o app perceptivelmente lento. Volta pro
+   fundo sólido que já existia como fallback pra navegadores sem suporte. */
 .frosted-card{
-  background: linear-gradient(rgba(10,11,16,.6),rgba(10,11,16,.6)), rgba(255,255,255,.07);
-  -webkit-backdrop-filter: blur(10px) saturate(1.5);
-  backdrop-filter: blur(10px) saturate(1.5);
+  background: var(--surface);
   border: 1px solid rgba(255,255,255,.16);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.10);
 }
 body.light .frosted-card{
-  background: linear-gradient(rgba(250,250,252,.62),rgba(250,250,252,.62)), rgba(255,255,255,.3);
-  -webkit-backdrop-filter: blur(10px) saturate(1.7);
-  backdrop-filter: blur(10px) saturate(1.7);
+  background: var(--surface);
   border-color: rgba(255,255,255,.65);
   box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.8);
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .frosted-card{ background: var(--surface); }
-}
 /* Painéis do "Meu Painel" (Minhas Atividades, Meus Projetos, gráficos, Saúde
-   das Atividades, Central de Comunicação) — mesmo tratamento de vidro. */
+   das Atividades, Central de Comunicação). */
 .dash-panel{
-  background: linear-gradient(rgba(10,11,16,.6),rgba(10,11,16,.6)), rgba(255,255,255,.07);
-  -webkit-backdrop-filter: blur(10px) saturate(1.5);
-  backdrop-filter: blur(10px) saturate(1.5);
+  background: var(--surface);
   border: 1px solid rgba(255,255,255,.16);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.10);
 }
 body.light .dash-panel{
-  background: linear-gradient(rgba(250,250,252,.62),rgba(250,250,252,.62)), rgba(255,255,255,.3);
-  -webkit-backdrop-filter: blur(10px) saturate(1.7);
-  backdrop-filter: blur(10px) saturate(1.7);
+  background: var(--surface);
   border-color: rgba(255,255,255,.65);
   box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.8);
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .dash-panel{ background: var(--surface); }
 }
  /* Fundo: UM ÚNICO gradiente, aqui no body, cobrindo a tela inteira — não em
     `.main`/`.page.active` separadamente (evita a costura entre sidebar e main).
@@ -95,19 +85,12 @@ body.light .dash-panel{
  /* SIDEBAR — MilaLab Design System: painel permanentemente escuro (indigo-900),
     igual nos dois temas do app (claro/escuro só trocam o conteúdo principal,
     a marca na lateral não muda). */
- /* Vidro fosco na sidebar: mesma receita do `.frosted-card` (blur 20px, saturate
-    1.6), mas tingida de indigo-900 em vez de branco translúcido — a marca na
-    lateral continua permanentemente escura nos dois temas (regra do Design
-    System), só troca de sólida para vidro. */
- /* will-change/contain: a sidebar fixed em tela cheia com backdrop-filter fica
-    sempre presente e sempre recompositando — promover ela pra sua própria
-    layer (e travar o repaint no que está dentro dela) evita que o navegador
-    tenha que recalcular o blur inteiro a cada scroll/hover em qualquer lugar
-    da página. */
- .sidebar{width:var(--sidebar-w);background:rgba(20,24,56,.9);-webkit-backdrop-filter:blur(10px) saturate(1.6);backdrop-filter:blur(10px) saturate(1.6);border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:10;overflow-y:auto;transition:width .22s cubic-bezier(.4,0,.2,1);box-shadow:inset -1px 0 0 rgba(255,255,255,.04);will-change:backdrop-filter;contain:paint}
- @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-   .sidebar{ background: #141838; }
- }
+ /* Fundo sólido indigo-900 (era vidro fosco com blur — removido do sistema
+    inteiro por custo de performance: uma superfície fixed em tela cheia com
+    backdrop-filter recomposita a cada scroll/hover em qualquer lugar da
+    página, e era perceptivelmente lento). contain:paint continua útil
+    mesmo sem blur (trava o repaint no que está dentro da sidebar). */
+ .sidebar{width:var(--sidebar-w);background:#141838;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:10;overflow-y:auto;transition:width .22s cubic-bezier(.4,0,.2,1);box-shadow:inset -1px 0 0 rgba(255,255,255,.04);contain:paint}
  .sidebar.collapsed{width:0!important;border-right:none;overflow:hidden}
  /* Handle fora do sidebar para não ser bloqueado pelo scrollbar */
  .sidebar-resize{position:fixed;top:0;left:var(--sidebar-w);width:8px;height:100vh;cursor:col-resize;z-index:20;transform:translateX(-4px);background:transparent;transition:background .12s}
@@ -146,11 +129,8 @@ body.light .dash-panel{
  /* Topbar fica exatamente sob o blob mais forte do gradiente (12%,0%) — sem
     cortina própria, o contraste do texto/ícones ali variava com a força do
     degradê atrás. Cortina quase opaca resolve isso de vez. */
- .topbar{height:52px;background:linear-gradient(rgba(10,11,16,.72),rgba(10,11,16,.72)), rgba(255,255,255,.07);-webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);border-bottom:1px solid rgba(255,255,255,.16);display:flex;align-items:center;padding:0 16px 0 20px;gap:10px;position:sticky;top:0;z-index:5;contain:paint}
- body.light .topbar{background:linear-gradient(rgba(250,250,252,.72),rgba(250,250,252,.72)), rgba(255,255,255,.3);-webkit-backdrop-filter:blur(10px) saturate(1.7);backdrop-filter:blur(10px) saturate(1.7);border-bottom-color:rgba(255,255,255,.65)}
- @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-   .topbar{ background: var(--surface); }
- }
+ .topbar{height:52px;background:var(--surface);border-bottom:1px solid rgba(255,255,255,.16);display:flex;align-items:center;padding:0 16px 0 20px;gap:10px;position:sticky;top:0;z-index:5;contain:paint}
+ body.light .topbar{background:var(--surface);border-bottom-color:rgba(255,255,255,.65)}
  .breadcrumb{font-size:12px;color:var(--muted)} .bc-link{color:var(--muted);cursor:pointer;text-decoration:none;border-bottom:1px dashed var(--border)} .bc-link:hover{color:var(--text);border-bottom-color:var(--text)}
  .breadcrumb span{color:var(--text);font-weight:500}
  .topbar-right{margin-left:auto;display:flex;gap:8px}
@@ -177,20 +157,14 @@ body.light .dash-panel{
  .bm{background:rgba(139,148,158,.12);color:var(--muted)}
  /* KPI */
  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
- .kpi-card{background:linear-gradient(rgba(10,11,16,.6),rgba(10,11,16,.6)), rgba(255,255,255,.07);-webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-lg);padding:16px 20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
- body.light .kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(250,250,252,.62)), rgba(255,255,255,.3);-webkit-backdrop-filter:blur(10px) saturate(1.7);backdrop-filter:blur(10px) saturate(1.7);border-color:rgba(255,255,255,.65);box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
- @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-   .kpi-card{ background: var(--surface); }
- }
+ .kpi-card{background:var(--surface);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-lg);padding:16px 20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
+ body.light .kpi-card{background:var(--surface);border-color:rgba(255,255,255,.65);box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
  .kpi-label{font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
  .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
  .kpi-val{font-size:28px;font-weight:700}.kpi-sub{font-size:11px;color:var(--muted);margin-top:4px}
  /* TABLES */
- .tbl-box{background:linear-gradient(rgba(10,11,16,.6),rgba(10,11,16,.6)), rgba(255,255,255,.07);-webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-lg);overflow-x:auto;overflow-y:visible;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
- body.light .tbl-box{background:linear-gradient(rgba(250,250,252,.62),rgba(250,250,252,.62)), rgba(255,255,255,.3);-webkit-backdrop-filter:blur(10px) saturate(1.7);backdrop-filter:blur(10px) saturate(1.7);border-color:rgba(255,255,255,.65);box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
- @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-   .tbl-box{ background: var(--surface); }
- }
+ .tbl-box{background:var(--surface);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-lg);overflow-x:auto;overflow-y:visible;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
+ body.light .tbl-box{background:var(--surface);border-color:rgba(255,255,255,.65);box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
  /* Obras: barra de controles fixa (Filtro/Agrupar/Ordenar/Período/
     Visualizações/Pesquisa) — padrão de referência pra replicar nas próximas
     abas. position:sticky sozinho só resolve o eixo vertical: se QUALQUER
@@ -229,11 +203,8 @@ body.light .dash-panel{
     sem gap nenhum entre as duas — um intervalo ali mostrava o fundo da
     página (cor diferente) entre a topbar e esta barra, parecendo duas
     faixas separadas em vez de uma peça só (reportado). */
- .obras-toolbar-fixed{position:fixed;top:52px;left:var(--sidebar-w);right:0;z-index:14;display:flex;align-items:center;gap:12px;padding:8px 24px;border-bottom:1px solid rgba(255,255,255,.16);background:linear-gradient(rgba(10,11,16,.72),rgba(10,11,16,.72)), rgba(255,255,255,.07);-webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5)}
- body.light .obras-toolbar-fixed{background:linear-gradient(rgba(250,250,252,.72),rgba(250,250,252,.72)), rgba(255,255,255,.3);-webkit-backdrop-filter:blur(10px) saturate(1.7);backdrop-filter:blur(10px) saturate(1.7);border-bottom-color:rgba(255,255,255,.65)}
- @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .obras-toolbar-fixed{background:var(--surface)}
- }
+ .obras-toolbar-fixed{position:fixed;top:52px;left:var(--sidebar-w);right:0;z-index:14;display:flex;align-items:center;gap:12px;padding:8px 24px;border-bottom:1px solid rgba(255,255,255,.16);background:var(--surface)}
+ body.light .obras-toolbar-fixed{background:var(--surface);border-bottom-color:rgba(255,255,255,.65)}
  .obras-toolbar-filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;min-width:0}
  .obras-fixed-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
  /* Título "Obras" + subtítulo descem pra abaixo da barra fixa (44px =
@@ -311,7 +282,7 @@ body.light .dash-panel{
  .oc-title{font-size:13px;font-weight:600;line-height:1.4;color:var(--text)}
  .oc-date{font-size:11px;color:var(--muted);margin-top:8px}
  /* PERFIL PANEL */
- .profile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;backdrop-filter:blur(2px)}
+ .profile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50}
  .profile-overlay.open{display:block}
  .profile-panel{position:fixed;bottom:0;left:0;width:var(--sidebar-w);background:var(--surface);border:1px solid var(--border);border-radius:12px 12px 0 0;z-index:51;padding:0;transform:translateY(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);box-shadow:0 -8px 32px rgba(0,0,0,.3)}
  .profile-panel.open{transform:translateY(0)}
@@ -334,7 +305,7 @@ body.light .dash-panel{
  .avatar-adjust-link{background:none;border:none;padding:0;margin-top:4px;font-size:11px;color:var(--muted);cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;transition:color .15s}
  .avatar-adjust-link:hover{color:var(--navy)}
  /* modal de enquadramento da foto de perfil */
- .acrop-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+ .acrop-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;align-items:center;justify-content:center}
  .acrop-backdrop.open{display:flex}
  .acrop-box{background:var(--surface);border-radius:var(--r-xl);padding:20px;width:320px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
  .acrop-box h3{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
@@ -373,7 +344,7 @@ body.light .dash-panel{
  .sb-user:hover{background:var(--surface2)}
  .sb-user-chevron{margin-left:auto;font-size:10px;color:var(--muted)}
  /* MODAL */
- .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;backdrop-filter:blur(3px);align-items:flex-start;justify-content:center;padding-top:48px;overflow-y:auto}
+ .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;align-items:flex-start;justify-content:center;padding-top:48px;overflow-y:auto}
  .modal-backdrop.open{display:flex}
  .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);width:100%;max-width:640px;box-shadow:var(--shadow-4);animation:modalIn .2s ease;margin-bottom:48px}
  @keyframes modalIn{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
@@ -427,8 +398,8 @@ body.light .dash-panel{
  .my-obra-sub{font-size:11px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
  .my-obra-badge{font-size:9.5px;font-weight:600;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* ── KPI CARDS — estilo Linear/Stripe: zero decoração, número é o único herói */
-.dash-kpi-card{background:linear-gradient(rgba(10,11,16,.6),rgba(10,11,16,.6)), rgba(255,255,255,.07);-webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.10);cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
-body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(250,250,252,.62)), rgba(255,255,255,.3);-webkit-backdrop-filter:blur(10px) saturate(1.7);backdrop-filter:blur(10px) saturate(1.7);border-color:rgba(255,255,255,.65);box-shadow:var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.8)}
+.dash-kpi-card{background:var(--surface);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-lg);padding:16px 18px;box-shadow:var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.10);cursor:pointer;transition:background .14s,border-color .14s;position:relative;user-select:none}
+body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,255,.65);box-shadow:var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.8)}
 .dash-kpi-card:hover{background:var(--surface);border-color:rgba(139,148,158,.4)}
 .dash-kpi-card:active{opacity:.85}
 .dash-kpi-card .kpi-header{margin-bottom:8px}
@@ -858,16 +829,11 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
 .vinc-card-title{font-size:10px;font-weight:700;color:var(--text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
 .vinc-card-row{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted);padding:1px 0}
 .vinc-card-row b{color:var(--text);font-weight:600;text-align:right}
-/* Cabeçalho de grupo (Gestor de Tarefas/Empresas/Contatos) — era um bloco
-   sólido em --surface2 (cinza neutro quase preto), destoando do resto do
-   app, que usa vidro fosco (blur) em toda superfície fixa/sticky (topbar,
-   sidebar, .obras-toolbar-fixed). Mesmo tratamento aqui, com fallback sólido
-   pra navegadores sem backdrop-filter (ver @supports abaixo). */
-.gestor-group-hd{position:sticky;top:38px;z-index:7;background:linear-gradient(rgba(10,11,16,.72),rgba(10,11,16,.72)), rgba(255,255,255,.07);-webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);border-bottom:1px solid rgba(255,255,255,.16)}
-body.light .gestor-group-hd{background:linear-gradient(rgba(250,250,252,.72),rgba(250,250,252,.72)), rgba(255,255,255,.3);-webkit-backdrop-filter:blur(10px) saturate(1.7);backdrop-filter:blur(10px) saturate(1.7);border-bottom-color:rgba(255,255,255,.65)}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
- .gestor-group-hd{background:var(--surface)}
-}
+/* Cabeçalho de grupo (Gestor de Tarefas/Empresas/Contatos) — fundo sólido,
+   sem blur (vidro fosco removido do sistema inteiro por custo de
+   performance — recompositava a cada scroll). */
+.gestor-group-hd{position:sticky;top:38px;z-index:7;background:var(--surface);border-bottom:1px solid rgba(255,255,255,.16)}
+body.light .gestor-group-hd{background:var(--surface);border-bottom-color:rgba(255,255,255,.65)}
 .gestor-group-hd td{background:transparent!important;padding:6px 12px;cursor:pointer}
 .gestor-group-hd:hover td{filter:brightness(1.05)}
 /* Gantt */
@@ -1216,38 +1182,28 @@ tbody[data-sp] tr:hover td{background:var(--navy-dim)!important}
  body.light input[type="date"],body.light input[type="datetime-local"]{color-scheme:light}
  input[type="date"].tf-inp,input[type="date"].sp-inp{min-height:36px;line-height:1.4}.tf-r2 input[type="date"]{width:100%;box-sizing:border-box}
 
-/* ── Vidro (glass): só em camadas temporárias flutuantes — nunca em tabela/
-   formulário/sidebar/dashboard. Painel de notificações (Central de Alertas)
-   e os menus-dropdown flutuantes usam o material translúcido do Design System,
-   com fallback sólido para navegadores sem backdrop-filter. ── */
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  #alert-drw{
-    background:rgba(28,30,44,.72);
-    -webkit-backdrop-filter:blur(14px) saturate(1.4);
-    backdrop-filter:blur(14px) saturate(1.4);
-    border-left:1px solid rgba(255,255,255,.14);
-  }
-  body.light #alert-drw{
-    background:rgba(255,255,255,.72);
-    border-left-color:rgba(20,20,40,.10);
-  }
-  .srch-sel-drop{
-    background:rgba(28,30,44,.78);
-    -webkit-backdrop-filter:blur(11px) saturate(1.3);
-    backdrop-filter:blur(11px) saturate(1.3);
-  }
-  body.light .srch-sel-drop{
-    background:rgba(255,255,255,.78);
-  }
-  /* Barra superior: sólida em repouso, vira vidro só depois que a página rola */
-  .topbar.tb-glass{
-    background:rgba(28,30,44,.68);
-    -webkit-backdrop-filter:blur(10px) saturate(1.4);
-    backdrop-filter:blur(10px) saturate(1.4);
-  }
-  body.light .topbar.tb-glass{
-    background:rgba(255,255,255,.68);
-  }
+/* Vidro (blur) removido de tudo, inclusive das camadas flutuantes (Central
+   de Alertas, dropdowns de busca, topbar-ao-rolar) — mesmo motivo: custo de
+   performance perceptível, sem contrapartida funcional. Fundo sólido. */
+#alert-drw{
+  background:rgb(28,30,44);
+  border-left:1px solid rgba(255,255,255,.14);
+}
+body.light #alert-drw{
+  background:#fff;
+  border-left-color:rgba(20,20,40,.10);
+}
+.srch-sel-drop{
+  background:rgb(28,30,44);
+}
+body.light .srch-sel-drop{
+  background:#fff;
+}
+.topbar.tb-glass{
+  background:rgb(28,30,44);
+}
+body.light .topbar.tb-glass{
+  background:#fff;
 }
 .topbar{transition:background .2s ease}
 
