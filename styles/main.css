@@ -543,6 +543,9 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
  .drw-sub-titulo.done{color:var(--muted);text-decoration:line-through}
  .drw-sub-del{background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;opacity:.4;padding:0 2px;transition:opacity .12s;flex-shrink:0}
  .drw-sub-del:hover{opacity:1;color:var(--red)}
+ .drw-sub-colab-btn{background:none;border:none;cursor:pointer;color:var(--muted);opacity:.5;padding:2px;display:flex;align-items:center;transition:opacity .12s,color .12s;flex-shrink:0}
+ .drw-sub-colab-btn:hover{opacity:1;color:var(--navy)}
+ .drw-sub-colab-ind{flex-shrink:0;display:flex;align-items:center}
  .drw-sub-inp{font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface);color:var(--text);font-family:inherit;outline:none;flex:1}
  .drw-sub-inp:focus{border-color:var(--navy)}
  .drw-sub-add{margin-top:4px;font-size:11px;padding:6px 14px;background:none;border:1px dashed var(--border);border-radius:var(--r-sm);color:var(--muted);cursor:pointer;width:100%;text-align:left;transition:all .12s;font-family:inherit}

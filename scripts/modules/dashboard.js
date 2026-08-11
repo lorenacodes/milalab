@@ -85,7 +85,7 @@ function _alertDrawerRender() {
   return;
  }
 
- var tipoLabel = { 'atr':'Prazo vencido', 'hoje':'Vence hoje', 'parada':'Tarefa parada', 'sem-atualizacao':'Sem atualização', 'inconsistente':'Status inconsistente' };
+ var tipoLabel = { 'atr':'Prazo vencido', 'hoje':'Vence hoje', 'parada':'Tarefa parada', 'sem-atualizacao':'Sem atualização', 'inconsistente':'Status inconsistente', 'colab':'Colaboração solicitada' };
  body.innerHTML = itens.map(function(a) {
   var cor = a.cor || 'var(--muted)';
   var labelTipo = tipoLabel[a.tipo] || 'Alerta';
@@ -164,6 +164,48 @@ function _dashBuildAlertsFromDB(allAt) {
   }
  }
  // Re-renderiza drawer se estiver aberto
+ var drw = document.getElementById('alert-drw');
+ if (drw && drw.style.transform === 'translateX(0px)') _alertDrawerRender();
+
+ // Colaborações pendentes recebidas pelo usuário logado entram na mesma
+ // Central de Alertas — busca é assíncrona, então o array/badge acima
+ // (síncronos) são complementados um instante depois, sem bloquear o resto
+ // do boot do Meu Painel.
+ if (typeof _dashAppendColabAlerts === 'function') _dashAppendColabAlerts();
+}
+
+/* Acrescenta a _alertDrawerItens um alerta por solicitação de colaboração
+ * PENDENTE recebida pelo usuário logado (receptor_email === me) — é a
+ * notificação real pedida em "Meu Painel" para quem recebe um pedido de
+ * colaboração, usando o mecanismo já existente (sino) em vez de inventar um
+ * painel novo. Roda sempre depois de _dashBuildAlertsFromDB ter acabado de
+ * substituir _alertDrawerItens, então só ACRESCENTA, nunca sobrescreve. */
+async function _dashAppendColabAlerts() {
+ if (!_currentUser) return;
+ var me = _currentUser.email || '';
+ var all = await _colabReqsAllCached();
+ var pendRecebidas = (all || []).filter(function(r){ return r.receptor_email === me && r.status === 'Pendente'; });
+ if (!pendRecebidas.length) return;
+ pendRecebidas.forEach(function(r) {
+  var alvo = r.subtask_titulo
+   ? ('subtarefa "' + r.subtask_titulo + '" (' + (r.atividade_titulo || 'atividade') + ')')
+   : ('"' + (r.atividade_titulo || 'Atividade') + '"');
+  var msg = (r.solicitante_nome || r.solicitante_email || 'Alguém') + ' solicitou sua colaboração em ' + alvo + (r.motivo ? ' — ' + r.motivo : '');
+  _alertDrawerItens.push({ tipo:'colab', cor:'#3D4FD1', msg: msg, id: r.atividade_id });
+ });
+ var badge = document.getElementById('alert-bell-badge');
+ var bellBtn = document.getElementById('alert-bell-btn');
+ if (badge) {
+  var total = _alertDrawerItens.length;
+  if (total > 0) {
+   badge.style.display = 'flex';
+   badge.textContent = total > 9 ? '9+' : String(total);
+   if (bellBtn) bellBtn.style.borderColor = '#D6433C';
+  } else {
+   badge.style.display = 'none';
+   if (bellBtn) bellBtn.style.borderColor = '';
+  }
+ }
  var drw = document.getElementById('alert-drw');
  if (drw && drw.style.transform === 'translateX(0px)') _alertDrawerRender();
 }
@@ -475,6 +517,7 @@ async function _drwColabReqEnviar() {
  var motivoSel   = document.getElementById('drw-colab-motivo');
  var msgEl       = document.getElementById('drw-colab-msg');
  var prazoEl     = document.getElementById('drw-colab-prazo');
+ var subtaskSel  = document.getElementById('drw-colab-subtask');
  if (!receptorSel || !receptorSel.value) { _showToast('Selecione um colaborador', 'erro'); return; }
  if (!motivoSel || !motivoSel.value)     { _showToast('Selecione o motivo da colaboração', 'erro'); return; }
  if (!_currentUser) { _showToast('Usuário não identificado', 'erro'); return; }
@@ -483,9 +526,15 @@ async function _drwColabReqEnviar() {
  if (!window._drwCurrentTask) { _showToast('Salve a atividade antes de solicitar colaboração', 'erro'); return; }
  var task = window._drwCurrentTask;
  var now = new Date().toISOString();
+ // Subtarefa relacionada é opcional — a colaboração continua valendo para a
+ // atividade toda quando nada é selecionado no <select> (opção "Nenhuma").
+ var subtaskId  = (subtaskSel && subtaskSel.value) ? subtaskSel.value : null;
+ var subtaskItem = subtaskId ? _drwSubItems.find(function(s){ return String(s._id) === String(subtaskId); }) : null;
  var payload = {
   atividade_id:       String(task.id),
   atividade_titulo:   task.titulo || task.nome || 'Atividade',
+  subtask_id:         subtaskItem ? String(subtaskItem._id) : null,
+  subtask_titulo:     subtaskItem ? (subtaskItem.titulo || null) : null,
   solicitante_email:  _currentUser.email || '',
   solicitante_nome:   _currentUser.name || _currentUser.email || '',
   receptor_email:     receptor.email,
@@ -500,7 +549,7 @@ async function _drwColabReqEnviar() {
  if (ins.error) { _showToast('Erro ao solicitar colaboração: ' + _supaErrPt(ins.error.message), 'erro'); return; }
  _drwColabReqCancel();
  _drwColabReqRender(task.id);
- _histLogAdd('colab', payload.atividade_titulo, 'Colaboração solicitada para ' + payload.receptor_nome + ' — ' + payload.motivo);
+ _histLogAdd('colab', payload.atividade_titulo, 'Colaboração solicitada para ' + payload.receptor_nome + ' — ' + payload.motivo + (payload.subtask_titulo ? ' (subtarefa: ' + payload.subtask_titulo + ')' : ''));
  _showToast('Colaboração solicitada para ' + payload.receptor_nome, 'ok');
 }
 
@@ -512,6 +561,15 @@ async function _drwColabReqRender(taskId) {
  var reqs = await _colabReqBuscar(function(r){
   return String(r.atividade_id) === String(taskId) && (r.solicitante_email === me || r.receptor_email === me);
  });
+ // Mapa subtask_id → solicitação ativa mais recente, consultado pela aba
+ // Subtarefas (_drwSubRender) para desenhar o indicador na linha certa.
+ _drwSubColabMap = {};
+ reqs.forEach(function(r) {
+  if (r.subtask_id && r.status !== 'Concluída' && r.status !== 'Recusada' && !_drwSubColabMap[r.subtask_id]) {
+   _drwSubColabMap[r.subtask_id] = r;
+  }
+ });
+ _drwSubRender();
  if (!reqs.length) {
   listEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:10px 0;text-align:center">Nenhuma colaboração solicitada para esta atividade.</div>';
   return;
@@ -577,7 +635,9 @@ async function _drwColabReqRender(taskId) {
    + '<div class="colab-card-av" style="background:' + (isSol ? 'var(--navy)' : '#7c3aed') + '">' + av + '</div>'
    + '<div class="colab-card-meta">'
    + '<div class="colab-card-who">' + whoLbl + '</div>'
-   + '<div class="colab-card-task">' + (r.atividade_titulo || '') + '</div>'
+   + '<div class="colab-card-task">' + (r.subtask_titulo
+      ? 'Subtarefa: <strong>' + r.subtask_titulo + '</strong> <span style="color:var(--muted)">(' + (r.atividade_titulo || '') + ')</span>'
+      : (r.atividade_titulo || '')) + '</div>'
    + '</div>'
    + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0">'
    + '<span class="' + bc + '">' + r.status + '</span>'
@@ -637,61 +697,65 @@ function _drwColabReqToggleForm() {
  if (prazo) prazo.value = '';
  var msg = document.getElementById('drw-colab-msg');
  if (msg) msg.value = '';
+ // Subtarefa relacionada é opcional — lista as subtarefas DESTA atividade
+ // (_drwSubItems, já carregado por _taskDrawerOpen), com "atividade toda" como padrão.
+ var subSel = document.getElementById('drw-colab-subtask');
+ if (subSel) {
+  subSel.innerHTML = '<option value="">Nenhuma (atividade toda)</option>'
+   + (_drwSubItems || []).map(function(s) {
+     return '<option value="' + s._id + '">' + (s.titulo || '(sem título)') + '</option>';
+    }).join('');
+  subSel.value = '';
+ }
 }
 function _drwColabReqCancel() {
  var form = document.getElementById('drw-colab-form');
  if (form) form.classList.remove('open');
 }
 
-/* Carrega solicitações de colaboração no painel Lembretes */
+/* Atalho a partir de uma linha de Subtarefa: abre (ou reaproveita) o mesmo
+ * formulário de "Solicitar Colaboração" já pré-selecionando essa subtarefa,
+ * em vez de duplicar UI — a subtarefa some do <select> apenas se o título
+ * ainda estiver vazio ("(clique para definir)"), já que colaborar sobre uma
+ * subtarefa sem título não faz sentido para quem for recebê-la. */
+function _drwColabReqOpenForSubtask(subtaskId) {
+ var item = _drwSubItems.find(function(s){ return String(s._id) === String(subtaskId); });
+ if (item && !item.titulo) { _showToast('Defina o título da subtarefa antes de solicitar colaboração', 'erro'); return; }
+ var form = document.getElementById('drw-colab-form');
+ if (!form) return;
+ if (!form.classList.contains('open')) _drwColabReqToggleForm();
+ var subSel = document.getElementById('drw-colab-subtask');
+ if (subSel) subSel.value = String(subtaskId);
+ _drwAnchor('comunicacao', null);
+ setTimeout(function(){ form.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 120);
+}
+
+// Cache curto (5s) da tabela colaboracao_solicitacoes inteira, compartilhado
+// entre _remLoadColabReqs e _dashAppendColabAlerts — os dois rodam no mesmo
+// ciclo de boot do Meu Painel e não há motivo para disparar a mesma query
+// duas vezes só porque um roda antes do outro.
+var _colabReqsCacheData = null;
+var _colabReqsCacheTs   = 0;
+async function _colabReqsAllCached() {
+ var agora = Date.now();
+ if (_colabReqsCacheData && (agora - _colabReqsCacheTs) < 5000) return _colabReqsCacheData;
+ _colabReqsCacheData = await _colabReqBuscar(null);
+ _colabReqsCacheTs   = agora;
+ return _colabReqsCacheData;
+}
+
+/* Calcula o contador de colaborações pendentes recebidas, usado pelo Painel
+ * de Saúde Operacional (_hpRow 'Colaborações pendentes'). A notificação
+ * ACIONÁVEL de fato vive na Central de Alertas (sino) — ver _dashAppendColabAlerts —
+ * este função não renderiza mais nenhuma lista própria (os ids #dash-colab-list/
+ * #rem-colab-badge que ela alimentava nunca existiram em index.html; era
+ * código morto que nunca disparava). */
 async function _remLoadColabReqs() {
  if (!_currentUser) return;
  var me = _currentUser.email || '';
- var reqs = await _colabReqBuscar(function(r){ return r.solicitante_email === me || r.receptor_email === me; });
+ var reqs = await _colabReqsAllCached();
  var pendentes = reqs.filter(function(r){ return r.status === 'Pendente' && r.receptor_email === me; }).length;
  window._colabPendCount = pendentes; // usado pelo Painel de Saúde Operacional
- var listEl = document.getElementById('dash-colab-list');
- if (!listEl) return;
- var badge = document.getElementById('rem-colab-badge');
- var abertos = reqs.filter(function(r){ return r.status !== 'Concluída' && r.status !== 'Recusada'; }).length;
- if (badge) { badge.style.display = abertos > 0 ? '' : 'none'; badge.textContent = abertos; }
- // Renderizar solicitações formais no topo
- var badgeClass = { 'Pendente':'pendente','Aceita':'aceita','Recusada':'recusada','Em andamento':'andamento','Concluída':'concluida' };
- var reqsHtml = reqs.slice(0,10).map(function(r) {
-  var isSol = r.solicitante_email === me;
-  var bc    = 'colab-req-badge-' + (badgeClass[r.status] || 'pendente');
-  var dt    = r.created_at ? new Date(r.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '';
-  var actions = '';
-  if (!isSol && r.status === 'Pendente') {
-   actions = '<div style="display:flex;gap:4px;margin-top:4px">'
-    + '<button class="colab-req-btn accept" onclick="_remColabReqAcao(\'' + r.id + '\',\'Aceita\')">Aceitar</button>'
-    + '<button class="colab-req-btn decline" onclick="_remColabReqAcao(\'' + r.id + '\',\'Recusada\')">Recusar</button>'
-    + '</div>';
-  }
-  return '<div style="padding:8px 12px;border-bottom:1px solid var(--border)">'
-   + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">'
-   + '<div style="flex:1;min-width:0">'
-   + '<div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:2px">' + (r.atividade_titulo || 'Atividade') + '</div>'
-   + '<div style="font-size:10px;color:var(--muted)">'
-   + (isSol ? 'Para ' + (r.receptor_nome || '?') : 'De ' + (r.solicitante_nome || '?'))
-   + ' · ' + dt + '</div>'
-   + (r.mensagem ? '<div style="font-size:10px;color:var(--muted);margin-top:2px">' + r.mensagem + '</div>' : '')
-   + actions
-   + '</div>'
-   + '<span class="colab-req-badge ' + bc + '" style="flex-shrink:0">' + r.status + '</span>'
-   + '</div>'
-   + '</div>';
- }).join('');
- listEl.innerHTML = reqsHtml || '<div style="padding:14px 12px;font-size:11px;color:var(--muted);text-align:center">Nenhuma colaboração.</div>';
-}
-
-/* Ação rápida sobre solicitação via painel Lembretes */
-function _remColabReqAcao(reqId, novoStatus) {
- _colabReqAtualizarStatus(reqId, novoStatus).then(function(ok) {
-  if (!ok) return;
-  _remLoadColabReqs();
-  _showToast('Colaboração ' + novoStatus.toLowerCase(), 'ok');
- });
 }
 
 // ── Abrir/fechar formulário ───────────────────────────────────────────────
@@ -1547,6 +1611,10 @@ function _drwSpyInit() {
 
 /* ── SUBTAREFAS NO DRAWER ────────────────────────────────────────────────── */
 var _drwSubItems = []; // [{_id, titulo, done}]
+// subtask_id → solicitação de colaboração ATIVA mais recente (não Concluída/
+// Recusada) para essa subtarefa, dentro da atividade aberta no drawer —
+// alimentado por _drwColabReqRender(taskId) a cada abertura/atualização.
+var _drwSubColabMap = {};
 
 // ── Cor no <select> de status (estava sem cor nenhuma, baixa legibilidade) —
 // aplica borda + fundo levemente tingido com a cor da opção selecionada, no
@@ -1575,12 +1643,24 @@ function _drwSubRender() {
  var list = document.getElementById('drw-sub-list');
  if (!list) return;
  if (!_drwSubItems.length) { list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">Nenhuma subtarefa ainda.</div>'; _drwSubBadge(); return; }
+ var podeColab = !!window._drwCurrentTask; // colaboração exige atividade já salva (atividade_id)
  list.innerHTML = _drwSubItems.map(function(s, idx) {
   var cbClass = 'drw-sub-cb' + (s.done ? ' done' : '');
   var check = s.done ? '<svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="2.2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>' : '';
+  var req = _drwSubColabMap[s._id];
+  var colabInd = req
+   ? '<span class="drw-sub-colab-ind" title="Colaboração com ' + (req.receptor_nome || req.receptor_email || '?') + ' — ' + req.status + '">' + _userAvatarByName(req.receptor_nome || req.receptor_email, 16) + '</span>'
+   : '';
+  var colabBtn = podeColab
+   ? '<button class="drw-sub-colab-btn" onclick="_drwColabReqOpenForSubtask(\'' + s._id + '\')" title="Solicitar colaboração nesta subtarefa">'
+     + '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="4" r="2"/><path d="M2 10.5c0-1.9 1.8-3.3 4-3.3s4 1.4 4 3.3"/></svg>'
+     + '</button>'
+   : '';
   return '<div class="drw-sub-item" id="drw-sub-item-' + idx + '">'
    + '<div class="' + cbClass + '" onclick="_drwSubToggleDone(' + idx + ')">' + check + '</div>'
    + '<span class="drw-sub-titulo' + (s.done ? ' done' : '') + '" onclick="_drwSubTitleEdit(' + idx + ')" title="Clique para editar">' + (s.titulo || '<i style="color:var(--muted)">(clique para definir)</i>') + '</span>'
+   + colabInd
+   + colabBtn
    + '<button class="drw-sub-del" onclick="_drwSubDelete(' + idx + ')" title="Remover">&times;</button>'
    + '</div>';
  }).join('');
