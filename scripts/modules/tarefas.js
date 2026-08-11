@@ -626,7 +626,13 @@ function _gestorPopulateFilters() {
   // as obsoletas que também estão vencidas.
   { key: 'status',      label: 'Status',                type: 'select', options: _gestorStatusOptions,
     getValue: function(a) { return a.status || ''; } },
-  { key: 'atrasada',    label: 'Somente atrasadas',     type: 'select', options: ['Sim', 'Não'],
+  // Rótulo "Atrasada" (não "Somente atrasadas") — o campo já é um Sim/Não,
+  // "Onde Somente atrasadas é Sim" soava redundante (o "somente" já sugere
+  // que só apareceriam as atrasadas, sem precisar escolher Sim/Não pra
+  // confirmar). "Onde Atrasada é Sim/Não" lê com a mesma gramática dos
+  // outros campos (Status/Prioridade) e mantém a opção "Não" (filtrar as
+  // NÃO atrasadas), que "somente atrasadas" não deixava claro que existia.
+  { key: 'atrasada',    label: 'Atrasada',              type: 'select', options: ['Sim', 'Não'],
     getValue: function(a) { return _gIsLate(a) ? 'Sim' : 'Não'; } },
   { key: 'prioridade',  label: 'Prioridade',            type: 'select', options: ['Alta','Média','Baixa'] },
   { key: 'area',        label: 'Área',                  type: 'select', options: function(){ return _gestorOptionsFrom(function(a){ return a.area; }); } },
