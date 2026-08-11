@@ -719,6 +719,11 @@ function _drwColabReqCancel() {
  * ainda estiver vazio ("(clique para definir)"), já que colaborar sobre uma
  * subtarefa sem título não faz sentido para quem for recebê-la. */
 function _drwColabReqOpenForSubtask(subtaskId) {
+ // Criando uma atividade nova (ainda sem id real no banco), o pedido de
+ // colaboração não tem em que se apoiar (atividade_id) — mesmo aviso que
+ // _drwColabReqEnviar já usa. Salve primeiro e o botão passa a funcionar
+ // normalmente, sem precisar reabrir nada.
+ if (!window._drwCurrentTask) { _showToast('Salve a atividade antes de solicitar colaboração', 'erro'); return; }
  var item = _drwSubItems.find(function(s){ return String(s._id) === String(subtaskId); });
  if (item && !item.titulo) { _showToast('Defina o título da subtarefa antes de solicitar colaboração', 'erro'); return; }
  var form = document.getElementById('drw-colab-form');
@@ -1114,11 +1119,23 @@ function _taskDrawerOpen(editId) {
     + '</div>';
   }).join('');
  } else if (histWrap) { histWrap.style.display = 'none'; }
- // Seção de Colaboração: visível só no modo edição
+ // Seção de Colaboração: sempre visível, inclusive criando uma atividade
+ // nova — colaborar numa subtarefa específica (ver _drwColabReqOpenForSubtask)
+ // precisa estar alcançável desde a criação, senão a pessoa nem enxerga a
+ // opção. O que exige a atividade já salva (atividade_id real no banco) é
+ // só a AÇÃO de enviar o pedido — isso já tem seu próprio aviso
+ // ("Salve a atividade antes de solicitar colaboração") em
+ // _drwColabReqEnviar/_drwColabReqOpenForSubtask, não a seção inteira.
  var colabWrap = get('drw-colab-req-wrap');
  if (colabWrap) {
-  colabWrap.style.display = t ? '' : 'none';
-  if (t) { _drwColabReqCancel(); _drwColabReqRender(t.id); }
+  colabWrap.style.display = '';
+  _drwColabReqCancel();
+  if (t) {
+   _drwColabReqRender(t.id);
+  } else {
+   var listEl = get('drw-colab-req-list');
+   if (listEl) listEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:10px 0;text-align:center">Salve a atividade pra poder solicitar colaborações.</div>';
+  }
  }
 
  // ── Aba Subtarefas ──
@@ -1643,7 +1660,10 @@ function _drwSubRender() {
  var list = document.getElementById('drw-sub-list');
  if (!list) return;
  if (!_drwSubItems.length) { list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">Nenhuma subtarefa ainda.</div>'; _drwSubBadge(); return; }
- var podeColab = !!window._drwCurrentTask; // colaboração exige atividade já salva (atividade_id)
+ // O botão de colaborar por subtarefa aparece sempre, inclusive criando uma
+ // atividade nova — senão a opção fica invisível até salvar, e a pessoa nem
+ // descobre que ela existe. Quem bloqueia é _drwColabReqOpenForSubtask (a
+ // ação em si exige atividade_id real), com aviso claro pra salvar primeiro.
  list.innerHTML = _drwSubItems.map(function(s, idx) {
   var cbClass = 'drw-sub-cb' + (s.done ? ' done' : '');
   var check = s.done ? '<svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="#fff" stroke-width="2.2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg>' : '';
@@ -1651,11 +1671,9 @@ function _drwSubRender() {
   var colabInd = req
    ? '<span class="drw-sub-colab-ind" title="Colaboração com ' + (req.receptor_nome || req.receptor_email || '?') + ' — ' + req.status + '">' + _userAvatarByName(req.receptor_nome || req.receptor_email, 16) + '</span>'
    : '';
-  var colabBtn = podeColab
-   ? '<button class="drw-sub-colab-btn" onclick="_drwColabReqOpenForSubtask(\'' + s._id + '\')" title="Solicitar colaboração nesta subtarefa">'
+  var colabBtn = '<button class="drw-sub-colab-btn" onclick="_drwColabReqOpenForSubtask(\'' + s._id + '\')" title="Solicitar colaboração nesta subtarefa">'
      + '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="4" r="2"/><path d="M2 10.5c0-1.9 1.8-3.3 4-3.3s4 1.4 4 3.3"/></svg>'
-     + '</button>'
-   : '';
+     + '</button>';
   return '<div class="drw-sub-item" id="drw-sub-item-' + idx + '">'
    + '<div class="' + cbClass + '" onclick="_drwSubToggleDone(' + idx + ')">' + check + '</div>'
    + '<span class="drw-sub-titulo' + (s.done ? ' done' : '') + '" onclick="_drwSubTitleEdit(' + idx + ')" title="Clique para editar">' + (s.titulo || '<i style="color:var(--muted)">(clique para definir)</i>') + '</span>'
