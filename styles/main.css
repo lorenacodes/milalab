@@ -858,9 +858,18 @@ body.light .dash-kpi-card{background:linear-gradient(rgba(250,250,252,.62),rgba(
 .vinc-card-title{font-size:10px;font-weight:700;color:var(--text);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
 .vinc-card-row{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted);padding:1px 0}
 .vinc-card-row b{color:var(--text);font-weight:600;text-align:right}
-.gestor-group-hd{background:var(--surface2)!important;position:sticky;top:38px;z-index:7}
-.gestor-group-hd td{background:var(--surface2)!important;padding:6px 12px;border-bottom:1px solid var(--border);cursor:pointer}
-.gestor-group-hd:hover td{filter:brightness(1.03)}
+/* Cabeçalho de grupo (Gestor de Tarefas/Empresas/Contatos) — era um bloco
+   sólido em --surface2 (cinza neutro quase preto), destoando do resto do
+   app, que usa vidro fosco (blur) em toda superfície fixa/sticky (topbar,
+   sidebar, .obras-toolbar-fixed). Mesmo tratamento aqui, com fallback sólido
+   pra navegadores sem backdrop-filter (ver @supports abaixo). */
+.gestor-group-hd{position:sticky;top:38px;z-index:7;background:linear-gradient(rgba(10,11,16,.72),rgba(10,11,16,.72)), rgba(255,255,255,.07);-webkit-backdrop-filter:blur(10px) saturate(1.5);backdrop-filter:blur(10px) saturate(1.5);border-bottom:1px solid rgba(255,255,255,.16)}
+body.light .gestor-group-hd{background:linear-gradient(rgba(250,250,252,.72),rgba(250,250,252,.72)), rgba(255,255,255,.3);-webkit-backdrop-filter:blur(10px) saturate(1.7);backdrop-filter:blur(10px) saturate(1.7);border-bottom-color:rgba(255,255,255,.65)}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+ .gestor-group-hd{background:var(--surface)}
+}
+.gestor-group-hd td{background:transparent!important;padding:6px 12px;cursor:pointer}
+.gestor-group-hd:hover td{filter:brightness(1.05)}
 /* Gantt */
 .gestor-timeline-wrap{overflow:auto;flex:1;min-height:0;background:var(--surface)}
 /* Métricas */
