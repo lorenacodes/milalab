@@ -882,7 +882,7 @@ function _gestorRenderSetor() {
     + '</div></div>'
     + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
     + '<span style="font-size:9px;background:' + sc.dot + '22;color:' + sc.dot + ';padding:1px 7px;border-radius:20px;font-weight:700">' + (a.status || 'A fazer') + '</span>'
-    + (late ? '<span title="Prazo vencido" style="font-size:9px;background:#D6433C22;color:#D6433C;padding:1px 6px;border-radius:20px;font-weight:700;margin-left:3px">Atrasada</span>' : '')
+    + (late && _gestorSomenteAtrasadas ? '<span title="Prazo vencido" style="font-size:9px;background:#D6433C22;color:#D6433C;padding:1px 6px;border-radius:20px;font-weight:700;margin-left:3px">Atrasada</span>' : '')
     + '<div style="display:flex;align-items:center;gap:6px">'
     + (respStr ? '<span style="font-size:9px;color:var(--muted)">' + respStr.split(' ')[0] + '</span>' : '')
     + (prazoTxt || '')
@@ -1190,7 +1190,10 @@ function _gestorRenderRow(a, rowNum, hoje) {
   + descHtml + vincHtml + '</div>'
   + '</div></td>'
   + '<td><span class="gs-badge ' + sc.cls + '">' + statusLbl + '</span>'
-  + (late ? '<span class="gs-badge gs-atrasado" title="Prazo vencido" style="margin-left:4px">Atrasada</span>' : '')
+  // Selo "Atrasada" só aparece com o botão de mesmo nome ativado — fora
+  // disso, o título já fica vermelho quando vencido (linha acima) e esse
+  // segundo selo só empilhava mal debaixo do status (célula estreita).
+  + (late && _gestorSomenteAtrasadas ? '<span class="gs-badge gs-atrasado" title="Prazo vencido" style="margin-left:4px">Atrasada</span>' : '')
   + '</td>'
   + '<td>' + prazoHtml + '</td>'
   + '<td>' + inicioHtml + '</td>'
