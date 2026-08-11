@@ -371,6 +371,22 @@ var _ptMonths = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 var _ptDows   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
+// Cor do evento no Calendário por valor de Transporte (não por status) — o
+// mesmo texto de transporte sempre cai na mesma cor, igual a uma coluna de
+// "single select" do Airtable, onde cada opção já nasce com uma cor fixa.
+// Hash determinístico numa paleta de 8 tons (não depende de ordem de
+// aparição nem de armazenar nada — o mesmo valor dá a mesma cor sempre,
+// mesmo depois de recarregar a página).
+var _ENT_CAL_PALETTE = ['pink','cyan','orange','green','purple','blue','yellow','red','teal','gray'];
+function _entTransporteColorClass(transporte) {
+ var t = (transporte || '').trim();
+ if (!t) return 'gray';
+ var hash = 0;
+ for (var i = 0; i < t.length; i++) hash = (hash * 31 + t.charCodeAt(i)) | 0;
+ var idx = Math.abs(hash) % _ENT_CAL_PALETTE.length;
+ return _ENT_CAL_PALETTE[idx];
+}
+
 function entCalNav(dir) {
   _entCalMonth += dir;
   if (_entCalMonth > 11) { _entCalMonth = 0; _entCalYear++; }
@@ -420,10 +436,11 @@ function renderEntCal() {
     html += '<div class="ent-cal-day' + (isToday ? ' today' : '') + '">';
     html += '<div class="ent-cal-daynum">' + d + '</div>';
     dayEvents.forEach(function(e) {
-      var bucket = _entBucketFor(e.etapa);
+      var colorCls = _entTransporteColorClass(e.transporte);
       var label = e.nome_entrega || (e.obra && e.obra.nome) || 'Entrega';
-      var shortLabel = label.length > 20 ? label.substring(0, 20) + '…' : label;
-      html += '<div class="ent-cal-event ' + bucket + '" title="' + label.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();_spEntregaById(\'' + e.id + '\')">' + shortLabel + '</div>';
+      var shortLabel = label.length > 28 ? label.substring(0, 28) + '…' : label;
+      var tTitle = label + (e.transporte ? (' — ' + e.transporte) : '');
+      html += '<div class="ent-cal-event ent-cal-event-' + colorCls + '" title="' + tTitle.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();_spEntregaById(\'' + e.id + '\')">' + shortLabel + '</div>';
     });
     html += '</div>';
   }
