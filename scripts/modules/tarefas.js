@@ -632,7 +632,11 @@ function _gestorPopulateFilters() {
   // confirmar). "Onde Atrasada é Sim/Não" lê com a mesma gramática dos
   // outros campos (Status/Prioridade) e mantém a opção "Não" (filtrar as
   // NÃO atrasadas), que "somente atrasadas" não deixava claro que existia.
-  { key: 'atrasada',    label: 'Atrasada',              type: 'select', options: ['Sim', 'Não'],
+  // defaultValue:'Sim' — escolher este campo já assume que a intenção é ver
+  // as atrasadas (o caso de longe mais comum); não obriga abrir o dropdown
+  // de valor pra confirmar algo que a própria escolha do campo já expressa.
+  // Ainda dá pra trocar pra "Não" se for esse o caso raro.
+  { key: 'atrasada',    label: 'Atrasada',              type: 'select', options: ['Sim', 'Não'], defaultValue: 'Sim',
     getValue: function(a) { return _gIsLate(a) ? 'Sim' : 'Não'; } },
   { key: 'prioridade',  label: 'Prioridade',            type: 'select', options: ['Alta','Média','Baixa'] },
   { key: 'area',        label: 'Área',                  type: 'select', options: function(){ return _gestorOptionsFrom(function(a){ return a.area; }); } },

@@ -18,14 +18,23 @@ var FB_OPS = {
  date:      [['eq','é'],['before','é antes de'],['after','é depois de'],['between','está entre'],['empty','está vazio'],['nempty','não está vazio']],
 };
 
-// fields: [{key,label,type:'text'|'select'|'multitext'|'date', options:[]|fn, getValue:fn(item)}]
+// fields: [{key,label,type:'text'|'select'|'multitext'|'date', options:[]|fn, getValue:fn(item),
+//           defaultValue:qualquer}] — defaultValue é opcional, pra campos onde
+// só adicionar a condição já expressa a intenção (ex.: "Atrasada" — quem
+// escolhe esse campo quer ver "Sim", não faz sentido obrigar a abrir o
+// dropdown de valor e escolher de novo algo que já era óbvio). Sem
+// defaultValue, comportamento de sempre (vazio, usuário escolhe).
 function _fbInit(instanceId, fields, onChange) {
  _fbInstances[instanceId] = { fields: fields, state: { logic:'AND', conditions: [] }, onChange: onChange, open: false };
 }
 function _fbFieldByKey(inst, key) { return inst.fields.filter(function(f){ return f.key === key; })[0] || inst.fields[0]; }
+function _fbDefaultValueFor(f) {
+ if (f.defaultValue !== undefined) return f.defaultValue;
+ return (f.type==='select'||f.type==='multitext') ? [] : '';
+}
 function _fbNewCondition(inst) {
  var f = inst.fields[0];
- return { id: 'c'+(++_fbUid), field: f.key, operator: FB_OPS[f.type][0][0], value: (f.type==='select'||f.type==='multitext') ? [] : '' };
+ return { id: 'c'+(++_fbUid), field: f.key, operator: FB_OPS[f.type][0][0], value: _fbDefaultValueFor(f) };
 }
 function _fbConditionIsUsable(c) {
  if (c.operator==='empty' || c.operator==='nempty') return true;
@@ -98,7 +107,7 @@ function _fbFieldChange(instanceId, condId, fieldKey) {
  var f = _fbFieldByKey(inst, fieldKey);
  c.field = fieldKey;
  c.operator = FB_OPS[f.type][0][0];
- c.value = (f.type==='select'||f.type==='multitext') ? [] : '';
+ c.value = _fbDefaultValueFor(f);
  _fbRender(instanceId);
  _fbApply(instanceId);
 }
@@ -356,5 +365,5 @@ function _fbSelectValue(instanceId, condId, val) {
 if (typeof module !== 'undefined' && module.exports) {
  module.exports = { _fbInstances, _fbInit, _fbEvaluate, _fbEvalCondition, _fbConditionIsUsable, FB_OPS,
  _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbOperatorChange, _fbValueChange, _fbValueChangeRange, _fbSetLogic, _fbMoveCondition,
- _fbSearchableDropdown, _FB_SEARCH_THRESHOLD };
+ _fbSearchableDropdown, _FB_SEARCH_THRESHOLD, _fbDefaultValueFor };
 }

@@ -8,7 +8,7 @@ const assert = require('node:assert/strict');
 const smartSearch = require('./smart-search.js');
 global._ssNormalize = smartSearch._ssNormalize;
 global._ssMatch = smartSearch._ssMatch;
-const { _fbInstances, _fbInit, _fbEvaluate, _fbConditionIsUsable, _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbOperatorChange, _fbValueChange, _fbValueChangeRange, _fbSearchableDropdown, _FB_SEARCH_THRESHOLD } = require('./filtro-builder.js');
+const { _fbInstances, _fbInit, _fbEvaluate, _fbConditionIsUsable, _fbAddCondition, _fbRemoveCondition, _fbClearAll, _fbFieldChange, _fbOperatorChange, _fbValueChange, _fbValueChangeRange, _fbSearchableDropdown, _FB_SEARCH_THRESHOLD, _fbDefaultValueFor } = require('./filtro-builder.js');
 
 const ITEMS = [
  { id: 1, area: 'TI', prioridade: 'Alta', melhoria: '' },
@@ -215,6 +215,41 @@ test("_fbOperatorChange: trocar pra 'between' inicializa value como par vazio", 
  _fbInstances.dt3.state.conditions = [{ id: 'c1', field: 'data_prazo', operator: 'eq', value: '2026-01-05' }];
  _fbOperatorChange('dt3', 'c1', 'between');
  assert.deepEqual(_fbInstances.dt3.state.conditions[0].value, ['', '']);
+});
+
+// ── defaultValue — campos "binários" (ex.: "Atrasada" do Gestor de Tarefas)
+// onde só escolher o campo já expressa a intenção, sem precisar abrir o
+// dropdown de valor de novo pra confirmar algo óbvio. ──
+const BOOL_FIELDS = [
+ { key: 'atrasada', label: 'Atrasada', type: 'select', options: ['Sim', 'Não'], defaultValue: 'Sim' },
+ { key: 'area', label: 'Área', type: 'select', options: ['TI', 'Comercial'] },
+];
+
+test("_fbDefaultValueFor: campo com defaultValue usa o valor declarado", () => {
+ assert.equal(_fbDefaultValueFor(BOOL_FIELDS[0]), 'Sim');
+});
+
+test("_fbDefaultValueFor: campo sem defaultValue mantém o comportamento antigo (select/multitext = [], resto = '')", () => {
+ assert.deepEqual(_fbDefaultValueFor({ type: 'select' }), []);
+ assert.deepEqual(_fbDefaultValueFor({ type: 'multitext' }), []);
+ assert.equal(_fbDefaultValueFor({ type: 'text' }), '');
+});
+
+test("_fbFieldChange: trocar para um campo com defaultValue já preenche o valor (sem passo extra)", () => {
+ _fbInit('bool1', BOOL_FIELDS, null);
+ _fbAddCondition('bool1');
+ const c = _fbInstances.bool1.state.conditions[0];
+ _fbFieldChange('bool1', c.id, 'atrasada');
+ assert.equal(_fbInstances.bool1.state.conditions[0].value, 'Sim');
+ assert.equal(_fbConditionIsUsable(_fbInstances.bool1.state.conditions[0]), true);
+});
+
+test("_fbFieldChange: trocar para um campo sem defaultValue continua vazio (usuário escolhe)", () => {
+ _fbInit('bool2', BOOL_FIELDS, null);
+ _fbAddCondition('bool2');
+ const c = _fbInstances.bool2.state.conditions[0];
+ _fbFieldChange('bool2', c.id, 'area');
+ assert.deepEqual(_fbInstances.bool2.state.conditions[0].value, []);
 });
 
 test("_fbValueChangeRange: seta cada ponta do intervalo independentemente", () => {
