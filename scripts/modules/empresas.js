@@ -24,6 +24,86 @@ function _spEmpOptSelect(list, atual) {
  }).join('');
 }
 
+// Estado (23 opções — acima do _FB_SEARCH_THRESHOLD de 8 usado pelo próprio
+// filtro-builder, então merece busca) usa o mesmo componente searchable
+// single-select já usado pra Obra/Projeto no drawer de Atividades
+// (nt-obra-*/nt-proj-* em dashboard.js, classes .srch-sel/.srch-sel-box/
+// .srch-sel-drop/.srch-sel-inp/.srch-sel-list/.srch-sel-opt já em main.css)
+// — um <select> nativo não permite injetar uma busca dentro do próprio
+// dropdown. Fase (6 opções) e Categoria continuam como estavam: Fase é
+// curta o bastante pra não precisar de busca (mesma convenção do
+// _FB_SEARCH_THRESHOLD), Categoria já é um multiselect funcionando.
+var _spEmpEstadoSelected = '';
+function _spEmpEstadoMarkup(atual) {
+ _spEmpEstadoSelected = atual || '';
+ var temValor = !!_spEmpEstadoSelected;
+ return '<input type="hidden" id="sp-emp-estado" value="'+_spEmpEstadoSelected+'">'
+  + '<div class="srch-sel" id="sp-emp-estado-srch">'
+  + '<div class="srch-sel-box" id="sp-emp-estado-box" onclick="_spEmpEstadoToggle()">'
+  + '<span class="srch-sel-val'+(temValor?'':' placeholder')+'" id="sp-emp-estado-val">'+(temValor?_spEmpEstadoSelected:'Selecione')+'</span>'
+  + '<button class="srch-sel-clr" id="sp-emp-estado-clr" style="display:'+(temValor?'':'none')+'" onclick="event.stopPropagation();_spEmpEstadoClear()" title="Remover">✕</button>'
+  + '<span class="srch-sel-chevron">▾</span>'
+  + '</div>'
+  + '<div class="srch-sel-drop" id="sp-emp-estado-drop">'
+  + '<input class="srch-sel-inp" id="sp-emp-estado-inp" type="text" placeholder="Buscar UF..." oninput="_spEmpEstadoFilter(this.value)" onkeydown="_spEmpEstadoKey(event)">'
+  + '<div class="srch-sel-list" id="sp-emp-estado-list"></div>'
+  + '</div>'
+  + '</div>';
+}
+function _spEmpEstadoToggle() {
+ var drop = document.getElementById('sp-emp-estado-drop');
+ var box  = document.getElementById('sp-emp-estado-box');
+ if (!drop) return;
+ if (drop.classList.contains('open')) { _spEmpEstadoClose(); return; }
+ drop.classList.add('open');
+ if (box) box.classList.add('open');
+ var inp = document.getElementById('sp-emp-estado-inp');
+ if (inp) { inp.value = ''; inp.focus(); }
+ _spEmpEstadoFilter('');
+}
+function _spEmpEstadoClose() {
+ var drop = document.getElementById('sp-emp-estado-drop');
+ var box  = document.getElementById('sp-emp-estado-box');
+ if (drop) drop.classList.remove('open');
+ if (box)  box.classList.remove('open');
+}
+function _spEmpEstadoFilter(q) {
+ q = (q || '').toLowerCase();
+ var list = document.getElementById('sp-emp-estado-list');
+ if (!list) return;
+ var matches = EMPRESA_ESTADO_OPCOES.filter(function(uf) { return uf.toLowerCase().indexOf(q) !== -1; });
+ if (!matches.length) { list.innerHTML = '<div class="srch-sel-empty">Nenhum estado encontrado.</div>'; return; }
+ list.innerHTML = matches.map(function(uf) {
+  var sel = uf === _spEmpEstadoSelected ? ' selected' : '';
+  return '<div class="srch-sel-opt' + sel + '" onclick="_spEmpEstadoSelectItem(\'' + uf + '\')">' + uf + '</div>';
+ }).join('');
+}
+function _spEmpEstadoSelectItem(uf) {
+ _spEmpEstadoSelected = uf;
+ var hidEl = document.getElementById('sp-emp-estado');
+ var valEl = document.getElementById('sp-emp-estado-val');
+ var clrEl = document.getElementById('sp-emp-estado-clr');
+ if (hidEl) hidEl.value = uf;
+ if (valEl) { valEl.textContent = uf; valEl.classList.remove('placeholder'); }
+ if (clrEl) clrEl.style.display = uf ? '' : 'none';
+ _spEmpEstadoClose();
+}
+function _spEmpEstadoClear() {
+ _spEmpEstadoSelectItem('');
+ var valEl = document.getElementById('sp-emp-estado-val');
+ if (valEl) { valEl.textContent = 'Selecione'; valEl.classList.add('placeholder'); }
+}
+function _spEmpEstadoKey(e) {
+ if (e.key === 'Escape') _spEmpEstadoClose();
+}
+document.addEventListener('click', function(e) {
+ var drop = document.getElementById('sp-emp-estado-drop');
+ var box  = document.getElementById('sp-emp-estado-box');
+ if (drop && box && !box.contains(e.target) && !drop.contains(e.target)) {
+  _spEmpEstadoClose();
+ }
+});
+
 // Categoria (multipleSelects real no Airtable) — mesmo componente de
 // multiselect-ui.js já usado pra Setor/Cidade de Fornecedores
 // (_fornRenderSetoresDropdown), só que aqui dentro do painel lateral de
@@ -75,7 +155,7 @@ async function _spEmpresas(row, tds) {
   + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/"/g,'&quot;')+'"></div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-emp-cnpj" value="'+cnpj.replace(/"/g,'&quot;')+'"></div>'
-  + '<div class="sp-field"><div class="sp-label">Estado</div><select class="sp-inp" id="sp-emp-estado">'+_spEmpOptSelect(EMPRESA_ESTADO_OPCOES, estado)+'</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Estado</div>'+_spEmpEstadoMarkup(estado)+'</div>'
   + '</div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Categoria</div><div id="sp-emp-categoria-dropdown"></div></div>'
@@ -1081,107 +1161,37 @@ function _empApplyFilters() {
 }
 
 /* --- CONTATOS FILTER --- */
-function toggleCttFilterPanel() {
- _cttPanelOpen = !_cttPanelOpen;
- document.getElementById('ctt-filter-panel').style.display = _cttPanelOpen ? 'block' : 'none';
- if (_cttPanelOpen && _cttConditions.length === 0) addCttCondition();
-}
-
-function addCttCondition() {
- var id = ++_cttCondId;
- var firstKey = Object.keys(_cttCampos)[0];
- _cttConditions.push({ id: id, field: firstKey, op: 'contains', value: '' });
- _renderCttConditions();
-}
-
-function _condCttChange(el) {
- var id = +el.dataset.cid;
- var key = el.dataset.key;
- var cond = _cttConditions.find(function(c){ return c.id === id; });
- if (!cond) return;
- cond[key] = el.value;
- if (key === 'field') { cond.op = 'contains'; cond.value = ''; }
- if (key === 'op' && (el.value === 'is_empty' || el.value === 'is_not_empty')) cond.value = '';
- _renderCttConditions();
-}
-
-function _condCttRemove(id) {
- _cttConditions = _cttConditions.filter(function(c){ return c.id !== id; });
- _renderCttConditions();
-}
-
-function _renderCttConditions() {
- var container = document.getElementById('ctt-filter-conditions');
- if (!container) return;
- var ss = 'border:1px solid var(--border);border-radius:6px;font-size:12px;padding:5px 8px;background:var(--surface);color:var(--text);outline:none';
- var html = _cttConditions.map(function(cond) {
- var campo = _cttCampos[cond.field] || {};
- var tipo = campo.type || 'text';
- var opsArr = _empCttOps[tipo] || _empCttOps.text;
- var needsVal = cond.op !== 'is_empty' && cond.op !== 'is_not_empty';
- var campoSel = '<select style="' + ss + '" data-cid="' + cond.id + '" data-key="field" onchange="_condCttChange(this)">';
- Object.keys(_cttCampos).forEach(function(k) {
- campoSel += '<option value="' + k + '"' + (cond.field === k ? ' selected' : '') + '>' + _cttCampos[k].label + '</option>';
- });
- campoSel += '</select>';
- var opSel = '<select style="' + ss + '" data-cid="' + cond.id + '" data-key="op" onchange="_condCttChange(this)">';
- opsArr.forEach(function(o) {
- opSel += '<option value="' + o.val + '"' + (cond.op === o.val ? ' selected' : '') + '>' + o.label + '</option>';
- });
- opSel += '</select>';
- var valEl = '';
- if (needsVal) {
- if (tipo === 'select' && campo.opts) {
- valEl = '<select style="' + ss + ';flex:1" data-cid="' + cond.id + '" data-key="value" onchange="_condCttChange(this)">';
- valEl += '<option value="">— selecione —</option>';
- campo.opts.forEach(function(opt) {
- valEl += '<option value="' + opt + '"' + (cond.value === opt ? ' selected' : '') + '>' + opt + '</option>';
- });
- valEl += '</select>';
- } else {
- valEl = '<input type="text" placeholder="valor..." value="' + (cond.value || '') + '" style="' + ss + ';flex:1" data-cid="' + cond.id + '" data-key="value" oninput="_condCttChange(this)">';
- }
- }
- return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
- campoSel + opSel + valEl +
- '<button onclick="_condCttRemove(' + cond.id + ')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:0 4px">×</button>' +
- '</div>';
- }).join('');
- container.innerHTML = html;
-}
-
-function filterContatos() {
- var searchEl = document.getElementById('ctt-search');
- var q = searchEl ? searchEl.value.toLowerCase() : '';
- var rows = document.querySelectorAll('#ctt-tbody tr');
+// Migrado pros componentes reutilizáveis (filtro-builder/sort-builder/
+// smart-search), mesmo padrão de _empApplyFilters acima — substitui o
+// condition-builder bespoke que esta função tinha (toggleCttFilterPanel/
+// addCttCondition/_condCttChange/_condCttRemove/_renderCttConditions/
+// filterContatos/limparCttFiltros), cujos botões "Ordenar"/"Ocultar campos"
+// na toolbar nem tinham onclick — não funcionavam. _cttCampos (mais abaixo)
+// já tinha o formato certo (label+type+opts), só precisou virar array pro
+// _fbInit, igual _empFbFields.
+function _cttApplyFilters() {
+ var buscaNorm = _ssNormalize(((document.getElementById('ctt-search') || {}).value || '').trim());
+ var activeConds = _fbInstances.contatos.state.conditions.filter(_fbConditionIsUsable).length;
+ var rows = Array.prototype.slice.call(document.querySelectorAll('#ctt-tbody tr'));
+ var visivel = 0;
  rows.forEach(function(tr) {
- var matchSearch = !q || tr.textContent.toLowerCase().includes(q);
- var matchConds = _cttConditions.every(function(cond) {
- var rawVal = (tr.dataset[cond.field] || '').toLowerCase();
- var condVal = (cond.value || '').toLowerCase();
- switch (cond.op) {
- case 'contains': return rawVal.includes(condVal);
- case 'not_contains': return !rawVal.includes(condVal);
- case 'is': return rawVal === condVal;
- case 'is_not': return rawVal !== condVal;
- case 'is_empty': return rawVal === '';
- case 'is_not_empty': return rawVal !== '';
- default: return true;
+  var ok = _fbEvaluate(tr.dataset, 'contatos');
+  if (ok && buscaNorm) ok = _ssMatch(_ssNormalize(tr.textContent), buscaNorm);
+  tr.style.display = ok ? '' : 'none';
+  if (ok) visivel++;
+ });
+ if (rows.length) {
+  rows.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'contatos'); });
+  var tbody = rows[0].parentElement;
+  rows.forEach(function(tr) { tbody.appendChild(tr); });
  }
- });
- tr.style.display = (matchSearch && matchConds) ? '' : 'none';
- });
- var count = _cttConditions.length;
+ var fbBadge = document.getElementById('fb-badge-contatos');
+ if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
  var countEl = document.getElementById('ctt-filter-count');
- if (countEl) { countEl.textContent = count ? count + ' filtro(s) ativo(s)' : ''; countEl.style.display = count ? 'inline' : 'none'; }
-}
-
-function limparCttFiltros() {
- _cttConditions = []; _cttCondId = 0;
- _renderCttConditions();
- filterContatos();
- var countEl = document.getElementById('ctt-filter-count');
- if (countEl) { countEl.style.display = 'none'; }
+ if (countEl) {
+  if (activeConds || buscaNorm) { countEl.textContent = visivel + (visivel === 1 ? ' resultado' : ' resultados'); countEl.style.display = 'inline'; }
+  else { countEl.style.display = 'none'; }
+ }
 }
 
 function openNovaEmpresa() { alert('Modal de nova empresa — a implementar'); }
@@ -1218,26 +1228,6 @@ var _cttCampos = {
  'cargo': { label: 'Cargo', type: 'select', opts: CONTATO_CARGO_OPCOES },
  'empresa': { label: 'Empresa', type: 'text' }
 };
-var _empCttOps = {
- 'select': [
- { val: 'contains', label: 'contém...' },
- { val: 'not_contains', label: 'não contém...' },
- { val: 'is', label: 'é...' },
- { val: 'is_not', label: 'não é...' },
- { val: 'is_empty', label: 'está vazio' },
- { val: 'is_not_empty', label: 'não está vazio' }
- ],
- 'text': [
- { val: 'contains', label: 'contém...' },
- { val: 'not_contains', label: 'não contém...' },
- { val: 'is', label: 'é...' },
- { val: 'is_not', label: 'não é...' },
- { val: 'is_empty', label: 'está vazio' },
- { val: 'is_not_empty', label: 'não está vazio' }
- ]
-};
-var _cttConditions = []; var _cttCondId = 0;
-var _cttPanelOpen = false;
 
 /* Filtro/Ordenação de Empresas — componentes reutilizáveis (filtro-builder/
    sort-builder/smart-search), mesmo padrão do Gestor de Tarefas/Obras.
@@ -1259,3 +1249,19 @@ var _empSbFields = [
  { key: 'estado', label: 'Estado', type: 'text' },
 ];
 _sbInit('empresas', _empSbFields, _empApplyFilters);
+
+/* Filtro/Ordenação de Contatos — mesma migração acima, reaproveitando
+   _cttCampos que já existia (nome/cargo/empresa, com o vocabulário real de
+   Cargo verificado no Airtable). */
+var _cttFbFields = Object.keys(_cttCampos).map(function(k) {
+ var c = _cttCampos[k];
+ return { key: k, label: c.label, type: c.type, options: c.opts || [] };
+});
+_fbInit('contatos', _cttFbFields, _cttApplyFilters);
+
+var _cttSbFields = [
+ { key: 'nome', label: 'Nome', type: 'text' },
+ { key: 'cargo', label: 'Cargo', type: 'text' },
+ { key: 'empresa', label: 'Empresa', type: 'text' },
+];
+_sbInit('contatos', _cttSbFields, _cttApplyFilters);

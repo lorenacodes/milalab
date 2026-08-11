@@ -95,13 +95,6 @@
  text-decoration:underline;text-underline-offset:2px;
  }
 
- /* Filter panel herdado */
- .nt-filter-panel {
- display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:200;
- background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);
- box-shadow:0 8px 32px rgba(0,0,0,.18);width:520px;padding:16px
- }
-
  /* Célula de contato com ações hover (telefone / e-mail) */
  .ctt-contact-cell { display:flex;align-items:center;gap:6px;min-width:0 }
  .ctt-val { font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px }
