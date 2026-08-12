@@ -192,6 +192,11 @@ async function _adminAlterarRole(userId, role) {
  if(res.error){_showToast('Erro: '+res.error,'erro');return;}
  var u = _adminUsers.find(function(u){return u.id===userId;});
  if(u) u.role = role;
+ // Re-renderiza respeitando o filtro/busca atuais — sem isso, quem já
+ // estava com o filtro "Admin" aplicado não via o usuário recém-promovido
+ // aparecer na lista (o dado em memória ficava certo, só a tela não
+ // atualizava sozinha).
+ _adminFilterUsers();
  _showToast('Perfil atualizado','ok');
 }
 
