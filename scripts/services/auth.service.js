@@ -49,6 +49,11 @@ function _loginSuccess(user) {
  }
  _refreshProfileUI();
  _loadProfileFromDB();
+ // go('dashboard') é o único lugar que adiciona a classe .active em
+ // #page-dashboard (CSS: .page{display:none!important}) — sem chamar isso
+ // aqui, a página ficava com display:none até o usuário clicar em outra
+ // aba e voltar (o que dispara go() de verdade pelo onclick do menu).
+ if (typeof go === 'function') go('dashboard');
  _dbInit();
 }
 
