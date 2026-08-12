@@ -1,7 +1,7 @@
 // node --test scripts/lib/group-builder.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { _gbInstances, _gbInit, _gbPrimaryField, _gbSetLevel, _gbAddLevel, _gbRemoveLevel, _gbClearAll, _gbLevelFieldChange } = require('./group-builder.js');
+const { _gbInstances, _gbInit, _gbPrimaryField, _gbPrimaryDir, _gbSetLevel, _gbAddLevel, _gbRemoveLevel, _gbClearAll, _gbLevelFieldChange, _gbLevelDirChange } = require('./group-builder.js');
 
 const FIELDS = [
  { key: 'responsavel', label: 'Responsável' },
@@ -68,6 +68,34 @@ test('_gbLevelFieldChange troca o campo de um nível existente', () => {
  _gbAddLevel('g7', 'status');
  _gbLevelFieldChange('g7', 1, 'area');
  assert.deepEqual(_gbInstances.g7.state.levels.map((l) => l.field), ['responsavel', 'area']);
+});
+
+// Ordem de aparição dos grupos (pedido explícito, estilo Airtable) — cada
+// nível guarda dir 'asc'/'desc', padrão 'asc' ao criar/adicionar um nível.
+test('_gbSetLevel/_gbAddLevel: nível novo nasce com dir "asc"', () => {
+ _gbInit('g10', FIELDS, null);
+ _gbSetLevel('g10', 'status');
+ assert.equal(_gbInstances.g10.state.levels[0].dir, 'asc');
+ _gbAddLevel('g10', 'area');
+ assert.equal(_gbInstances.g10.state.levels[1].dir, 'asc');
+});
+
+test('_gbLevelDirChange troca a direção de um nível específico', () => {
+ _gbInit('g11', FIELDS, null);
+ _gbSetLevel('g11', 'status');
+ _gbAddLevel('g11', 'area');
+ _gbLevelDirChange('g11', 1, 'desc');
+ assert.equal(_gbInstances.g11.state.levels[0].dir, 'asc');
+ assert.equal(_gbInstances.g11.state.levels[1].dir, 'desc');
+});
+
+test('_gbPrimaryDir retorna "asc" por padrão e sem agrupamento ativo', () => {
+ _gbInit('g12', FIELDS, null);
+ assert.equal(_gbPrimaryDir('g12'), 'asc'); // sem nível nenhum ainda
+ _gbSetLevel('g12', 'status');
+ assert.equal(_gbPrimaryDir('g12'), 'asc');
+ _gbLevelDirChange('g12', 0, 'desc');
+ assert.equal(_gbPrimaryDir('g12'), 'desc');
 });
 
 test('_gbClearAll remove o agrupamento por completo', () => {

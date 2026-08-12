@@ -1859,7 +1859,9 @@ function _obrasApplyFilters() {
     buckets[val].push(tr);
    });
    var fieldLabel = (_obrasGbFields.filter(function(f){ return f.key === groupField; })[0] || {}).label || groupField;
-   order.slice().sort(function(a, b){ return a.localeCompare(b, 'pt-BR'); }).forEach(function(key) {
+   var orderedKeys = order.slice().sort(function(a, b){ return a.localeCompare(b, 'pt-BR'); });
+   if (_gbPrimaryDir('obras') === 'desc') orderedKeys.reverse();
+   orderedKeys.forEach(function(key) {
     var bucketRows = buckets[key];
     var visCount = bucketRows.filter(function(tr){ return tr.style.display !== 'none'; }).length;
     var hd = document.createElement('tr');

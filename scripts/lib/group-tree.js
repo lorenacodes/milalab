@@ -64,7 +64,14 @@ function _gtBuildTree(items, levels, keyForFn, fixedOrders, levelIdx) {
  } else if (fixedOrders && fixedOrders[field]) {
   var fixed = fixedOrders[field];
   order = fixed.filter(function(k){ return buckets[k]; }).concat(order.filter(function(k){ return fixed.indexOf(k) === -1; }));
+ } else {
+  // Sem sortKey nem ordem fixa: ordem alfabética (pt-BR) como base, em vez
+  // de "primeira aparição nos dados" (que embaralha os grupos à toa) — só
+  // assim o controle de direção abaixo (asc/desc) tem efeito visível.
+  order.sort(function(x,y){ return x.localeCompare(y, 'pt-BR'); });
  }
+ // Direção escolhida no popover de Agrupar (asc = ordem acima; desc = invertida).
+ if (levels[levelIdx].dir === 'desc') order.reverse();
  var children = {};
  order.forEach(function(k) { children[k] = _gtBuildTree(buckets[k].items, levels, keyForFn, fixedOrders, levelIdx + 1); });
  return { leaf: false, field: field, order: order, children: children };

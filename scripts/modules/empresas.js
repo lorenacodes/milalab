@@ -1235,7 +1235,7 @@ function _empRenderGrouped(groupField) {
  });
  filtered.sort(function(a, b) { return _sbCompare(_empPseudoDataset(a), _empPseudoDataset(b), 'empresas'); });
 
- var tree = _gtBuildTree(filtered, [{ field: groupField }], _empGroupKeyFor, null, 0);
+ var tree = _gtBuildTree(filtered, [{ field: groupField, dir: _gbPrimaryDir('empresas') }], _empGroupKeyFor, null, 0);
  var rowsArr = [];
  _empRenderGroupNode(tree, [], rowsArr);
  tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma empresa encontrada.</td></tr>';
@@ -1352,7 +1352,7 @@ function _cttRenderGrouped(groupField) {
  });
  filtered.sort(function(a, b) { return _sbCompare(_cttPseudoDataset(a), _cttPseudoDataset(b), 'contatos'); });
 
- var tree = _gtBuildTree(filtered, [{ field: groupField }], _cttGroupKeyFor, null, 0);
+ var tree = _gtBuildTree(filtered, [{ field: groupField, dir: _gbPrimaryDir('contatos') }], _cttGroupKeyFor, null, 0);
  var rowsArr = [];
  _cttRenderGroupNode(tree, [], rowsArr);
  tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhum contato encontrado.</td></tr>';

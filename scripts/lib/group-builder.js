@@ -22,6 +22,15 @@ function _gbPrimaryField(instanceId) {
  if (!inst || !inst.state.levels.length) return null;
  return inst.state.levels[0].field;
 }
+// Ordem de exibição dos grupos daquele nível — 'asc' (padrão) ou 'desc'.
+// Usada pelos módulos que só têm 1 nível de agrupamento hoje (Obras,
+// Entregas) e repassam isto pra _gtBuildTree (Gestor/Empresas/Contatos já
+// passam o level inteiro, dir incluso, direto de inst.state.levels).
+function _gbPrimaryDir(instanceId) {
+ var inst = _gbInstances[instanceId];
+ if (!inst || !inst.state.levels.length) return 'asc';
+ return inst.state.levels[0].dir || 'asc';
+}
 
 function _gbToggle(instanceId) {
  var inst = _gbInstances[instanceId];
@@ -45,7 +54,7 @@ if (typeof document !== 'undefined') {
 
 function _gbSetLevel(instanceId, fieldKey) {
  var inst = _gbInstances[instanceId];
- inst.state.levels = [{ field: fieldKey }];
+ inst.state.levels = [{ field: fieldKey, dir: 'asc' }];
  _gbRender(instanceId);
  _gbApply(instanceId);
 }
@@ -53,8 +62,13 @@ function _gbAddLevel(instanceId, fieldKey) {
  var inst = _gbInstances[instanceId];
  var used = inst.state.levels.map(function(l){ return l.field; });
  if (used.indexOf(fieldKey) !== -1) return;
- inst.state.levels.push({ field: fieldKey });
+ inst.state.levels.push({ field: fieldKey, dir: 'asc' });
  _gbRender(instanceId);
+ _gbApply(instanceId);
+}
+function _gbLevelDirChange(instanceId, idx, dir) {
+ var inst = _gbInstances[instanceId];
+ inst.state.levels[idx].dir = dir;
  _gbApply(instanceId);
 }
 function _gbRemoveLevel(instanceId, idx) {
@@ -108,9 +122,19 @@ function _gbRender(instanceId) {
   var onChangeFn = idx === 0
    ? '_gbSetLevel(\'' + instanceId + '\',this.value)'
    : '_gbLevelFieldChange(\'' + instanceId + '\',' + idx + ',this.value)';
+  var dir = lvl.dir || 'asc';
+  // Ordem de aparição dos grupos (pedido explícito, estilo Airtable) — A→Z
+  // é o rótulo genérico; pra campos com ordem própria (datas, status com
+  // fixedOrders) "A→Z" corresponde à ordem natural/cronológica e "Z→A" à
+  // invertida, não literalmente alfabética.
+  var dirSel = '<select class="fb-op-sel" style="flex:1" onchange="_gbLevelDirChange(\'' + instanceId + '\',' + idx + ',this.value)">'
+   + '<option value="asc"' + (dir === 'asc' ? ' selected' : '') + '>A → Z</option>'
+   + '<option value="desc"' + (dir === 'desc' ? ' selected' : '') + '>Z → A</option>'
+   + '</select>';
   return '<div class="fb-row">'
    + '<div class="fb-lead-wrap" style="width:64px"><span class="fb-lead">' + (idx===0?'Agrupar por':'e depois') + '</span></div>'
    + '<select class="fb-field-sel" style="flex:2" onchange="' + onChangeFn + '">' + fieldOpts + '</select>'
+   + dirSel
    + '<button type="button" class="fb-row-del" title="Remover" onclick="_gbRemoveLevel(\'' + instanceId + '\',' + idx + ')">&times;</button>'
    + '</div>';
  }).join('');
@@ -147,6 +171,6 @@ function _gbLevelFieldChange(instanceId, idx, fieldKey) {
 
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _gbInstances, _gbInit, _gbPrimaryField, _gbSetLevel, _gbAddLevel, _gbRemoveLevel,
- _gbClearAll, _gbLevelFieldChange, _gbToggle };
+ module.exports = { _gbInstances, _gbInit, _gbPrimaryField, _gbPrimaryDir, _gbSetLevel, _gbAddLevel, _gbRemoveLevel,
+ _gbClearAll, _gbLevelFieldChange, _gbLevelDirChange, _gbToggle };
 }

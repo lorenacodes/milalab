@@ -53,16 +53,26 @@ function keyForSimples(item, field) {
  return { key: item[field] || '— Sem valor', sortKey: null };
 }
 
-test('_gtBuildTree: agrupamento simples (1 nível)', () => {
+test('_gtBuildTree: agrupamento simples (1 nível), sem sortKey/fixedOrders cai pra ordem alfabética (pt-BR)', () => {
  const items = [
   { id: 1, area: 'TI' }, { id: 2, area: 'TI' }, { id: 3, area: 'RH' },
  ];
  const tree = _gtBuildTree(items, [{ field: 'area' }], keyForSimples, null, 0);
  assert.equal(tree.leaf, false);
- assert.deepEqual(tree.order, ['TI', 'RH']);
+ assert.deepEqual(tree.order, ['RH', 'TI']); // alfabética, não mais "primeira aparição"
  assert.equal(tree.children['TI'].items.length, 2);
  assert.equal(tree.children['RH'].items.length, 1);
  assert.equal(tree.children['TI'].leaf, true);
+});
+
+test('_gtBuildTree: dir "desc" inverte a ordem dos grupos (funciona com alfabética, sortKey e fixedOrders)', () => {
+ const items = [
+  { id: 1, area: 'TI' }, { id: 2, area: 'TI' }, { id: 3, area: 'RH' },
+ ];
+ const treeAsc  = _gtBuildTree(items, [{ field: 'area', dir: 'asc' }], keyForSimples, null, 0);
+ const treeDesc = _gtBuildTree(items, [{ field: 'area', dir: 'desc' }], keyForSimples, null, 0);
+ assert.deepEqual(treeAsc.order, ['RH', 'TI']);
+ assert.deepEqual(treeDesc.order, ['TI', 'RH']);
 });
 
 test('_gtBuildTree: agrupamentos múltiplos (2 níveis) com expansão/recolhimento independente', () => {

@@ -272,7 +272,7 @@ function _entRenderGrouped(groupField) {
  var tbody = document.getElementById('ent-tbody');
  if (!tbody) return;
  var filtered = _entFilteredSorted();
- var tree = _gtBuildTree(filtered, [{ field: groupField }], _entGroupKeyFor, null, 0);
+ var tree = _gtBuildTree(filtered, [{ field: groupField, dir: _gbPrimaryDir('entregas') }], _entGroupKeyFor, null, 0);
  var rowsArr = [];
  _entRenderGroupNode(tree, [], rowsArr);
  tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma entrega encontrada.</td></tr>';

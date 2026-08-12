@@ -680,7 +680,7 @@ function _gestorPopulateFilters() {
   { key: 'data_inicio',   label: 'Data de Início' },
   { key: 'projeto_obra',  label: 'Projeto → Obra' },
  ], _gestorApplyFilters, 3);
- if (!_gbInstances.gestor.state.levels.length) _gbInstances.gestor.state.levels = [{ field: 'responsavel' }];
+ if (!_gbInstances.gestor.state.levels.length) _gbInstances.gestor.state.levels = [{ field: 'responsavel', dir: 'asc' }];
 
  // Restaura filtro/ordenação/agrupamento/período da última vez que a pessoa
  // usou o Gestor de Tarefas (senão tudo resetava a cada F5/reabertura da
