@@ -768,7 +768,7 @@ function _remOpenNew()    { _remToggleSend(); }   // FIX: função que faltava
 function _remToggleSend() {
  var wrap = document.getElementById('rem-send-wrap');
  if (!wrap) return;
- var isOpen = wrap.style.display !== 'none' && wrap.style.display !== '';
+ var isOpen = wrap.style.display !== 'none'; // painel nasce com display:none inline; '' (aberto) não é "fechado"
  wrap.style.display = isOpen ? 'none' : '';
  if (!isOpen) {
   var txt = document.getElementById('dash-reminder-text');
@@ -840,6 +840,19 @@ async function _remSendSupabase() {
 
 // Alias para compatibilidade com botão HTML existente
 function _remSend()           { _remSendSupabase(); }  // FIX: função que faltava
+
+// ── Cancelar novo lembrete sem enviar ────────────────────────────────────
+function _remCancelNew() {
+ var selEl     = document.getElementById('rem-to-select');
+ var textEl    = document.getElementById('dash-reminder-text');
+ var urgencyEl = document.getElementById('dash-reminder-urgency');
+ var ativSel   = document.getElementById('rem-ativ-select');
+ if (selEl)     selEl.value  = '';
+ if (textEl)    textEl.value = '';
+ if (urgencyEl) urgencyEl.value = 'normal';
+ if (ativSel)   ativSel.value = '';
+ _remToggleSend();
+}
 
 
 /* ── DASHBOARD — TAREFAS (localStorage por usuário) ─────────────────── */
@@ -2409,37 +2422,30 @@ function _submitNewTask() {
     criado_por:     (_currentUser && _currentUser.id) || null,
     visibilidade:   privVisibilidade
    };
+   // Recorrência: só a 1ª ocorrência é criada agora. As próximas nascem
+   // sob demanda — um trigger no banco (gerar_proxima_ocorrencia_recorrente)
+   // cria a ocorrência seguinte automaticamente quando a atual é marcada
+   // como "Feito", já com status "A fazer". Isso substitui a criação em
+   // lote de até 365 linhas de uma vez que existia antes.
+   if (recorre === 'sim' && mae.data_inicio && mae.data_fim) {
+    var dtI = new Date(mae.data_inicio + 'T00:00:00');
+    var dtF = new Date(mae.data_fim    + 'T00:00:00');
+    Object.assign(linhaBase, {
+     rec_freq_val:      mae.freq_val,
+     rec_freq_unit:     freqUnit,
+     rec_infinita:      recInfinita,
+     rec_repeticoes:    recRep > 0 ? recRep : null,
+     rec_dt_fim:        recDtFim || null,
+     rec_duracao_dias:  Math.round((dtF - dtI) / 86400000),
+     rec_ocorrencia_num: 1
+    });
+   }
+
    var linhas = [Object.assign({}, linhaBase, {
     data_inicio: mae.data_inicio || null,
     data_prazo:  mae.data_fim    || null,
     subtasks:    subtasksParaSalvar
    })];
-
-   // Geração de filhos (recorrência)
-   if (recorre === 'sim' && mae.data_inicio && mae.data_fim) {
-    var dtI   = new Date(mae.data_inicio + 'T00:00:00');
-    var dtF   = new Date(mae.data_fim    + 'T00:00:00');
-    var durMs = dtF - dtI;
-    var freq  = mae.freq_val;
-    var unit  = freqUnit;
-    // Determinar limite: infinita = 365, repeticoes definida, dt-fim calculada, senão 12
-    var MAX_FILHOS = recInfinita ? 365 : (recRep > 0 ? recRep : 12);
-    var dtLimite   = recDtFim ? new Date(recDtFim + 'T23:59:59') : null;
-    for (var n = 1; n <= MAX_FILHOS; n++) {
-     var repI = new Date(dtI);
-     if      (unit === 'dias')    repI.setDate(repI.getDate()         + freq * n);
-     else if (unit === 'semanas') repI.setDate(repI.getDate()         + freq * 7 * n);
-     else if (unit === 'meses')   repI.setMonth(repI.getMonth()       + freq * n);
-     else if (unit === 'anos')    repI.setFullYear(repI.getFullYear() + freq * n);
-     if (dtLimite && repI > dtLimite) break;
-     var repF  = new Date(repI.getTime() + durMs);
-     linhas.push(Object.assign({}, linhaBase, {
-      data_inicio: repI.toISOString().slice(0, 10),
-      data_prazo:  repF.toISOString().slice(0, 10),
-      subtasks:    []
-     }));
-    }
-   }
 
    _taskDrawerClose();
    _showToast('Salvando...', 'ok');

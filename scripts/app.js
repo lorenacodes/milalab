@@ -238,6 +238,13 @@ async function _dbInit() {
  // Motivo: _dashLoad() deve ser chamado sempre após _dbInit, independente
  // de _dbOk — quando sem conexão, ela limpa o "Carregando..." e exibe estado vazio.
  if (typeof _dashLoad === 'function') _dashLoad();
+ // Mesma lógica de go('dashboard') pra 1ª visita: como _currentRoute já
+ // nasce 'dashboard' (linha ~31), o primeiro go('dashboard') do usuário
+ // nunca disparava esse bloco (_prevRoute === id) — sem isto, Meu Painel
+ // só carregava de verdade depois de trocar de aba e voltar.
+ if (typeof buildGreeting === 'function')    buildGreeting();
+ if (typeof _dashTasksInit === 'function')   _dashTasksInit();
+ if (typeof _dashRenderInbox === 'function') _dashRenderInbox();
  // Exibir FAB do histórico pessoal após autenticação
  if (typeof _histInit === 'function') _histInit();
 }
