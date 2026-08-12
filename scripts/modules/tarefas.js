@@ -617,6 +617,20 @@ function _gestorOptionsFrom(getter) {
  _gestorAllAt.forEach(function(a){ var v = getter(a); if (v) set[v] = 1; });
  return Object.keys(set).sort();
 }
+// "Criada por" vem de atividades.criado_por (uuid, FK auth.users, setado na
+// criação em tarefas.js) — resolve pro nome via _usuariosCache (mesma cache
+// já carregada em _dbInit/_loadUsuariosCache). "Último alterado por" vem de
+// atividades.atualizado_por (text/e-mail, setado pelo trigger
+// set_atividades_atualizado_por() a cada INSERT/UPDATE) — resolve por e-mail.
+function _gestorCriadoPorNome(a) {
+ var u = (_usuariosCache || []).find(function(x){ return x.id === a.criado_por; });
+ return (u && (u.nome_display || u.email)) || '';
+}
+function _gestorAtualizadoPorNome(a) {
+ if (!a.atualizado_por) return '';
+ var u = (_usuariosCache || []).find(function(x){ return x.email === a.atualizado_por; });
+ return (u && u.nome_display) || a.atualizado_por;
+}
 function _gestorRespOptions() {
  var set = {};
  _gestorAllAt.forEach(function(a) {
@@ -648,6 +662,10 @@ function _gestorPopulateFilters() {
   { key: 'tipo_resp',   label: 'Individual / Coletiva', type: 'select', options: ['Tarefas Individuais','Tarefas Coletivas','— Sem responsável'], getValue: _gTipoResp },
   { key: 'data_prazo',  label: 'Prazo',                  type: 'date' },
   { key: 'data_inicio', label: 'Início',                 type: 'date' },
+  { key: 'observacoes', label: 'Observações',            type: 'text' },
+  { key: 'atualizado_por', label: 'Último alterado por', type: 'select', options: function(){ return _gestorOptionsFrom(_gestorAtualizadoPorNome); }, getValue: _gestorAtualizadoPorNome },
+  { key: 'criado_por',  label: 'Criada por',             type: 'select', options: function(){ return _gestorOptionsFrom(_gestorCriadoPorNome); }, getValue: _gestorCriadoPorNome },
+  { key: 'created_at',  label: 'Data de criação',        type: 'date' },
  ], _gestorApplyFilters);
 
  var _prioOrdemSort = { 'Alta': 0, 'Média': 1, 'Baixa': 2 };
@@ -680,7 +698,10 @@ function _gestorPopulateFilters() {
   { key: 'data_inicio',   label: 'Data de Início' },
   { key: 'projeto_obra',  label: 'Projeto → Obra' },
  ], _gestorApplyFilters, 3);
- if (!_gbInstances.gestor.state.levels.length) _gbInstances.gestor.state.levels = [{ field: 'responsavel', dir: 'asc' }];
+ // Sem valor padrão forçado aqui de propósito — "sem agrupamento" agora é
+ // um estado real (grade plana, ver _gestorRenderGrid), não mais disfarçado
+ // de agrupamento por responsável (que dividia Individual/Coletiva mesmo
+ // com o Agrupar desativado).
 
  // Restaura filtro/ordenação/agrupamento/período da última vez que a pessoa
  // usou o Gestor de Tarefas (senão tudo resetava a cada F5/reabertura da
@@ -1052,13 +1073,25 @@ function _gestorRenderGrid() {
   return;
  }
 
- // Sem agrupamento nenhum: trata como 1 nível "responsável" (comportamento
- // padrão de sempre, pra Grade nunca aparecer sem organização nenhuma).
- var effectiveLevels = levels.length ? levels : [{ field: 'responsavel' }];
- _gestorSyncGroupedColumn(effectiveLevels.map(function(l){ return l.field; }));
+ // Sem agrupamento nenhum: grade plana de verdade, uma linha por atividade,
+ // sem nenhum cabeçalho de grupo. Antes disto, "sem agrupamento" caía num
+ // agrupamento por "responsavel" disfarçado (_gestorGroupKeyFor colapsa 2+
+ // responsáveis em "Tarefas Coletivas") — ou seja, a divisão Individual/
+ // Coletiva aparecia mesmo com o Agrupar desativado.
+ if (!levels.length) {
+  _gestorSyncGroupedColumn([]);
+  var hojeFlat = new Date(); hojeFlat.setHours(0,0,0,0);
+  var flatRows = _gestorFiltered.map(function(a, i) { return _gestorRenderRow(a, i + 1, hojeFlat); });
+  tbody.innerHTML = flatRows.length
+   ? flatRows.join('')
+   : '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px;font-size:12px">Nenhuma atividade encontrada para o período selecionado.</td></tr>';
+  return;
+ }
+
+ _gestorSyncGroupedColumn(levels.map(function(l){ return l.field; }));
 
  var hoje = new Date(); hoje.setHours(0,0,0,0);
- var tree = _gestorBuildGroupTree(_gestorFiltered, effectiveLevels, 0);
+ var tree = _gestorBuildGroupTree(_gestorFiltered, levels, 0);
  var rowsArr = [];
  _gestorRenderGroupNode(tree, [], { n: 0 }, hoje, rowsArr);
 
