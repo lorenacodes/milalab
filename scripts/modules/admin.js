@@ -197,6 +197,7 @@ async function _adminAlterarRole(userId, role) {
  // aparecer na lista (o dado em memória ficava certo, só a tela não
  // atualizava sozinha).
  _adminFilterUsers();
+ _adminRenderSysAdmins();
  _showToast('Perfil atualizado','ok');
 }
 
@@ -391,7 +392,24 @@ async function _adminRejeitar(id){
 }
 
 // ── Sistema tab ───────────────────────────────────────────────────────────────
+async function _adminRenderSysAdmins() {
+ var el = document.getElementById('adm-sys-admins');
+ if (!el) return;
+ if (!_adminUsers.length) await _adminLoadUsers();
+ var admins = _adminUsers.filter(function(u){ return (u.role||'usuario') === 'admin'; });
+ if (!admins.length) { el.innerHTML = 'Nenhum admin encontrado'; return; }
+ el.innerHTML = admins.map(function(u) {
+  var ini = (u.full_name||u.email||'?').charAt(0).toUpperCase();
+  return '<div style="display:flex;align-items:center;gap:8px">'
+   +'<div style="width:28px;height:28px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0">'+ini+'</div>'
+   +'<div><div style="font-weight:600;color:var(--text)">'+(u.full_name||u.email||'—')+'</div><div style="color:var(--muted)">'+(u.email||'')+(u.area?' · '+u.area:'')+'</div></div>'
+   +'<span style="margin-left:auto;font-size:10px;padding:2px 7px;border-radius:4px;background:var(--navy-dim);color:var(--navy);font-weight:600">Admin</span>'
+   +'</div>';
+ }).join('');
+}
+
 async function _adminLoadSys() {
+ _adminRenderSysAdmins();
  // Verifica saúde do banco
  var dbEl = document.getElementById('adm-sys-db');
  try {
