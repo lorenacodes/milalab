@@ -347,11 +347,59 @@ var _projSbFields = [
 ];
 _sbInit('projetos', _projSbFields, _projApplyFilters);
 
+// Agrupar — mesmo esquema de Obras (opera sobre <tr> já existentes no DOM,
+// não reconstrói a tbody a partir de um array em memória; ver comentário
+// completo em _obrasRenderGroupNode, obras.js).
+var _projGbFields = [
+ { key: 'tipo',    label: 'Tipo de orçamento' },
+ { key: 'etapa',   label: 'Etapa' },
+ { key: 'compl',   label: 'Complexidade' },
+ { key: 'cliente', label: 'Cliente/Obra' },
+];
+_gbInit('projetos', _projGbFields, _projApplyFilters, 3);
+var _projGroupCollapsed = {};
+function _projToggleGroup(key) {
+ _projGroupCollapsed[key] = !_projGroupCollapsed[key];
+ _projApplyFilters();
+}
+function _projRenderGroupNode(node, path, tbody, forceHidden) {
+ if (node.leaf) {
+  node.items.forEach(function(tr) {
+   if (forceHidden) tr.style.display = 'none';
+   tbody.appendChild(tr);
+  });
+  return;
+ }
+ node.order.forEach(function(k) {
+  var child = node.children[k];
+  var nodePath = path.concat(k);
+  var pathKey = nodePath.join(' :: ');
+  var isCollapsed = !!_projGroupCollapsed[pathKey];
+  var visCount = _gtTreeCount(child, function(tr){ return tr.style.display !== 'none'; });
+  var indent = 12 + path.length * 20;
+  var hd = document.createElement('tr');
+  hd.className = 'gestor-group-hd proj-group-row';
+  hd.style.position = 'static';
+  hd.onclick = function(){ _projToggleGroup(pathKey); };
+  hd.style.display = (forceHidden || !visCount) ? 'none' : '';
+  hd.innerHTML = '<td colspan="11" style="padding-left:' + indent + 'px">'
+   + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
+   + '<strong>' + (k || '—') + '</strong>'
+   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">(' + visCount + ')</span>'
+   + '</td>';
+  tbody.appendChild(hd);
+  _projRenderGroupNode(child, nodePath, tbody, forceHidden || isCollapsed);
+ });
+}
+
 function _projApplyFilters() {
  var buscaNorm = _ssNormalize(((document.getElementById('proj-search') || {}).value || '').trim());
  var activeConds = _fbInstances.projetos.state.conditions.filter(_fbConditionIsUsable).length;
  var visivel = 0;
 
+ // Remove cabeçalhos de grupo da renderização anterior antes de reconsultar
+ // as linhas — eles não têm data-id, então não entram no seletor abaixo.
+ Array.prototype.slice.call(document.querySelectorAll('#proj-tbody tr.proj-group-row')).forEach(function(tr){ tr.remove(); });
  var rows = Array.prototype.slice.call(document.querySelectorAll('#proj-tbody tr[data-id]'));
  rows.forEach(function(tr) {
   var ok = _fbEvaluate(tr.dataset, 'projetos');
@@ -362,7 +410,15 @@ function _projApplyFilters() {
  if (rows.length) {
   rows.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'projetos'); });
   var tbody = rows[0].parentElement;
-  rows.forEach(function(tr) { tbody.appendChild(tr); });
+  var groupLevels = (_gbInstances.projetos && _gbInstances.projetos.state.levels) || [];
+  if (groupLevels.length) {
+   var tree = _gtBuildTree(rows, groupLevels, function(tr, field) {
+    return { key: tr.dataset[field] || 'Sem valor', sortKey: null };
+   }, null, 0);
+   _projRenderGroupNode(tree, [], tbody, false);
+  } else {
+   rows.forEach(function(tr) { tbody.appendChild(tr); });
+  }
  }
 
  var cards = Array.prototype.slice.call(document.querySelectorAll('#proj-kanban .proj-kn-card'));

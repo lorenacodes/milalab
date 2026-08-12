@@ -1783,8 +1783,8 @@ var _obrasSbFields = [
 _sbInit('obras', _obrasSbFields, _obrasApplyFilters);
 
 // Agrupar: campos categóricos só (nome/valor/data não fazem sentido como
-// "balde" de agrupamento) — 1 nível só, igual ao que a Tabela hoje sabe
-// desenhar (ver bloco de agrupamento dentro de _obrasApplyFilters abaixo).
+// "balde" de agrupamento) — até 3 níveis (_obrasRenderGroupNode abaixo é
+// recursivo via _gtBuildTree, igual Gestor/Empresas/Entregas).
 var _obrasGbFields = [
  { key: 'etapa',   label: 'Etapa' },
  { key: 'tipo',    label: 'Categoria da obra' },
@@ -1792,7 +1792,50 @@ var _obrasGbFields = [
  { key: 'estado',  label: 'Estado' },
  { key: 'cidade',  label: 'Cidade' },
 ];
-_gbInit('obras', _obrasGbFields, _obrasApplyFilters, 1);
+_gbInit('obras', _obrasGbFields, _obrasApplyFilters, 3);
+// Obras é a única tela de agrupamento que opera sobre <tr> já existentes no
+// DOM (não reconstrói a tbody a partir de um array em memória, como
+// Empresas/Entregas/Gestor) — por isso não dá pra simplesmente "não
+// renderizar" um grupo colapsado (as linhas ficariam detached e
+// desapareceriam de vez do próximo _obrasApplyFilters, que relê a tbody via
+// querySelectorAll). Em vez disso, um grupo colapsado ainda tem suas linhas
+// anexadas à tbody, só com display:none — ver forceHidden.
+var _obrasGroupCollapsed = {};
+function _obrasToggleGroup(key) {
+ _obrasGroupCollapsed[key] = !_obrasGroupCollapsed[key];
+ _obrasApplyFilters();
+}
+function _obrasRenderGroupNode(node, path, tbody, forceHidden) {
+ if (node.leaf) {
+  node.items.forEach(function(tr) {
+   if (forceHidden) tr.style.display = 'none';
+   tbody.appendChild(tr);
+  });
+  return;
+ }
+ node.order.forEach(function(k) {
+  var child = node.children[k];
+  var nodePath = path.concat(k);
+  var pathKey = nodePath.join(' :: ');
+  var isCollapsed = !!_obrasGroupCollapsed[pathKey];
+  // Contagem calculada ANTES de propagar forceHidden pros filhos — reflete
+  // só o filtro (busca/condições), não o colapso, igual ao "(N)" de sempre.
+  var visCount = _gtTreeCount(child, function(tr){ return tr.style.display !== 'none'; });
+  var indent = 12 + path.length * 20;
+  var hd = document.createElement('tr');
+  hd.className = 'gestor-group-hd obras-group-row';
+  hd.style.position = 'static'; // sticky faria sentido só dentro de um scroll interno (não é o caso de Obras)
+  hd.onclick = function(){ _obrasToggleGroup(pathKey); };
+  hd.style.display = (forceHidden || !visCount) ? 'none' : '';
+  hd.innerHTML = '<td colspan="8" style="padding-left:' + indent + 'px">'
+   + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
+   + '<strong>' + (k || '—') + '</strong>'
+   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">(' + visCount + ')</span>'
+   + '</td>';
+  tbody.appendChild(hd);
+  _obrasRenderGroupNode(child, nodePath, tbody, forceHidden || isCollapsed);
+ });
+}
 
 // Período: dropdown "Período" igual ao do Gestor (period-picker.js), filtra
 // pela data de envio da proposta — único campo de data relevante de Obras.
@@ -1848,30 +1891,12 @@ function _obrasApplyFilters() {
  if (rows.length) {
   rows.sort(function(a, b) { return _sbCompare(a.dataset, b.dataset, 'obras'); });
   var tbody = rows[0].parentElement;
-  var groupField = _gbPrimaryField('obras');
-  if (groupField) {
-   // Agrupa preservando a ordenação já calculada dentro de cada grupo;
-   // grupos em si ficam em ordem alfabética (pt-BR).
-   var buckets = {}, order = [];
-   rows.forEach(function(tr) {
-    var val = tr.dataset[groupField] || 'Sem valor';
-    if (!buckets[val]) { buckets[val] = []; order.push(val); }
-    buckets[val].push(tr);
-   });
-   var fieldLabel = (_obrasGbFields.filter(function(f){ return f.key === groupField; })[0] || {}).label || groupField;
-   var orderedKeys = order.slice().sort(function(a, b){ return a.localeCompare(b, 'pt-BR'); });
-   if (_gbPrimaryDir('obras') === 'desc') orderedKeys.reverse();
-   orderedKeys.forEach(function(key) {
-    var bucketRows = buckets[key];
-    var visCount = bucketRows.filter(function(tr){ return tr.style.display !== 'none'; }).length;
-    var hd = document.createElement('tr');
-    hd.className = 'gestor-group-hd obras-group-row';
-    hd.style.position = 'static'; // sticky faria sentido só dentro de um scroll interno (não é o caso de Obras)
-    if (!visCount) hd.style.display = 'none';
-    hd.innerHTML = '<td colspan="8" style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.3px">' + fieldLabel + ': ' + (key || '—') + ' <span style="font-weight:400;text-transform:none;color:var(--muted)">(' + visCount + ')</span></td>';
-    tbody.appendChild(hd);
-    bucketRows.forEach(function(tr){ tbody.appendChild(tr); });
-   });
+  var groupLevels = (_gbInstances.obras && _gbInstances.obras.state.levels) || [];
+  if (groupLevels.length) {
+   var tree = _gtBuildTree(rows, groupLevels, function(tr, field) {
+    return { key: tr.dataset[field] || 'Sem valor', sortKey: null };
+   }, null, 0);
+   _obrasRenderGroupNode(tree, [], tbody, false);
   } else {
    rows.forEach(function(tr) { tbody.appendChild(tr); });
   }

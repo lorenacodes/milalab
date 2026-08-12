@@ -832,10 +832,14 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
 /* Cabeçalho de grupo (Gestor de Tarefas/Empresas/Contatos) — fundo sólido,
    sem blur (vidro fosco removido do sistema inteiro por custo de
    performance — recompositava a cada scroll). */
-.gestor-group-hd{position:sticky;top:38px;z-index:7;background:var(--surface);border-bottom:1px solid rgba(255,255,255,.16)}
-body.light .gestor-group-hd{background:var(--surface);border-bottom-color:rgba(255,255,255,.65)}
-.gestor-group-hd td{background:transparent!important;padding:6px 12px;cursor:pointer}
+/* Cor levemente destacada (--surface2, não a mesma da linha de dados) +
+   faixa lateral (--navy) — antes ficava neutro demais (mesma cor de fundo
+   das linhas normais), difícil de "bater o olho e ver que é um grupo". */
+.gestor-group-hd{position:sticky;top:38px;z-index:7;background:var(--surface2);border-bottom:1px solid rgba(255,255,255,.16)}
+body.light .gestor-group-hd{background:var(--surface2);border-bottom-color:rgba(255,255,255,.65)}
+.gestor-group-hd td{background:transparent!important;padding:6px 12px;cursor:pointer;border-left:3px solid var(--navy)}
 .gestor-group-hd:hover td{filter:brightness(1.05)}
+.gestor-group-hd strong{text-transform:uppercase;font-size:11px;letter-spacing:.3px}
 /* Gantt */
 .gestor-timeline-wrap{overflow:auto;flex:1;min-height:0;background:var(--surface)}
 /* Métricas */

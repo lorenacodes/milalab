@@ -95,8 +95,9 @@ var _entSbFields = [
 ];
 _sbInit('entregas', _entSbFields, _entApplyFilters);
 
-// Agrupamento — travado em 1 nível (mesmo padrão de Empresas/Contatos, ver
-// _empRenderGrouped em empresas.js). Campos pedidos: Cidade/Estado/Status/Transporte.
+// Agrupamento — até 4 níveis (todos os campos disponíveis). Campos pedidos:
+// Cidade/Estado/Status/Transporte. _entRenderGroupNode já é recursivo desde
+// sempre (_gtBuildTree), só o maxLevels travava em 1.
 var _entGroupCollapsed = {};
 function _entGroupKeyFor(e, field) {
  if (field === 'status')      return { key: _entBucketLabel[_entBucketFor(e.etapa)], sortKey: ['aguardando','producao','transporte','entregue'].indexOf(_entBucketFor(e.etapa)) };
@@ -113,7 +114,7 @@ _gbInit('entregas', [
  { key: 'estado',      label: 'Estado' },
  { key: 'status',      label: 'Status' },
  { key: 'transporte',  label: 'Transporte' },
-], _entApplyFilters, 1);
+], _entApplyFilters, 3);
 
 // Pseudo-dataset: mesmos campos/mesma normalização que um <tr data-*> real
 // carregaria — permite _fbEvaluate/_sbCompare funcionarem idênticos com ou
@@ -186,8 +187,8 @@ function _entQuickPreset(name, btn) {
 }
 
 function _entApplyFilters() {
- var groupField = _gbPrimaryField('entregas');
- if (groupField) { _entRenderGrouped(groupField); return; }
+ var groupLevels = (_gbInstances.entregas && _gbInstances.entregas.state.levels) || [];
+ if (groupLevels.length) { _entRenderGrouped(groupLevels); return; }
 
  // Saindo do modo agrupado: remove cabeçalhos de grupo inseridos por
  // _entRenderGrouped antes de operar sobre as <tr data-id> normais (mesmo
@@ -257,9 +258,10 @@ function _entRenderGroupNode(node, path, rowsArr) {
   var nodePath = 'entregas::' + path.concat(k).join(' :: ');
   var isCollapsed = !!_entGroupCollapsed[nodePath];
   var total = _gtTreeCount(child);
+  var indent = 12 + path.length * 20; // indentação por nível — antes fixa em 12px, ilegível com 2+ níveis
   rowsArr.push(
    '<tr class="gestor-group-hd" onclick="_entToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="6" style="padding-left:12px">'
+   + '<td colspan="6" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
    + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' entrega' + (total !== 1 ? 's' : '') + '</span>'
@@ -268,11 +270,11 @@ function _entRenderGroupNode(node, path, rowsArr) {
   if (!isCollapsed) _entRenderGroupNode(child, path.concat(k), rowsArr);
  });
 }
-function _entRenderGrouped(groupField) {
+function _entRenderGrouped(levels) {
  var tbody = document.getElementById('ent-tbody');
  if (!tbody) return;
  var filtered = _entFilteredSorted();
- var tree = _gtBuildTree(filtered, [{ field: groupField, dir: _gbPrimaryDir('entregas') }], _entGroupKeyFor, null, 0);
+ var tree = _gtBuildTree(filtered, levels, _entGroupKeyFor, null, 0);
  var rowsArr = [];
  _entRenderGroupNode(tree, [], rowsArr);
  tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma entrega encontrada.</td></tr>';
@@ -611,8 +613,8 @@ async function _dbLoadEntregas() {
  _entregasArr = data || [];
  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  if (error || !data?.length) return;
- var groupField = _gbPrimaryField('entregas');
- if (groupField) { _entRenderGrouped(groupField); return; }
+ var groupLevels = (_gbInstances.entregas && _gbInstances.entregas.state.levels) || [];
+ if (groupLevels.length) { _entRenderGrouped(groupLevels); return; }
  const tbody = document.getElementById('ent-tbody');
  if (!tbody) return;
  tbody.innerHTML = data.map(_entRowHTML).join('');
