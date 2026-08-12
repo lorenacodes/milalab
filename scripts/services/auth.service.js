@@ -30,7 +30,14 @@ function _loginSuccess(user) {
  localStorage.setItem('milatec-user-email', email);
  var tu  = document.getElementById('topbar-user');   if (tu)  tu.style.display  = 'flex';
  var tn  = document.getElementById('topbar-user-name'); if (tn) tn.textContent  = email;
- var isAdmin  = _ALLOWED_EMAILS.indexOf(email) !== -1;
+ // Admin = e-mail na lista fixa (bootstrap original) OU role='admin' salvo
+ // no user_metadata pelo próprio painel de Admin (_adminAlterarRole →
+ // auth-admin/alterar-role) — mesma regra já usada do lado do servidor
+ // (Edge Function auth-admin: "ADMINS.includes(email) || role==='admin'").
+ // Antes só checava a lista fixa aqui: promover alguém a admin pelo painel
+ // gravava o role certinho no banco, mas essa pessoa continuava sem ver o
+ // menu/acesso de Admin ao entrar, porque o login nunca olhava pro role.
+ var isAdmin  = _ALLOWED_EMAILS.indexOf(email) !== -1 || (user.user_metadata && user.user_metadata.role === 'admin');
  var navAdmin = document.getElementById('nav-admin');
  if (navAdmin) navAdmin.style.display = isAdmin ? '' : 'none';
  if (isAdmin) {
