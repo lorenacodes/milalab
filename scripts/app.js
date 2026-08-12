@@ -233,6 +233,12 @@ async function _dbInit() {
    _rtWatch('contatos', _dbLoadContatos);
    _rtWatch('entregas', _dbLoadEntregas);
    _rtWatch('projetos', _dbLoadProjetos);
+   // 'atividades' também é observada pelo Gestor de Tarefas (tarefas.js) —
+   // _rtWatch já soma os dois callbacks no mesmo canal, então isto não
+   // substitui aquele. Sem isto, edições de recorrência (ou qualquer outra
+   // mudança) feitas por outro usuário só apareciam no Meu Painel depois de
+   // recarregar a página inteira.
+   if (typeof _dashLoad === 'function') _rtWatch('atividades', _dashLoad);
   }
  }
  // Motivo: _dashLoad() deve ser chamado sempre após _dbInit, independente

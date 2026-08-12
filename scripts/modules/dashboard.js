@@ -897,6 +897,11 @@ function _dashTaskPrazo(t) {
 /* ── DRAWER DE NOVA ATIVIDADE ─────────────────────────────────────── */
 // ID da tarefa em edição — null = modo criação, número = modo edição
 var _taskEditId = null;
+// rec_serie_id da atividade aberta no drawer, se ela já fizer parte de uma
+// série recorrente — usado por _taskRecorrenciaAutosave pra saber se é a
+// 1ª vez que a recorrência é ligada (precisa iniciar a série) ou se é só
+// uma edição de config de uma série que já existia.
+var _taskEditRecSerieId = null;
 
 /* ── AUTO-SAVE (só no modo edição — criar uma atividade nova continua com
    botão explícito, já que não existe linha no banco pra salvar em cima
@@ -1163,21 +1168,27 @@ function _taskDrawerOpen(editId) {
   : [];
  _drwSubRender();
 
- // ── Seção Recorrência — só faz sentido ao criar (editar a recorrência de
- // uma atividade existente não regenera nem afeta nada hoje, então a seção
- // fica oculta em modo edição em vez de fingir que funciona) ──
+ // ── Seção Recorrência — visível tanto ao criar quanto ao editar, pra dar
+ // pra consultar se a atividade tem recorrência configurada e removê-la se
+ // preciso (ver _taskRecorrenciaAutosave, chamada pelos onchange dos campos
+ // abaixo só em modo edição — em criação os valores são lidos direto do DOM
+ // no submit) ──
  var recWrap = get('drw-sec-recorrencia-wrap');
- if (recWrap) recWrap.style.display = t ? 'none' : '';
- if (!t) {
-  document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ r.checked = r.value === 'nao'; });
-  set('nt-freq-val', 1);
-  set('nt-freq-unit', 'semanal');
-  set('nt-rec-repeticoes', '');
-  set('nt-rec-dt-fim', '');
-  var infEl = get('nt-rec-infinita');
-  if (infEl) infEl.checked = false;
-  _taskRecorrenciaChange();
- }
+ if (recWrap) recWrap.style.display = '';
+ var temRecorrenciaAtiva = !!(t && t.rec_freq_val && t.rec_freq_unit);
+ _taskEditRecSerieId = (t && t.rec_serie_id) || null;
+ // O banco guarda a unidade no formato interno (dias/semanas/meses/anos);
+ // o <select> usa o formato exibido (diario/semanal/mensal/anual) — inverso
+ // do mapeamento feito em _submitNewTask ao salvar.
+ var freqUnitMapRev = { dias:'diario', semanas:'semanal', meses:'mensal', anos:'anual' };
+ document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ r.checked = r.value === (temRecorrenciaAtiva ? 'sim' : 'nao'); });
+ set('nt-freq-val',        temRecorrenciaAtiva ? t.rec_freq_val  : 1);
+ set('nt-freq-unit',       temRecorrenciaAtiva ? (freqUnitMapRev[t.rec_freq_unit] || 'semanal') : 'semanal');
+ set('nt-rec-repeticoes',  temRecorrenciaAtiva ? t.rec_repeticoes : '');
+ set('nt-rec-dt-fim',      temRecorrenciaAtiva ? t.rec_dt_fim     : '');
+ var infEl = get('nt-rec-infinita');
+ if (infEl) infEl.checked = temRecorrenciaAtiva ? !!t.rec_infinita : false;
+ _taskRecorrenciaChange();
 
  // ── Seção Auditoria (só no modo edição — atividade nova ainda não existe) ──
  var auditTab  = get('drw-tab-auditoria');
@@ -1576,6 +1587,58 @@ function _taskRecorrenciaChange() {
  var limiteWrap = document.getElementById('nt-rec-limite-wrap');
  if (infinita && limiteWrap) limiteWrap.style.display = infinita.checked ? 'none' : 'flex';
  _recorrenciaPreview();
+}
+
+// ── Autosave da Recorrência em modo edição — mesmo mecanismo (_taskAutoSaveQueue)
+// dos outros campos do drawer, então propaga em tempo real pro Gestor de Tarefas
+// (via _rtWatch('atividades', ...) já existente) e otimisticamente pro próprio
+// Meu Painel (_taskApplyPatchEverywhere). "Remover recorrência" = limpar os
+// campos rec_* desta linha, o que já é suficiente pro trigger do banco parar
+// de gerar a próxima ocorrência quando esta for marcada "Feito".
+function _taskRecorrenciaAutosave() {
+ if (!_taskEditId) return; // criação: nada no banco ainda, valores são lidos direto no submit
+ var recorre = 'nao';
+ document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ if (r.checked) recorre = r.value; });
+
+ if (recorre !== 'sim') {
+  _taskEditRecSerieId = null;
+  _taskAutoSaveQueue({
+   rec_freq_val: null, rec_freq_unit: null, rec_infinita: null,
+   rec_repeticoes: null, rec_dt_fim: null, rec_duracao_dias: null,
+   rec_ocorrencia_num: null, rec_serie_id: null
+  }, true);
+  return;
+ }
+
+ var freqUnitRaw = (document.getElementById('nt-freq-unit') || {}).value || 'semanal';
+ var freqUnitMap = { diario:'dias', semanal:'semanas', mensal:'meses', anual:'anos' };
+ var freqUnit    = freqUnitMap[freqUnitRaw] || freqUnitRaw;
+ var freqVal     = parseInt((document.getElementById('nt-freq-val') || {}).value) || 1;
+ var infEl       = document.getElementById('nt-rec-infinita');
+ var infinita    = !!(infEl && infEl.checked);
+ var recRepStr   = (document.getElementById('nt-rec-repeticoes') || {}).value || '';
+ var recRep      = recRepStr ? parseInt(recRepStr) : 0;
+ var recDtFim    = (document.getElementById('nt-rec-dt-fim') || {}).value || '';
+ var dtI = (document.getElementById('nt-dt-inicio') || {}).value;
+ var dtF = (document.getElementById('nt-dt-fim') || {}).value;
+ var duracao = (dtI && dtF) ? Math.round((new Date(dtF + 'T00:00:00') - new Date(dtI + 'T00:00:00')) / 86400000) : null;
+
+ var patch = {
+  rec_freq_val:     freqVal,
+  rec_freq_unit:    freqUnit,
+  rec_infinita:     infinita,
+  rec_repeticoes:   infinita ? null : (recRep > 0 ? recRep : null),
+  rec_dt_fim:       infinita ? null : (recDtFim || null),
+  rec_duracao_dias: duracao
+ };
+ // 1ª vez que a recorrência é ligada nesta atividade (não tinha série ainda)
+ // → inicia uma série nova a partir de agora, na ocorrência 1.
+ if (!_taskEditRecSerieId) {
+  patch.rec_serie_id      = _taskEditId;
+  patch.rec_ocorrencia_num = 1;
+  _taskEditRecSerieId = _taskEditId;
+ }
+ _taskAutoSaveQueue(patch, true);
 }
 
 /* ── PREVIEW DA SÉRIE DE RECORRÊNCIA ─────────────────────────────────────── */
