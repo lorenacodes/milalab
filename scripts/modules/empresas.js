@@ -172,6 +172,34 @@ function _empScheduleAutoSave() {
  _empAutoSaveTimer = setTimeout(function(){ _spSaveEmpresa(); }, 700);
 }
 
+// Máscara de CNPJ (00.000.000/0000-00) — regex em cadeia, cada uma pega o
+// que a anterior ainda não formatou (padrão padrão pra esse tipo de máscara
+// progressiva). Aplicada tanto na criação quanto na edição, pra todo CNPJ
+// digitado a partir de agora ficar no mesmo formato (isso também é o que
+// permite a checagem de duplicidade abaixo comparar por igualdade simples
+// em vez de precisar normalizar dois formatos diferentes toda hora).
+function _empCnpjMask(el) {
+ var v = (el.value || '').replace(/\D/g, '').slice(0, 14);
+ v = v.replace(/^(\d{2})(\d)/, '$1.$2');
+ v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+ v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
+ v = v.replace(/(\d{4})(\d)/, '$1-$2');
+ el.value = v;
+}
+// Checa se já existe outra empresa com esse CNPJ (excludeId = ignora a
+// própria empresa, pra não acusar duplicidade dela consigo mesma ao editar
+// sem mudar o CNPJ). Comparação exata (não ilike) — CNPJ é um valor
+// estruturado, "contém" não faz sentido aqui, e todo CNPJ salvo por esta UI
+// já sai mascarado igual (ver _empCnpjMask), então strings iguais = mesmo
+// CNPJ de verdade.
+async function _empCnpjJaExiste(cnpj, excludeId) {
+ if (!cnpj || !_sb) return false;
+ var q = _sb.from('empresas').select('id').eq('cnpj', cnpj).limit(1);
+ if (excludeId) q = q.neq('id', excludeId);
+ var res = await q;
+ return !!(res.data && res.data.length);
+}
+
 var _spEmpCurrentId = '';
 
 async function _spEmpresas(row, tds) {
@@ -208,10 +236,10 @@ async function _spEmpresas(row, tds) {
   + '</div>';
 
  _spSet('Empresa', nome,
-  '<div class="sp-field"><div class="sp-label">Razão Social</div>'
+  '<div class="sp-field"><div class="sp-label">Razão Social <span style="color:var(--red)">*</span></div>'
   + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/"/g,'&quot;')+'" oninput="_empScheduleAutoSave()"></div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-emp-cnpj" value="'+cnpj.replace(/"/g,'&quot;')+'" oninput="_empScheduleAutoSave()"></div>'
+  + '<div class="sp-field"><div class="sp-label">CNPJ <span style="color:var(--red)">*</span></div><input class="sp-inp" id="sp-emp-cnpj" placeholder="00.000.000/0000-00" maxlength="18" value="'+cnpj.replace(/"/g,'&quot;')+'" oninput="_empCnpjMask(this);_empScheduleAutoSave()"></div>'
   + '<div class="sp-field"><div class="sp-label">Estado</div>'+_spEmpEstadoMarkup(estado)+'</div>'
   + '</div>'
   + '<div class="sp-g2">'
@@ -649,13 +677,14 @@ async function _spSaveEmpresa() {
   ultima_modificacao: new Date().toISOString(),
  };
  if (!payload.nome) { _showToast('Informe a Razão Social.', 'erro'); return; }
-
- var btn = document.getElementById('sp-emp-save-btn');
- var { error } = await _sb.from('empresas').update(payload).eq('id', id);
- if (btn) {
-  btn.textContent = error ? 'Erro!' : 'Salvo!';
-  setTimeout(function(){ btn.textContent = 'Salvar'; }, 1800);
+ if (payload.cnpj && await _empCnpjJaExiste(payload.cnpj, id)) {
+  _showToast('Já existe outra empresa cadastrada com este CNPJ.', 'erro');
+  var cnpjEl = document.getElementById('sp-emp-cnpj');
+  if (cnpjEl) { cnpjEl.style.borderColor = 'var(--red)'; setTimeout(function(){ cnpjEl.style.borderColor = ''; }, 2500); }
+  return;
  }
+
+ var { error } = await _sb.from('empresas').update(payload).eq('id', id);
  if (error) {
   _showToast('Erro ao salvar empresa: ' + _supaErrPt(error.message), 'erro');
   return;
@@ -1621,22 +1650,81 @@ function _cttApplyFilters() {
  }
 }
 
-// Cria a empresa direto (nome provisório "Nova empresa", sem outros campos
-// obrigatórios pra abrir) e já abre o painel lateral nela pra edição — mesmo
-// princípio de fricção mínima que o resto do sistema usa em vez de um modal
-// de cadastro à parte. Ponto #6 do pedido: antes isto era só um alert()
-//("a implementar"), então cadastrar empresa não existia de fato na tela.
-async function openNovaEmpresa() {
+// Abre o painel lateral num formulário de criação de verdade — Razão Social
+// e CNPJ marcados com * e validados (inclusive duplicidade de CNPJ) antes de
+// gravar qualquer coisa no banco. Antes disto, a empresa era inserida em
+// branco na hora (só "Nova empresa", sem nada obrigatório) e só depois
+// editada — sem nenhum campo obrigatório de verdade, dava pra "criar" uma
+// empresa sem nome nenhum de sentido nem CNPJ. Vínculos com obra/contato só
+// aparecem depois de criada (não faz sentido vincular algo que ainda não
+// existe no banco).
+function openNovaEmpresa() {
+ _spEmpCurrentId = '';
+ _spEmpCategoriaSel = [];
+ var ov = document.getElementById('sp-overlay'), dr = document.getElementById('sp-drawer');
+ if (_spRow) { _spRow.classList.remove('sp-active'); _spRow = null; }
+ ov.classList.add('sp-open'); dr.classList.add('sp-open');
+ _spSet('Nova empresa', 'Nova empresa',
+  '<div class="sp-field"><div class="sp-label">Razão Social <span style="color:var(--red)">*</span></div>'
+  + '<input class="sp-inp" id="sp-emp-nome" placeholder="Nome da empresa"></div>'
+  + '<div class="sp-g2">'
+  + '<div class="sp-field"><div class="sp-label">CNPJ <span style="color:var(--red)">*</span></div>'
+  + '<input class="sp-inp" id="sp-emp-cnpj" placeholder="00.000.000/0000-00" maxlength="18" oninput="_empCnpjMask(this)"></div>'
+  + '<div class="sp-field"><div class="sp-label">Estado</div>'+_spEmpEstadoMarkup('')+'</div>'
+  + '</div>'
+  + '<div class="sp-g2">'
+  + '<div class="sp-field"><div class="sp-label">Categoria</div><div id="sp-emp-categoria-dropdown"></div></div>'
+  + '<div class="sp-field"><div class="sp-label">Fase</div><select class="sp-inp" id="sp-emp-fase">'+_spEmpOptSelect(EMPRESA_FASE_OPCOES,'')+'</select></div>'
+  + '</div>'
+  + '<div class="sp-field"><div class="sp-label">URL do site</div>'
+  + '<input class="sp-inp" id="sp-emp-site" type="url" placeholder="https://..."></div>'
+  + '<div style="margin-top:14px;font-size:11px;color:var(--muted)">Vínculos com obras e contatos ficam disponíveis depois de criar a empresa.</div>',
+  '<button class="btn btn-primary" id="sp-emp-criar-btn" onclick="_spCriarEmpresa()">Criar empresa</button> <button class="btn btn-ghost" onclick="closePanel()">Cancelar</button>'
+ );
+ _spEmpRenderCategoriaDropdown();
+ document.addEventListener('keydown', _spEsc, {once:true});
+}
+async function _spCriarEmpresa() {
+ var nomeEl = document.getElementById('sp-emp-nome');
+ var cnpjEl = document.getElementById('sp-emp-cnpj');
+ var nome = (nomeEl || {}).value ? nomeEl.value.trim() : '';
+ var cnpj = (cnpjEl || {}).value ? cnpjEl.value.trim() : '';
+ [[nomeEl, nome], [cnpjEl, cnpj]].forEach(function(p) {
+  if (p[0]) { p[0].style.borderColor = p[1] ? '' : 'var(--red)'; p[0].style.boxShadow = p[1] ? '' : '0 0 0 2px rgba(239,68,68,.18)'; }
+ });
+ if (!nome || !cnpj) { _showToast('Preencha os campos obrigatórios (*).', 'erro'); return; }
+ if (cnpj.replace(/\D/g, '').length !== 14) {
+  if (cnpjEl) { cnpjEl.style.borderColor = 'var(--red)'; cnpjEl.style.boxShadow = '0 0 0 2px rgba(239,68,68,.18)'; }
+  _showToast('CNPJ inválido — informe os 14 dígitos.', 'erro');
+  return;
+ }
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
- var res = await _sb.from('empresas').insert({ nome: 'Nova empresa' }).select().single();
+ var btn = document.getElementById('sp-emp-criar-btn');
+ if (btn) { btn.disabled = true; btn.textContent = 'Verificando...'; }
+ if (await _empCnpjJaExiste(cnpj, null)) {
+  _showToast('Já existe uma empresa cadastrada com este CNPJ.', 'erro');
+  if (cnpjEl) { cnpjEl.style.borderColor = 'var(--red)'; cnpjEl.style.boxShadow = '0 0 0 2px rgba(239,68,68,.18)'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Criar empresa'; }
+  return;
+ }
+ var payload = {
+  nome: nome,
+  cnpj: cnpj,
+  estado: ((document.getElementById('sp-emp-estado') || {}).value || '').trim().toUpperCase() || null,
+  fase_ciclo_vida: ((document.getElementById('sp-emp-fase') || {}).value || '').trim() || null,
+  categoria: (_spEmpCategoriaSel || []).slice(),
+  url_site: (document.getElementById('sp-emp-site') || {}).value.trim() || null,
+ };
+ var res = await _sb.from('empresas').insert(payload).select().single();
  if (res.error || !res.data) {
   _showToast('Erro ao criar empresa: ' + _supaErrPt((res.error && res.error.message) || ''), 'erro');
+  if (btn) { btn.disabled = false; btn.textContent = 'Criar empresa'; }
   return;
  }
  await _dbLoadEmpresas();
  var row = document.querySelector('#emp-tbody tr[data-id="'+res.data.id+'"]');
  if (row) _spOpen('empresas', row);
- _showToast('Empresa criada — edite os dados no painel.', 'ok');
+ _showToast('Empresa criada!', 'ok');
 }
 function openNovoContato() { alert('Modal de novo contato — a implementar'); }
 
