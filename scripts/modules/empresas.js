@@ -1895,7 +1895,7 @@ var _empCampos = {
   return Object.keys(set).sort();
  } },
  'ctt': { label: 'Todos os Contatos', type: 'select', opts: ['Com contato','Sem contato'] },
- 'ultalt': { label: 'Última alteração', type: 'select', opts: function(){ return _empOptionsFrom(function(e){ return e.ultima_alteracao_por; }); } }
+ 'ultalt': { label: 'Última alteração', type: 'select', includeEmptyOption: true, opts: function(){ return _empOptionsFrom(function(e){ return e.ultima_alteracao_por; }); } }
 };
 var _cttCampos = {
  'nome': { label: 'Nome', type: 'text' },
@@ -1912,7 +1912,7 @@ var _cttCampos = {
    lados então funciona igual com ou sem essa normalização prévia. */
 var _empFbFields = Object.keys(_empCampos).map(function(k) {
  var c = _empCampos[k];
- return { key: k, label: c.label, type: c.type, options: c.opts || [] };
+ return { key: k, label: c.label, type: c.type, options: c.opts || [], includeEmptyOption: c.includeEmptyOption };
 });
 _fbInit('empresas', _empFbFields, _empApplyFilters);
 
