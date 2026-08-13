@@ -179,12 +179,34 @@ function _empScheduleAutoSave() {
 // permite a checagem de duplicidade abaixo comparar por igualdade simples
 // em vez de precisar normalizar dois formatos diferentes toda hora).
 function _empCnpjMask(el) {
- var v = (el.value || '').replace(/\D/g, '').slice(0, 14);
+ var oldVal = el.value || '';
+ // Conta quantos DÍGITOS existem antes do cursor no valor atual — é essa
+ // contagem (não a posição em caracteres, que muda quando um "." ou "/" é
+ // inserido/removido) que precisa se manter igual depois de reformatar.
+ var cursorPos = (el.selectionStart == null) ? oldVal.length : el.selectionStart;
+ var digitsBeforeCursor = oldVal.slice(0, cursorPos).replace(/\D/g, '').length;
+
+ var v = oldVal.replace(/\D/g, '').slice(0, 14);
  v = v.replace(/^(\d{2})(\d)/, '$1.$2');
  v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
  v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
  v = v.replace(/(\d{4})(\d)/, '$1-$2');
  el.value = v;
+
+ // Recoloca o cursor logo depois do mesmo tanto de dígitos de antes — sem
+ // isso, toda reformatação (inserir um "." ou "/" novo) jogava o cursor pro
+ // final do campo, o efeito colateral clássico de máscara feita à mão:
+ // corrigir um dígito no meio do CNPJ fazia o resto "fugir"/parecer que a
+ // máscara sumiu no meio da digitação.
+ if (digitsBeforeCursor === 0) { el.setSelectionRange(0, 0); return; }
+ var seen = 0, pos = v.length;
+ for (var i = 0; i < v.length; i++) {
+  if (/\d/.test(v.charAt(i))) {
+   seen++;
+   if (seen === digitsBeforeCursor) { pos = i + 1; break; }
+  }
+ }
+ el.setSelectionRange(pos, pos);
 }
 // Checa se já existe outra empresa com esse CNPJ (excludeId = ignora a
 // própria empresa, pra não acusar duplicidade dela consigo mesma ao editar
