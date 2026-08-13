@@ -693,7 +693,8 @@ function switchEmpTab(tab) {
   b.style.borderBottom = active ? '2px solid var(--navy)' : '2px solid transparent';
  });
 
- document.getElementById('btn-nova-empresa').style.display = (tab === 'empresas') ? 'inline-flex' : 'none';
+ // btn-nova-empresa saiu do toolbar (ver comentário no index.html) — só
+ // btn-novo-contato continua sendo alternado por aqui.
  document.getElementById('btn-novo-contato').style.display = (tab === 'contatos') ? 'inline-flex' : 'none';
 }
 
