@@ -396,7 +396,17 @@ function _empLinkRenderList(tipo, q) {
 }
 async function _empLinkAdd(tipo, id, label) {
  var empId = _spEmpCurrentId;
- if (!empId || !id) return;
+ if (!id) return;
+ // Modo criação (painel de "Nova empresa", ainda sem id no banco): guarda só
+ // na fila local — o vínculo de verdade é gravado por _spCriarEmpresa()
+ // junto com a empresa, na mesma ação.
+ if (!empId) {
+  var arr = _spNovaVinculosArr(tipo);
+  if (!arr.some(function(x){ return String(x.id) === String(id); })) arr.push({ id: id, nome: label });
+  _empLinkToggle(tipo);
+  _spNovaVinculosRefresh(tipo);
+  return;
+ }
  var res;
  if (tipo === 'obra') {
   res = await _sb.from('empresas_obras').insert({ empresa_id: empId, obra_id: id });
@@ -1655,12 +1665,56 @@ function _cttApplyFilters() {
 // gravar qualquer coisa no banco. Antes disto, a empresa era inserida em
 // branco na hora (só "Nova empresa", sem nada obrigatório) e só depois
 // editada — sem nenhum campo obrigatório de verdade, dava pra "criar" uma
-// empresa sem nome nenhum de sentido nem CNPJ. Vínculos com obra/contato só
-// aparecem depois de criada (não faz sentido vincular algo que ainda não
-// existe no banco).
+// empresa sem nome nenhum de sentido nem CNPJ. Obra/Contato já dá pra
+// vincular na própria criação (fila local abaixo), sem precisar reabrir o
+// painel depois de criada.
+// Obras/Contatos escolhidos ANTES da empresa existir no banco — não dá pra
+// gravar em empresas_obras/contatos_empresas sem um empresa_id ainda, então
+// ficam só numa fila local ({id, nome}) até _spCriarEmpresa() criar a
+// empresa de verdade e gravar os vínculos juntos, na mesma ação.
+var _spEmpNovaObrasSel = [];
+var _spEmpNovaContatosSel = [];
+function _spNovaVinculosArr(tipo) { return tipo === 'obra' ? _spEmpNovaObrasSel : _spEmpNovaContatosSel; }
+function _spNovaVinculosChipsHTML(tipo) {
+ var arr = _spNovaVinculosArr(tipo);
+ if (!arr.length) return '<div class="sp-empty">Nenhum'+(tipo==='obra'?'a obra':' contato')+' selecionad'+(tipo==='obra'?'a':'o')+'.</div>';
+ return arr.map(function(o){
+  return _spRelChipHTML(tipo==='obra'?'obras':'contatos', o.id, o.nome, null, "_spNovaVinculoRemove('"+tipo+"','"+String(o.id).replace(/'/g,"\\'")+"')");
+ }).join('');
+}
+function _spNovaVinculosHTML() {
+ function secao(tipo, label) {
+  return '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
+   + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+   + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">'+label+'</div>'
+   + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_empLinkToggle(\''+tipo+'\')">+ Vincular</button>'
+   + '</div>'
+   + '<div id="sp-emp-link-'+tipo+'" style="display:none;margin-bottom:8px"></div>'
+   + '<div id="sp-emp-'+(tipo==='obra'?'obras':'contatos')+'" class="sp-rel-chips-wrap">' + _spNovaVinculosChipsHTML(tipo) + '</div></div>';
+ }
+ return secao('obra', 'Obras vinculadas') + secao('contato', 'Contatos vinculados');
+}
+// Re-renderiza só os chips de rascunho a partir da fila local (sem tocar no
+// banco) — chamada tanto depois de adicionar (_empLinkAdd em modo criação)
+// quanto depois de remover (_spNovaVinculoRemove) um item da fila.
+function _spNovaVinculosRefresh(tipo) {
+ var container = document.getElementById(tipo === 'obra' ? 'sp-emp-obras' : 'sp-emp-contatos');
+ if (container) container.innerHTML = _spNovaVinculosChipsHTML(tipo);
+}
+// Chip de rascunho (ainda não gravado) removido só da fila local — nada de
+// chamada ao banco aqui, é exatamente o oposto local de _empLinkAdd em modo
+// criação (ver mais abaixo).
+function _spNovaVinculoRemove(tipo, id) {
+ var arr = _spNovaVinculosArr(tipo);
+ var idx = arr.findIndex(function(x){ return String(x.id) === String(id); });
+ if (idx !== -1) arr.splice(idx, 1);
+ _spNovaVinculosRefresh(tipo);
+}
 function openNovaEmpresa() {
  _spEmpCurrentId = '';
  _spEmpCategoriaSel = [];
+ _spEmpNovaObrasSel = [];
+ _spEmpNovaContatosSel = [];
  var ov = document.getElementById('sp-overlay'), dr = document.getElementById('sp-drawer');
  if (_spRow) { _spRow.classList.remove('sp-active'); _spRow = null; }
  ov.classList.add('sp-open'); dr.classList.add('sp-open');
@@ -1678,7 +1732,7 @@ function openNovaEmpresa() {
   + '</div>'
   + '<div class="sp-field"><div class="sp-label">URL do site</div>'
   + '<input class="sp-inp" id="sp-emp-site" type="url" placeholder="https://..."></div>'
-  + '<div style="margin-top:14px;font-size:11px;color:var(--muted)">Vínculos com obras e contatos ficam disponíveis depois de criar a empresa.</div>',
+  + _spNovaVinculosHTML(),
   '<button class="btn btn-primary" id="sp-emp-criar-btn" onclick="_spCriarEmpresa()">Criar empresa</button> <button class="btn btn-ghost" onclick="closePanel()">Cancelar</button>'
  );
  _spEmpRenderCategoriaDropdown();
@@ -1721,10 +1775,29 @@ async function _spCriarEmpresa() {
   if (btn) { btn.disabled = false; btn.textContent = 'Criar empresa'; }
   return;
  }
+ // Grava os vínculos escolhidos ANTES de existir empresa_id (fila local, ver
+ // _spEmpNovaObrasSel/_spEmpNovaContatosSel) agora que a empresa já existe
+ // de verdade — na mesma ação de criar, sem precisar reabrir o painel e
+ // vincular tudo de novo depois.
+ var novoId = res.data.id;
+ var vincErros = [];
+ if (_spEmpNovaObrasSel.length) {
+  var rObras = await _sb.from('empresas_obras').insert(_spEmpNovaObrasSel.map(function(o){ return { empresa_id: novoId, obra_id: o.id }; }));
+  if (rObras.error) vincErros.push(rObras.error);
+ }
+ if (_spEmpNovaContatosSel.length) {
+  var rContatos = await _sb.from('contatos_empresas').insert(_spEmpNovaContatosSel.map(function(c){ return { empresa_id: novoId, contato_id: c.id }; }));
+  if (rContatos.error) vincErros.push(rContatos.error);
+ }
  await _dbLoadEmpresas();
- var row = document.querySelector('#emp-tbody tr[data-id="'+res.data.id+'"]');
+ var row = document.querySelector('#emp-tbody tr[data-id="'+novoId+'"]');
  if (row) _spOpen('empresas', row);
- _showToast('Empresa criada!', 'ok');
+ if (vincErros.length) {
+  _showToast('Empresa criada, mas houve erro ao vincular obra/contato.', 'erro');
+  console.error('[_spCriarEmpresa] erro(s) ao vincular:', vincErros);
+ } else {
+  _showToast('Empresa criada!', 'ok');
+ }
 }
 function openNovoContato() { alert('Modal de novo contato — a implementar'); }
 
