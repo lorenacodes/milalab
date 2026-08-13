@@ -1359,6 +1359,13 @@ var _empGroupCollapsed = {};
 // "Múltiplas categorias", mesmo espírito de _gestorGroupKeyFor colapsando
 // responsável multi-valorado em "Tarefas Coletivas".
 function _empGroupKeyFor(e, field) {
+ // "Nome" agrupa por letra inicial (A, B, C...) — estilo índice alfabético
+ // (Notion/Airtable) — agrupar pelo nome completo criaria um grupo por
+ // empresa, o que não serve pra nada como agrupamento.
+ if (field === 'nome') {
+  var n = (e.nome || '').trim();
+  return { key: n ? n.charAt(0).toUpperCase() : '— Sem nome', sortKey: null };
+ }
  if (field === 'fase') return { key: e.fase_ciclo_vida || '— Sem fase', sortKey: null };
  if (field === 'estado') return { key: (e.estado || '— Sem estado').toUpperCase(), sortKey: null };
  if (field === 'categoria') {
@@ -1688,6 +1695,7 @@ _sbInit('empresas', _empSbFields, _empApplyFilters);
 // múltiplos níveis como o Gestor de Tarefas tem). Campos mínimos pedidos:
 // Fase, Estado, Categoria (ver _empGroupKeyFor acima pra semântica de cada).
 _gbInit('empresas', [
+ { key: 'nome',      label: 'Nome' },
  { key: 'fase',      label: 'Fase' },
  { key: 'estado',    label: 'Estado' },
  { key: 'categoria', label: 'Categoria' },
