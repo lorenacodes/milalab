@@ -676,6 +676,7 @@ function _gestorPopulateFilters() {
   { key: 'prioridade',  label: 'Prioridade', type: 'number', getValue: function(a){ return _prioOrdemSort[a.prioridade] ?? 3; } },
   { key: 'status',      label: 'Status',     type: 'text', getValue: function(a){ return a.status||''; } },
   { key: 'area',        label: 'Área',       type: 'text' },
+  { key: 'obra',        label: 'Obra',       type: 'text', getValue: function(a){ return a._obraNome||''; } },
  ], _gestorApplyFilters);
  // Só inicializa o nível padrão (Prazo ↑) na primeira vez — trocas de aba/
  // dados não devem resetar uma ordenação que a pessoa já escolheu.
@@ -690,6 +691,7 @@ function _gestorPopulateFilters() {
  // campo comum — é uma relação hierárquica própria), sem entrar no sistema
  // genérico de múltiplos níveis.
  _gbInit('gestor', [
+  { key: 'titulo',        label: 'Nome da Tarefa' },
   { key: 'responsavel',   label: 'Responsável' },
   { key: 'tipo_resp',     label: 'Individual / Coletiva' },
   { key: 'status',        label: 'Status' },
@@ -976,6 +978,14 @@ function _gestorSyncGroupedColumn(fields) {
 // _gtTreeCount), com teste automatizado próprio. Aqui só fica o que é
 // específico do Gestor de Tarefas: como cada CAMPO vira chave de grupo.
 function _gestorGroupKeyFor(a, field) {
+ // "Nome da Tarefa" agrupa por letra inicial (A, B, C...) — índice
+ // alfabético, mesmo critério já usado em "Nome" no agrupamento de Empresas
+ // (_empGroupKeyFor): agrupar pelo título completo criaria um grupo por
+ // tarefa, o que não serve pra nada como agrupamento.
+ if (field === 'titulo') {
+  var t = (a.titulo || '').trim();
+  return { key: t ? t.charAt(0).toUpperCase() : '— Sem título', sortKey: null };
+ }
  if (field === 'responsavel') {
   var respList = (a.responsavel || '').split(/[,;]+/).map(function(r){ return r.trim(); }).filter(Boolean);
   return { key: respList.length === 0 ? '— Sem responsável' : (respList.length === 1 ? respList[0] : 'Tarefas Coletivas'), sortKey: null };
