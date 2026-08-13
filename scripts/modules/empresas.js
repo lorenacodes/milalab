@@ -201,7 +201,13 @@ async function _spEmpresas(row, tds) {
   + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando contatos...</div>'
   + '</div></div>'
   + auditHtml,
-  '<button class="btn btn-primary" id="sp-emp-save-btn" onclick="_spSaveEmpresa()">Salvar</button> <button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
+  // Sem botão "Salvar": o painel já autosalva (_empScheduleAutoSave, ver
+  // campos acima) — pedir pra clicar em algo pra persistir uma mudança que
+  // já foi salva sozinha é redundante e confunde ("salvei ou não?").
+  // "Excluir" fica aqui (com confirmação) em vez de só na listagem, porque
+  // é a única ação puramente destrutiva do painel.
+  '<button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);margin-right:auto" onclick="_spDeleteEmpresa(\''+empId+'\',\''+nome.replace(/'/g,"\\'")+'\')">Excluir empresa</button> '
+  + '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
  );
 
  _spEmpRenderCategoriaDropdown();
@@ -267,42 +273,59 @@ async function _spEmpresas(row, tds) {
 // depende de _obrasAll/_contatosArr (populados só quando Dashboard/Contatos
 // já foram visitados nesta sessão), então funciona mesmo abrindo Empresas
 // como primeira tela.
-var _empLinkSearchTimer = null;
+// Mesmo componente visual/estrutural do seletor de Estado acima (_spEmpEstadoMarkup)
+// e do picker de Obra/Projeto do Gestor de Tarefas (nt-obra-* em dashboard.js):
+// caixa com busca embutida que já abre com a lista carregada (não fica vazia
+// até digitar 2+ letras — esse era o bug real do "não aparecem as obras": a
+// versão anterior só buscava a partir do 2º caractere e não mostrava nada de
+// cara). Clicar num item já vincula na hora (sem precisar de um botão
+// "Confirmar" à parte) e a caixa fecha sozinha.
+var _empLinkCache = { obra: null, contato: null }; // cache da lista completa por tipo, carregada 1x por abertura
 function _empLinkToggle(tipo) {
  var box = document.getElementById('sp-emp-link-' + tipo);
  if (!box) return;
  var abrir = box.style.display === 'none';
- // Fecha a outra caixa (obra/contato), só uma aberta por vez.
  ['obra','contato'].forEach(function(t){
   var b = document.getElementById('sp-emp-link-' + t);
   if (b && t !== tipo) b.style.display = 'none';
  });
  box.style.display = abrir ? '' : 'none';
  if (!abrir) { box.innerHTML = ''; return; }
- box.innerHTML = '<input class="sp-inp" type="text" placeholder="Buscar '+(tipo==='obra'?'obra':'contato')+' pelo nome..." '
-  + 'oninput="_empLinkSearch(\''+tipo+'\', this.value)" autofocus>'
-  + '<div class="sp-rel-chips-wrap" id="sp-emp-link-'+tipo+'-results" style="margin-top:6px"></div>';
+ box.innerHTML = '<div class="srch-sel" style="width:100%">'
+  + '<div class="srch-sel-drop open" style="position:static;box-shadow:none;border:1px solid var(--border)">'
+  + '<input class="srch-sel-inp" type="text" placeholder="Buscar '+(tipo==='obra'?'obra':'contato')+' pelo nome..." '
+  + 'oninput="_empLinkFilter(\''+tipo+'\', this.value)">'
+  + '<div class="srch-sel-list" id="sp-emp-link-'+tipo+'-list"><div class="srch-sel-empty">Carregando...</div></div>'
+  + '</div></div>';
+ _empLinkLoad(tipo);
 }
-function _empLinkSearch(tipo, q) {
- if (_empLinkSearchTimer) clearTimeout(_empLinkSearchTimer);
- var resultsEl = document.getElementById('sp-emp-link-' + tipo + '-results');
- if (!resultsEl) return;
- q = (q || '').trim();
- if (q.length < 2) { resultsEl.innerHTML = ''; return; }
- _empLinkSearchTimer = setTimeout(function() {
-  var table = tipo === 'obra' ? 'obras' : 'contatos';
-  var col   = tipo === 'obra' ? 'nome'  : 'nome_completo';
-  _sb.from(table).select('id, ' + col).ilike(col, '%' + q + '%').limit(8).then(function(res) {
-   if (res.error || !res.data) { resultsEl.innerHTML = ''; return; }
-   if (!res.data.length) { resultsEl.innerHTML = '<div class="sp-empty">Nada encontrado.</div>'; return; }
-   resultsEl.innerHTML = res.data.map(function(r) {
-    var label = (r[col] || '—').replace(/</g,'&lt;');
-    var idSafe = String(r.id).replace(/'/g,"\\'");
-    return '<div class="sp-rel-chip" style="cursor:pointer" onclick="_empLinkAdd(\''+tipo+'\',\''+idSafe+'\',\''+label.replace(/'/g,"\\'")+'\')">'
-     + '<span class="sp-rel-chip-label">' + label + '</span></div>';
-   }).join('');
-  });
- }, 300);
+// Carrega a lista completa (as ~1500 obras/700 contatos cabem tranquilo numa
+// única chamada — mesmo padrão de _lookupPage em tarefas.js) só na 1ª vez que
+// a caixa abre nesta sessão de painel; filtrar depois é local (sem round-trip
+// no banco a cada tecla).
+function _empLinkLoad(tipo) {
+ var table = tipo === 'obra' ? 'obras' : 'contatos';
+ var col   = tipo === 'obra' ? 'nome'  : 'nome_completo';
+ _sb.from(table).select('id, ' + col).order(col).limit(2000).then(function(res) {
+  _empLinkCache[tipo] = (res.data || []).map(function(r){ return { id: r.id, nome: r[col] || '—' }; });
+  _empLinkRenderList(tipo, '');
+ });
+}
+function _empLinkFilter(tipo, q) { _empLinkRenderList(tipo, q); }
+function _empLinkRenderList(tipo, q) {
+ var listEl = document.getElementById('sp-emp-link-' + tipo + '-list');
+ if (!listEl) return;
+ var all = _empLinkCache[tipo];
+ if (!all) { listEl.innerHTML = '<div class="srch-sel-empty">Carregando...</div>'; return; }
+ var qn = (q || '').trim().toLowerCase();
+ var matches = qn ? all.filter(function(o){ return o.nome.toLowerCase().indexOf(qn) !== -1; }) : all;
+ matches = matches.slice(0, 50); // lista já filtrada localmente, só limita o DOM renderizado
+ if (!matches.length) { listEl.innerHTML = '<div class="srch-sel-empty">Nenhum(a) '+(tipo==='obra'?'obra':'contato')+' encontrado(a).</div>'; return; }
+ listEl.innerHTML = matches.map(function(o) {
+  var label = (o.nome || '—').replace(/</g,'&lt;');
+  var idSafe = String(o.id).replace(/'/g,"\\'");
+  return '<div class="srch-sel-opt" onclick="_empLinkAdd(\''+tipo+'\',\''+idSafe+'\',\''+label.replace(/'/g,"\\'")+'\')">' + label + '</div>';
+ }).join('');
 }
 async function _empLinkAdd(tipo, id, label) {
  var empId = _spEmpCurrentId;
@@ -590,6 +613,23 @@ async function _spSaveEmpresa() {
   if (tr) tr.outerHTML = _empRowHTML(_empresasArr[idx]);
   if (typeof _empApplyFilters === 'function') _empApplyFilters();
  }
+}
+
+// Mesmo padrão de confirm() nativo já usado em _taskDelete (dashboard.js) e
+// excluirFornecedor — não é um modal custom, é o confirm() do navegador
+// mesmo, consistente com o resto do sistema.
+async function _spDeleteEmpresa(id, nome) {
+ if (!id) return;
+ if (!confirm('Excluir "' + (nome || 'esta empresa') + '"?\n\nOs vínculos com obras e contatos também serão removidos. Esta ação não pode ser desfeita.')) return;
+ closePanel();
+ _showToast('Excluindo...', 'ok');
+ var res = await _sb.from('empresas').delete().eq('id', id);
+ if (res.error) {
+  _showToast('Erro ao excluir: ' + _supaErrPt(res.error.message), 'erro');
+  return;
+ }
+ _showToast('Empresa excluída.', 'ok');
+ _dbLoadEmpresas();
 }
 
 function switchEmpTab(tab) {
