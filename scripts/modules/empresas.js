@@ -87,6 +87,7 @@ function _spEmpEstadoSelectItem(uf) {
  if (valEl) { valEl.textContent = uf; valEl.classList.remove('placeholder'); }
  if (clrEl) clrEl.style.display = uf ? '' : 'none';
  _spEmpEstadoClose();
+ if (typeof _empScheduleAutoSave === 'function') _empScheduleAutoSave();
 }
 function _spEmpEstadoClear() {
  _spEmpEstadoSelectItem('');
@@ -117,16 +118,33 @@ function _spEmpCategoriaToggle(campo, valor, checked) {
  _spEmpCategoriaSel = _msToggle(_spEmpCategoriaSel, valor, checked);
  var btn = document.querySelector('#sp-emp-categoria-dropdown .fb-msel-btn');
  if (btn) btn.textContent = _spEmpCategoriaSel.length ? _spEmpCategoriaSel.length + ' selecionado(s)' : 'Selecione a(s) categoria(s)';
+ if (typeof _empScheduleAutoSave === 'function') _empScheduleAutoSave();
 }
+
+// Debounce simples de autosave — dispara _spSaveEmpresa() 700ms depois da
+// última tecla/mudança, pra não bater no banco a cada caractere digitado.
+// Ponto #2 do pedido: painel de Empresa era só-manual (só salvava no clique
+// de "Salvar"), diferente do Gestor de Tarefas (_taskAutoSaveQueue) — agora
+// segue o mesmo princípio, o botão "Salvar" continua existindo como reforço/
+// atalho, mas deixa de ser a ÚNICA forma de persistir uma mudança.
+var _empAutoSaveTimer = null;
+function _empScheduleAutoSave() {
+ if (_empAutoSaveTimer) clearTimeout(_empAutoSaveTimer);
+ _empAutoSaveTimer = setTimeout(function(){ _spSaveEmpresa(); }, 700);
+}
+
+var _spEmpCurrentId = '';
 
 async function _spEmpresas(row, tds) {
  var d = row.dataset;
  var empId = d.id || '';
+ _spEmpCurrentId = empId;
  // Fonte de verdade: cache carregado do Supabase (_empresasArr), não o dataset
  // da linha (que fica em minúsculas, só para filtro) nem o DOM renderizado.
  var emp = (_empresasArr || []).find(function(e){ return String(e.id) === String(empId); }) || {};
  var nome = emp.nome || d.nome || '';
  var cnpj = emp.cnpj || '';
+ var site = emp.url_site || '';
  var estado = (emp.estado || '').toUpperCase();
  var fase   = emp.fase_ciclo_vida || '';
  _spEmpCategoriaSel = (emp.categoria || []).slice();
@@ -152,23 +170,33 @@ async function _spEmpresas(row, tds) {
 
  _spSet('Empresa', nome,
   '<div class="sp-field"><div class="sp-label">Razão Social</div>'
-  + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/"/g,'&quot;')+'"></div>'
+  + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/"/g,'&quot;')+'" oninput="_empScheduleAutoSave()"></div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-emp-cnpj" value="'+cnpj.replace(/"/g,'&quot;')+'"></div>'
+  + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-emp-cnpj" value="'+cnpj.replace(/"/g,'&quot;')+'" oninput="_empScheduleAutoSave()"></div>'
   + '<div class="sp-field"><div class="sp-label">Estado</div>'+_spEmpEstadoMarkup(estado)+'</div>'
   + '</div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Categoria</div><div id="sp-emp-categoria-dropdown"></div></div>'
-  + '<div class="sp-field"><div class="sp-label">Fase</div><select class="sp-inp" id="sp-emp-fase">'+_spEmpOptSelect(EMPRESA_FASE_OPCOES, fase)+'</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Fase</div><select class="sp-inp" id="sp-emp-fase" onchange="_empScheduleAutoSave()">'+_spEmpOptSelect(EMPRESA_FASE_OPCOES, fase)+'</select></div>'
   + '</div>'
+  + '<div class="sp-field"><div class="sp-label">URL do site</div>'
+  + '<input class="sp-inp" id="sp-emp-site" type="url" placeholder="https://..." value="'+site.replace(/"/g,'&quot;')+'" oninput="_empScheduleAutoSave()"></div>'
   + '<input type="hidden" id="sp-emp-id" value="'+empId+'">'
   + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
-  + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Obras vinculadas</div>'
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+  + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">Obras vinculadas</div>'
+  + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_empLinkToggle(\'obra\')">+ Vincular</button>'
+  + '</div>'
+  + '<div id="sp-emp-link-obra" style="display:none;margin-bottom:8px"></div>'
   + '<div id="sp-emp-obras" class="sp-rel-chips-wrap">'
   + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando obras...</div>'
   + '</div></div>'
   + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
-  + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Contatos vinculados</div>'
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+  + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">Contatos vinculados</div>'
+  + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_empLinkToggle(\'contato\')">+ Vincular</button>'
+  + '</div>'
+  + '<div id="sp-emp-link-contato" style="display:none;margin-bottom:8px"></div>'
   + '<div id="sp-emp-contatos" class="sp-rel-chips-wrap">'
   + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando contatos...</div>'
   + '</div></div>'
@@ -232,6 +260,70 @@ async function _spEmpresas(row, tds) {
  }).join('');
 }
 
+// ── Vincular Obra/Contato a partir do painel de Empresa (ponto #5 do pedido:
+// antes só dava pra VER obras/contatos já vinculados, não pra associar um
+// novo por aqui — só editando o outro lado, obra por obra/contato por
+// contato). Busca ao vivo (debounce) por nome direto no Supabase — não
+// depende de _obrasAll/_contatosArr (populados só quando Dashboard/Contatos
+// já foram visitados nesta sessão), então funciona mesmo abrindo Empresas
+// como primeira tela.
+var _empLinkSearchTimer = null;
+function _empLinkToggle(tipo) {
+ var box = document.getElementById('sp-emp-link-' + tipo);
+ if (!box) return;
+ var abrir = box.style.display === 'none';
+ // Fecha a outra caixa (obra/contato), só uma aberta por vez.
+ ['obra','contato'].forEach(function(t){
+  var b = document.getElementById('sp-emp-link-' + t);
+  if (b && t !== tipo) b.style.display = 'none';
+ });
+ box.style.display = abrir ? '' : 'none';
+ if (!abrir) { box.innerHTML = ''; return; }
+ box.innerHTML = '<input class="sp-inp" type="text" placeholder="Buscar '+(tipo==='obra'?'obra':'contato')+' pelo nome..." '
+  + 'oninput="_empLinkSearch(\''+tipo+'\', this.value)" autofocus>'
+  + '<div class="sp-rel-chips-wrap" id="sp-emp-link-'+tipo+'-results" style="margin-top:6px"></div>';
+}
+function _empLinkSearch(tipo, q) {
+ if (_empLinkSearchTimer) clearTimeout(_empLinkSearchTimer);
+ var resultsEl = document.getElementById('sp-emp-link-' + tipo + '-results');
+ if (!resultsEl) return;
+ q = (q || '').trim();
+ if (q.length < 2) { resultsEl.innerHTML = ''; return; }
+ _empLinkSearchTimer = setTimeout(function() {
+  var table = tipo === 'obra' ? 'obras' : 'contatos';
+  var col   = tipo === 'obra' ? 'nome'  : 'nome_completo';
+  _sb.from(table).select('id, ' + col).ilike(col, '%' + q + '%').limit(8).then(function(res) {
+   if (res.error || !res.data) { resultsEl.innerHTML = ''; return; }
+   if (!res.data.length) { resultsEl.innerHTML = '<div class="sp-empty">Nada encontrado.</div>'; return; }
+   resultsEl.innerHTML = res.data.map(function(r) {
+    var label = (r[col] || '—').replace(/</g,'&lt;');
+    var idSafe = String(r.id).replace(/'/g,"\\'");
+    return '<div class="sp-rel-chip" style="cursor:pointer" onclick="_empLinkAdd(\''+tipo+'\',\''+idSafe+'\',\''+label.replace(/'/g,"\\'")+'\')">'
+     + '<span class="sp-rel-chip-label">' + label + '</span></div>';
+   }).join('');
+  });
+ }, 300);
+}
+async function _empLinkAdd(tipo, id, label) {
+ var empId = _spEmpCurrentId;
+ if (!empId || !id) return;
+ var res;
+ if (tipo === 'obra') {
+  res = await _sb.from('empresas_obras').insert({ empresa_id: empId, obra_id: id });
+ } else {
+  res = await _sb.from('contatos_empresas').insert({ empresa_id: empId, contato_id: id });
+ }
+ if (res.error) {
+  _showToast('Erro ao vincular: ' + _supaErrPt(res.error.message), 'erro');
+  return;
+ }
+ _showToast((tipo==='obra'?'Obra':'Contato') + ' vinculado(a)!', 'ok');
+ _empLinkToggle(tipo); // fecha a busca
+ // Recarrega só os chips da seção afetada, sem fechar o painel.
+ var row = document.querySelector('#emp-tbody tr[data-id="'+empId+'"]');
+ if (row) _spEmpresas(row, []);
+}
+
 // ── Renderer: Contatos ───────────────────────────────────────────────────────
 function _spContatos(row, tds) {
  _spContatoById(row.dataset.id);
@@ -280,6 +372,7 @@ function _empFaseTag(fase) {
 function _empRowHTML(e) {
  var initials = (e.nome||'?').split(' ').filter(Boolean).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();
  var nCtt = (e.contatos_empresas||[]).length;
+ var obraNomes = (e.empresas_obras||[]).map(function(l){ return l.obra && l.obra.nome; }).filter(Boolean);
  var cats = (e.categoria||[]);
  var fase = e.fase_ciclo_vida || '—';
  return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'empresas\',this)"'
@@ -287,8 +380,12 @@ function _empRowHTML(e) {
   + ' data-nome="'+(e.nome||'').toLowerCase()+'"'
   + ' data-fase="'+fase.toLowerCase()+'"'
   + ' data-estado="'+(e.estado||'').toLowerCase()+'"'
-  + ' data-categoria="'+cats.join(',').toLowerCase()+'">'
-  + '<td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>'
+  + ' data-categoria="'+cats.join(',').toLowerCase()+'"'
+  + ' data-cnpj="'+(e.cnpj||'').toLowerCase()+'"'
+  + ' data-site="'+(e.url_site||'').toLowerCase()+'"'
+  + ' data-ultalt="'+(e.ultima_alteracao_por||'').toLowerCase()+'"'
+  + ' data-obra="'+obraNomes.join(',').toLowerCase()+'"'
+  + ' data-ctt="'+(nCtt>0?'com contato':'sem contato')+'">'
   + '<td><div style="display:flex;align-items:center;gap:10px">'
   + '<div class="nt-avatar" style="background:'+_empColor(e.nome)+'">'+initials+'</div>'
   + '<div><div style="font-weight:500;font-size:13px">'+e.nome+'</div>'
@@ -304,11 +401,11 @@ function _empRowHTML(e) {
 
 async function _dbLoadEmpresas() {
  var tbody0 = document.getElementById('emp-tbody');
- if (tbody0) tbody0.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Carregando...</td></tr>';
+ if (tbody0) tbody0.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Carregando...</td></tr>';
  var allData = []; var from = 0; var more = true;
  while (more) {
   var res = await _sb.from('empresas')
-   .select('id, nome, cnpj, estado, fase_ciclo_vida, categoria, criado_por, ultima_alteracao_por, ultima_modificacao, created_at, contatos_empresas(contato_id)')
+   .select('id, nome, cnpj, estado, fase_ciclo_vida, categoria, url_site, criado_por, ultima_alteracao_por, ultima_modificacao, created_at, contatos_empresas(contato_id), empresas_obras(obra:obra_id(nome))')
    .order('nome').range(from, from + 999);
   if (res.error || !res.data || !res.data.length) break;
   allData = allData.concat(res.data);
@@ -402,7 +499,6 @@ function _cttRowHTML(c) {
   + ' data-nome="'+nome.toLowerCase()+'"'
   + ' data-cargo="'+(c.cargo||'').toLowerCase()+'"'
   + ' data-empresa="'+empNome.toLowerCase()+'">'
-  + '<td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>'
   + '<td><div style="display:flex;align-items:center;gap:9px">'
   + '<div class="nt-avatar nt-avatar-circle" style="background:'+_cttColor(nome)+'">'+initials+'</div>'
   + '<div style="font-weight:500;font-size:13px">'+nome+'</div>'
@@ -418,7 +514,7 @@ function _cttRowHTML(c) {
 // ── Load Contatos (cache global + renderiza tabela) ───────────────────────────
 async function _dbLoadContatos() {
  var tbody0 = document.getElementById('ctt-tbody');
- if (tbody0) tbody0.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Carregando...</td></tr>';
+ if (tbody0) tbody0.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Carregando...</td></tr>';
  var allData = []; var from = 0; var more = true;
  while (more) {
   var res = await _sb.from('contatos')
@@ -452,11 +548,13 @@ async function _dbLoadContatos() {
 
 // ── Salvar Empresa (painel lateral) ────────────────────────────────────────────
 async function _spSaveEmpresa() {
+ if (_empAutoSaveTimer) { clearTimeout(_empAutoSaveTimer); _empAutoSaveTimer = null; }
  var id = (document.getElementById('sp-emp-id') || {}).value;
  if (!_sb || !id) return;
  var payload = {
   nome:            (document.getElementById('sp-emp-nome')    || {}).value.trim() || '',
   cnpj:            (document.getElementById('sp-emp-cnpj')    || {}).value.trim() || null,
+  url_site:        (document.getElementById('sp-emp-site')    || {}).value.trim() || null,
   estado:          ((document.getElementById('sp-emp-estado') || {}).value || '').trim().toUpperCase() || null,
   fase_ciclo_vida: ((document.getElementById('sp-emp-fase')    || {}).value || '').trim() || null,
   categoria:       (_spEmpCategoriaSel || []).slice(),
@@ -482,8 +580,16 @@ async function _spSaveEmpresa() {
  }
  var titleEl = document.getElementById('sp-title');
  if (titleEl) titleEl.textContent = payload.nome;
- _showToast('Empresa salva com sucesso!', 'ok');
- _dbLoadEmpresas();
+ // Atualiza o cache local em vez de recarregar as 638 empresas do banco a
+ // cada autosave (a cada pausa de digitação) — só a linha/registro editado
+ // muda; _dbLoadEmpresas() completo fica só pra criação/exclusão de fato.
+ var idx = (_empresasArr || []).findIndex(function(e){ return String(e.id) === String(id); });
+ if (idx !== -1) {
+  Object.assign(_empresasArr[idx], payload);
+  var tr = document.querySelector('#emp-tbody tr[data-id="'+id+'"]');
+  if (tr) tr.outerHTML = _empRowHTML(_empresasArr[idx]);
+  if (typeof _empApplyFilters === 'function') _empApplyFilters();
+ }
 }
 
 function switchEmpTab(tab) {
@@ -1187,11 +1293,18 @@ function _empGroupKeyFor(e, field) {
 // real carregaria em data-* — assim _fbEvaluate/_sbCompare (que leem
 // item[key] por padrão) funcionam idêntico com ou sem DOM.
 function _empPseudoDataset(e) {
+ var nCtt = (e.contatos_empresas||[]).length;
+ var obraNomes = (e.empresas_obras||[]).map(function(l){ return l.obra && l.obra.nome; }).filter(Boolean);
  return {
   nome: (e.nome || '').toLowerCase(),
   fase: (e.fase_ciclo_vida || '').toLowerCase(),
   estado: (e.estado || '').toLowerCase(),
   categoria: (e.categoria || []).join(',').toLowerCase(),
+  cnpj: (e.cnpj || '').toLowerCase(),
+  site: (e.url_site || '').toLowerCase(),
+  ultalt: (e.ultima_alteracao_por || '').toLowerCase(),
+  obra: obraNomes.join(',').toLowerCase(),
+  ctt: nCtt > 0 ? 'com contato' : 'sem contato',
  };
 }
 function _empToggleGroup(key) {
@@ -1210,7 +1323,7 @@ function _empRenderGroupNode(node, path, rowsArr) {
   var total = _gtTreeCount(child);
   rowsArr.push(
    '<tr class="gestor-group-hd" onclick="_empToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="7" style="padding-left:12px">'
+   + '<td colspan="6" style="padding-left:12px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
    + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' empresa' + (total !== 1 ? 's' : '') + '</span>'
@@ -1238,7 +1351,7 @@ function _empRenderGrouped(groupField) {
  var tree = _gtBuildTree(filtered, [{ field: groupField, dir: _gbPrimaryDir('empresas') }], _empGroupKeyFor, null, 0);
  var rowsArr = [];
  _empRenderGroupNode(tree, [], rowsArr);
- tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma empresa encontrada.</td></tr>';
+ tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma empresa encontrada.</td></tr>';
 
  var fbBadge = document.getElementById('fb-badge-empresas');
  if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
@@ -1327,7 +1440,7 @@ function _cttRenderGroupNode(node, path, rowsArr) {
   var total = _gtTreeCount(child);
   rowsArr.push(
    '<tr class="gestor-group-hd" onclick="_cttToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="7" style="padding-left:12px">'
+   + '<td colspan="6" style="padding-left:12px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
    + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' contato' + (total !== 1 ? 's' : '') + '</span>'
@@ -1355,7 +1468,7 @@ function _cttRenderGrouped(groupField) {
  var tree = _gtBuildTree(filtered, [{ field: groupField, dir: _gbPrimaryDir('contatos') }], _cttGroupKeyFor, null, 0);
  var rowsArr = [];
  _cttRenderGroupNode(tree, [], rowsArr);
- tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhum contato encontrado.</td></tr>';
+ tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhum contato encontrado.</td></tr>';
 
  var fbBadge = document.getElementById('fb-badge-contatos');
  if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
@@ -1401,7 +1514,23 @@ function _cttApplyFilters() {
  }
 }
 
-function openNovaEmpresa() { alert('Modal de nova empresa — a implementar'); }
+// Cria a empresa direto (nome provisório "Nova empresa", sem outros campos
+// obrigatórios pra abrir) e já abre o painel lateral nela pra edição — mesmo
+// princípio de fricção mínima que o resto do sistema usa em vez de um modal
+// de cadastro à parte. Ponto #6 do pedido: antes isto era só um alert()
+//("a implementar"), então cadastrar empresa não existia de fato na tela.
+async function openNovaEmpresa() {
+ if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
+ var res = await _sb.from('empresas').insert({ nome: 'Nova empresa' }).select().single();
+ if (res.error || !res.data) {
+  _showToast('Erro ao criar empresa: ' + _supaErrPt((res.error && res.error.message) || ''), 'erro');
+  return;
+ }
+ await _dbLoadEmpresas();
+ var row = document.querySelector('#emp-tbody tr[data-id="'+res.data.id+'"]');
+ if (row) _spOpen('empresas', row);
+ _showToast('Empresa criada — edite os dados no painel.', 'ok');
+}
 function openNovoContato() { alert('Modal de novo contato — a implementar'); }
 
 // ── Estado dos filtros (movido de dashboard.js) ──────────────────────────────
@@ -1419,6 +1548,15 @@ var CONTATO_CARGO_OPCOES = [
  'Gerente de projetos', 'Presidente', 'Projetista', 'Representante Comercial', 'Sócia',
  'SÓCIO', 'Sócio(a)', 'Técnico'
 ];
+// Opções dinâmicas (dependem dos dados carregados, não dá pra fixar num
+// array estático como Fase/Estado) — mesmo padrão de _gestorOptionsFrom em
+// tarefas.js: recalculadas sob demanda a partir de _empresasArr sempre que o
+// popover de Filtro abre.
+function _empOptionsFrom(getter) {
+ var set = {};
+ (_empresasArr || []).forEach(function(e) { var v = getter(e); if (v) set[v] = 1; });
+ return Object.keys(set).sort();
+}
 var _empCampos = {
  'nome': { label: 'Empresa', type: 'text' },
  // type 'multitext' é o tipo que filtro-builder.js já entende pra campos
@@ -1428,7 +1566,16 @@ var _empCampos = {
  // que _fbEvalCondition espera pra esse tipo.
  'categoria': { label: 'Categoria', type: 'multitext', opts: EMPRESA_CATEGORIA_OPCOES },
  'fase': { label: 'Fase', type: 'select', opts: EMPRESA_FASE_OPCOES },
- 'estado': { label: 'Estado', type: 'select', opts: EMPRESA_ESTADO_OPCOES }
+ 'estado': { label: 'Estado', type: 'select', opts: EMPRESA_ESTADO_OPCOES },
+ 'cnpj': { label: 'CNPJ', type: 'text' },
+ 'site': { label: 'URL do site', type: 'text' },
+ 'obra': { label: 'Obra', type: 'multitext', opts: function(){
+  var set = {};
+  (_empresasArr || []).forEach(function(e){ (e.empresas_obras||[]).forEach(function(l){ if (l.obra && l.obra.nome) set[l.obra.nome] = 1; }); });
+  return Object.keys(set).sort();
+ } },
+ 'ctt': { label: 'Todos os Contatos', type: 'select', opts: ['Com contato','Sem contato'] },
+ 'ultalt': { label: 'Última alteração', type: 'select', opts: function(){ return _empOptionsFrom(function(e){ return e.ultima_alteracao_por; }); } }
 };
 var _cttCampos = {
  'nome': { label: 'Nome', type: 'text' },

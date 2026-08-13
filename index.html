@@ -1097,7 +1097,6 @@
  <table class="nt-table">
  <thead>
  <tr>
- <th><input type="checkbox" style="cursor:pointer;opacity:.5"></th>
  <th>
  <div style="display:flex;align-items:center;gap:4px">
  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="2" y1="5" x2="14" y2="5"/><line x1="2" y1="9" x2="10" y2="9"/><line x1="2" y1="13" x2="7" y2="13"/></svg>
@@ -1111,174 +1110,15 @@
  <th style="width:80px"></th>
  </tr>
  </thead>
+ <!-- Preenchido por _dbLoadEmpresas() (empresas.js) a partir do Supabase — sem
+      dados de protótipo aqui: linhas estáticas desalinhadas com o <thead> real
+      (a versão antiga tinha 9 <td> contra 6 <th>) causavam a formatação
+      quebrada até o primeiro re-render (ex.: ao pesquisar). -->
  <tbody id="emp-tbody" data-sp="empresas">
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('empresas',this)" data-nome="construtora vega" data-setor="construção civil" data-tipo="cliente" data-fase="parceiro" data-cidade="são paulo" data-estado="sp" data-ult="0">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td>
- <div style="display:flex;align-items:center;gap:10px">
- <div class="nt-avatar" style="background:#3D4FD1">CV</div>
- <div>
- <div style="font-weight:500;font-size:13px">Construtora Vega</div>
- <div style="font-size:11px;color:var(--muted)">12.345.678/0001-90</div>
- </div>
- </div>
- </td>
- <td style="color:var(--muted)">Construção Civil</td>
- <td style="color:var(--muted)">São Paulo, SP</td>
- <td><span class="nt-tag nt-tag-blue">Cliente</span></td>
- <td><span class="nt-tag nt-tag-green">Parceiro</span></td>
- <td style="text-align:center;font-weight:600">3</td>
- <td>
- <div style="display:flex;align-items:center;gap:5px">
- <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span>
- <span style="font-size:12px;color:var(--muted)">Hoje</span>
- </div>
- </td>
- <td>
- <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
- <div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s">
- <button title="Nota" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- <button title="Nova obra" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- </div>
- <button class="nt-open-btn" style="opacity:0;transition:opacity .12s;font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Abrir →</button>
- </div>
- </td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('empresas',this)" data-nome="grupo delta engenharia" data-setor="engenharia" data-tipo="cliente" data-fase="em negociação" data-cidade="campinas" data-estado="sp" data-ult="1">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td>
- <div style="display:flex;align-items:center;gap:10px">
- <div class="nt-avatar" style="background:#9c27b0">GD</div>
- <div>
- <div style="font-weight:500;font-size:13px">Grupo Delta Engenharia</div>
- <div style="font-size:11px;color:var(--muted)">98.765.432/0001-12</div>
- </div>
- </div>
- </td>
- <td style="color:var(--muted)">Engenharia</td>
- <td style="color:var(--muted)">Campinas, SP</td>
- <td><span class="nt-tag nt-tag-blue">Cliente</span></td>
- <td><span class="nt-tag nt-tag-yellow">Em negociação</span></td>
- <td style="text-align:center;font-weight:600">1</td>
- <td>
- <div style="display:flex;align-items:center;gap:5px">
- <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span>
- <span style="font-size:12px;color:var(--muted)">Ontem</span>
- </div>
- </td>
- <td>
- <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
- <div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s">
- <button title="Nota" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- <button title="Nova obra" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- </div>
- <button class="nt-open-btn" style="opacity:0;transition:opacity .12s;font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Abrir →</button>
- </div>
- </td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('empresas',this)" data-nome="solar park empreendimentos" data-setor="energia solar" data-tipo="cliente" data-fase="proj. aprovado" data-cidade="jundiaí" data-estado="sp" data-ult="5">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td>
- <div style="display:flex;align-items:center;gap:10px">
- <div class="nt-avatar" style="background:#f59e0b">SP</div>
- <div>
- <div style="font-weight:500;font-size:13px">Solar Park Empreendimentos</div>
- <div style="font-size:11px;color:var(--muted)">45.678.901/0001-23</div>
- </div>
- </div>
- </td>
- <td style="color:var(--muted)">Energia Solar</td>
- <td style="color:var(--muted)">Jundiaí, SP</td>
- <td><span class="nt-tag nt-tag-blue">Cliente</span></td>
- <td><span class="nt-tag nt-tag-green">Proj. aprovado</span></td>
- <td style="text-align:center;font-weight:600">2</td>
- <td>
- <div style="display:flex;align-items:center;gap:5px">
- <span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;display:inline-block"></span>
- <span style="font-size:12px;color:var(--muted)">5 dias atrás</span>
- </div>
- </td>
- <td>
- <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
- <div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s">
- <button title="Nota" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- <button title="Nova obra" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- </div>
- <button class="nt-open-btn" style="opacity:0;transition:opacity .12s;font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Abrir →</button>
- </div>
- </td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('empresas',this)" data-nome="prefeitura de jundiaí" data-setor="governo" data-tipo="licitação" data-fase="análise inicial" data-cidade="jundiaí" data-estado="sp" data-ult="18">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td>
- <div style="display:flex;align-items:center;gap:10px">
- <div class="nt-avatar" style="background:#009688">PJ</div>
- <div>
- <div style="font-weight:500;font-size:13px">Prefeitura de Jundiaí</div>
- <div style="font-size:11px;color:var(--muted)">01.234.567/0001-45</div>
- </div>
- </div>
- </td>
- <td style="color:var(--muted)">Governo / Público</td>
- <td style="color:var(--muted)">Jundiaí, SP</td>
- <td><span class="nt-tag nt-tag-purple">Licitação</span></td>
- <td><span class="nt-tag nt-tag-orange">Análise inicial</span></td>
- <td style="text-align:center;font-weight:600">1</td>
- <td>
- <div style="display:flex;align-items:center;gap:5px">
- <span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block"></span>
- <span style="font-size:12px;color:var(--muted)">18 dias atrás</span>
- </div>
- </td>
- <td>
- <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
- <div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s">
- <button title="Nota" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- <button title="Nova obra" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- </div>
- <button class="nt-open-btn" style="opacity:0;transition:opacity .12s;font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Abrir →</button>
- </div>
- </td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('empresas',this)" data-nome="log brasil s.a." data-setor="logística" data-tipo="cliente" data-fase="concluído" data-cidade="sorocaba" data-estado="sp" data-ult="35">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td>
- <div style="display:flex;align-items:center;gap:10px">
- <div class="nt-avatar" style="background:#455a64">LB</div>
- <div>
- <div style="font-weight:500;font-size:13px">Log Brasil S.A.</div>
- <div style="font-size:11px;color:var(--muted)">67.890.123/0001-56</div>
- </div>
- </div>
- </td>
- <td style="color:var(--muted)">Logística</td>
- <td style="color:var(--muted)">Sorocaba, SP</td>
- <td><span class="nt-tag nt-tag-blue">Cliente</span></td>
- <td><span class="nt-tag nt-tag-teal">Concluído</span></td>
- <td style="text-align:center;font-weight:600">4</td>
- <td>
- <div style="display:flex;align-items:center;gap:5px">
- <span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block"></span>
- <span style="font-size:12px;color:var(--muted)">35 dias atrás</span>
- </div>
- </td>
- <td>
- <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
- <div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s">
- <button title="Nota" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- <button title="Nova obra" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px;color:var(--muted)"></button>
- </div>
- <button class="nt-open-btn" style="opacity:0;transition:opacity .12s;font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Abrir →</button>
- </div>
- </td>
- </tr>
+ <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Carregando...</td></tr>
  </tbody>
  </table>
- <!-- Rodapé Notion -->
- <button onclick="openNovaEmpresa()" class="nt-new-row">
- <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>
- Nova empresa
- </button>
+ <!-- Rodapé Notion — botão único de criação vive só no cabeçalho (#btn-nova-empresa) agora. -->
  <div class="nt-count" id="emp-count">Carregando...</div>
 
  </div><!-- /tab-panel-empresas -->
@@ -1331,7 +1171,6 @@
  <table class="nt-table">
  <thead>
  <tr>
- <th><input type="checkbox" style="cursor:pointer;opacity:.5"></th>
  <th>
  <div style="display:flex;align-items:center;gap:4px">
  <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
@@ -1345,95 +1184,10 @@
  <th style="width:70px"></th>
  </tr>
  </thead>
+ <!-- Preenchido por _dbLoadContatos() (empresas.js) — ver comentário equivalente
+      em #emp-tbody sobre por que não há mais linhas de protótipo aqui. -->
  <tbody id="ctt-tbody" data-sp="contatos">
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('contatos',this)" data-nome="ricardo costa" data-cargo="diretor de obras" data-perfil="decisor" data-empresa="construtora vega" data-ult="0">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#3D4FD1">RC</div><div style="font-weight:500">Ricardo Costa</div></div></td>
- <td style="color:var(--muted);font-size:12px">Diretor de Obras</td>
- <td><span class="nt-tag nt-tag-red">Decisor</span></td>
- <td style="font-size:12px">Construtora Vega</td>
- <td style="font-size:12px;color:var(--muted)">(11) 99234-5678</td>
- <td style="font-size:12px;color:var(--muted)">r.costa@vega.com.br</td>
- <td><div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span><span style="font-size:12px;color:var(--muted)">Hoje</span></div></td>
- <td><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s"><button title="Ligar" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button><button title="E-mail" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button></div></div></td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('contatos',this)" data-nome="ana martins" data-cargo="engenheira civil" data-perfil="técnico" data-empresa="construtora vega" data-ult="3">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#28B548">AM</div><div style="font-weight:500">Ana Martins</div></div></td>
- <td style="color:var(--muted);font-size:12px">Engenheira Civil</td>
- <td><span class="nt-tag nt-tag-blue">Técnico</span></td>
- <td style="font-size:12px">Construtora Vega</td>
- <td style="font-size:12px;color:var(--muted)">(11) 98765-4321</td>
- <td style="font-size:12px;color:var(--muted)">ana.martins@vega.com.br</td>
- <td><div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span><span style="font-size:12px;color:var(--muted)">3 dias atrás</span></div></td>
- <td><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s"><button title="Ligar" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button><button title="E-mail" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button></div></div></td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('contatos',this)" data-nome="carlos henrique souza" data-cargo="diretor comercial" data-perfil="decisor" data-empresa="grupo delta engenharia" data-ult="1">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#9c27b0">CS</div><div style="font-weight:500">Carlos H. Souza</div></div></td>
- <td style="color:var(--muted);font-size:12px">Diretor Comercial</td>
- <td><span class="nt-tag nt-tag-red">Decisor</span></td>
- <td style="font-size:12px">Grupo Delta Engenharia</td>
- <td style="font-size:12px;color:var(--muted)">(19) 98877-6655</td>
- <td style="font-size:12px;color:var(--muted)">c.souza@delta.eng.br</td>
- <td><div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span><span style="font-size:12px;color:var(--muted)">Ontem</span></div></td>
- <td><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s"><button title="Ligar" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button><button title="E-mail" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button></div></div></td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('contatos',this)" data-nome="fernanda lima" data-cargo="arquiteta" data-perfil="técnico" data-empresa="solar park empreendimentos" data-ult="5">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#f59e0b">FL</div><div style="font-weight:500">Fernanda Lima</div></div></td>
- <td style="color:var(--muted);font-size:12px">Arquiteta</td>
- <td><span class="nt-tag nt-tag-blue">Técnico</span></td>
- <td style="font-size:12px">Solar Park Empreendimentos</td>
- <td style="font-size:12px;color:var(--muted)">(11) 97654-3210</td>
- <td style="font-size:12px;color:var(--muted)">fernanda@solarpark.com.br</td>
- <td><div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;display:inline-block"></span><span style="font-size:12px;color:var(--muted)">5 dias atrás</span></div></td>
- <td><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s"><button title="Ligar" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button><button title="E-mail" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button></div></div></td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('contatos',this)" data-nome="marcos alves" data-cargo="engenheiro de projetos" data-perfil="técnico" data-empresa="grupo delta engenharia" data-ult="7">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#455a64">MA</div><div style="font-weight:500">Marcos Alves</div></div></td>
- <td style="color:var(--muted);font-size:12px">Eng. de Projetos</td>
- <td><span class="nt-tag nt-tag-blue">Técnico</span></td>
- <td style="font-size:12px">Grupo Delta Engenharia</td>
- <td style="font-size:12px;color:var(--muted)">(19) 97766-5544</td>
- <td style="font-size:12px;color:var(--muted)">marcos@delta.eng.br</td>
- <td><div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;display:inline-block"></span><span style="font-size:12px;color:var(--muted)">7 dias atrás</span></div></td>
- <td><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s"><button title="Ligar" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button><button title="E-mail" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button></div></div></td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('contatos',this)" data-nome="patrícia mendes" data-cargo="coordenadora administrativa" data-perfil="operacional" data-empresa="prefeitura de jundiaí" data-ult="18">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#009688">PM</div><div style="font-weight:500">Patrícia Mendes</div></div></td>
- <td style="color:var(--muted);font-size:12px">Coord. Administrativa</td>
- <td><span class="nt-tag nt-tag-gray">Operacional</span></td>
- <td style="font-size:12px">Prefeitura de Jundiaí</td>
- <td style="font-size:12px;color:var(--muted)">(11) 3344-5566</td>
- <td style="font-size:12px;color:var(--muted)">patricia@jundiai.sp.gov.br</td>
- <td><div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block"></span><span style="font-size:12px;color:var(--muted)">18 dias atrás</span></div></td>
- <td><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s"><button title="Ligar" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button><button title="E-mail" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button></div></div></td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('contatos',this)" data-nome="roberto figueiredo" data-cargo="gerente financeiro" data-perfil="financeiro" data-empresa="log brasil s.a." data-ult="35">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#e53935">RF</div><div style="font-weight:500">Roberto Figueiredo</div></div></td>
- <td style="color:var(--muted);font-size:12px">Gerente Financeiro</td>
- <td><span class="nt-tag nt-tag-green">Financeiro</span></td>
- <td style="font-size:12px">Log Brasil S.A.</td>
- <td style="font-size:12px;color:var(--muted)">(15) 98899-7788</td>
- <td style="font-size:12px;color:var(--muted)">r.figueiredo@log.com.br</td>
- <td><div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block"></span><span style="font-size:12px;color:var(--muted)">35 dias atrás</span></div></td>
- <td><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s"><button title="Ligar" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button><button title="E-mail" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button></div></div></td>
- </tr>
- <tr onclick="if(!event.target.closest('button,a,input,select'))_spOpen('contatos',this)" data-nome="júlia carvalho" data-cargo="diretora de projetos" data-perfil="decisor" data-empresa="solar park empreendimentos" data-ult="20">
- <td><input type="checkbox" style="cursor:pointer;opacity:.4"></td>
- <td><div style="display:flex;align-items:center;gap:9px"><div class="nt-avatar nt-avatar-circle" style="background:#f59e0b">JC</div><div style="font-weight:500">Júlia Carvalho</div></div></td>
- <td style="color:var(--muted);font-size:12px">Diretora de Projetos</td>
- <td><span class="nt-tag nt-tag-red">Decisor</span></td>
- <td style="font-size:12px">Solar Park Empreendimentos</td>
- <td style="font-size:12px;color:var(--muted)">(11) 97654-0011</td>
- <td style="font-size:12px;color:var(--muted)">julia@solarpark.com.br</td>
- <td><div style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block"></span><span style="font-size:12px;color:var(--muted)">20 dias atrás</span></div></td>
- <td><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><div class="nt-row-acts" style="opacity:0;display:flex;gap:3px;transition:opacity .12s"><button title="Ligar" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button><button title="E-mail" style="border:none;background:rgba(0,0,0,.06);border-radius:4px;padding:3px 6px;cursor:pointer;font-size:11px"></button></div></div></td>
- </tr>
+ <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Carregando...</td></tr>
  </tbody>
  </table>
  <!-- Rodapé Notion -->
