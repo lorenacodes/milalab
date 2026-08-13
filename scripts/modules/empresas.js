@@ -103,21 +103,59 @@ document.addEventListener('click', function(e) {
  if (drop && box && !box.contains(e.target) && !drop.contains(e.target)) {
   _spEmpEstadoClose();
  }
+ var addBox = document.getElementById('sp-emp-categoria-add');
+ if (addBox && addBox.style.display !== 'none' && !addBox.contains(e.target) && !e.target.closest('#sp-emp-categoria-dropdown')) {
+  addBox.style.display = 'none'; addBox.innerHTML = '';
+ }
 });
 
-// Categoria (multipleSelects real no Airtable) — mesmo componente de
-// multiselect-ui.js já usado pra Setor/Cidade de Fornecedores
-// (_fornRenderSetoresDropdown), só que aqui dentro do painel lateral de
-// detalhe de Empresa em vez do formulário de cadastro.
+// Categoria (multipleSelects real no Airtable) — chips coloridos (mesma
+// paleta nt-tag-* já usada pra Fase/Estado em todo o app) em vez do dropdown
+// genérico "N selecionado(s)" de multiselect-ui.js (usado pra Setor/Cidade de
+// Fornecedores): aqui o valor escolhido precisa ficar visível de cara, não
+// escondido atrás de uma contagem — pedido explícito de design, replicando o
+// visual de multiselect colorido do Airtable original.
 var _spEmpCategoriaSel = [];
+var EMPRESA_CATEGORIA_COR = { 'Modular':'nt-tag-blue', 'Solar':'nt-tag-green', 'Steel Frame':'nt-tag-purple', 'Telhados':'nt-tag-orange' };
+function _empCategoriaTagCls(cat) { return EMPRESA_CATEGORIA_COR[cat] || 'nt-tag-gray'; }
 function _spEmpRenderCategoriaDropdown() {
  var wrap = document.getElementById('sp-emp-categoria-dropdown');
- if (wrap) wrap.innerHTML = _msRenderDropdown('sp-emp-categoria', EMPRESA_CATEGORIA_OPCOES, _spEmpCategoriaSel, '_spEmpCategoriaToggle', 'Selecione a(s) categoria(s)');
+ if (!wrap) return;
+ var chips = (_spEmpCategoriaSel || []).map(function(c) {
+  var esc = c.replace(/'/g,"\\'");
+  return '<span class="nt-tag ' + _empCategoriaTagCls(c) + '" style="display:inline-flex;align-items:center;gap:4px">'
+   + c.replace(/</g,'&lt;')
+   + '<button type="button" onclick="_spEmpCategoriaRemove(\''+esc+'\')" title="Remover" '
+   + 'style="background:none;border:none;cursor:pointer;padding:0;line-height:1;color:inherit;opacity:.65;font-size:12px">×</button></span>';
+ }).join('');
+ wrap.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;position:relative">'
+  + chips
+  + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_spEmpCategoriaOpenAdd()">+</button>'
+  + '<div id="sp-emp-categoria-add" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:20;min-width:170px"></div>'
+  + '</div>';
 }
-function _spEmpCategoriaToggle(campo, valor, checked) {
- _spEmpCategoriaSel = _msToggle(_spEmpCategoriaSel, valor, checked);
- var btn = document.querySelector('#sp-emp-categoria-dropdown .fb-msel-btn');
- if (btn) btn.textContent = _spEmpCategoriaSel.length ? _spEmpCategoriaSel.length + ' selecionado(s)' : 'Selecione a(s) categoria(s)';
+function _spEmpCategoriaOpenAdd() {
+ var box = document.getElementById('sp-emp-categoria-add');
+ if (!box) return;
+ var abrir = box.style.display === 'none';
+ box.style.display = abrir ? 'block' : 'none';
+ if (!abrir) { box.innerHTML = ''; return; }
+ var restantes = EMPRESA_CATEGORIA_OPCOES.filter(function(o){ return (_spEmpCategoriaSel||[]).indexOf(o) === -1; });
+ box.innerHTML = '<div class="srch-sel-drop open" style="position:static">'
+  + '<div class="srch-sel-list">' + (restantes.length ? restantes.map(function(o) {
+     var esc = o.replace(/'/g,"\\'");
+     return '<div class="srch-sel-opt" onclick="_spEmpCategoriaAdd(\''+esc+'\')">'
+      + '<span class="nt-tag ' + _empCategoriaTagCls(o) + '" style="pointer-events:none">' + o + '</span></div>';
+    }).join('') : '<div class="srch-sel-empty">Todas já selecionadas.</div>') + '</div></div>';
+}
+function _spEmpCategoriaAdd(valor) {
+ _spEmpCategoriaSel = _msToggle(_spEmpCategoriaSel, valor, true);
+ _spEmpRenderCategoriaDropdown();
+ if (typeof _empScheduleAutoSave === 'function') _empScheduleAutoSave();
+}
+function _spEmpCategoriaRemove(valor) {
+ _spEmpCategoriaSel = _msToggle(_spEmpCategoriaSel, valor, false);
+ _spEmpRenderCategoriaDropdown();
  if (typeof _empScheduleAutoSave === 'function') _empScheduleAutoSave();
 }
 
@@ -125,8 +163,9 @@ function _spEmpCategoriaToggle(campo, valor, checked) {
 // última tecla/mudança, pra não bater no banco a cada caractere digitado.
 // Ponto #2 do pedido: painel de Empresa era só-manual (só salvava no clique
 // de "Salvar"), diferente do Gestor de Tarefas (_taskAutoSaveQueue) — agora
-// segue o mesmo princípio, o botão "Salvar" continua existindo como reforço/
-// atalho, mas deixa de ser a ÚNICA forma de persistir uma mudança.
+// segue o mesmo princípio — só que aqui o botão "Salvar" nem existe mais
+// (removido depois, ver _spDeleteEmpresa/ação do painel): autosave é a única
+// forma de persistir, sem clique nenhum de reforço.
 var _empAutoSaveTimer = null;
 function _empScheduleAutoSave() {
  if (_empAutoSaveTimer) clearTimeout(_empAutoSaveTimer);
