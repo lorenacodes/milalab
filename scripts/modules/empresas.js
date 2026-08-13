@@ -272,7 +272,7 @@ async function _spEmpresas(row, tds) {
    container.innerHTML = res.data.map(function(link) {
     var o = link.obra;
     if (!o) return '';
-    return _spRelChipHTML('obras', o.id, o.nome || '—');
+    return _spRelChipHTML('obras', o.id, o.nome || '—', null, "_empUnlink('obra','"+empId+"','"+o.id+"','"+(o.nome||'').replace(/'/g,"\\'")+"')");
    }).join('');
   });
 
@@ -301,7 +301,7 @@ async function _spEmpresas(row, tds) {
   if (!c) return '';
   var nome = c.nome_completo || '—';
   var sub = link.is_primary ? 'Principal' : (c.cargo || '');
-  return _spRelChipHTML('contatos', c.id, nome, sub);
+  return _spRelChipHTML('contatos', c.id, nome, sub, "_empUnlink('contato','"+empId+"','"+c.id+"','"+nome.replace(/'/g,"\\'")+"')");
  }).join('');
 }
 
@@ -382,6 +382,26 @@ async function _empLinkAdd(tipo, id, label) {
  _showToast((tipo==='obra'?'Obra':'Contato') + ' vinculado(a)!', 'ok');
  _empLinkToggle(tipo); // fecha a busca
  // Recarrega só os chips da seção afetada, sem fechar o painel.
+ var row = document.querySelector('#emp-tbody tr[data-id="'+empId+'"]');
+ if (row) _spEmpresas(row, []);
+}
+
+// Desvincular — o par exatamente inverso do _empLinkAdd acima: os chips de
+// "Obras vinculadas"/"Contatos vinculados" eram só de leitura+navegação (ver
+// _spRelChipHTML), sem jeito de remover um vínculo por engano sem editar a
+// obra/contato do outro lado. Confirmação simples porque desvincular não
+// apaga a obra/contato em si, só a relação — bem menos destrutivo que
+// _spDeleteEmpresa (por isso sem o aviso mais forte de lá).
+async function _empUnlink(tipo, empId, relId, label) {
+ if (!confirm('Desvincular "' + (label || '') + '" desta empresa?')) return;
+ var table = tipo === 'obra' ? 'empresas_obras' : 'contatos_empresas';
+ var col   = tipo === 'obra' ? 'obra_id' : 'contato_id';
+ var res = await _sb.from(table).delete().eq('empresa_id', empId).eq(col, relId);
+ if (res.error) {
+  _showToast('Erro ao desvincular: ' + _supaErrPt(res.error.message), 'erro');
+  return;
+ }
+ _showToast((tipo==='obra'?'Obra':'Contato') + ' desvinculado(a).', 'ok');
  var row = document.querySelector('#emp-tbody tr[data-id="'+empId+'"]');
  if (row) _spEmpresas(row, []);
 }

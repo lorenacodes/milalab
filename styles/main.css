@@ -542,6 +542,8 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
  .sp-rel-chip-sub{font-size:10.5px;color:var(--muted);flex-shrink:0;white-space:nowrap}
  .sp-rel-chip-chevron{font-size:13px;color:var(--muted);flex-shrink:0;transition:transform .12s,color .12s}
  .sp-rel-chip:hover .sp-rel-chip-chevron{transform:translateX(2px);color:var(--navy)}
+ .sp-rel-chip-rm{flex-shrink:0;background:none;border:none;cursor:pointer;font-size:15px;line-height:1;color:var(--muted);padding:0 2px;border-radius:4px;transition:background .12s,color .12s}
+ .sp-rel-chip-rm:hover{background:rgba(207,34,46,.1);color:var(--red)}
  /* Comunicação */
  .drw-comm-section{display:flex;flex-direction:column;gap:4px}
  .drw-comm-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:2px}

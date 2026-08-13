@@ -92,8 +92,13 @@ function _spOpenEntityById(section, id) {
 // indicador (mesmas cores de badge já usadas em nt-tag-blue/nt-tag-green,
 // ver styles/empresas.css) e para onde o clique navega via
 // _spOpenEntityById. `sublabel` é opcional (ex.: cargo do contato).
+// `onRemoveExpr` é opcional: expressão JS (string) pra um botão "×" de
+// desvincular — só aparece quando passado, então as outras 6 chamadas deste
+// componente (Obra→Empresa/Projeto, Projeto→Empresa, Entrega→Obra) continuam
+// sem esse botão, exatamente como eram antes. Fica em cima do clique do chip
+// (event.stopPropagation()), senão desvincular também abriria o registro.
 var _SP_REL_CHIP_DOT = { obras: '#1d4ed8', contatos: '#15803d', projetos: '#7c3aed', empresas: '#c2410c' };
-function _spRelChipHTML(section, id, label, sublabel) {
+function _spRelChipHTML(section, id, label, sublabel, onRemoveExpr) {
  var dot = _SP_REL_CHIP_DOT[section] || '#8B8B94';
  var idAttr = String(id == null ? '' : id).replace(/'/g, "\\'").replace(/"/g, '&quot;');
  var labelSafe = (label || '—').replace(/</g, '&lt;');
@@ -102,7 +107,7 @@ function _spRelChipHTML(section, id, label, sublabel) {
   + '<span class="sp-rel-chip-dot" style="background:' + dot + '"></span>'
   + '<span class="sp-rel-chip-label">' + labelSafe + '</span>'
   + (sublabel ? '<span class="sp-rel-chip-sub">' + sublabel + '</span>' : '')
-  + '<span class="sp-rel-chip-chevron">\u203a</span>'
+  + (onRemoveExpr ? '<button type="button" class="sp-rel-chip-rm" title="Desvincular" onclick="event.stopPropagation();' + onRemoveExpr + '">\u00d7</button>' : '<span class="sp-rel-chip-chevron">\u203a</span>')
   + '</div>';
 }
 
