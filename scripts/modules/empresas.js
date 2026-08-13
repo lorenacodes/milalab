@@ -178,6 +178,26 @@ function _empScheduleAutoSave() {
 // digitado a partir de agora ficar no mesmo formato (isso também é o que
 // permite a checagem de duplicidade abaixo comparar por igualdade simples
 // em vez de precisar normalizar dois formatos diferentes toda hora).
+// Molde fixo (18 posições) — "0" marca posição de dígito, o resto (. / -)
+// é literal. Diferente da versão anterior (que só ia inserindo pontuação
+// conforme os dígitos chegavam, deixando o resto do campo "vazio"), aqui as
+// posições de dígito ainda não preenchidas mostram "_" — a "colinha" pedida
+// fica dentro do próprio campo, sempre visível, em vez de um placeholder
+// nativo (que some ao digitar o 1º caractere) ou uma legenda à parte.
+var CNPJ_TEMPLATE = '00.000.000/0000-00';
+// Só dígitos de verdade contam pro valor — "_" é caractere não-dígito, então
+// \D já ignora ele igual ignora "." "/" "-", sem risco de confundir um "_"
+// de preenchimento com um dígito digitado de propósito (por isso o molde
+// usa "_" pros espaços vazios, não "0").
+function _empCnpjMaskValue(input) {
+ var digits = (input || '').replace(/\D/g, '').slice(0, 14);
+ var di = 0, out = '';
+ for (var i = 0; i < CNPJ_TEMPLATE.length; i++) {
+  if (CNPJ_TEMPLATE.charAt(i) === '0') { out += (di < digits.length) ? digits.charAt(di) : '_'; di++; }
+  else out += CNPJ_TEMPLATE.charAt(i);
+ }
+ return out;
+}
 function _empCnpjMask(el) {
  var oldVal = el.value || '';
  // Conta quantos DÍGITOS existem antes do cursor no valor atual — é essa
@@ -186,22 +206,16 @@ function _empCnpjMask(el) {
  var cursorPos = (el.selectionStart == null) ? oldVal.length : el.selectionStart;
  var digitsBeforeCursor = oldVal.slice(0, cursorPos).replace(/\D/g, '').length;
 
- var v = oldVal.replace(/\D/g, '').slice(0, 14);
- v = v.replace(/^(\d{2})(\d)/, '$1.$2');
- v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
- v = v.replace(/\.(\d{3})(\d)/, '.$1/$2');
- v = v.replace(/(\d{4})(\d)/, '$1-$2');
- el.value = v;
+ el.value = _empCnpjMaskValue(oldVal);
 
  // Recoloca o cursor logo depois do mesmo tanto de dígitos de antes — sem
- // isso, toda reformatação (inserir um "." ou "/" novo) jogava o cursor pro
- // final do campo, o efeito colateral clássico de máscara feita à mão:
- // corrigir um dígito no meio do CNPJ fazia o resto "fugir"/parecer que a
- // máscara sumiu no meio da digitação.
+ // isso, toda reformatação jogava o cursor pro final do campo, o efeito
+ // colateral clássico de máscara feita à mão: corrigir um dígito no meio do
+ // CNPJ fazia o resto "fugir"/parecer que a máscara sumia no meio da digitação.
  if (digitsBeforeCursor === 0) { el.setSelectionRange(0, 0); return; }
- var seen = 0, pos = v.length;
- for (var i = 0; i < v.length; i++) {
-  if (/\d/.test(v.charAt(i))) {
+ var seen = 0, pos = el.value.length;
+ for (var i = 0; i < CNPJ_TEMPLATE.length; i++) {
+  if (CNPJ_TEMPLATE.charAt(i) === '0') {
    seen++;
    if (seen === digitsBeforeCursor) { pos = i + 1; break; }
   }
@@ -261,8 +275,7 @@ async function _spEmpresas(row, tds) {
   '<div class="sp-field"><div class="sp-label">Razão Social <span style="color:var(--red)">*</span></div>'
   + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/"/g,'&quot;')+'" oninput="_empScheduleAutoSave()"></div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">CNPJ <span style="color:var(--red)">*</span></div><input class="sp-inp" id="sp-emp-cnpj" placeholder="00.000.000/0000-00" maxlength="18" value="'+cnpj.replace(/"/g,'&quot;')+'" oninput="_empCnpjMask(this);_empScheduleAutoSave()">'
-  + '<div style="font-size:10px;color:var(--muted);margin-top:3px">Formato: 00.000.000/0000-00</div></div>'
+  + '<div class="sp-field"><div class="sp-label">CNPJ <span style="color:var(--red)">*</span></div><input class="sp-inp" id="sp-emp-cnpj" value="'+_empCnpjMaskValue(cnpj).replace(/"/g,'&quot;')+'" oninput="_empCnpjMask(this);_empScheduleAutoSave()"></div>'
   + '<div class="sp-field"><div class="sp-label">Estado</div>'+_spEmpEstadoMarkup(estado)+'</div>'
   + '</div>'
   + '<div class="sp-g2">'
@@ -694,9 +707,23 @@ async function _spSaveEmpresa() {
  if (_empAutoSaveTimer) { clearTimeout(_empAutoSaveTimer); _empAutoSaveTimer = null; }
  var id = (document.getElementById('sp-emp-id') || {}).value;
  if (!_sb || !id) return;
+ var cnpjEl = document.getElementById('sp-emp-cnpj');
+ var cnpjDigits = ((cnpjEl || {}).value || '').replace(/\D/g, '');
+ // O campo nunca fica "vazio" de verdade (o molde preenche com "_"), então
+ // quem decide é a contagem de dígitos: 14 = CNPJ completo, salva mascarado
+ // limpo; 0 = deixado em branco de propósito (permitido — registros antigos
+ // migrados do Airtable podem não ter CNPJ, autosave não pode forçar
+ // preencher isso retroativamente); 1-13 = incompleto, não salva nada até
+ // completar (senão qualquer pausa no meio da digitação salvaria lixo).
+ if (cnpjDigits.length > 0 && cnpjDigits.length < 14) {
+  _showToast('CNPJ incompleto — informe os 14 dígitos (ou apague todos pra deixar em branco).', 'erro');
+  if (cnpjEl) { cnpjEl.style.borderColor = 'var(--red)'; setTimeout(function(){ cnpjEl.style.borderColor = ''; }, 2500); }
+  return;
+ }
+ var cnpjClean = cnpjDigits.length === 14 ? _empCnpjMaskValue(cnpjDigits) : null;
  var payload = {
   nome:            (document.getElementById('sp-emp-nome')    || {}).value.trim() || '',
-  cnpj:            (document.getElementById('sp-emp-cnpj')    || {}).value.trim() || null,
+  cnpj:            cnpjClean,
   url_site:        (document.getElementById('sp-emp-site')    || {}).value.trim() || null,
   estado:          ((document.getElementById('sp-emp-estado') || {}).value || '').trim().toUpperCase() || null,
   fase_ciclo_vida: ((document.getElementById('sp-emp-fase')    || {}).value || '').trim() || null,
@@ -712,7 +739,6 @@ async function _spSaveEmpresa() {
  if (!payload.nome) { _showToast('Informe a Razão Social.', 'erro'); return; }
  if (payload.cnpj && await _empCnpjJaExiste(payload.cnpj, id)) {
   _showToast('Já existe outra empresa cadastrada com este CNPJ.', 'erro');
-  var cnpjEl = document.getElementById('sp-emp-cnpj');
   if (cnpjEl) { cnpjEl.style.borderColor = 'var(--red)'; setTimeout(function(){ cnpjEl.style.borderColor = ''; }, 2500); }
   return;
  }
@@ -1746,8 +1772,7 @@ function openNovaEmpresa() {
   + '<input class="sp-inp" id="sp-emp-nome" placeholder="Nome da empresa"></div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">CNPJ <span style="color:var(--red)">*</span></div>'
-  + '<input class="sp-inp" id="sp-emp-cnpj" placeholder="00.000.000/0000-00" maxlength="18" oninput="_empCnpjMask(this)">'
-  + '<div style="font-size:10px;color:var(--muted);margin-top:3px">Formato: 00.000.000/0000-00</div></div>'
+  + '<input class="sp-inp" id="sp-emp-cnpj" value="'+_empCnpjMaskValue('')+'" oninput="_empCnpjMask(this)"></div>'
   + '<div class="sp-field"><div class="sp-label">Estado</div>'+_spEmpEstadoMarkup('')+'</div>'
   + '</div>'
   + '<div class="sp-g2">'
@@ -1766,14 +1791,17 @@ async function _spCriarEmpresa() {
  var nomeEl = document.getElementById('sp-emp-nome');
  var cnpjEl = document.getElementById('sp-emp-cnpj');
  var nome = (nomeEl || {}).value ? nomeEl.value.trim() : '';
- var cnpj = (cnpjEl || {}).value ? cnpjEl.value.trim() : '';
- [[nomeEl, nome], [cnpjEl, cnpj]].forEach(function(p) {
-  if (p[0]) { p[0].style.borderColor = p[1] ? '' : 'var(--red)'; p[0].style.boxShadow = p[1] ? '' : '0 0 0 2px rgba(239,68,68,.18)'; }
- });
- if (!nome || !cnpj) { _showToast('Preencha os campos obrigatórios (*).', 'erro'); return; }
- if (cnpj.replace(/\D/g, '').length !== 14) {
-  if (cnpjEl) { cnpjEl.style.borderColor = 'var(--red)'; cnpjEl.style.boxShadow = '0 0 0 2px rgba(239,68,68,.18)'; }
-  _showToast('CNPJ inválido — informe os 14 dígitos.', 'erro');
+ // cnpj nunca é uma string "vazia" de verdade agora (o molde preenche as
+ // posições não digitadas com "_") — quem decide se está completo é a
+ // contagem de dígitos reais (\D já ignora "_" igual ignora "." "/" "-"),
+ // não mais um simples if(!cnpj).
+ var cnpj = (cnpjEl || {}).value || '';
+ var cnpjDigits = cnpj.replace(/\D/g, '');
+ if (nomeEl) { nomeEl.style.borderColor = nome ? '' : 'var(--red)'; nomeEl.style.boxShadow = nome ? '' : '0 0 0 2px rgba(239,68,68,.18)'; }
+ if (cnpjEl) { cnpjEl.style.borderColor = cnpjDigits.length === 14 ? '' : 'var(--red)'; cnpjEl.style.boxShadow = cnpjDigits.length === 14 ? '' : '0 0 0 2px rgba(239,68,68,.18)'; }
+ if (!nome) { _showToast('Preencha os campos obrigatórios (*).', 'erro'); return; }
+ if (cnpjDigits.length !== 14) {
+  _showToast('CNPJ incompleto — informe os 14 dígitos.', 'erro');
   return;
  }
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
