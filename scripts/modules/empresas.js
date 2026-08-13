@@ -116,7 +116,7 @@ document.addEventListener('click', function(e) {
 // escondido atrás de uma contagem — pedido explícito de design, replicando o
 // visual de multiselect colorido do Airtable original.
 var _spEmpCategoriaSel = [];
-var EMPRESA_CATEGORIA_COR = { 'Modular':'nt-tag-blue', 'Solar':'nt-tag-green', 'Steel Frame':'nt-tag-purple', 'Telhados':'nt-tag-orange' };
+var EMPRESA_CATEGORIA_COR = { 'Modular':'nt-tag-blue', 'Solar':'nt-tag-yellow', 'Steel Frame':'nt-tag-purple', 'Telhados':'nt-tag-green' };
 function _empCategoriaTagCls(cat) { return EMPRESA_CATEGORIA_COR[cat] || 'nt-tag-gray'; }
 function _spEmpRenderCategoriaDropdown() {
  var wrap = document.getElementById('sp-emp-categoria-dropdown');
