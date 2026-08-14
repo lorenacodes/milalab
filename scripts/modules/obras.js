@@ -411,6 +411,43 @@ var _etapaKcId = {
  'Concluído':'kc-concluido','Negócio perdido':'kc-perdido'
 };
 
+// Vocabulário real de canal_vendas (não um enum de marketing — é quase texto
+// livre: nome de representante, campanha pontual). Ordenado pela distribuição
+// real no banco (select canal_vendas, count(*) from obras group by 1 order
+// by 2 desc), pra opção mais comum aparecer primeiro na busca.
+var CANAL_VENDAS_OPCOES = [
+ 'Inbound (cliente recorrente)', 'Inbound (Indicação de clientes)', 'Rep. Hooberdan - Aragão',
+ 'Outbound (prospecção ativa)', 'Rep. Jorge - Mauá', 'Rep. Maurício - Mautti', 'FICONS 2024',
+ 'Outbound (feiras)', 'Inbound (cliente inativo)', 'Inbound (social media)', 'Rep. Marcos - CE',
+ 'Outbound (cliente inativo)', 'Representante comercial', 'Rep. Luiz - PB', 'Rep. Pedro - MA',
+];
+
+// Lista fechada das 27 UFs — diferente de canal/cidade, aqui não existe
+// "opção nova" de verdade (é geografia do Brasil), então não precisa de
+// "creatable" nem de defender contra um valor fora da lista.
+var UF_BRASIL = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+
+// Cache das cidades já usadas em Obras (~205 valores distintos hoje, cresce
+// com o tempo — cada obra nova pode trazer uma cidade inédita, por isso o
+// campo é "creatable": pesquisa nas já usadas, mas aceita digitar uma nova).
+// Carregada 1x (só quando o dropdown de Cidade é aberto pela 1ª vez),
+// reaproveitada nas aberturas seguintes do painel — mesmo espírito de
+// _cttEmpLinkCache (empresas.js).
+var _obraCidadesCache = null;
+async function _obraCarregarCidades() {
+ if (_obraCidadesCache) return _obraCidadesCache;
+ var set = {};
+ var from = 0, pageSize = 1000, more = true;
+ while (more) {
+  var res = await _sb.from('obras').select('cidade').not('cidade', 'is', null).range(from, from + pageSize - 1);
+  if (res.error || !res.data || !res.data.length) break;
+  res.data.forEach(function(r){ if (r.cidade) set[r.cidade] = true; });
+  more = res.data.length === pageSize; from += pageSize;
+ }
+ _obraCidadesCache = Object.keys(set).sort(function(a,b){ return a.localeCompare(b, 'pt-BR'); });
+ return _obraCidadesCache;
+}
+
 function _normObraAssoc(o) {
  o.empresa_id = (o.empresas_obras||[])[0]?.empresa_id || null;
  o.empresa    = (o.empresas_obras||[])[0]?.empresa    || null;
@@ -1235,7 +1272,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
  var tipoArr = o.tipo_obra || [];
  var tipo    = tipoArr[0] || '';
  var etapas  = Object.keys(_etapaKcId);
- var canais  = ['Indicação','Google Ads','Instagram','LinkedIn','Email marketing','Outro'];
+ // Lista antiga ('Indicação','Google Ads','Instagram'...) era um enum de
+ // marketing inventado que nunca bateu com o que o Airtable de fato usa —
+ // canal_vendas lá é quase texto livre (nome de representante, campanhas
+ // como "FICONS 2024"), não um canal de mídia. Vocabulário real por
+ // distribuição (select canal_vendas, count(*) from obras group by 1).
+ var canais = CANAL_VENDAS_OPCOES.slice();
+ if (o.canal_vendas && canais.indexOf(o.canal_vendas) === -1) canais.push(o.canal_vendas);
 
  // ── Proposta Comercial Solar: vincula via projeto com produto solar ───────────
  var SOLAR_PRODUTOS = ['Solo','Carport 2 Linhas','Carport 3 Linhas','Laje'];
@@ -1313,7 +1356,11 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
        var initials = pResp
         ? pResp.trim().split(/\s+/).slice(0,2).map(function(w){ return w[0] || ''; }).join('').toUpperCase()
         : '';
+       // Linha já vinha com cursor:pointer + hover, mas nunca teve onclick —
+       // parecia clicável e não fazia nada. _spOpenEntityById (side-panel.js)
+       // é o mesmo usado pelos chips de "vinculado(s)" em todo o resto do app.
        return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s"'
+        + ' onclick="_spOpenEntityById(\'projetos\',\'' + p.id + '\')"'
         + ' onmouseover="this.style.background=\'var(--surface2)\'"'
         + ' onmouseout="this.style.background=\'\'">'
         + '<td style="padding:8px 10px">'
@@ -1387,13 +1434,34 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   return '<span class="spt-badge' + (n > 0 ? ' has-data' : '') + '">' + n + '</span>';
  }
 
- // ── Opções de etapa ──────────────────────────────────────────────────────────
- var etapaOpts = etapas.map(function(e){
-  return '<option' + (o.etapa_negocio === e ? ' selected' : '') + '>' + e + '</option>';
- }).join('');
-
- var canalOpts = '<option value="">—</option>'
-  + canais.map(function(c){ return '<option' + (o.canal_vendas === c ? ' selected' : '') + '>' + c + '</option>'; }).join('');
+ // ── Etapa/Cidade/UF/Canal: selects buscáveis (componente genérico, ver
+ // scripts/lib/searchable-select.js) — pedido explícito: Etapa não tinha
+ // busca nem opção vazia; Cidade/UF eram texto livre, não single select;
+ // Canal de vendas usava um vocabulário de marketing inventado que nunca
+ // bateu com o real do Airtable (ver CANAL_VENDAS_OPCOES acima). Cidade e
+ // Canal são "creatable" (Airtable permite criar opção nova ali mesmo — a
+ // lista de cidades/canais reais cresce com o tempo); Etapa e UF são listas
+ // fechadas de verdade.
+ _srchSelRegister('etapa', {
+  options: etapas, placeholder: 'Nenhuma etapa',
+  onSelect: function(v) { _spOnEtapaChange(v); _obraScheduleAutoSave(); },
+ });
+ _srchSelRegister('uf', {
+  options: UF_BRASIL, placeholder: 'Selecione o UF...',
+  onSelect: function() { _obraScheduleAutoSave(); },
+ });
+ _srchSelRegister('canal', {
+  options: CANAL_VENDAS_OPCOES, creatable: true, placeholder: 'Selecione o canal...',
+  onSelect: function() { _obraScheduleAutoSave(); },
+ });
+ _srchSelRegister('cidade', {
+  options: function(){ return _obraCidadesCache || []; }, creatable: true, placeholder: 'Selecione a cidade...',
+  onOpen: _obraCarregarCidades,
+  onSelect: function(v) {
+   if (v && (_obraCidadesCache||[]).indexOf(v) === -1) _obraCidadesCache.push(v);
+   _obraScheduleAutoSave();
+  },
+ });
 
  // ── HTML completo com abas ───────────────────────────────────────────────────
  var html = '<input type="hidden" id="sp-obra-id" value="' + o.id + '">'
@@ -1422,12 +1490,18 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<option' + (tipo==='Solar'?' selected':'') + '>Solar</option>'
   + '</select></div>'
   + '<div class="sp-field"><div class="sp-label">Etapa do Negócio</div>'
-  + '<select class="sp-inp" id="sp-etapa" onchange="_spOnEtapaChange(this.value);_obraScheduleAutoSave()">' + etapaOpts + '</select></div>'
+  + _srchSelMarkup('etapa', 'sp-etapa', o.etapa_negocio || '') + '</div>'
   + '</div>'
 
   + '<div class="sp-g2">'
+  // Antes era readonly (mostrava created_at, um timestamp de sistema) —
+  // data_criacao é uma coluna própria e editável ("Data do orçamento" de
+  // verdade, pode ser retroativa em registros migrados do Airtable), então
+  // vira um <input type="date"> de verdade como o de baixo — ganha o
+  // seletor de calendário nativo E o formato passa a seguir o locale do
+  // navegador em vez do "YYYY-MM-DD" cru de um texto sem máscara.
   + '<div class="sp-field"><div class="sp-label">Data do orçamento</div>'
-  + '<input class="sp-inp" value="' + (fmtData(o.data_criacao) !== '—' ? fmtData(o.data_criacao) : fmtData(o.created_at)) + '" readonly style="color:var(--muted);cursor:default" title="Preenchido automaticamente pelo sistema"></div>'
+  + '<input class="sp-inp" id="sp-data-criacao" type="date" value="' + (o.data_criacao ? String(o.data_criacao).substring(0,10) : (o.created_at ? String(o.created_at).substring(0,10) : '')) + '" onchange="_obraScheduleAutoSave()"></div>'
   + '<div class="sp-field"><div class="sp-label">Data envio da proposta</div>'
   + '<input class="sp-inp" id="sp-data-proposta" type="date" value="' + (o.data_envio_proposta ? String(o.data_envio_proposta).substring(0,10) : '') + '" onchange="_obraScheduleAutoSave()"></div>'
   + '</div>'
@@ -1441,9 +1515,9 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div id="sp-proposta-status" style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:var(--muted)">Verificando...</div></div>'
 
   + '<div class="sp-g3">'
-  + '<div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-cidade" value="' + (o.cidade||'') + '" oninput="_obraScheduleAutoSave()"></div>'
-  + '<div class="sp-field"><div class="sp-label">UF</div><input class="sp-inp" id="sp-uf" value="' + (o.estado||'') + '" maxlength="2" style="text-transform:uppercase" oninput="_obraScheduleAutoSave()"></div>'
-  + '<div class="sp-field"><div class="sp-label">Canal de vendas</div><select class="sp-inp" id="sp-canal" onchange="_obraScheduleAutoSave()">' + canalOpts + '</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Cidade</div>' + _srchSelMarkup('cidade', 'sp-cidade', o.cidade || '') + '</div>'
+  + '<div class="sp-field"><div class="sp-label">UF</div>' + _srchSelMarkup('uf', 'sp-uf', (o.estado||'').toUpperCase()) + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Canal de vendas</div>' + _srchSelMarkup('canal', 'sp-canal', o.canal_vendas || '') + '</div>'
   + '</div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">CNO (Cadastro Nacional de Obras)</div><input class="sp-inp" id="sp-cno" value="' + (o.cno||'') + '" placeholder="00.000.000.000-0" oninput="_obraScheduleAutoSave()"></div>'
@@ -1754,6 +1828,7 @@ async function _spSaveObraFull() {
   nome:              document.getElementById('sp-nome')?.value || '',
   tipo_obra:         [document.getElementById('sp-tipo')?.value || ''],
   etapa_negocio:     document.getElementById('sp-etapa')?.value || '',
+  data_criacao:        document.getElementById('sp-data-criacao')?.value || null,
   data_envio_proposta: document.getElementById('sp-data-proposta')?.value || null,
   cidade:            document.getElementById('sp-cidade')?.value || '',
   estado:            document.getElementById('sp-uf')?.value?.toUpperCase() || '',
