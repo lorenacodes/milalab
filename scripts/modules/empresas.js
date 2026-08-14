@@ -647,7 +647,19 @@ function _cttEmpLinkRenderList(q) {
 }
 async function _cttEmpLinkAdd(empId, label) {
  var cttId = _spCttCurrentId;
- if (!empId || !cttId) return;
+ if (!empId) return;
+ // Modo criação (painel de "Novo contato", ainda sem id no banco): guarda só
+ // na fila local — o vínculo de verdade é gravado por _cttCriarContato()
+ // junto com o contato, na mesma ação (mesmo padrão de _empLinkAdd).
+ if (!cttId) {
+  if (!_spCttNovaEmpresasSel.some(function(x){ return String(x.id) === String(empId); })) {
+   _spCttNovaEmpresasSel.push({ id: empId, nome: label });
+  }
+  _cttEmpLinkToggle();
+  var c = document.getElementById('sp-ctt-empresas');
+  if (c) c.innerHTML = _spCttNovaEmpresasChipsHTML();
+  return;
+ }
  var res = await _sb.from('contatos_empresas').insert({ contato_id: cttId, empresa_id: empId });
  if (res.error) { _showToast('Erro ao vincular: ' + _supaErrPt(res.error.message), 'erro'); return; }
  _showToast('Empresa vinculada.', 'ok');
@@ -1041,21 +1053,20 @@ function switchEmpTab(tab) {
   b.style.borderBottom = active ? '2px solid var(--navy)' : '2px solid transparent';
  });
 
- // btn-nova-empresa saiu do toolbar (ver comentário no index.html) — só
- // btn-novo-contato continua sendo alternado por aqui.
- document.getElementById('btn-novo-contato').style.display = (tab === 'contatos') ? 'inline-flex' : 'none';
-
- // #topbar-action-btn ("+ Nova Empresa") é setado uma única vez por ROTA em
- // go('empresas') (scripts/app.js), nunca por SUB-ABA — por isso ficava
- // visível mesmo depois de trocar pra Contatos. switchEmpTab não tinha
- // nenhuma lógica pra esconder/restaurar esse botão.
+ // #topbar-action-btn é setado uma única vez por ROTA em go('empresas')
+ // (scripts/app.js: routes.empresas.btn = "+ Nova Empresa"/openNovaEmpresa),
+ // nunca por SUB-ABA — por isso ficava fixo em "+ Nova Empresa" mesmo depois
+ // de trocar pra Contatos. Agora troca de rótulo/ação junto com a sub-aba,
+ // igual ao padrão já usado pro resto da topbar — sem precisar de um botão
+ // duplicado dentro da própria tela (ver comentário no index.html).
  var topBtn = document.getElementById('topbar-action-btn');
  if (topBtn) {
+  topBtn.style.display = '';
   if (tab === 'contatos') {
-   topBtn.style.display = 'none';
+   topBtn.textContent = '+ Novo Contato';
+   topBtn._action = 'openNovoContato';
   } else {
    topBtn.textContent = '+ Nova Empresa';
-   topBtn.style.display = '';
    topBtn._action = 'openNovaEmpresa';
   }
  }
@@ -2119,7 +2130,94 @@ async function _spCriarEmpresa() {
   _showToast('Empresa criada!', 'ok');
  }
 }
-function openNovoContato() { alert('Modal de novo contato — a implementar'); }
+// Fila local de empresas escolhidas ANTES do contato existir de verdade no
+// banco — mesmo princípio de _spEmpNovaObrasSel/_spEmpNovaContatosSel
+// (Nova Empresa): grava tudo de uma vez em _cttCriarContato, sem precisar
+// reabrir o painel pra vincular depois. Reaproveita o mesmo botão/seletor
+// "+ Vincular" (_cttEmpLinkToggle/_cttEmpLinkAdd) do painel de EDIÇÃO — ver
+// o branch "sem _spCttCurrentId" em _cttEmpLinkAdd.
+var _spCttNovaEmpresasSel = [];
+function _spCttNovaEmpresasChipsHTML() {
+ if (!_spCttNovaEmpresasSel.length) return '<div class="sp-empty">Nenhuma empresa selecionada.</div>';
+ return _spCttNovaEmpresasSel.map(function(e){
+  return _spRelChipHTML('empresas', e.id, e.nome, null, "_spCttNovaEmpresaRemove('"+String(e.id).replace(/'/g,"\\'")+"')");
+ }).join('');
+}
+function _spCttNovaEmpresaRemove(id) {
+ var idx = _spCttNovaEmpresasSel.findIndex(function(x){ return String(x.id) === String(id); });
+ if (idx !== -1) _spCttNovaEmpresasSel.splice(idx, 1);
+ var c = document.getElementById('sp-ctt-empresas');
+ if (c) c.innerHTML = _spCttNovaEmpresasChipsHTML();
+}
+
+function openNovoContato() {
+ _spCttCurrentId = '';
+ _spCttNovaEmpresasSel = [];
+ var ov = document.getElementById('sp-overlay'), dr = document.getElementById('sp-drawer');
+ if (_spRow) { _spRow.classList.remove('sp-active'); _spRow = null; }
+ ov.classList.add('sp-open'); dr.classList.add('sp-open');
+ _spSet('Novo contato', 'Novo contato',
+  '<div class="sp-field"><div class="sp-label">Nome <span style="color:var(--red)">*</span></div>'
+  + '<input class="sp-inp" id="sp-ctt-nome" placeholder="Nome completo"></div>'
+  + '<div class="sp-g2">'
+  + '<div class="sp-field"><div class="sp-label">Cargo</div><select class="sp-inp" id="sp-ctt-cargo">'+_spEmpOptSelect(CONTATO_CARGO_OPCOES,'')+'</select></div>'
+  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" placeholder="email@empresa.com"></div>'
+  + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Telefone</div>'
+  + '<input class="sp-inp" id="sp-ctt-telefone" type="tel" value="'+_cttTelMaskValue('')+'" oninput="_cttTelMask(this)"></div>'
+  + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+  + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">Empresas vinculadas</div>'
+  + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_cttEmpLinkToggle()">+ Vincular</button>'
+  + '</div>'
+  + '<div id="sp-ctt-link-empresa" style="display:none;margin-bottom:8px"></div>'
+  + '<div id="sp-ctt-empresas" class="sp-rel-chips-wrap">' + _spCttNovaEmpresasChipsHTML() + '</div></div>',
+  '<button class="btn btn-primary" id="sp-ctt-criar-btn" onclick="_cttCriarContato()">Criar contato</button> <button class="btn btn-ghost" onclick="closePanel()">Cancelar</button>'
+ );
+ document.addEventListener('keydown', _spEsc, {once:true});
+}
+
+async function _cttCriarContato() {
+ var nomeEl = document.getElementById('sp-ctt-nome');
+ var nome = (nomeEl || {}).value ? nomeEl.value.trim() : '';
+ if (nomeEl) { nomeEl.style.borderColor = nome ? '' : 'var(--red)'; nomeEl.style.boxShadow = nome ? '' : '0 0 0 2px rgba(239,68,68,.18)'; }
+ if (!nome) { _showToast('Informe o nome do contato.', 'erro'); return; }
+ // Mesma regra de _spSaveContato: 0 dígitos ok (fica em branco), 10/11
+ // completo, 1-9 bloqueia.
+ var telEl = document.getElementById('sp-ctt-telefone');
+ var telDigits = ((telEl || {}).value || '').replace(/\D/g, '');
+ if (telDigits.length > 0 && telDigits.length < 10) {
+  _showToast('Telefone incompleto — informe DDD + número (10 ou 11 dígitos), ou deixe em branco.', 'erro');
+  if (telEl) { telEl.style.borderColor = 'var(--red)'; setTimeout(function(){ telEl.style.borderColor = ''; }, 2500); }
+  return;
+ }
+ if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
+ var btn = document.getElementById('sp-ctt-criar-btn');
+ if (btn) { btn.disabled = true; btn.textContent = 'Criando...'; }
+ var payload = {
+  nome_completo: nome,
+  cargo:    (document.getElementById('sp-ctt-cargo') || {}).value || null,
+  email:    (document.getElementById('sp-ctt-email') || {}).value.trim() || null,
+  telefone: telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
+ };
+ var res = await _sb.from('contatos').insert(payload).select().single();
+ if (res.error || !res.data) {
+  _showToast('Erro ao criar contato: ' + _supaErrPt((res.error && res.error.message) || ''), 'erro');
+  if (btn) { btn.disabled = false; btn.textContent = 'Criar contato'; }
+  return;
+ }
+ var novoId = res.data.id;
+ if (_spCttNovaEmpresasSel.length) {
+  var rLink = await _sb.from('contatos_empresas').insert(_spCttNovaEmpresasSel.map(function(e, i){
+   return { contato_id: novoId, empresa_id: e.id, is_primary: i === 0 };
+  }));
+  if (rLink.error) console.error('[_cttCriarContato] erro ao vincular empresa(s):', rLink.error);
+ }
+ await _dbLoadContatos();
+ var row = document.querySelector('#ctt-tbody tr[data-id="'+novoId+'"]');
+ if (row) _spOpen('contatos', row);
+ _showToast('Contato criado!', 'ok');
+}
 
 // ── Estado dos filtros (movido de dashboard.js) ──────────────────────────────
 // Cargo (singleSelect real no Airtable, tabela Contatos) — vocabulário
