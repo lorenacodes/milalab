@@ -485,27 +485,166 @@ function _spContatos(row, tds) {
  _spContatoById(row.dataset.id);
 }
 
+var _spCttCurrentId = '';
+
 function _spContatoById(id) {
  var c = (_contatosArr || []).find(function(x){ return String(x.id) === String(id); }) || {};
+ _spCttCurrentId = String(c.id || id || '');
  var nome  = c.nome_completo ? c.nome_completo.replace(/\w/g,function(l){return l.toUpperCase();}) : '';
- var cargo = (c.cargo || '').replace(/\w/g,function(l){return l.toUpperCase();});
- var links = c.contatos_empresas || [];
- var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
- var empresa = ((empLink && empLink.empresa && empLink.empresa.nome) || '').replace(/\w/g,function(l){return l.toUpperCase();});
+ var cargo = c.cargo || '';
  var email = c.email || '';
  var tel   = c.telefone || '';
  _spSet('Contato', nome,
   '<div class="sp-field"><div class="sp-label">Nome</div>'
-  + '<input class="sp-inp" value="'+nome.replace(/"/g,'&quot;')+'"></div>'
+  + '<input class="sp-inp" id="sp-ctt-nome" value="'+nome.replace(/"/g,'&quot;')+'" oninput="_cttScheduleAutoSave()"></div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Cargo</div><input class="sp-inp" value="'+cargo.replace(/"/g,'&quot;')+'"></div>'
-  + '<div class="sp-field"><div class="sp-label">Empresa</div><input class="sp-inp" value="'+empresa.replace(/"/g,'&quot;')+'"></div>'
+  + '<div class="sp-field"><div class="sp-label">Cargo</div><select class="sp-inp" id="sp-ctt-cargo" onchange="_cttScheduleAutoSave()">'+_spEmpOptSelect(CONTATO_CARGO_OPCOES, cargo)+'</select></div>'
+  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" value="'+email.replace(/"/g,'&quot;')+'" oninput="_cttScheduleAutoSave()"></div>'
   + '</div>'
-  + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" type="email" value="'+email.replace(/"/g,'&quot;')+'"></div>'
-  + '<div class="sp-field"><div class="sp-label">Telefone</div><input class="sp-inp" type="tel" value="'+tel.replace(/"/g,'&quot;')+'"></div>'
-  + '</div>',
+  + '<div class="sp-field"><div class="sp-label">Telefone</div>'
+  + '<input class="sp-inp" id="sp-ctt-telefone" type="tel" value="'+tel.replace(/"/g,'&quot;')+'" oninput="_cttScheduleAutoSave()"></div>'
+  + '<input type="hidden" id="sp-ctt-id" value="'+_spCttCurrentId+'">'
+  // Empresas vinculadas: N:N de verdade (contatos_empresas), igual no
+  // Airtable — mesmo padrão de chips + "+ Vincular" já usado em "Obras
+  // vinculadas"/"Contatos vinculados" no painel de Empresa (_spEmpresas). A
+  // Fase do Ciclo de Vida de cada empresa aparece como subtítulo do chip
+  // (dado da empresa, não existe campo próprio em contatos).
+  + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+  + '<div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">Empresas vinculadas</div>'
+  + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_cttEmpLinkToggle()">+ Vincular</button>'
+  + '</div>'
+  + '<div id="sp-ctt-link-empresa" style="display:none;margin-bottom:8px"></div>'
+  + '<div id="sp-ctt-empresas" class="sp-rel-chips-wrap">'
+  + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando empresas...</div>'
+  + '</div></div>',
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+
+ if (!_sb || !_spCttCurrentId) return;
+ _cttRenderEmpresasVinculadas();
+}
+
+async function _cttRenderEmpresasVinculadas() {
+ var cttId = _spCttCurrentId;
+ var res = await _sb.from('contatos_empresas')
+  .select('is_primary, empresa:empresa_id(id, nome, fase_ciclo_vida)')
+  .eq('contato_id', cttId)
+  .order('is_primary', { ascending: false });
+ var container = document.getElementById('sp-ctt-empresas');
+ if (!container) return;
+ if (res.error || !res.data || !res.data.length) {
+  container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este contato.</div>';
+  return;
+ }
+ container.innerHTML = res.data.map(function(link) {
+  var e = link.empresa;
+  if (!e) return '';
+  return _spRelChipHTML('empresas', e.id, e.nome || '—', e.fase_ciclo_vida || '', "_cttUnlinkEmpresa('"+cttId+"','"+e.id+"','"+(e.nome||'').replace(/'/g,"\\'")+"')");
+ }).join('');
+}
+
+async function _cttUnlinkEmpresa(cttId, empId, label) {
+ if (!confirm('Desvincular "' + (label || '') + '" deste contato?')) return;
+ var res = await _sb.from('contatos_empresas').delete().eq('contato_id', cttId).eq('empresa_id', empId);
+ if (res.error) { _showToast('Erro ao desvincular: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ _showToast('Empresa desvinculada.', 'ok');
+ _cttRenderEmpresasVinculadas();
+ _cttRefreshRowFromDB(cttId);
+}
+
+// Cache da lista completa de empresas (as ~636 cabem numa única chamada,
+// mesmo padrão de _empLinkCache) — carregada 1x por abertura do seletor.
+var _cttEmpLinkCache = null;
+function _cttEmpLinkToggle() {
+ var box = document.getElementById('sp-ctt-link-empresa');
+ if (!box) return;
+ var abrir = box.style.display === 'none';
+ box.style.display = abrir ? '' : 'none';
+ if (!abrir) { box.innerHTML = ''; return; }
+ box.innerHTML = '<div class="srch-sel" style="width:100%">'
+  + '<div class="srch-sel-drop open" style="position:static;box-shadow:none;border:1px solid var(--border)">'
+  + '<input class="srch-sel-inp" type="text" placeholder="Buscar empresa pelo nome..." oninput="_cttEmpLinkFilter(this.value)">'
+  + '<div class="srch-sel-list" id="sp-ctt-link-empresa-list"><div class="srch-sel-empty">Carregando...</div></div>'
+  + '</div></div>';
+ _cttEmpLinkLoad();
+}
+function _cttEmpLinkLoad() {
+ _sb.from('empresas').select('id, nome').order('nome').limit(2000).then(function(res) {
+  _cttEmpLinkCache = (res.data || []).map(function(r){ return { id: r.id, nome: r.nome || '—' }; });
+  _cttEmpLinkRenderList('');
+ });
+}
+function _cttEmpLinkFilter(q) { _cttEmpLinkRenderList(q); }
+function _cttEmpLinkRenderList(q) {
+ var listEl = document.getElementById('sp-ctt-link-empresa-list');
+ if (!listEl) return;
+ var all = _cttEmpLinkCache;
+ if (!all) { listEl.innerHTML = '<div class="srch-sel-empty">Carregando...</div>'; return; }
+ var qn = (q || '').trim().toLowerCase();
+ var matches = qn ? all.filter(function(o){ return o.nome.toLowerCase().indexOf(qn) !== -1; }) : all;
+ matches = matches.slice(0, 50);
+ if (!matches.length) { listEl.innerHTML = '<div class="srch-sel-empty">Nenhuma empresa encontrada.</div>'; return; }
+ listEl.innerHTML = matches.map(function(o) {
+  var label = (o.nome || '—').replace(/</g,'&lt;');
+  var idSafe = String(o.id).replace(/'/g,"\\'");
+  return '<div class="srch-sel-opt" onclick="_cttEmpLinkAdd(\''+idSafe+'\',\''+label.replace(/'/g,"\\'")+'\')">' + label + '</div>';
+ }).join('');
+}
+async function _cttEmpLinkAdd(empId, label) {
+ var cttId = _spCttCurrentId;
+ if (!empId || !cttId) return;
+ var res = await _sb.from('contatos_empresas').insert({ contato_id: cttId, empresa_id: empId });
+ if (res.error) { _showToast('Erro ao vincular: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ _showToast('Empresa vinculada.', 'ok');
+ _cttEmpLinkToggle();
+ _cttRenderEmpresasVinculadas();
+ _cttRefreshRowFromDB(cttId);
+}
+
+// Recarrega só os vínculos do contato (não a lista inteira) e atualiza a
+// linha correspondente na tabela + o cache local, sem esperar um reload de
+// todos os ~700 contatos — mesmo princípio de _spSaveEmpresa (autosave não
+// deve custar uma consulta cara pra refletir 1 mudança pequena).
+function _cttRefreshRowFromDB(cttId) {
+ _sb.from('contatos_empresas').select('is_primary, empresa:empresa_id(id, nome, fase_ciclo_vida)').eq('contato_id', cttId).then(function(r) {
+  var c = (_contatosArr || []).find(function(x){ return String(x.id) === String(cttId); });
+  if (c && r.data) {
+   c.contatos_empresas = r.data;
+   var tr = document.querySelector('#ctt-tbody tr[data-id="'+cttId+'"]');
+   if (tr) tr.outerHTML = _cttRowHTML(c);
+  }
+ });
+}
+
+// Autosave (mesmo debounce de 700ms do painel de Empresa, _empScheduleAutoSave)
+// — antes o painel de Contato não tinha handler NENHUM nos campos, então
+// nada digitado ali era salvo de verdade.
+var _cttAutoSaveTimer = null;
+function _cttScheduleAutoSave() {
+ if (_cttAutoSaveTimer) clearTimeout(_cttAutoSaveTimer);
+ _cttAutoSaveTimer = setTimeout(function(){ _spSaveContato(); }, 700);
+}
+async function _spSaveContato() {
+ if (_cttAutoSaveTimer) { clearTimeout(_cttAutoSaveTimer); _cttAutoSaveTimer = null; }
+ var id = (document.getElementById('sp-ctt-id') || {}).value;
+ if (!_sb || !id) return;
+ var payload = {
+  nome_completo: (document.getElementById('sp-ctt-nome')     || {}).value.trim() || null,
+  cargo:         (document.getElementById('sp-ctt-cargo')    || {}).value || null,
+  email:         (document.getElementById('sp-ctt-email')    || {}).value.trim() || null,
+  telefone:      (document.getElementById('sp-ctt-telefone') || {}).value.trim() || null,
+ };
+ var { error } = await _sb.from('contatos').update(payload).eq('id', id);
+ if (error) { _showToast('Erro ao salvar contato: ' + _supaErrPt(error.message), 'erro'); return; }
+ var titleEl = document.getElementById('sp-title');
+ if (titleEl) titleEl.textContent = payload.nome_completo;
+ var idx = (_contatosArr || []).findIndex(function(c){ return String(c.id) === String(id); });
+ if (idx !== -1) {
+  Object.assign(_contatosArr[idx], payload);
+  var tr = document.querySelector('#ctt-tbody tr[data-id="'+id+'"]');
+  if (tr) tr.outerHTML = _cttRowHTML(_contatosArr[idx]);
+  if (typeof _cttApplyFilters === 'function') _cttApplyFilters();
+ }
 }
 
 var _empColorPalette = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
@@ -618,12 +757,28 @@ function _cttEmpresaPrimaria(c) {
  var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
  return (empLink && empLink.empresa && empLink.empresa.nome) || '';
 }
+// Um contato pode estar vinculado a mais de uma empresa (contatos_empresas é
+// N:N, igual no Airtable) — usada na coluna Empresa da tabela, que agora
+// mostra todos os vínculos em vez de só o primário/primeiro.
+function _cttEmpresasNomesTodas(c) {
+ return (c.contatos_empresas || []).map(function(l){ return l.empresa && l.empresa.nome; }).filter(Boolean);
+}
+// Fase do Ciclo de Vida vem da EMPRESA vinculada (contatos não tem esse
+// campo próprio) — usa a mesma empresa "primária" de _cttEmpresaPrimaria
+// pra decidir qual fase mostrar quando há mais de uma empresa vinculada.
+function _cttFasePrimaria(c) {
+ var links = c.contatos_empresas || [];
+ var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
+ return (empLink && empLink.empresa && empLink.empresa.fase_ciclo_vida) || '';
+}
 // Extraído de _dbLoadContatos (era closure local ao map) pra ser reaproveitado
 // também por _cttRenderGrouped abaixo.
 function _cttRowHTML(c) {
  var nome = c.nome_completo || '—';
  var initials = nome.split(' ').filter(Boolean).slice(0,2).map(function(w){return w[0];}).join('').toUpperCase() || '?';
- var empNome = _cttEmpresaPrimaria(c) || '—';
+ var empNomes = _cttEmpresasNomesTodas(c);
+ var empNome = empNomes.join(', ') || '—';
+ var fase = _cttFasePrimaria(c);
 
  // Telefone + ações hover
  var telCell = '<span style="font-size:12px;color:var(--muted)">—</span>';
@@ -661,6 +816,7 @@ function _cttRowHTML(c) {
   + '</div></td>'
   + '<td style="font-size:12px;color:var(--muted)">'+(c.cargo||'—')+'</td>'
   + '<td style="font-size:12px;color:var(--muted)">'+empNome+'</td>'
+  + '<td>'+_empFaseTag(fase)+'</td>'
   + '<td>'+telCell+'</td>'
   + '<td>'+emailCell+'</td>'
   + '<td><button class="nt-open-btn" onclick="event.stopPropagation();_spOpen(\'contatos\',this.closest(\'tr\'))" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500;opacity:0;transition:opacity .12s">Abrir →</button></td>'
@@ -670,11 +826,11 @@ function _cttRowHTML(c) {
 // ── Load Contatos (cache global + renderiza tabela) ───────────────────────────
 async function _dbLoadContatos() {
  var tbody0 = document.getElementById('ctt-tbody');
- if (tbody0) tbody0.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Carregando...</td></tr>';
+ if (tbody0) tbody0.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Carregando...</td></tr>';
  var allData = []; var from = 0; var more = true;
  while (more) {
   var res = await _sb.from('contatos')
-   .select('id, nome_completo, cargo, email, telefone, contatos_empresas(is_primary, empresa:empresa_id(id, nome))')
+   .select('id, nome_completo, cargo, email, telefone, contatos_empresas(is_primary, empresa:empresa_id(id, nome, fase_ciclo_vida))')
    .order('nome_completo').range(from, from + 999);
   if (res.error || !res.data || !res.data.length) break;
   allData = allData.concat(res.data);
@@ -1635,7 +1791,7 @@ function _cttRenderGroupNode(node, path, rowsArr) {
   var total = _gtTreeCount(child);
   rowsArr.push(
    '<tr class="gestor-group-hd" onclick="_cttToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="6" style="padding-left:12px">'
+   + '<td colspan="7" style="padding-left:12px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
    + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' contato' + (total !== 1 ? 's' : '') + '</span>'
@@ -1663,7 +1819,7 @@ function _cttRenderGrouped(groupField) {
  var tree = _gtBuildTree(filtered, [{ field: groupField, dir: _gbPrimaryDir('contatos') }], _cttGroupKeyFor, null, 0);
  var rowsArr = [];
  _cttRenderGroupNode(tree, [], rowsArr);
- tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhum contato encontrado.</td></tr>';
+ tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhum contato encontrado.</td></tr>';
 
  var fbBadge = document.getElementById('fb-badge-contatos');
  if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }

@@ -1729,6 +1729,15 @@ async function _spCriarContato() {
  };
  const { data, error } = await _sb.from('contatos').insert(payload).select().single();
  if (error || !data) { alert('Erro ao criar contato: ' + (error?.message || '')); return; }
+ // Grava também na junção N:N contatos_empresas — não só na FK direta
+ // contatos.empresa_id acima. Achado real: a tela de Empresas/Contatos só lê
+ // da junção (ver _cttEmpresaPrimaria/_spEmpresas), então um contato criado
+ // só com a FK direta ficava "invisível" como vinculado em todo o resto do
+ // sistema, mesmo já tendo uma empresa associada no banco.
+ if (empId) {
+  const { error: linkError } = await _sb.from('contatos_empresas').insert({ contato_id: data.id, empresa_id: empId, is_primary: true });
+  if (linkError) console.error('[Obras] erro ao vincular contato_empresas na criação rápida:', linkError);
+ }
  _contatosArr.push(data);
  const sel = document.getElementById('sp-contato-id');
  if (sel) {
