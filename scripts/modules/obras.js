@@ -469,12 +469,24 @@ async function _dbLoadObras() {
  // segunda metade do achado de lentidão (a primeira foi o índice/ilike
  // acima): antes o tempo total era obras+documentos somados, agora é só
  // o maior dos dois.
- var results = await Promise.all([
-  _obrasCarregarTodasObras(),
-  _obrasCarregarPropostaMap().catch(function(e){ console.error('[Obras] erro ao verificar propostas comerciais:', e); return {}; })
- ]);
- var allObras = results[0];
- var propostaMap = results[1];
+ // try/catch novo: antes, qualquer erro na busca de obras (rede, timeout,
+ // RLS) deixava a Promise rejeitada sem handler nenhum — a tela ficava
+ // travada em "Carregando obras..." pra sempre, sem nenhuma pista do que
+ // deu errado. Agora aparece um erro real na tela + no console.
+ var allObras, propostaMap;
+ try {
+  var results = await Promise.all([
+   _obrasCarregarTodasObras(),
+   _obrasCarregarPropostaMap().catch(function(e){ console.error('[Obras] erro ao verificar propostas comerciais:', e); return {}; })
+  ]);
+  allObras = results[0];
+  propostaMap = results[1];
+ } catch (e) {
+  console.error('[Obras] erro ao carregar a lista de obras:', e);
+  var tbodyErr = document.getElementById('obras-tbody');
+  if (tbodyErr) tbodyErr.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:24px">Erro ao carregar obras: ' + (e && e.message ? e.message : 'erro desconhecido') + '</td></tr>';
+  return;
+ }
  if(!allObras.length)return;
  // Mapa global id→{nome,empresa} usado por _dbLoadProjetos
  _obraIdMap = {};
