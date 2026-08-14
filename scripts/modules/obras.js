@@ -1269,8 +1269,14 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
  }).join('');
 
  // ── Opções de contato ────────────────────────────────────────────────────────
- var contFiltrados = _contatosArr.filter(function(c){ return c.empresa_id === o.empresa_id; });
- var contOptions = contFiltrados.length
+ // Sem empresa selecionada pra obra ainda: não filtra (c.empresa_id === null
+ // bateria com qualquer contato sem empresa vinculada, o que é errado aqui —
+ // o pedido é "nenhum contato até escolher uma empresa", não "contatos
+ // órfãos").
+ var contFiltrados = o.empresa_id ? _contatosArr.filter(function(c){ return c.empresa_id === o.empresa_id; }) : [];
+ var contOptions = !o.empresa_id
+  ? '<option value="">Selecione a empresa primeiro</option>'
+  : contFiltrados.length
   ? contFiltrados.map(function(c){
      return '<option value="' + c.id + '"' + (c.id === o.contato_id ? ' selected' : '') + '>'
       + c.nome_completo + (c.cargo ? ' · ' + c.cargo : '') + '</option>';
@@ -1492,7 +1498,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div class="sp-field"><div class="sp-label">Contato do orçamento</div>'
   + '<div style="display:flex;gap:6px;align-items:center">'
   + '<select class="sp-inp" id="sp-contato-id" style="flex:1">'
-  + (contFiltrados.length ? contOptions : '<option value="">Selecione a empresa primeiro</option>')
+  + contOptions
   + '</select>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoContato()" title="Criar novo contato">+</button>'
   + '</div></div>'
