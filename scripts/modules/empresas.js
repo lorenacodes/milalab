@@ -236,6 +236,44 @@ async function _empCnpjJaExiste(cnpj, excludeId) {
  return !!(res.data && res.data.length);
 }
 
+// Máscara de Telefone (mesmo esquema de "_" pra posições vazias que o CNPJ
+// já usa — pedido explícito: "molde semelhante ao que tem no do CNPJ").
+// Diferente do CNPJ (sempre 14 dígitos), telefone BR varia entre fixo (10
+// dígitos, "(00) 0000-0000") e celular (11 dígitos, "(00) 00000-0000") — o
+// molde troca sozinho pro de 11 assim que o 11º dígito é digitado. Usada no
+// campo Telefone do painel de Contato e no formulário rápido de contato
+// (Obras) — o link de WhatsApp (_sanitizeTelWA acima) já limpa tudo que não
+// é dígito, então funciona igual com ou sem a máscara.
+var TEL_TEMPLATE_10 = '(00) 0000-0000';
+var TEL_TEMPLATE_11 = '(00) 00000-0000';
+function _cttTelMaskValue(input) {
+ var digits = (input || '').replace(/\D/g, '').slice(0, 11);
+ var template = digits.length > 10 ? TEL_TEMPLATE_11 : TEL_TEMPLATE_10;
+ var di = 0, out = '';
+ for (var i = 0; i < template.length; i++) {
+  if (template.charAt(i) === '0') { out += (di < digits.length) ? digits.charAt(di) : '_'; di++; }
+  else out += template.charAt(i);
+ }
+ return out;
+}
+function _cttTelMask(el) {
+ var oldVal = el.value || '';
+ var cursorPos = (el.selectionStart == null) ? oldVal.length : el.selectionStart;
+ var digitsBeforeCursor = oldVal.slice(0, cursorPos).replace(/\D/g, '').length;
+ var totalDigits = oldVal.replace(/\D/g, '').length;
+ el.value = _cttTelMaskValue(oldVal);
+ if (digitsBeforeCursor === 0) { el.setSelectionRange(0, 0); return; }
+ var template = totalDigits > 10 ? TEL_TEMPLATE_11 : TEL_TEMPLATE_10;
+ var seen = 0, pos = el.value.length;
+ for (var i = 0; i < template.length; i++) {
+  if (template.charAt(i) === '0') {
+   seen++;
+   if (seen === digitsBeforeCursor) { pos = i + 1; break; }
+  }
+ }
+ el.setSelectionRange(pos, pos);
+}
+
 var _spEmpCurrentId = '';
 
 async function _spEmpresas(row, tds) {
@@ -502,7 +540,7 @@ function _spContatoById(id) {
   + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" value="'+email.replace(/"/g,'&quot;')+'" oninput="_cttScheduleAutoSave()"></div>'
   + '</div>'
   + '<div class="sp-field"><div class="sp-label">Telefone</div>'
-  + '<input class="sp-inp" id="sp-ctt-telefone" type="tel" value="'+tel.replace(/"/g,'&quot;')+'" oninput="_cttScheduleAutoSave()"></div>'
+  + '<input class="sp-inp" id="sp-ctt-telefone" type="tel" value="'+_cttTelMaskValue(tel).replace(/"/g,'&quot;')+'" oninput="_cttTelMask(this);_cttScheduleAutoSave()"></div>'
   + '<input type="hidden" id="sp-ctt-id" value="'+_spCttCurrentId+'">'
   // Empresas vinculadas: N:N de verdade (contatos_empresas), igual no
   // Airtable — mesmo padrão de chips + "+ Vincular" já usado em "Obras
@@ -645,11 +683,21 @@ async function _spSaveContato() {
  if (_cttAutoSaveTimer) { clearTimeout(_cttAutoSaveTimer); _cttAutoSaveTimer = null; }
  var id = (document.getElementById('sp-ctt-id') || {}).value;
  if (!_sb || !id) return;
+ // Mesma regra do CNPJ: 0 dígitos = deixado em branco de propósito (ok);
+ // 10 ou 11 = completo, salva mascarado; 1-9 = incompleto, não salva até
+ // completar (senão uma pausa no meio da digitação salvaria lixo).
+ var telEl = document.getElementById('sp-ctt-telefone');
+ var telDigits = ((telEl || {}).value || '').replace(/\D/g, '');
+ if (telDigits.length > 0 && telDigits.length < 10) {
+  _showToast('Telefone incompleto — informe DDD + número (10 ou 11 dígitos).', 'erro');
+  if (telEl) { telEl.style.borderColor = 'var(--red)'; setTimeout(function(){ telEl.style.borderColor = ''; }, 2500); }
+  return;
+ }
  var payload = {
-  nome_completo: (document.getElementById('sp-ctt-nome')     || {}).value.trim() || null,
-  cargo:         (document.getElementById('sp-ctt-cargo')    || {}).value || null,
-  email:         (document.getElementById('sp-ctt-email')    || {}).value.trim() || null,
-  telefone:      (document.getElementById('sp-ctt-telefone') || {}).value.trim() || null,
+  nome_completo: (document.getElementById('sp-ctt-nome')  || {}).value.trim() || null,
+  cargo:         (document.getElementById('sp-ctt-cargo') || {}).value || null,
+  email:         (document.getElementById('sp-ctt-email') || {}).value.trim() || null,
+  telefone:      telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
  };
  var { error } = await _sb.from('contatos').update(payload).eq('id', id);
  if (error) { _showToast('Erro ao salvar contato: ' + _supaErrPt(error.message), 'erro'); return; }
@@ -788,6 +836,18 @@ function _cttFasePrimaria(c) {
  var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
  return (empLink && empLink.empresa && empLink.empresa.fase_ciclo_vida) || '';
 }
+// Categoria/Estado — mesma empresa "primária", mesmo raciocínio de _cttFasePrimaria.
+function _cttCategoriaPrimaria(c) {
+ var links = c.contatos_empresas || [];
+ var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
+ var cats = (empLink && empLink.empresa && empLink.empresa.categoria) || [];
+ return cats.join(', ');
+}
+function _cttEstadoPrimario(c) {
+ var links = c.contatos_empresas || [];
+ var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
+ return ((empLink && empLink.empresa && empLink.empresa.estado) || '').toUpperCase();
+}
 // Extraído de _dbLoadContatos (era closure local ao map) pra ser reaproveitado
 // também por _cttRenderGrouped abaixo.
 function _cttRowHTML(c) {
@@ -826,7 +886,14 @@ function _cttRowHTML(c) {
   + ' data-id="'+c.id+'"'
   + ' data-nome="'+nome.toLowerCase()+'"'
   + ' data-cargo="'+(c.cargo||'').toLowerCase()+'"'
-  + ' data-empresa="'+empNome.toLowerCase()+'">'
+  + ' data-empresa="'+empNome.toLowerCase()+'"'
+  + ' data-fase="'+fase.toLowerCase()+'"'
+  + ' data-categoria="'+_cttCategoriaPrimaria(c).toLowerCase()+'"'
+  + ' data-estado="'+_cttEstadoPrimario(c).toLowerCase()+'"'
+  + ' data-telefone="'+(c.telefone||'').toLowerCase()+'"'
+  + ' data-email="'+(c.email||'').toLowerCase()+'"'
+  + ' data-created_at="'+(c.created_at||'').slice(0,10)+'"'
+  + ' data-ultima_alteracao_por="'+(c.ultima_alteracao_por||'').toLowerCase()+'">'
   + '<td><div style="display:flex;align-items:center;gap:9px">'
   + '<div class="nt-avatar nt-avatar-circle" style="background:'+_cttColor(nome)+'">'+initials+'</div>'
   + '<div style="font-weight:500;font-size:13px">'+nome+'</div>'
@@ -847,7 +914,7 @@ async function _dbLoadContatos() {
  var allData = []; var from = 0; var more = true;
  while (more) {
   var res = await _sb.from('contatos')
-   .select('id, nome_completo, cargo, email, telefone, contatos_empresas(is_primary, empresa:empresa_id(id, nome, fase_ciclo_vida))')
+   .select('id, nome_completo, cargo, email, telefone, created_at, ultima_alteracao_por, contatos_empresas(is_primary, empresa:empresa_id(id, nome, fase_ciclo_vida, categoria, estado))')
    .order('nome_completo').range(from, from + 999);
   if (res.error || !res.data || !res.data.length) break;
   allData = allData.concat(res.data);
@@ -977,6 +1044,21 @@ function switchEmpTab(tab) {
  // btn-nova-empresa saiu do toolbar (ver comentário no index.html) — só
  // btn-novo-contato continua sendo alternado por aqui.
  document.getElementById('btn-novo-contato').style.display = (tab === 'contatos') ? 'inline-flex' : 'none';
+
+ // #topbar-action-btn ("+ Nova Empresa") é setado uma única vez por ROTA em
+ // go('empresas') (scripts/app.js), nunca por SUB-ABA — por isso ficava
+ // visível mesmo depois de trocar pra Contatos. switchEmpTab não tinha
+ // nenhuma lógica pra esconder/restaurar esse botão.
+ var topBtn = document.getElementById('topbar-action-btn');
+ if (topBtn) {
+  if (tab === 'contatos') {
+   topBtn.style.display = 'none';
+  } else {
+   topBtn.textContent = '+ Nova Empresa';
+   topBtn.style.display = '';
+   topBtn._action = 'openNovaEmpresa';
+  }
+ }
 }
 
 // ── Fornecedores (Supabase: fornecedores + fornecedores_produtos) ─────────────
@@ -1783,6 +1865,12 @@ var _cttGroupCollapsed = {};
 function _cttGroupKeyFor(c, field) {
  if (field === 'cargo') return { key: c.cargo || '— Sem cargo', sortKey: null };
  if (field === 'empresa') return { key: _cttEmpresaPrimaria(c) || '— Sem empresa', sortKey: null };
+ // Mesmo esquema de _empGroupKeyFor(field==='nome') pra Empresas — agrupa
+ // pela letra inicial (A-Z), não pelo nome completo.
+ if (field === 'nome') {
+  var n = (c.nome_completo || '').trim();
+  return { key: n ? n.charAt(0).toUpperCase() : '— Sem nome', sortKey: null };
+ }
  return { key: '— Sem grupo', sortKey: null };
 }
 function _cttPseudoDataset(c) {
@@ -1790,6 +1878,13 @@ function _cttPseudoDataset(c) {
   nome: (c.nome_completo || '').toLowerCase(),
   cargo: (c.cargo || '').toLowerCase(),
   empresa: (_cttEmpresaPrimaria(c) || '').toLowerCase(),
+  fase: _cttFasePrimaria(c).toLowerCase(),
+  categoria: _cttCategoriaPrimaria(c).toLowerCase(),
+  estado: _cttEstadoPrimario(c).toLowerCase(),
+  telefone: (c.telefone || '').toLowerCase(),
+  email: (c.email || '').toLowerCase(),
+  created_at: (c.created_at || '').slice(0,10),
+  ultima_alteracao_por: (c.ultima_alteracao_por || '').toLowerCase(),
  };
 }
 function _cttToggleGroup(key) {
@@ -2070,10 +2165,31 @@ var _empCampos = {
  'ctt': { label: 'Todos os Contatos', type: 'select', opts: ['Com contato','Sem contato'] },
  'ultalt': { label: 'Última alteração', type: 'select', includeEmptyOption: true, opts: function(){ return _empOptionsFrom(function(e){ return e.ultima_alteracao_por; }); } }
 };
+function _cttOptionsFrom(getter) {
+ var set = {};
+ (_contatosArr || []).forEach(function(c) { var v = getter(c); if (v) set[v] = 1; });
+ return Object.keys(set).sort();
+}
 var _cttCampos = {
  'nome': { label: 'Nome', type: 'text' },
  'cargo': { label: 'Cargo', type: 'select', opts: CONTATO_CARGO_OPCOES },
- 'empresa': { label: 'Empresa', type: 'text' }
+ // Multitext (não select simples): um contato pode ter mais de uma empresa
+ // vinculada (contatos_empresas é N:N) — o valor comparado (data-empresa)
+ // já é a lista de nomes separada por vírgula, ver _cttEmpresasNomesTodas.
+ 'empresa': { label: 'Empresa', type: 'multitext', opts: function(){
+  var set = {};
+  (_contatosArr || []).forEach(function(c){ _cttEmpresasNomesTodas(c).forEach(function(n){ set[n] = 1; }); });
+  return Object.keys(set).sort();
+ } },
+ // Fase/Categoria/Estado vêm da empresa vinculada (contatos não tem esses
+ // campos próprios) — mesmo vocabulário fixo já usado em Empresas.
+ 'fase':     { label: 'Fase do ciclo de vida', type: 'select', includeEmptyOption: true, opts: EMPRESA_FASE_OPCOES },
+ 'categoria':{ label: 'Categoria', type: 'multitext', opts: EMPRESA_CATEGORIA_OPCOES },
+ 'estado':   { label: 'Estado', type: 'select', includeEmptyOption: true, opts: EMPRESA_ESTADO_OPCOES },
+ 'telefone': { label: 'Número de Telefone', type: 'text' },
+ 'email':    { label: 'E-mail', type: 'text' },
+ 'created_at': { label: 'Data de criação', type: 'date' },
+ 'ultima_alteracao_por': { label: 'Última alteração', type: 'select', includeEmptyOption: true, opts: function(){ return _cttOptionsFrom(function(c){ return c.ultima_alteracao_por; }); } }
 };
 
 /* Filtro/Ordenação de Empresas — componentes reutilizáveis (filtro-builder/
@@ -2112,20 +2228,33 @@ _gbInit('empresas', [
    Cargo verificado no Airtable). */
 var _cttFbFields = Object.keys(_cttCampos).map(function(k) {
  var c = _cttCampos[k];
- return { key: k, label: c.label, type: c.type, options: c.opts || [] };
+ return { key: k, label: c.label, type: c.type, options: c.opts || [], includeEmptyOption: c.includeEmptyOption };
 });
 _fbInit('contatos', _cttFbFields, _cttApplyFilters);
 
 var _cttSbFields = [
- { key: 'nome', label: 'Nome', type: 'text' },
- { key: 'cargo', label: 'Cargo', type: 'text' },
- { key: 'empresa', label: 'Empresa', type: 'text' },
+ { key: 'nome',      label: 'Nome',      type: 'text' },
+ { key: 'cargo',     label: 'Cargo',     type: 'text' },
+ { key: 'empresa',   label: 'Empresa',   type: 'text' },
+ { key: 'fase',      label: 'Fase do ciclo de vida (Empresa)', type: 'text' },
+ { key: 'categoria', label: 'Categoria (Empresa)', type: 'text' },
+ { key: 'estado',    label: 'Estado (Empresa)', type: 'text' },
+ { key: 'telefone',  label: 'Número de Telefone', type: 'text' },
+ { key: 'email',     label: 'E-mail', type: 'text' },
+ // created_at já chega pré-truncado em YYYY-MM-DD (tanto no dataset do <tr>
+ // quanto no pseudo-dataset), então type:'date' direto no valor funciona
+ // sem precisar de getValue — o parser de data do sort-builder espera
+ // exatamente esse formato.
+ { key: 'created_at', label: 'Data de criação', type: 'date' },
+ { key: 'ultima_alteracao_por', label: 'Última alteração', type: 'text' },
 ];
 _sbInit('contatos', _cttSbFields, _cttApplyFilters);
 
 // Agrupamento — travado em 1 nível, mesma engine de Empresas/Gestor de
-// Tarefas. Campos mínimos pedidos: Cargo, Empresa (ver _cttGroupKeyFor acima).
+// Tarefas. "Nome" agrupa pela letra inicial (A-Z), mesmo esquema de Empresas
+// (ver _cttGroupKeyFor acima).
 _gbInit('contatos', [
+ { key: 'nome',    label: 'Nome do contato' },
  { key: 'cargo',   label: 'Cargo' },
  { key: 'empresa', label: 'Empresa' },
 ], _cttApplyFilters, 1);

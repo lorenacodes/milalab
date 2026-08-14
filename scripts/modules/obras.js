@@ -1395,7 +1395,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div class="sp-field"><div class="sp-label">Nome completo *</div><input class="sp-inp" id="sp-new-cont-nome" placeholder="Nome"></div>'
   + '<div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-new-cont-email" type="email" placeholder="email@empresa.com"></div>'
-  + '<div class="sp-field"><div class="sp-label">Telefone</div><input class="sp-inp" id="sp-new-cont-tel" placeholder="(11) 99999-9999"></div>'
+  + '<div class="sp-field"><div class="sp-label">Telefone</div><input class="sp-inp" id="sp-new-cont-tel" placeholder="(11) 99999-9999" oninput="_cttTelMask(this)"></div>'
   + '</div><div class="sp-field" style="margin-top:8px"><div class="sp-label">Cargo</div><input class="sp-inp" id="sp-new-cont-cargo" placeholder="Engenheiro, Comprador..."></div>'
   + '<div style="display:flex;gap:6px;margin-top:10px">'
   + '<button class="btn btn-primary btn-sm" onclick="_spCriarContato()" style="flex:1;justify-content:center">Criar contato</button>'
@@ -1720,11 +1720,19 @@ async function _spCriarContato() {
  const nome = document.getElementById('sp-new-cont-nome')?.value?.trim();
  const empId = document.getElementById('sp-empresa-id')?.value;
  if (!nome) { alert('Nome do contato é obrigatório.'); return; }
+ // Mesma regra de _spSaveContato (empresas.js): 10/11 dígitos salva
+ // mascarado, 0 fica em branco, 1-9 bloqueia (senão salvaria o molde
+ // incompleto — "(11) 9____-____" — como se fosse o telefone de verdade).
+ const telDigits = (document.getElementById('sp-new-cont-tel')?.value || '').replace(/\D/g, '');
+ if (telDigits.length > 0 && telDigits.length < 10) {
+  alert('Telefone incompleto — informe DDD + número (10 ou 11 dígitos), ou deixe em branco.');
+  return;
+ }
  const payload = {
   nome_completo: nome,
   empresa_id: empId || null,
   email:  document.getElementById('sp-new-cont-email')?.value?.trim() || null,
-  telefone: document.getElementById('sp-new-cont-tel')?.value?.trim() || null,
+  telefone: telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
   cargo: document.getElementById('sp-new-cont-cargo')?.value?.trim() || null,
  };
  const { data, error } = await _sb.from('contatos').insert(payload).select().single();
