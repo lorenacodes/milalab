@@ -1478,8 +1478,12 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div class="sp-field"><div class="sp-label">Estado</div><select class="sp-inp" id="sp-new-emp-uf">' + _spEmpOptSelect(EMPRESA_ESTADO_OPCOES, '') + '</select></div>'
   + '<div class="sp-field"><div class="sp-label">Fase do Ciclo de Vida</div><select class="sp-inp" id="sp-new-emp-fase">' + _spEmpOptSelect(EMPRESA_FASE_OPCOES, '') + '</select></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
+  // Mesmo componente de chips coloridos já usado em openNovaEmpresa()
+  // (empresas.js) — _spEmpCategoriaSel é global e resetado em
+  // _spToggleNovaEmpresa() antes de abrir este formulário, então não há
+  // risco de arrastar seleção de uma sessão de criação anterior.
+  + '<div class="sp-field"><div class="sp-label">Categoria</div><div id="sp-emp-categoria-dropdown"></div></div>'
   + '<div class="sp-field"><div class="sp-label">Site</div><input class="sp-inp" id="sp-new-emp-site" placeholder="https://"></div>'
-  + '<div></div>'
   + '</div><div style="display:flex;gap:6px;margin-top:10px">'
   + '<button class="btn btn-primary btn-sm" onclick="_spCriarEmpresaObra()" style="flex:1;justify-content:center">Criar empresa</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEmpresa()">Cancelar</button>'
@@ -1809,7 +1813,13 @@ function _spOnEmpresaChange() {
 // ── Quick-create Empresa ──────────────────────────────────────────────────────
 function _spToggleNovaEmpresa() {
  const f = document.getElementById('sp-nova-empresa-form');
- if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+ if (!f) return;
+ var abrir = f.style.display === 'none';
+ f.style.display = abrir ? 'block' : 'none';
+ if (abrir) {
+  _spEmpCategoriaSel = [];
+  _spEmpRenderCategoriaDropdown();
+ }
 }
 // Nome próprio (_spCriarEmpresaObra, não _spCriarEmpresa) de propósito —
 // empresas.js já define uma _spCriarEmpresa GLOBAL diferente (openNovaEmpresa,
@@ -1841,6 +1851,7 @@ async function _spCriarEmpresaObra() {
   cnpj,
   estado: document.getElementById('sp-new-emp-uf')?.value || null,
   fase_ciclo_vida: document.getElementById('sp-new-emp-fase')?.value || null,
+  categoria: (_spEmpCategoriaSel || []).slice(),
   url_site: document.getElementById('sp-new-emp-site')?.value?.trim() || null,
  };
  const { data, error } = await _sb.from('empresas').insert(payload).select().single();

@@ -1048,6 +1048,18 @@ async function _dbLoadContatos() {
   allData = allData.concat(res.data);
   more = res.data.length === 1000; from += 1000;
  }
+ // Sintetiza c.empresa_id (empresa primária, is_primary || primeiro vínculo)
+ // a partir da junção contatos_empresas — mesmo espírito de o.empresa_id em
+ // obras.js (linha ~415). Achado real ao mexer no formulário da Obra: o
+ // filtro de "Contato do orçamento" por empresa (aqui em obras.js) comparava
+ // com c.empresa_id, um campo que nunca existiu em nenhum contato — o
+ // dropdown nunca listava contato nenhum, mesmo quando a empresa tinha
+ // contatos vinculados de verdade.
+ allData.forEach(function(c) {
+  var links = c.contatos_empresas || [];
+  var empLink = links.find(function(l){ return l.is_primary; }) || links[0];
+  c.empresa_id = (empLink && empLink.empresa && empLink.empresa.id) || null;
+ });
  _contatosArr = allData;
  if (!allData.length) return;
 
