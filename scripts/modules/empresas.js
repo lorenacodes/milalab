@@ -611,6 +611,17 @@ async function _empUnlink(tipo, empId, relId, label) {
  _showToast((tipo==='obra'?'Obra':'Contato') + ' desvinculado(a).', 'ok');
  var row = document.querySelector('#emp-tbody tr[data-id="'+empId+'"]');
  if (row) _spEmpresas(row, []);
+ // Sem isso, o lado desvinculado (obra ou contato) ficava com o cache local
+ // desatualizado — não é bug de realtime, é cache: _contatosArr/a lista de
+ // obras já carregada em memória continuava mostrando o vínculo removido
+ // até um F5 forçado. Achado real: empresa desvinculada de um contato ainda
+ // aparecia associada ao pesquisar depois na aba Empresas & Contatos.
+ if (tipo === 'contato' && typeof _cttRefreshRowFromDB === 'function') {
+  _cttRefreshRowFromDB(relId);
+ } else if (tipo === 'obra' && typeof _dbLoadObras === 'function') {
+  _dbLoadObras();
+  if (typeof _dbLoadObrasKanban === 'function') _dbLoadObrasKanban();
+ }
 }
 
 // ── Renderer: Contatos ───────────────────────────────────────────────────────
@@ -784,6 +795,13 @@ function _cttRefreshRowFromDB(cttId) {
   var c = (_contatosArr || []).find(function(x){ return String(x.id) === String(cttId); });
   if (c && r.data) {
    c.contatos_empresas = r.data;
+   // Mesma síntese de _dbLoadContatos (empresa primária, is_primary || 1º
+   // vínculo) — sem isso, c.empresa_id ficava desatualizado depois de um
+   // desvincular, e o filtro de "Contato do orçamento" na Obra (que lê
+   // c.empresa_id) continuava mostrando o contato como vinculado à empresa
+   // já removida.
+   var empLink = r.data.find(function(l){ return l.is_primary; }) || r.data[0];
+   c.empresa_id = (empLink && empLink.empresa && empLink.empresa.id) || null;
    var tr = document.querySelector('#ctt-tbody tr[data-id="'+cttId+'"]');
    if (tr) tr.outerHTML = _cttRowHTML(c);
   }
