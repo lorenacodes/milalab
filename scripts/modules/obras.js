@@ -1473,6 +1473,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<select class="sp-inp" id="sp-empresa-id" onchange="_spOnEmpresaChange()" style="flex:1">'
   + '<option value="">Selecione a empresa...</option>' + empOptions
   + '</select>'
+  // Pedido explícito: depois de empresa/contato escolhidos, esses selects
+  // ficavam "presos" — a única forma de abrir o detalhamento era descer até
+  // "Empresa(s) vinculada(s)" mais embaixo (informação duplicada, mesma
+  // empresa mostrada duas vezes). Este botão abre o painel de detalhe da
+  // empresa selecionada direto daqui; some quando nada está selecionado
+  // (_spOnEmpresaChange mantém isso atualizado a cada troca).
+  + '<button class="btn btn-ghost btn-sm" id="sp-empresa-open-btn" onclick="_spAbrirEmpresaSelecionada()" title="Abrir empresa" style="display:' + (o.empresa_id ? '' : 'none') + '">›</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEmpresa()" title="Criar nova empresa">+</button>'
   + '</div></div>'
   + '<div id="sp-nova-empresa-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">'
@@ -1497,9 +1504,10 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
 
   + '<div class="sp-field"><div class="sp-label">Contato do orçamento</div>'
   + '<div style="display:flex;gap:6px;align-items:center">'
-  + '<select class="sp-inp" id="sp-contato-id" style="flex:1">'
+  + '<select class="sp-inp" id="sp-contato-id" onchange="_spToggleContatoOpenBtn()" style="flex:1">'
   + contOptions
   + '</select>'
+  + '<button class="btn btn-ghost btn-sm" id="sp-contato-open-btn" onclick="_spAbrirContatoSelecionado()" title="Abrir contato" style="display:' + (o.contato_id ? '' : 'none') + '">›</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoContato()" title="Criar novo contato">+</button>'
   + '</div></div>'
   + '<div id="sp-novo-contato-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">'
@@ -1808,12 +1816,32 @@ async function _spSaveObraFull() {
 // ── Empresa: mudar seleção → atualiza contatos ────────────────────────────────
 function _spOnEmpresaChange() {
  const empId = document.getElementById('sp-empresa-id')?.value;
+ const btn = document.getElementById('sp-empresa-open-btn');
+ if (btn) btn.style.display = empId ? '' : 'none';
  const sel = document.getElementById('sp-contato-id');
  if (!sel) return;
  const filtrados = _contatosArr.filter(c => c.empresa_id === empId);
  sel.innerHTML = filtrados.length
   ? '<option value="">Selecione o contato...</option>' + filtrados.map(c => `<option value="${c.id}">${c.nome_completo}${c.cargo ? ' · ' + c.cargo : ''}</option>`).join('')
   : '<option value="">Nenhum contato para esta empresa</option>';
+ _spToggleContatoOpenBtn();
+}
+// Abre o painel de detalhe da empresa/contato já escolhido nos selects de
+// "Empresa & Contato" — sem isso, a única forma de chegar lá era descer até
+// "Empresa(s) vinculada(s)"/"Contatos vinculados" mais embaixo no mesmo
+// painel, mostrando a mesma informação duas vezes de forma redundante.
+function _spAbrirEmpresaSelecionada() {
+ const id = document.getElementById('sp-empresa-id')?.value;
+ if (id) _spOpenEntityById('empresas', id);
+}
+function _spAbrirContatoSelecionado() {
+ const id = document.getElementById('sp-contato-id')?.value;
+ if (id) _spOpenEntityById('contatos', id);
+}
+function _spToggleContatoOpenBtn() {
+ const id = document.getElementById('sp-contato-id')?.value;
+ const btn = document.getElementById('sp-contato-open-btn');
+ if (btn) btn.style.display = id ? '' : 'none';
 }
 
 // ── Quick-create Empresa ──────────────────────────────────────────────────────
@@ -1942,6 +1970,7 @@ async function _spCriarContato() {
   const opt = document.createElement('option');
   opt.value = data.id; opt.textContent = data.nome_completo + (data.cargo ? ' · ' + data.cargo : ''); opt.selected = true;
   sel.appendChild(opt);
+  _spToggleContatoOpenBtn();
  }
  _spToggleNovoContato();
 }
