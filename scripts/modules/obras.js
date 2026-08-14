@@ -1263,25 +1263,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
  var totalValor = projetos.reduce(function(s, p){ return s + (Number(p.valor_unitario) * Number(p.quantidade || 1) || 0); }, 0);
  var totalPeso  = projetos.reduce(function(s, p){ return s + (Number(p.peso_kg) || 0); }, 0);
 
- // ── Opções de empresa ────────────────────────────────────────────────────────
- var empOptions = _empresasArr.map(function(e){
-  return '<option value="' + e.id + '"' + (e.id === o.empresa_id ? ' selected' : '') + '>' + e.nome + '</option>';
- }).join('');
-
- // ── Opções de contato ────────────────────────────────────────────────────────
- // Sem empresa selecionada pra obra ainda: não filtra (c.empresa_id === null
- // bateria com qualquer contato sem empresa vinculada, o que é errado aqui —
- // o pedido é "nenhum contato até escolher uma empresa", não "contatos
- // órfãos").
- var contFiltrados = o.empresa_id ? _contatosArr.filter(function(c){ return c.empresa_id === o.empresa_id; }) : [];
- var contOptions = !o.empresa_id
-  ? '<option value="">Selecione a empresa primeiro</option>'
-  : contFiltrados.length
-  ? contFiltrados.map(function(c){
-     return '<option value="' + c.id + '"' + (c.id === o.contato_id ? ' selected' : '') + '>'
-      + c.nome_completo + (c.cargo ? ' · ' + c.cargo : '') + '</option>';
-    }).join('')
-  : '<option value="">Nenhum contato cadastrado para esta empresa</option>';
+ // ── Rótulo inicial de Empresa/Contato (selects buscáveis, ver
+ // _spObEmpresaMarkup/_spObContatoMarkup) ──────────────────────────────────────
+ var empresaNomeAtual = (o.empresa && o.empresa.nome) || '';
+ var contatoAtualObj = o.contato_id ? _contatosArr.find(function(c){ return c.id === o.contato_id; }) : null;
+ var contatoLabelAtual = contatoAtualObj
+  ? (contatoAtualObj.nome_completo + (contatoAtualObj.cargo ? ' · ' + contatoAtualObj.cargo : ''))
+  : ((o.contato && o.contato.nome_completo) || '');
 
  // ── Cards de projetos ────────────────────────────────────────────────────────
  var etapaCls = {
@@ -1470,9 +1458,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div class="sp-stitle">Empresa & Contato</div>'
   + '<div class="sp-field"><div class="sp-label">Empresa</div>'
   + '<div style="display:flex;gap:6px;align-items:center">'
-  + '<select class="sp-inp" id="sp-empresa-id" onchange="_spOnEmpresaChange()" style="flex:1">'
-  + '<option value="">Selecione a empresa...</option>' + empOptions
-  + '</select>'
+  + _spObEmpresaMarkup(o.empresa_id, empresaNomeAtual)
   // Pedido explícito: depois de empresa/contato escolhidos, esses selects
   // ficavam "presos" — a única forma de abrir o detalhamento era descer até
   // "Empresa(s) vinculada(s)" mais embaixo (informação duplicada, mesma
@@ -1504,9 +1490,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
 
   + '<div class="sp-field"><div class="sp-label">Contato do orçamento</div>'
   + '<div style="display:flex;gap:6px;align-items:center">'
-  + '<select class="sp-inp" id="sp-contato-id" onchange="_spToggleContatoOpenBtn()" style="flex:1">'
-  + contOptions
-  + '</select>'
+  + _spObContatoMarkup(o.contato_id, contatoLabelAtual)
   + '<button class="btn btn-ghost btn-sm" id="sp-contato-open-btn" onclick="_spAbrirContatoSelecionado()" title="Abrir contato" style="display:' + (o.contato_id ? '' : 'none') + '">›</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoContato()" title="Criar novo contato">+</button>'
   + '</div></div>'
@@ -1522,24 +1506,14 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoContato()">Cancelar</button>'
   + '</div></div>'
 
-  // ── Registros vinculados (Obra→Empresa e Obra→Projeto) ────────────────────
-  // Empresa(s): vem direto de o.empresas_obras (já trazido junto pela query
-  // de _spObraById, ver linha ~626 — junction empresas_obras, mesma relação
-  // já usada pelo select acima; normalmente 1 empresa por obra, mas o schema
-  // permite mais de uma — mostra todas). Projetos: reverse FK
-  // (projetos.obra_id), já recebido como parâmetro `projetos` desta função —
-  // nenhuma query nova necessária. Ambos usam o chip clicável padrão
-  // (_spRelChipHTML, ver side-panel.js) pros mesmos já usados no painel de
-  // Empresa (Obras/Contatos vinculados).
-  + '<div class="sp-stitle">Empresa(s) vinculada(s)</div>'
-  + '<div class="sp-rel-chips-wrap" style="margin-bottom:16px">'
-  + ((o.empresas_obras || []).length
-     ? (o.empresas_obras || []).filter(function(link){ return link.empresa; }).map(function(link){
-        return _spRelChipHTML('empresas', link.empresa.id, link.empresa.nome || '—');
-       }).join('')
-     : '<div class="sp-empty">Nenhuma empresa vinculada a esta obra.</div>')
-  + '</div>'
-
+  // ── Registros vinculados (Obra→Projeto) ────────────────────────────────────
+  // "Empresa(s) vinculada(s)" foi removida daqui — pedido explícito: ficava
+  // redundante com o campo Empresa logo acima, que já mostra a mesma empresa
+  // e agora tem seu próprio atalho "›" pra abrir o detalhamento
+  // (_spAbrirEmpresaSelecionada). Projetos: reverse FK (projetos.obra_id),
+  // já recebido como parâmetro `projetos` desta função — nenhuma query nova
+  // necessária. Usa o chip clicável padrão (_spRelChipHTML, ver
+  // side-panel.js), mesmo componente já usado no painel de Empresa.
   + '<div class="sp-stitle">Projetos vinculados</div>'
   + '<div class="sp-rel-chips-wrap" style="margin-bottom:16px">'
   + (projetos.length
@@ -1818,18 +1792,16 @@ function _spOnEmpresaChange() {
  const empId = document.getElementById('sp-empresa-id')?.value;
  const btn = document.getElementById('sp-empresa-open-btn');
  if (btn) btn.style.display = empId ? '' : 'none';
- const sel = document.getElementById('sp-contato-id');
- if (!sel) return;
- const filtrados = _contatosArr.filter(c => c.empresa_id === empId);
- sel.innerHTML = filtrados.length
-  ? '<option value="">Selecione o contato...</option>' + filtrados.map(c => `<option value="${c.id}">${c.nome_completo}${c.cargo ? ' · ' + c.cargo : ''}</option>`).join('')
-  : '<option value="">Nenhum contato para esta empresa</option>';
- _spToggleContatoOpenBtn();
+ // Troca de empresa invalida o contato escolhido antes (pode não pertencer
+ // à empresa nova) — reseta a seleção; a lista buscável refiltra pela
+ // empresa atual só na hora de abrir (_spObContatoFilter lê sp-empresa-id
+ // ao vivo, não precisa reconstruir nada aqui).
+ if (typeof _spObContatoSelectItem === 'function') _spObContatoSelectItem('', '');
 }
-// Abre o painel de detalhe da empresa/contato já escolhido nos selects de
+// Abre o painel de detalhe da empresa/contato já escolhido nos campos de
 // "Empresa & Contato" — sem isso, a única forma de chegar lá era descer até
-// "Empresa(s) vinculada(s)"/"Contatos vinculados" mais embaixo no mesmo
-// painel, mostrando a mesma informação duas vezes de forma redundante.
+// "Empresa(s) vinculada(s)" mais embaixo no mesmo painel, mostrando a mesma
+// informação duas vezes de forma redundante.
 function _spAbrirEmpresaSelecionada() {
  const id = document.getElementById('sp-empresa-id')?.value;
  if (id) _spOpenEntityById('empresas', id);
@@ -1843,6 +1815,146 @@ function _spToggleContatoOpenBtn() {
  const btn = document.getElementById('sp-contato-open-btn');
  if (btn) btn.style.display = id ? '' : 'none';
 }
+
+// ── Empresa & Contato: selects buscáveis (mesmo design "Buscar obra..." já
+// usado no Gestor de Tarefas — componente srch-sel, ver nt-obra-box em
+// index.html/dashboard.js) — pedido explícito: com centenas de empresas e
+// contatos cadastrados, um <select> nativo sem filtro obrigava rolar a
+// lista inteira pra achar um registro. O valor escolhido continua vivendo
+// num <input type="hidden"> com o mesmo id de sempre (sp-empresa-id/
+// sp-contato-id), então todo o resto do código (_spSaveObraFull, guards,
+// botões "›"/"+") continua lendo com .value sem precisar mudar nada.
+var _spObEmpresaSelected = '';
+function _spObEmpresaMarkup(atualId, atualNome) {
+ _spObEmpresaSelected = atualId || '';
+ var temValor = !!_spObEmpresaSelected;
+ return '<input type="hidden" id="sp-empresa-id" value="' + _spObEmpresaSelected.replace(/"/g,'&quot;') + '">'
+  + '<div class="srch-sel" id="sp-ob-empresa-srch" style="flex:1">'
+  + '<div class="srch-sel-box" id="sp-ob-empresa-box" onclick="_spObEmpresaToggle()">'
+  + '<span class="srch-sel-val' + (temValor?'':' placeholder') + '" id="sp-ob-empresa-val">' + (temValor ? (atualNome||'').replace(/</g,'&lt;') : 'Selecione a empresa...') + '</span>'
+  + '<button class="srch-sel-clr" id="sp-ob-empresa-clr" style="display:' + (temValor?'':'none') + '" onclick="event.stopPropagation();_spObEmpresaClear()" title="Remover">✕</button>'
+  + '<span class="srch-sel-chevron">▾</span>'
+  + '</div>'
+  + '<div class="srch-sel-drop" id="sp-ob-empresa-drop">'
+  + '<input class="srch-sel-inp" id="sp-ob-empresa-inp" type="text" placeholder="Buscar empresa..." oninput="_spObEmpresaFilter(this.value)" onkeydown="_spObEmpresaKey(event)">'
+  + '<div class="srch-sel-list" id="sp-ob-empresa-list"></div>'
+  + '</div>'
+  + '</div>';
+}
+function _spObEmpresaToggle() {
+ var drop = document.getElementById('sp-ob-empresa-drop');
+ var box  = document.getElementById('sp-ob-empresa-box');
+ if (!drop) return;
+ if (drop.classList.contains('open')) { _spObEmpresaClose(); return; }
+ drop.classList.add('open'); if (box) box.classList.add('open');
+ var inp = document.getElementById('sp-ob-empresa-inp');
+ if (inp) { inp.value = ''; inp.focus(); }
+ _spObEmpresaFilter('');
+}
+function _spObEmpresaClose() {
+ var drop = document.getElementById('sp-ob-empresa-drop');
+ var box  = document.getElementById('sp-ob-empresa-box');
+ if (drop) drop.classList.remove('open');
+ if (box)  box.classList.remove('open');
+}
+function _spObEmpresaFilter(q) {
+ q = (q || '').toLowerCase();
+ var list = document.getElementById('sp-ob-empresa-list');
+ if (!list) return;
+ var matches = (_empresasArr || []).filter(function(e){ return (e.nome||'').toLowerCase().indexOf(q) !== -1; });
+ if (!matches.length) { list.innerHTML = '<div class="srch-sel-empty">Nenhuma empresa encontrada.</div>'; return; }
+ list.innerHTML = matches.map(function(e){
+  var sel = e.id === _spObEmpresaSelected ? ' selected' : '';
+  return '<div class="srch-sel-opt' + sel + '" onclick="_spObEmpresaSelectItem(\'' + e.id + '\',\'' + (e.nome||'').replace(/'/g,"\\'") + '\')">' + (e.nome||'').replace(/</g,'&lt;') + '</div>';
+ }).join('');
+}
+function _spObEmpresaSelectItem(id, nome) {
+ _spObEmpresaSelected = id || '';
+ var hidEl = document.getElementById('sp-empresa-id');
+ var valEl = document.getElementById('sp-ob-empresa-val');
+ var clrEl = document.getElementById('sp-ob-empresa-clr');
+ if (hidEl) hidEl.value = _spObEmpresaSelected;
+ if (valEl) { valEl.textContent = nome || 'Selecione a empresa...'; valEl.classList.toggle('placeholder', !_spObEmpresaSelected); }
+ if (clrEl) clrEl.style.display = _spObEmpresaSelected ? '' : 'none';
+ _spObEmpresaClose();
+ _spOnEmpresaChange();
+}
+function _spObEmpresaClear() { _spObEmpresaSelectItem('', ''); }
+function _spObEmpresaKey(e) { if (e.key === 'Escape') _spObEmpresaClose(); }
+
+var _spObContatoSelected = '';
+function _spObContatoMarkup(atualId, atualLabel) {
+ _spObContatoSelected = atualId || '';
+ var temValor = !!_spObContatoSelected;
+ return '<input type="hidden" id="sp-contato-id" value="' + _spObContatoSelected.replace(/"/g,'&quot;') + '">'
+  + '<div class="srch-sel" id="sp-ob-contato-srch" style="flex:1">'
+  + '<div class="srch-sel-box" id="sp-ob-contato-box" onclick="_spObContatoToggle()">'
+  + '<span class="srch-sel-val' + (temValor?'':' placeholder') + '" id="sp-ob-contato-val">' + (temValor ? (atualLabel||'').replace(/</g,'&lt;') : 'Selecione a empresa primeiro') + '</span>'
+  + '<button class="srch-sel-clr" id="sp-ob-contato-clr" style="display:' + (temValor?'':'none') + '" onclick="event.stopPropagation();_spObContatoClear()" title="Remover">✕</button>'
+  + '<span class="srch-sel-chevron">▾</span>'
+  + '</div>'
+  + '<div class="srch-sel-drop" id="sp-ob-contato-drop">'
+  + '<input class="srch-sel-inp" id="sp-ob-contato-inp" type="text" placeholder="Buscar contato..." oninput="_spObContatoFilter(this.value)" onkeydown="_spObContatoKey(event)">'
+  + '<div class="srch-sel-list" id="sp-ob-contato-list"></div>'
+  + '</div>'
+  + '</div>';
+}
+function _spObContatoToggle() {
+ if (!document.getElementById('sp-empresa-id')?.value) return; // sem empresa, nada pra listar
+ var drop = document.getElementById('sp-ob-contato-drop');
+ var box  = document.getElementById('sp-ob-contato-box');
+ if (!drop) return;
+ if (drop.classList.contains('open')) { _spObContatoClose(); return; }
+ drop.classList.add('open'); if (box) box.classList.add('open');
+ var inp = document.getElementById('sp-ob-contato-inp');
+ if (inp) { inp.value = ''; inp.focus(); }
+ _spObContatoFilter('');
+}
+function _spObContatoClose() {
+ var drop = document.getElementById('sp-ob-contato-drop');
+ var box  = document.getElementById('sp-ob-contato-box');
+ if (drop) drop.classList.remove('open');
+ if (box)  box.classList.remove('open');
+}
+function _spObContatoFilter(q) {
+ q = (q || '').toLowerCase();
+ var list = document.getElementById('sp-ob-contato-list');
+ if (!list) return;
+ var empId = document.getElementById('sp-empresa-id')?.value;
+ var pool = empId ? (_contatosArr || []).filter(function(c){ return c.empresa_id === empId; }) : [];
+ var matches = pool.filter(function(c){
+  return (c.nome_completo||'').toLowerCase().indexOf(q) !== -1 || (c.cargo||'').toLowerCase().indexOf(q) !== -1;
+ });
+ if (!matches.length) { list.innerHTML = '<div class="srch-sel-empty">Nenhum contato encontrado.</div>'; return; }
+ list.innerHTML = matches.map(function(c){
+  var sel = c.id === _spObContatoSelected ? ' selected' : '';
+  var label = c.nome_completo + (c.cargo ? ' · ' + c.cargo : '');
+  return '<div class="srch-sel-opt' + sel + '" onclick="_spObContatoSelectItem(\'' + c.id + '\',\'' + label.replace(/'/g,"\\'") + '\')">' + label.replace(/</g,'&lt;') + '</div>';
+ }).join('');
+}
+function _spObContatoSelectItem(id, label) {
+ _spObContatoSelected = id || '';
+ var hidEl = document.getElementById('sp-contato-id');
+ var valEl = document.getElementById('sp-ob-contato-val');
+ var clrEl = document.getElementById('sp-ob-contato-clr');
+ if (hidEl) hidEl.value = _spObContatoSelected;
+ if (valEl) {
+  var semEmpresa = !document.getElementById('sp-empresa-id')?.value;
+  valEl.textContent = label || (semEmpresa ? 'Selecione a empresa primeiro' : 'Selecione o contato...');
+  valEl.classList.toggle('placeholder', !_spObContatoSelected);
+ }
+ if (clrEl) clrEl.style.display = _spObContatoSelected ? '' : 'none';
+ _spObContatoClose();
+ _spToggleContatoOpenBtn();
+}
+function _spObContatoClear() { _spObContatoSelectItem('', ''); }
+function _spObContatoKey(e) { if (e.key === 'Escape') _spObContatoClose(); }
+document.addEventListener('click', function(e) {
+ var eDrop = document.getElementById('sp-ob-empresa-drop'), eBox = document.getElementById('sp-ob-empresa-box');
+ if (eDrop && eBox && !eBox.contains(e.target) && !eDrop.contains(e.target)) _spObEmpresaClose();
+ var cDrop = document.getElementById('sp-ob-contato-drop'), cBox = document.getElementById('sp-ob-contato-box');
+ if (cDrop && cBox && !cBox.contains(e.target) && !cDrop.contains(e.target)) _spObContatoClose();
+});
 
 // ── Quick-create Empresa ──────────────────────────────────────────────────────
 function _spToggleNovaEmpresa() {
@@ -1900,13 +2012,7 @@ async function _spCriarEmpresaObra() {
  }
  _empresasArr.push(data);
  _empresasArr.sort((a,b) => a.nome.localeCompare(b.nome));
- const sel = document.getElementById('sp-empresa-id');
- if (sel) {
-  const opt = document.createElement('option');
-  opt.value = data.id; opt.textContent = data.nome; opt.selected = true;
-  sel.appendChild(opt);
-  _spOnEmpresaChange();
- }
+ if (typeof _spObEmpresaSelectItem === 'function') _spObEmpresaSelectItem(data.id, data.nome);
  _spToggleNovaEmpresa();
  _dbLoadEmpresas(); // atualiza tabela de empresas em segundo plano
 }
@@ -1964,14 +2070,16 @@ async function _spCriarContato() {
   const { error: linkError } = await _sb.from('contatos_empresas').insert({ contato_id: data.id, empresa_id: empId, is_primary: true });
   if (linkError) console.error('[Obras] erro ao vincular contato_empresas na criação rápida:', linkError);
  }
- _contatosArr.push(data);
- const sel = document.getElementById('sp-contato-id');
- if (sel) {
-  const opt = document.createElement('option');
-  opt.value = data.id; opt.textContent = data.nome_completo + (data.cargo ? ' · ' + data.cargo : ''); opt.selected = true;
-  sel.appendChild(opt);
-  _spToggleContatoOpenBtn();
+ // Vincula já à obra atual (mesmo espírito de _spCriarEmpresaObra) — antes
+ // esse vínculo só era gravado em contatos_obras quando o formulário
+ // INTEIRO da obra fosse salvo (_spSaveObraFull), então recarregar a página
+ // (ou abrir a obra de novo) sem salvar antes perdia o contato escolhido.
+ if (_obraAtiva && _obraAtiva.id) {
+  const { error: obraLinkError } = await _sb.from('contatos_obras').upsert({ obra_id: _obraAtiva.id, contato_id: data.id }, { onConflict: 'obra_id,contato_id', ignoreDuplicates: true });
+  if (obraLinkError) console.error('[Obras] erro ao vincular contato à obra na criação rápida:', obraLinkError);
  }
+ _contatosArr.push(data);
+ if (typeof _spObContatoSelectItem === 'function') _spObContatoSelectItem(data.id, data.nome_completo + (data.cargo ? ' · ' + data.cargo : ''));
  _spToggleNovoContato();
 }
 
