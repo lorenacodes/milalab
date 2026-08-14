@@ -1394,7 +1394,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Novo Contato</div>'
   + '<div class="sp-field"><div class="sp-label">Nome completo *</div><input class="sp-inp" id="sp-new-cont-nome" placeholder="Nome"></div>'
   + '<div class="sp-g2" style="gap:8px;margin-top:8px">'
-  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-new-cont-email" type="email" placeholder="email@empresa.com"></div>'
+  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-new-cont-email" type="email" placeholder="nome@empresa.com" oninput="_cttEmailMask(this)"></div>'
   + '<div class="sp-field"><div class="sp-label">Telefone</div><input class="sp-inp" id="sp-new-cont-tel" placeholder="(11) 99999-9999" oninput="_cttTelMask(this)"></div>'
   + '</div><div class="sp-field" style="margin-top:8px"><div class="sp-label">Cargo</div><input class="sp-inp" id="sp-new-cont-cargo" placeholder="Engenheiro, Comprador..."></div>'
   + '<div style="display:flex;gap:6px;margin-top:10px">'
@@ -1728,10 +1728,15 @@ async function _spCriarContato() {
   alert('Telefone incompleto — informe DDD + número (10 ou 11 dígitos), ou deixe em branco.');
   return;
  }
+ const emailVal = document.getElementById('sp-new-cont-email')?.value?.trim() || '';
+ if (emailVal && !_cttEmailValida(emailVal)) {
+  alert('E-mail inválido — formato esperado: nome@empresa.com.');
+  return;
+ }
  const payload = {
   nome_completo: nome,
   empresa_id: empId || null,
-  email:  document.getElementById('sp-new-cont-email')?.value?.trim() || null,
+  email:  emailVal || null,
   telefone: telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
   cargo: document.getElementById('sp-new-cont-cargo')?.value?.trim() || null,
  };

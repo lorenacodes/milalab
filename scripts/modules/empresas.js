@@ -274,6 +274,25 @@ function _cttTelMask(el) {
  el.setSelectionRange(pos, pos);
 }
 
+// Molde de E-mail: diferente de CNPJ/Telefone, e-mail não tem posições
+// fixas pra preencher com "_" — o "molde" aqui é o placeholder
+// "nome@empresa.com" (já usado nos campos) + filtro em tempo real (barra
+// espaço nunca é válida em e-mail, erro de digitação comum em teclado
+// mobile) + bloqueio no salvar se o formato não bater com um e-mail de
+// verdade, mesmo espírito de validação do CNPJ/Telefone (incompleto/
+// inválido não salva até corrigir; vazio é permitido).
+function _cttEmailMask(el) {
+ var pos = el.selectionStart;
+ var clean = el.value.replace(/\s/g, '');
+ if (clean !== el.value) {
+  el.value = clean;
+  if (pos != null) el.setSelectionRange(Math.max(0, pos - 1), Math.max(0, pos - 1));
+ }
+}
+function _cttEmailValida(email) {
+ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 var _spEmpCurrentId = '';
 
 async function _spEmpresas(row, tds) {
@@ -537,7 +556,7 @@ function _spContatoById(id) {
   + '<input class="sp-inp" id="sp-ctt-nome" value="'+nome.replace(/"/g,'&quot;')+'" oninput="_cttScheduleAutoSave()"></div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Cargo</div><select class="sp-inp" id="sp-ctt-cargo" onchange="_cttScheduleAutoSave()">'+_spEmpOptSelect(CONTATO_CARGO_OPCOES, cargo)+'</select></div>'
-  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" value="'+email.replace(/"/g,'&quot;')+'" oninput="_cttScheduleAutoSave()"></div>'
+  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" placeholder="nome@empresa.com" value="'+email.replace(/"/g,'&quot;')+'" oninput="_cttEmailMask(this);_cttScheduleAutoSave()"></div>'
   + '</div>'
   + '<div class="sp-field"><div class="sp-label">Telefone</div>'
   + '<input class="sp-inp" id="sp-ctt-telefone" type="tel" value="'+_cttTelMaskValue(tel).replace(/"/g,'&quot;')+'" oninput="_cttTelMask(this);_cttScheduleAutoSave()"></div>'
@@ -705,10 +724,19 @@ async function _spSaveContato() {
   if (telEl) { telEl.style.borderColor = 'var(--red)'; setTimeout(function(){ telEl.style.borderColor = ''; }, 2500); }
   return;
  }
+ // Mesma regra: vazio ok, preenchido precisa ter o formato de um e-mail de
+ // verdade (nome@dominio.algo) — senão não salva.
+ var emailEl = document.getElementById('sp-ctt-email');
+ var emailVal = ((emailEl || {}).value || '').trim();
+ if (emailVal && !_cttEmailValida(emailVal)) {
+  _showToast('E-mail inválido — formato esperado: nome@empresa.com.', 'erro');
+  if (emailEl) { emailEl.style.borderColor = 'var(--red)'; setTimeout(function(){ emailEl.style.borderColor = ''; }, 2500); }
+  return;
+ }
  var payload = {
   nome_completo: (document.getElementById('sp-ctt-nome')  || {}).value.trim() || null,
   cargo:         (document.getElementById('sp-ctt-cargo') || {}).value || null,
-  email:         (document.getElementById('sp-ctt-email') || {}).value.trim() || null,
+  email:         emailVal || null,
   telefone:      telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
  };
  var { error } = await _sb.from('contatos').update(payload).eq('id', id);
@@ -2161,7 +2189,7 @@ function openNovoContato() {
   + '<input class="sp-inp" id="sp-ctt-nome" placeholder="Nome completo"></div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Cargo</div><select class="sp-inp" id="sp-ctt-cargo">'+_spEmpOptSelect(CONTATO_CARGO_OPCOES,'')+'</select></div>'
-  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" placeholder="email@empresa.com"></div>'
+  + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" placeholder="nome@empresa.com" oninput="_cttEmailMask(this)"></div>'
   + '</div>'
   + '<div class="sp-field"><div class="sp-label">Telefone</div>'
   + '<input class="sp-inp" id="sp-ctt-telefone" type="tel" value="'+_cttTelMaskValue('')+'" oninput="_cttTelMask(this)"></div>'
@@ -2191,13 +2219,20 @@ async function _cttCriarContato() {
   if (telEl) { telEl.style.borderColor = 'var(--red)'; setTimeout(function(){ telEl.style.borderColor = ''; }, 2500); }
   return;
  }
+ var emailEl = document.getElementById('sp-ctt-email');
+ var emailVal = ((emailEl || {}).value || '').trim();
+ if (emailVal && !_cttEmailValida(emailVal)) {
+  _showToast('E-mail inválido — formato esperado: nome@empresa.com.', 'erro');
+  if (emailEl) { emailEl.style.borderColor = 'var(--red)'; setTimeout(function(){ emailEl.style.borderColor = ''; }, 2500); }
+  return;
+ }
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
  var btn = document.getElementById('sp-ctt-criar-btn');
  if (btn) { btn.disabled = true; btn.textContent = 'Criando...'; }
  var payload = {
   nome_completo: nome,
   cargo:    (document.getElementById('sp-ctt-cargo') || {}).value || null,
-  email:    (document.getElementById('sp-ctt-email') || {}).value.trim() || null,
+  email:    emailVal || null,
   telefone: telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
  };
  var res = await _sb.from('contatos').insert(payload).select().single();
