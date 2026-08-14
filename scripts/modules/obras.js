@@ -1767,7 +1767,11 @@ async function _spSaveObraFull() {
  var { error } = await _sb.from('obras').update(payload).eq('id', id);
  var vincErro = null;
  if (!error) {
-  // Grava empresa na tabela associativa (substitui a existente)
+  // Grava empresa na tabela associativa (substitui a existente). Antes só
+  // agia "if (novaEmpresaId)" — limpar o campo (botão ✕) nunca de fato
+  // desvinculava a empresa antiga, o autosave simplesmente não fazia nada
+  // com empresas_obras. Agora o "else" cobre esse caso: campo vazio =
+  // desvincular de verdade.
   if (novaEmpresaId) {
    var delEmp = await _sb.from('empresas_obras').delete().eq('obra_id', id);
    if (delEmp.error) vincErro = delEmp.error;
@@ -1775,6 +1779,9 @@ async function _spSaveObraFull() {
     var insEmp = await _sb.from('empresas_obras').insert({ obra_id: id, empresa_id: novaEmpresaId });
     if (insEmp.error) vincErro = insEmp.error;
    }
+  } else {
+   var delEmpClear = await _sb.from('empresas_obras').delete().eq('obra_id', id);
+   if (delEmpClear.error) vincErro = delEmpClear.error;
   }
   // Garante que o contato selecionado está vinculado (sem remover outros)
   if (novoContatoId && !vincErro) {
