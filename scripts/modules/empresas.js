@@ -518,10 +518,27 @@ function _spContatoById(id) {
   + '<div id="sp-ctt-empresas" class="sp-rel-chips-wrap">'
   + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando empresas...</div>'
   + '</div></div>',
-  '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+  // Mesmo padrão de _spDeleteEmpresa: "Excluir" fica no painel de detalhe
+  // (com confirm() nativo), não só na listagem — é a única ação destrutiva.
+  '<button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);margin-right:auto" onclick="_spDeleteContato(\''+_spCttCurrentId+'\',\''+nome.replace(/'/g,"\\'")+'\')">Excluir contato</button> '
+  + '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 
  if (!_sb || !_spCttCurrentId) return;
  _cttRenderEmpresasVinculadas();
+}
+
+async function _spDeleteContato(id, nome) {
+ if (!id) return;
+ if (!confirm('Excluir "' + (nome || 'este contato') + '"?\n\nOs vínculos com empresas também serão removidos. Esta ação não pode ser desfeita.')) return;
+ closePanel();
+ _showToast('Excluindo...', 'ok');
+ var res = await _sb.from('contatos').delete().eq('id', id);
+ if (res.error) {
+  _showToast('Erro ao excluir: ' + _supaErrPt(res.error.message), 'erro');
+  return;
+ }
+ _showToast('Contato excluído.', 'ok');
+ _dbLoadContatos();
 }
 
 async function _cttRenderEmpresasVinculadas() {
