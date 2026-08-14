@@ -107,7 +107,83 @@ document.addEventListener('click', function(e) {
  if (addBox && addBox.style.display !== 'none' && !addBox.contains(e.target) && !e.target.closest('#sp-emp-categoria-dropdown')) {
   addBox.style.display = 'none'; addBox.innerHTML = '';
  }
+ var cargoDrop = document.getElementById('sp-ctt-cargo-drop');
+ var cargoBox  = document.getElementById('sp-ctt-cargo-box');
+ if (cargoDrop && cargoBox && !cargoBox.contains(e.target) && !cargoDrop.contains(e.target)) {
+  _spCttCargoClose();
+ }
 });
+
+// Cargo de Contato — mesmo componente searchable single-select já usado pra
+// Estado acima (23 opções reais, com quase-duplicatas de grafia tipo
+// "COMPRAS"/"Compras" — busca ajuda a diferenciar rápido, um <select>
+// nativo obrigava rolar a lista inteira). Usado tanto no painel de edição
+// quanto em "Novo Contato" — o valor fica no <input type="hidden"
+// id="sp-ctt-cargo">, então _spSaveContato/_cttCriarContato continuam
+// lendo com .value normalmente, sem mudar nada nesses dois lugares.
+var _spCttCargoSelected = '';
+function _spCttCargoMarkup(atual) {
+ _spCttCargoSelected = atual || '';
+ var temValor = !!_spCttCargoSelected;
+ return '<input type="hidden" id="sp-ctt-cargo" value="'+_spCttCargoSelected.replace(/"/g,'&quot;')+'">'
+  + '<div class="srch-sel" id="sp-ctt-cargo-srch">'
+  + '<div class="srch-sel-box" id="sp-ctt-cargo-box" onclick="_spCttCargoToggle()">'
+  + '<span class="srch-sel-val'+(temValor?'':' placeholder')+'" id="sp-ctt-cargo-val">'+(temValor?_spCttCargoSelected.replace(/</g,'&lt;'):'Selecione')+'</span>'
+  + '<button class="srch-sel-clr" id="sp-ctt-cargo-clr" style="display:'+(temValor?'':'none')+'" onclick="event.stopPropagation();_spCttCargoClear()" title="Remover">✕</button>'
+  + '<span class="srch-sel-chevron">▾</span>'
+  + '</div>'
+  + '<div class="srch-sel-drop" id="sp-ctt-cargo-drop">'
+  + '<input class="srch-sel-inp" id="sp-ctt-cargo-inp" type="text" placeholder="Buscar cargo..." oninput="_spCttCargoFilter(this.value)" onkeydown="_spCttCargoKey(event)">'
+  + '<div class="srch-sel-list" id="sp-ctt-cargo-list"></div>'
+  + '</div>'
+  + '</div>';
+}
+function _spCttCargoToggle() {
+ var drop = document.getElementById('sp-ctt-cargo-drop');
+ var box  = document.getElementById('sp-ctt-cargo-box');
+ if (!drop) return;
+ if (drop.classList.contains('open')) { _spCttCargoClose(); return; }
+ drop.classList.add('open');
+ if (box) box.classList.add('open');
+ var inp = document.getElementById('sp-ctt-cargo-inp');
+ if (inp) { inp.value = ''; inp.focus(); }
+ _spCttCargoFilter('');
+}
+function _spCttCargoClose() {
+ var drop = document.getElementById('sp-ctt-cargo-drop');
+ var box  = document.getElementById('sp-ctt-cargo-box');
+ if (drop) drop.classList.remove('open');
+ if (box)  box.classList.remove('open');
+}
+function _spCttCargoFilter(q) {
+ q = (q || '').toLowerCase();
+ var list = document.getElementById('sp-ctt-cargo-list');
+ if (!list) return;
+ var matches = CONTATO_CARGO_OPCOES.filter(function(c) { return c.toLowerCase().indexOf(q) !== -1; });
+ if (!matches.length) { list.innerHTML = '<div class="srch-sel-empty">Nenhum cargo encontrado.</div>'; return; }
+ list.innerHTML = matches.map(function(c) {
+  var sel = c === _spCttCargoSelected ? ' selected' : '';
+  return '<div class="srch-sel-opt' + sel + '" onclick="_spCttCargoSelectItem(\'' + c.replace(/'/g,"\\'") + '\')">' + c.replace(/</g,'&lt;') + '</div>';
+ }).join('');
+}
+function _spCttCargoSelectItem(cargo) {
+ _spCttCargoSelected = cargo;
+ var hidEl = document.getElementById('sp-ctt-cargo');
+ var valEl = document.getElementById('sp-ctt-cargo-val');
+ var clrEl = document.getElementById('sp-ctt-cargo-clr');
+ if (hidEl) hidEl.value = cargo;
+ if (valEl) { valEl.textContent = cargo || 'Selecione'; valEl.classList.toggle('placeholder', !cargo); }
+ if (clrEl) clrEl.style.display = cargo ? '' : 'none';
+ _spCttCargoClose();
+ // No-op em modo criação (_cttScheduleAutoSave só age com _spCttCurrentId
+ // setado — ver _taskAutoSaveQueue/_cttScheduleAutoSave); autosave real
+ // dispara normalmente em modo edição.
+ if (typeof _cttScheduleAutoSave === 'function') _cttScheduleAutoSave();
+}
+function _spCttCargoClear() { _spCttCargoSelectItem(''); }
+function _spCttCargoKey(e) {
+ if (e.key === 'Escape') _spCttCargoClose();
+}
 
 // Categoria (multipleSelects real no Airtable) — chips coloridos (mesma
 // paleta nt-tag-* já usada pra Fase/Estado em todo o app) em vez do dropdown
@@ -555,7 +631,7 @@ function _spContatoById(id) {
   '<div class="sp-field"><div class="sp-label">Nome</div>'
   + '<input class="sp-inp" id="sp-ctt-nome" value="'+nome.replace(/"/g,'&quot;')+'" oninput="_cttScheduleAutoSave()"></div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Cargo</div><select class="sp-inp" id="sp-ctt-cargo" onchange="_cttScheduleAutoSave()">'+_spEmpOptSelect(CONTATO_CARGO_OPCOES, cargo)+'</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Cargo</div>'+_spCttCargoMarkup(cargo)+'</div>'
   + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" placeholder="nome@empresa.com" value="'+email.replace(/"/g,'&quot;')+'" oninput="_cttEmailMask(this);_cttScheduleAutoSave()"></div>'
   + '</div>'
   + '<div class="sp-field"><div class="sp-label">Telefone</div>'
@@ -2188,7 +2264,7 @@ function openNovoContato() {
   '<div class="sp-field"><div class="sp-label">Nome <span style="color:var(--red)">*</span></div>'
   + '<input class="sp-inp" id="sp-ctt-nome" placeholder="Nome completo"></div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Cargo</div><select class="sp-inp" id="sp-ctt-cargo">'+_spEmpOptSelect(CONTATO_CARGO_OPCOES,'')+'</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Cargo</div>'+_spCttCargoMarkup('')+'</div>'
   + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" placeholder="nome@empresa.com" oninput="_cttEmailMask(this)"></div>'
   + '</div>'
   + '<div class="sp-field"><div class="sp-label">Telefone</div>'
