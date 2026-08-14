@@ -59,7 +59,11 @@
  .nt-tag-red { background:#fee2e2;color:#b91c1c }
  .nt-tag-purple { background:#ede9fe;color:#7c3aed }
  .nt-tag-orange { background:#ffedd5;color:#c2410c }
- .nt-tag-gray { background:rgba(0,0,0,.06);color:var(--muted) }
+ /* Cor sólida (mesmo padrão de todas as outras nt-tag-*), não mais um
+    overlay preto transparente — esse ficava praticamente invisível em tema
+    escuro (rgba(0,0,0,.06) some contra um fundo já escuro), diferente das
+    demais cores, que já eram pastéis sólidos e por isso sempre visíveis. */
+ .nt-tag-gray { background:#e5e7eb;color:#4b5563 }
  .nt-tag-teal { background:#ccfbf1;color:#0f766e }
  body.light .nt-tag-blue { background:#dbeafe;color:#1d4ed8 }
 
