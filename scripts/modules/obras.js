@@ -437,14 +437,21 @@ async function _obrasCarregarPropostaMap() {
  var map = {}; var from = 0; var pageSize = 1000; var more = true;
  while (more) {
   var res = await _sb.from('documentos')
-   .select('obra_id, caminho_storage, nome_arquivo, created_at')
+   .select('obra_id, caminho_storage, nome_arquivo, status, created_at')
    .in('tipo', ['Proposta Comercial', 'proposta_comercial'])
    .not('obra_id', 'is', null)
    .order('created_at', { ascending: false })
    .range(from, from + pageSize - 1);
   if (res.error || !res.data || !res.data.length) break;
   res.data.forEach(function(d){
-   if (d.obra_id && !map[d.obra_id]) map[d.obra_id] = { path: d.caminho_storage, nome: d.nome_arquivo };
+   // "Pendente Upload" (mesmo status usado em _spCarregarDocumentos) não
+   // tem arquivo de verdade no Storage ainda — caminho_storage vem null
+   // nesse caso. Sem essa checagem, o botão "Ver" da grid quebrava com
+   // TypeError (.replace de null) e travava _dbLoadObras inteiro (erro
+   // síncrono dentro do .map() de render, fora do try/catch das queries).
+   if (d.obra_id && d.caminho_storage && d.status !== 'Pendente Upload' && !map[d.obra_id]) {
+    map[d.obra_id] = { path: d.caminho_storage, nome: d.nome_arquivo };
+   }
   });
   more = res.data.length === pageSize; from += pageSize;
  }
@@ -495,6 +502,7 @@ async function _dbLoadObras() {
   _obraIdMap[o.id] = { nome: o.nome || '', empresa: emp };
  });
  var tbody=document.getElementById('obras-tbody'); if(!tbody)return;
+ try {
  tbody.innerHTML=allObras.map(function(o){
   var tipos=o.tipo_obra||[]; var etapa=o.etapa_negocio||''; var eCls=_etapaClsBd[etapa]||'bm';
   var empNome=(o.empresa&&o.empresa.nome)||(_empresasArr&&o.empresa_id?((_empresasArr.find(function(e){return e.id===o.empresa_id;})||{}).nome||''):'')||'';
@@ -507,7 +515,11 @@ async function _dbLoadObras() {
   // Clica e pré-visualiza na hora (mesmo modal de PDF já usado na aba
   // Documentos, _spAbrirDocStorage) — igual ao campo attachment do Airtable,
   // não só um indicador Sim/Não.
-  var propostaCell = proposta
+  // Checagem defensiva (proposta && proposta.path), não só "proposta existe"
+  // — já bastou uma vez um caminho_storage nulo pra travar _dbLoadObras
+  // inteiro com TypeError síncrono dentro deste .map() (ver correção em
+  // _obrasCarregarPropostaMap acima).
+  var propostaCell = (proposta && proposta.path)
    ? '<button type="button" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:5px" onclick="event.stopPropagation();_spAbrirDocStorage(\''+proposta.path.replace(/'/g,"\\'")+'\',\''+(proposta.nome||'Proposta Comercial').replace(/'/g,"\\'")+'\')" title="Pré-visualizar proposta comercial"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>Ver</button>'
    : '<span style="color:var(--muted);font-size:12px">—</span>';
   // "Gerar Orçamento" vive só dentro do painel da Obra (Calculadora Modular
@@ -527,6 +539,16 @@ async function _dbLoadObras() {
    +'<td style="font-weight:600">'+valor+'</td>'
    +'<td><button class="btn btn-ghost btn-sm" onclick="_spObraById(\''+o.id+'\')">Abrir</button></td></tr>';
  }).join('');
+ } catch (e) {
+  // Erro SÍNCRONO dentro do .map() (ex.: TypeError num campo inesperado)
+  // não é pego pelo try/catch das queries acima (esse já retornou antes de
+  // chegar aqui) — sem isto, a tela ficava travada em "Carregando
+  // obras..." pra sempre e o erro só aparecia no console (foi exatamente
+  // o que aconteceu com o bug do caminho_storage nulo).
+  console.error('[Obras] erro ao renderizar a lista de obras:', e);
+  tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:24px">Erro ao exibir obras: ' + (e && e.message ? e.message : 'erro desconhecido') + '</td></tr>';
+  return;
+ }
  // Badge do menu lateral: agora vem de _navBadgesLoadInitial() (RPC de
  // contagem única, no boot) + realtime — não mais como efeito colateral
  // de carregar a lista inteira aqui.
