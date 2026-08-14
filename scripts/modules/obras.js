@@ -423,17 +423,22 @@ function _normObraAssoc(o) {
 // grid (pedido explícito: mesma UX do campo attachment do Airtable — clica
 // e abre um preview, não só um "Sim/Não"). Dado real vem misturado em duas
 // grafias (Airtable sincronizou "Proposta Comercial", upload manual pelo
-// wizard grava "proposta_comercial") — ilike cobre as duas de uma vez.
-// Uma única query agregada + ordenada por created_at desc pra todas as
-// obras (não dá pra buscar isso por obra individualmente sem 1500+
-// requests) — guarda só o documento MAIS RECENTE por obra (primeira
-// ocorrência de cada obra_id, já que a query vem em ordem decrescente).
+// wizard grava "proposta_comercial") — .in() com as duas grafias exatas,
+// não mais ilike('%...%') (sequential scan sem índice possível pra padrão
+// com curinga no início — achado real de lentidão: 6500+ linhas de
+// `documentos` escaneadas a cada load da grid de Obras; ver migração
+// add_index_documentos_tipo, que criou um índice comum em tipo pra esse
+// .in() aproveitar). Uma única query agregada + ordenada por created_at
+// desc pra todas as obras (não dá pra buscar isso por obra individualmente
+// sem 1500+ requests) — guarda só o documento MAIS RECENTE por obra
+// (primeira ocorrência de cada obra_id, já que a query vem em ordem
+// decrescente).
 async function _obrasCarregarPropostaMap() {
  var map = {}; var from = 0; var pageSize = 1000; var more = true;
  while (more) {
   var res = await _sb.from('documentos')
    .select('obra_id, caminho_storage, nome_arquivo, created_at')
-   .ilike('tipo', '%proposta%comercial%')
+   .in('tipo', ['Proposta Comercial', 'proposta_comercial'])
    .not('obra_id', 'is', null)
    .order('created_at', { ascending: false })
    .range(from, from + pageSize - 1);
@@ -446,7 +451,7 @@ async function _obrasCarregarPropostaMap() {
  return map;
 }
 
-async function _dbLoadObras() {
+async function _obrasCarregarTodasObras() {
  var allObras=[]; var from=0; var pageSize=1000; var more=true;
  while(more){
   var res=await _sb.from('obras').select('*, empresas_obras(empresa_id,empresa:empresa_id(id,nome,cnpj)), contatos_obras(contato_id,contato:contato_id(id,nome_completo))').range(from,from+pageSize-1).order('created_at',{ascending:false});
@@ -455,6 +460,21 @@ async function _dbLoadObras() {
   res.data.forEach(_normObraAssoc);
   allObras=allObras.concat(res.data); more=res.data.length===pageSize; from+=pageSize;
  }
+ return allObras;
+}
+
+async function _dbLoadObras() {
+ // As duas consultas são independentes (obras vs. documentos) — rodar em
+ // paralelo em vez de esperar uma terminar pra começar a outra foi a
+ // segunda metade do achado de lentidão (a primeira foi o índice/ilike
+ // acima): antes o tempo total era obras+documentos somados, agora é só
+ // o maior dos dois.
+ var results = await Promise.all([
+  _obrasCarregarTodasObras(),
+  _obrasCarregarPropostaMap().catch(function(e){ console.error('[Obras] erro ao verificar propostas comerciais:', e); return {}; })
+ ]);
+ var allObras = results[0];
+ var propostaMap = results[1];
  if(!allObras.length)return;
  // Mapa global id→{nome,empresa} usado por _dbLoadProjetos
  _obraIdMap = {};
@@ -462,8 +482,6 @@ async function _dbLoadObras() {
   var emp = (o.empresa && o.empresa.nome) || '';
   _obraIdMap[o.id] = { nome: o.nome || '', empresa: emp };
  });
- var propostaMap = {};
- try { propostaMap = await _obrasCarregarPropostaMap(); } catch (e) { console.error('[Obras] erro ao verificar propostas comerciais:', e); }
  var tbody=document.getElementById('obras-tbody'); if(!tbody)return;
  tbody.innerHTML=allObras.map(function(o){
   var tipos=o.tipo_obra||[]; var etapa=o.etapa_negocio||''; var eCls=_etapaClsBd[etapa]||'bm';
