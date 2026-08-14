@@ -1473,12 +1473,15 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Nova Empresa</div>'
   + '<div class="sp-g2" style="gap:8px">'
   + '<div class="sp-field"><div class="sp-label">Nome *</div><input class="sp-inp" id="sp-new-emp-nome" placeholder="Razão social"></div>'
-  + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-new-emp-cnpj" placeholder="00.000.000/0001-00"></div>'
+  + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-new-emp-cnpj" value="' + _empCnpjMaskValue('') + '" oninput="_empCnpjMask(this)"></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
-  + '<div class="sp-field"><div class="sp-label">Estado</div><input class="sp-inp" id="sp-new-emp-uf" placeholder="SP" maxlength="2" style="text-transform:uppercase"></div>'
+  + '<div class="sp-field"><div class="sp-label">Estado</div><select class="sp-inp" id="sp-new-emp-uf">' + _spEmpOptSelect(EMPRESA_ESTADO_OPCOES, '') + '</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Fase do Ciclo de Vida</div><select class="sp-inp" id="sp-new-emp-fase">' + _spEmpOptSelect(EMPRESA_FASE_OPCOES, '') + '</select></div>'
+  + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">Site</div><input class="sp-inp" id="sp-new-emp-site" placeholder="https://"></div>'
+  + '<div></div>'
   + '</div><div style="display:flex;gap:6px;margin-top:10px">'
-  + '<button class="btn btn-primary btn-sm" onclick="_spCriarEmpresa()" style="flex:1;justify-content:center">Criar empresa</button>'
+  + '<button class="btn btn-primary btn-sm" onclick="_spCriarEmpresaObra()" style="flex:1;justify-content:center">Criar empresa</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEmpresa()">Cancelar</button>'
   + '</div></div>'
 
@@ -1494,8 +1497,8 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div class="sp-field"><div class="sp-label">Nome completo *</div><input class="sp-inp" id="sp-new-cont-nome" placeholder="Nome"></div>'
   + '<div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-new-cont-email" type="email" placeholder="nome@empresa.com" oninput="_cttEmailMask(this)"></div>'
-  + '<div class="sp-field"><div class="sp-label">Telefone</div><input class="sp-inp" id="sp-new-cont-tel" placeholder="(11) 99999-9999" oninput="_cttTelMask(this)"></div>'
-  + '</div><div class="sp-field" style="margin-top:8px"><div class="sp-label">Cargo</div><input class="sp-inp" id="sp-new-cont-cargo" placeholder="Engenheiro, Comprador..."></div>'
+  + '<div class="sp-field"><div class="sp-label">Telefone</div><input class="sp-inp" id="sp-new-cont-tel" value="' + _cttTelMaskValue('') + '" oninput="_cttTelMask(this)"></div>'
+  + '</div><div class="sp-field" style="margin-top:8px"><div class="sp-label">Cargo</div>' + _spCttCargoMarkup('') + '</div>'
   + '<div style="display:flex;gap:6px;margin-top:10px">'
   + '<button class="btn btn-primary btn-sm" onclick="_spCriarContato()" style="flex:1;justify-content:center">Criar contato</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoContato()">Cancelar</button>'
@@ -1808,17 +1811,48 @@ function _spToggleNovaEmpresa() {
  const f = document.getElementById('sp-nova-empresa-form');
  if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
-async function _spCriarEmpresa() {
+// Nome próprio (_spCriarEmpresaObra, não _spCriarEmpresa) de propósito —
+// empresas.js já define uma _spCriarEmpresa GLOBAL diferente (openNovaEmpresa,
+// tela de Empresas). Como os dois arquivos são scripts globais (sem módulos),
+// e empresas.js carrega DEPOIS de obras.js no index.html, uma função com o
+// mesmo nome nos dois SOBRESCREVIA silenciosamente a desta — o botão "Criar
+// empresa" aqui dentro da Obra sempre chamava a versão errada (lendo os ids
+// sp-emp-nome/sp-emp-cnpj da OUTRA tela, que nem existem aqui), então nunca
+// funcionava de verdade. Achado ao investigar o pedido de auto-vínculo.
+async function _spCriarEmpresaObra() {
  const nome = document.getElementById('sp-new-emp-nome')?.value?.trim();
  if (!nome) { alert('Nome da empresa é obrigatório.'); return; }
+ // Mesma regra de _spCriarEmpresa/_spCriarContato (empresas.js): CNPJ vazio
+ // é permitido, incompleto bloqueia — o molde preenche posições vazias com
+ // "_", então quem decide é a contagem de dígitos reais, não um if(!cnpj).
+ const cnpjEl = document.getElementById('sp-new-emp-cnpj');
+ const cnpjDigits = ((cnpjEl || {}).value || '').replace(/\D/g, '');
+ if (cnpjDigits.length > 0 && cnpjDigits.length < 14) {
+  alert('CNPJ incompleto — informe os 14 dígitos, ou deixe em branco.');
+  return;
+ }
+ const cnpj = cnpjDigits.length === 14 ? _empCnpjMaskValue(cnpjDigits) : null;
+ if (cnpj && await _empCnpjJaExiste(cnpj, null)) {
+  alert('Já existe uma empresa cadastrada com este CNPJ.');
+  return;
+ }
  const payload = {
   nome,
-  cnpj:   document.getElementById('sp-new-emp-cnpj')?.value?.trim() || null,
-  estado: document.getElementById('sp-new-emp-uf')?.value?.toUpperCase() || null,
+  cnpj,
+  estado: document.getElementById('sp-new-emp-uf')?.value || null,
+  fase_ciclo_vida: document.getElementById('sp-new-emp-fase')?.value || null,
   url_site: document.getElementById('sp-new-emp-site')?.value?.trim() || null,
  };
  const { data, error } = await _sb.from('empresas').insert(payload).select().single();
  if (error || !data) { alert('Erro ao criar empresa: ' + (error?.message || '')); return; }
+ // Vincula já à obra atual (mesmo espírito de _spCriarContato, que já grava
+ // o vínculo na hora de criar) — pedido explícito: antes, o vínculo só era
+ // gravado quando o formulário INTEIRO da Obra fosse salvo (_spSaveObraFull),
+ // um passo extra e fácil de esquecer depois de criar a empresa aqui.
+ if (_obraAtiva && _obraAtiva.id) {
+  const linkRes = await _sb.from('empresas_obras').insert({ obra_id: _obraAtiva.id, empresa_id: data.id });
+  if (linkRes.error) console.error('[Obras] erro ao vincular nova empresa à obra:', linkRes.error);
+ }
  _empresasArr.push(data);
  _empresasArr.sort((a,b) => a.nome.localeCompare(b.nome));
  const sel = document.getElementById('sp-empresa-id');
@@ -1835,12 +1869,23 @@ async function _spCriarEmpresa() {
 // ── Quick-create Contato ──────────────────────────────────────────────────────
 function _spToggleNovoContato() {
  const f = document.getElementById('sp-novo-contato-form');
- if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+ if (!f) return;
+ var abrir = f.style.display === 'none';
+ // Pedido explícito: um contato criado por aqui sempre se associa à
+ // empresa da obra (ver payload.empresa_id + junção contatos_empresas
+ // abaixo) — sem empresa selecionada não tem a quem associar, então nem
+ // deixa abrir o formulário (em vez de deixar criar "solto" e confundir).
+ if (abrir && !document.getElementById('sp-empresa-id')?.value) {
+  alert('Selecione (ou crie) a empresa da obra antes de adicionar um contato.');
+  return;
+ }
+ f.style.display = abrir ? 'block' : 'none';
 }
 async function _spCriarContato() {
  const nome = document.getElementById('sp-new-cont-nome')?.value?.trim();
  const empId = document.getElementById('sp-empresa-id')?.value;
  if (!nome) { alert('Nome do contato é obrigatório.'); return; }
+ if (!empId) { alert('Selecione (ou crie) a empresa da obra antes de adicionar um contato.'); return; }
  // Mesma regra de _spSaveContato (empresas.js): 10/11 dígitos salva
  // mascarado, 0 fica em branco, 1-9 bloqueia (senão salvaria o molde
  // incompleto — "(11) 9____-____" — como se fosse o telefone de verdade).
@@ -1859,7 +1904,10 @@ async function _spCriarContato() {
   empresa_id: empId || null,
   email:  emailVal || null,
   telefone: telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
-  cargo: document.getElementById('sp-new-cont-cargo')?.value?.trim() || null,
+  // Cargo agora é o select buscável _spCttCargoMarkup (mesmo componente já
+  // usado no painel de Contato/"Novo Contato" da aba Contatos) — valor fica
+  // no hidden input #sp-ctt-cargo, não mais um <input> de texto solto.
+  cargo: document.getElementById('sp-ctt-cargo')?.value || null,
  };
  const { data, error } = await _sb.from('contatos').insert(payload).select().single();
  if (error || !data) { alert('Erro ao criar contato: ' + (error?.message || '')); return; }
