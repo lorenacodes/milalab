@@ -419,20 +419,31 @@ function _normObraAssoc(o) {
  return o;
 }
 
-// Documento "Proposta Comercial" existe pra uma obra? Dado real vem
-// misturado em duas grafias (Airtable sincronizou "Proposta Comercial",
-// upload manual pelo wizard grava "proposta_comercial") — ilike cobre as
-// duas de uma vez. Uma única query agregada pra todas as obras (não dá pra
-// verificar isso por obra individualmente sem 1500+ requests).
-async function _obrasCarregarPropostaSet() {
- var set = {}; var from = 0; var pageSize = 1000; var more = true;
+// Documento "Proposta Comercial" de cada obra, pra pré-visualizar direto da
+// grid (pedido explícito: mesma UX do campo attachment do Airtable — clica
+// e abre um preview, não só um "Sim/Não"). Dado real vem misturado em duas
+// grafias (Airtable sincronizou "Proposta Comercial", upload manual pelo
+// wizard grava "proposta_comercial") — ilike cobre as duas de uma vez.
+// Uma única query agregada + ordenada por created_at desc pra todas as
+// obras (não dá pra buscar isso por obra individualmente sem 1500+
+// requests) — guarda só o documento MAIS RECENTE por obra (primeira
+// ocorrência de cada obra_id, já que a query vem em ordem decrescente).
+async function _obrasCarregarPropostaMap() {
+ var map = {}; var from = 0; var pageSize = 1000; var more = true;
  while (more) {
-  var res = await _sb.from('documentos').select('obra_id').ilike('tipo', '%proposta%comercial%').not('obra_id', 'is', null).range(from, from + pageSize - 1);
+  var res = await _sb.from('documentos')
+   .select('obra_id, caminho_storage, nome_arquivo, created_at')
+   .ilike('tipo', '%proposta%comercial%')
+   .not('obra_id', 'is', null)
+   .order('created_at', { ascending: false })
+   .range(from, from + pageSize - 1);
   if (res.error || !res.data || !res.data.length) break;
-  res.data.forEach(function(d){ if (d.obra_id) set[d.obra_id] = true; });
+  res.data.forEach(function(d){
+   if (d.obra_id && !map[d.obra_id]) map[d.obra_id] = { path: d.caminho_storage, nome: d.nome_arquivo };
+  });
   more = res.data.length === pageSize; from += pageSize;
  }
- return set;
+ return map;
 }
 
 async function _dbLoadObras() {
@@ -451,8 +462,8 @@ async function _dbLoadObras() {
   var emp = (o.empresa && o.empresa.nome) || '';
   _obraIdMap[o.id] = { nome: o.nome || '', empresa: emp };
  });
- var propostaSet = {};
- try { propostaSet = await _obrasCarregarPropostaSet(); } catch (e) { console.error('[Obras] erro ao verificar propostas comerciais:', e); }
+ var propostaMap = {};
+ try { propostaMap = await _obrasCarregarPropostaMap(); } catch (e) { console.error('[Obras] erro ao verificar propostas comerciais:', e); }
  var tbody=document.getElementById('obras-tbody'); if(!tbody)return;
  tbody.innerHTML=allObras.map(function(o){
   var tipos=o.tipo_obra||[]; var etapa=o.etapa_negocio||''; var eCls=_etapaClsBd[etapa]||'bm';
@@ -462,13 +473,18 @@ async function _dbLoadObras() {
   var dataEnvio=o.data_envio_proposta?new Date(o.data_envio_proposta+'T00:00:00').toLocaleDateString('pt-BR'):'—';
   var valor=(o.valor!=null)?'R$ '+Number(o.valor).toLocaleString('pt-BR',{minimumFractionDigits:0}):'—';
   var qtd=(o.quantidade!=null)?o.quantidade:'—';
-  var temProposta=!!propostaSet[o.id];
-  var propostaTag=temProposta?'<span class="nt-tag nt-tag-green">Sim</span>':'<span class="nt-tag nt-tag-gray">Não</span>';
+  var proposta=propostaMap[o.id];
+  // Clica e pré-visualiza na hora (mesmo modal de PDF já usado na aba
+  // Documentos, _spAbrirDocStorage) — igual ao campo attachment do Airtable,
+  // não só um indicador Sim/Não.
+  var propostaCell = proposta
+   ? '<button type="button" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:5px" onclick="event.stopPropagation();_spAbrirDocStorage(\''+proposta.path.replace(/'/g,"\\'")+'\',\''+(proposta.nome||'Proposta Comercial').replace(/'/g,"\\'")+'\')" title="Pré-visualizar proposta comercial"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/><circle cx="8" cy="8" r="2"/></svg>Ver</button>'
+   : '<span style="color:var(--muted);font-size:12px">—</span>';
   // "Gerar Orçamento" vive só dentro do painel da Obra (Calculadora Modular
   // para Modular, Proposta Comercial para Solar) — aqui só abre o painel.
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'obras\',this)"'
    +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'"'
-   +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'" data-proposta="'+(temProposta?'sim':'nao')+'">'
+   +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'" data-proposta="'+(proposta?'sim':'nao')+'">'
    +'<td><div style="font-weight:500">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
    +'<td><div class="oc-tags" style="margin-bottom:0">'+catBadges+'</div></td>'
    +'<td style="color:var(--muted)">'+(o.cidade||'—')+'</td>'
@@ -477,7 +493,7 @@ async function _dbLoadObras() {
    +'<td style="color:var(--muted)">'+(o.canal_vendas||'—')+'</td>'
    +'<td><span class="badge '+eCls+'">'+(etapa||'—')+'</span></td>'
    +'<td style="color:var(--muted);font-size:12px">'+dataEnvio+'</td>'
-   +'<td style="text-align:center">'+propostaTag+'</td>'
+   +'<td style="text-align:center">'+propostaCell+'</td>'
    +'<td style="font-weight:600">'+valor+'</td>'
    +'<td><button class="btn btn-ghost btn-sm" onclick="_spObraById(\''+o.id+'\')">Abrir</button></td></tr>';
  }).join('');
@@ -1639,7 +1655,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
 
 // Resumo de "Proposta Comercial" na Visão Geral — mesma checagem de tipo
 // (case-insensitive, cobre "Proposta Comercial" do Airtable e
-// "proposta_comercial" do upload manual) usada em _obrasCarregarPropostaSet
+// "proposta_comercial" do upload manual) usada em _obrasCarregarPropostaMap
 // pra grid, só que aqui é 1 obra só. "Ver em Documentos" pula pra aba real
 // (_sptSwitch já dispara _spCarregarDocumentos sozinho).
 async function _spCarregarPropostaStatus(obraId) {
