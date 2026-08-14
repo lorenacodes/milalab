@@ -1412,24 +1412,24 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
 
   + '<div class="sp-stitle" style="margin-top:0">Identificação</div>'
   + '<div class="sp-field"><div class="sp-label">Nome da obra</div>'
-  + '<input class="sp-inp" id="sp-nome" value="' + (o.nome||'').replace(/"/g,'&quot;') + '" placeholder="Nome da obra..."></div>'
+  + '<input class="sp-inp" id="sp-nome" value="' + (o.nome||'').replace(/"/g,'&quot;') + '" placeholder="Nome da obra..." oninput="_obraScheduleAutoSave()"></div>'
 
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Tipo</div><select class="sp-inp" id="sp-tipo">'
+  + '<div class="sp-field"><div class="sp-label">Tipo</div><select class="sp-inp" id="sp-tipo" onchange="_obraScheduleAutoSave()">'
   + '<option' + (tipo==='Telhados'?' selected':'') + '>Telhados</option>'
   + '<option' + (tipo==='Steel Frame'?' selected':'') + '>Steel Frame</option>'
   + '<option' + (tipo==='Modular'?' selected':'') + '>Modular</option>'
   + '<option' + (tipo==='Solar'?' selected':'') + '>Solar</option>'
   + '</select></div>'
   + '<div class="sp-field"><div class="sp-label">Etapa do Negócio</div>'
-  + '<select class="sp-inp" id="sp-etapa" onchange="_spOnEtapaChange(this.value)">' + etapaOpts + '</select></div>'
+  + '<select class="sp-inp" id="sp-etapa" onchange="_spOnEtapaChange(this.value);_obraScheduleAutoSave()">' + etapaOpts + '</select></div>'
   + '</div>'
 
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Data do orçamento</div>'
   + '<input class="sp-inp" value="' + (fmtData(o.data_criacao) !== '—' ? fmtData(o.data_criacao) : fmtData(o.created_at)) + '" readonly style="color:var(--muted);cursor:default" title="Preenchido automaticamente pelo sistema"></div>'
   + '<div class="sp-field"><div class="sp-label">Data envio da proposta</div>'
-  + '<input class="sp-inp" id="sp-data-proposta" type="date" value="' + (o.data_envio_proposta ? String(o.data_envio_proposta).substring(0,10) : '') + '"></div>'
+  + '<input class="sp-inp" id="sp-data-proposta" type="date" value="' + (o.data_envio_proposta ? String(o.data_envio_proposta).substring(0,10) : '') + '" onchange="_obraScheduleAutoSave()"></div>'
   + '</div>'
 
   // Proposta Comercial não é um campo de texto (é um documento anexado, ver
@@ -1441,18 +1441,18 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div id="sp-proposta-status" style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:var(--muted)">Verificando...</div></div>'
 
   + '<div class="sp-g3">'
-  + '<div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-cidade" value="' + (o.cidade||'') + '"></div>'
-  + '<div class="sp-field"><div class="sp-label">UF</div><input class="sp-inp" id="sp-uf" value="' + (o.estado||'') + '" maxlength="2" style="text-transform:uppercase"></div>'
-  + '<div class="sp-field"><div class="sp-label">Canal de vendas</div><select class="sp-inp" id="sp-canal">' + canalOpts + '</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-cidade" value="' + (o.cidade||'') + '" oninput="_obraScheduleAutoSave()"></div>'
+  + '<div class="sp-field"><div class="sp-label">UF</div><input class="sp-inp" id="sp-uf" value="' + (o.estado||'') + '" maxlength="2" style="text-transform:uppercase" oninput="_obraScheduleAutoSave()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Canal de vendas</div><select class="sp-inp" id="sp-canal" onchange="_obraScheduleAutoSave()">' + canalOpts + '</select></div>'
   + '</div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">CNO (Cadastro Nacional de Obras)</div><input class="sp-inp" id="sp-cno" value="' + (o.cno||'') + '" placeholder="00.000.000.000-0"></div>'
-  + '<div class="sp-field"><div class="sp-label">Endereço de Entrega</div><input class="sp-inp" id="sp-end-entrega" value="' + (o.endereco_entrega||'') + '" placeholder="Rua, nº, cidade..."></div>'
+  + '<div class="sp-field"><div class="sp-label">CNO (Cadastro Nacional de Obras)</div><input class="sp-inp" id="sp-cno" value="' + (o.cno||'') + '" placeholder="00.000.000.000-0" oninput="_obraScheduleAutoSave()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Endereço de Entrega</div><input class="sp-inp" id="sp-end-entrega" value="' + (o.endereco_entrega||'') + '" placeholder="Rua, nº, cidade..." oninput="_obraScheduleAutoSave()"></div>'
   + '</div>'
 
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-obra-quantidade" type="number" min="0" placeholder="—" value="' + (o.quantidade != null ? o.quantidade : '') + '"></div>'
-  + '<div class="sp-field"><div class="sp-label">Valor da obra</div><input class="sp-inp" id="sp-obra-valor" type="text" placeholder="R$ 0,00" value="' + (o.valor != null ? Number(o.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '') + '" onfocus="_spValorFocus(this)" onblur="_spValorBlur(this)"></div>'
+  + '<div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-obra-quantidade" type="number" min="0" placeholder="—" value="' + (o.quantidade != null ? o.quantidade : '') + '" oninput="_obraScheduleAutoSave()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Valor da obra</div><input class="sp-inp" id="sp-obra-valor" type="text" placeholder="R$ 0,00" value="' + (o.valor != null ? Number(o.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '') + '" onfocus="_spValorFocus(this)" onblur="_spValorBlur(this)" oninput="_obraScheduleAutoSave()"></div>'
   + '</div>'
 
   + '<div class="sp-stitle">Empresa & Contato</div>'
@@ -1672,10 +1672,12 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<div id="sp-propostas-lista"><div class="sp-empty"><div style="font-size:11px;color:var(--muted)">Clique na aba para carregar...</div></div></div>'
   + '</div>'; // fim spt-panel documentos
 
+ // Sem botão "Salvar" — pedido explícito: qualquer alteração no formulário
+ // já salva sozinha (ver _obraScheduleAutoSave/_spSaveObraFull), mesmo
+ // padrão de autosave já usado nos painéis de Empresa/Contato/Atividade.
  _spSet('Obra', (o.nome||'').split('—')[0]?.trim() || o.nome || 'Obra',
   html,
-  '<button class="btn btn-primary" onclick="_spSaveObraFull()">Salvar</button>'
-  + ' <button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
+  '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
  );
 
  _spCarregarPropostaStatus(o.id);
@@ -1731,8 +1733,19 @@ function _spValorBlur(el) {
  el.value = isNaN(n) ? '' : n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 }
 
-// ── Salvar obra completa ──────────────────────────────────────────────────────
+// ── Salvar obra completa (autosave) ───────────────────────────────────────────
+// Pedido explícito: nenhum campo do detalhamento de Obra deve exigir clique em
+// "Salvar" — qualquer alteração já persiste sozinha, mesmo espírito de
+// _empScheduleAutoSave (empresas.js)/_taskAutoSaveQueue (Gestor de Tarefas).
+// Debounce de 700ms (mesmo valor usado em Empresa) pra não bater no banco a
+// cada tecla digitada.
+var _obraAutoSaveTimer = null;
+function _obraScheduleAutoSave() {
+ if (_obraAutoSaveTimer) clearTimeout(_obraAutoSaveTimer);
+ _obraAutoSaveTimer = setTimeout(function(){ _spSaveObraFull(); }, 700);
+}
 async function _spSaveObraFull() {
+ if (_obraAutoSaveTimer) { clearTimeout(_obraAutoSaveTimer); _obraAutoSaveTimer = null; }
  if (!_obraAtiva) return;
  const id = document.getElementById('sp-obra-id')?.value;
  const novaEmpresaId = document.getElementById('sp-empresa-id')?.value || null;
@@ -1769,12 +1782,6 @@ async function _spSaveObraFull() {
    if (upsCtt.error) vincErro = upsCtt.error;
   }
  }
- const btn = document.querySelector('#sp-actions .btn-primary');
- if (btn) {
-  btn.textContent = error ? 'Erro!' : 'Salvo!';
-  btn.style.background = error ? 'var(--red)' : 'var(--green)';
-  setTimeout(() => { btn.textContent = 'Salvar'; btn.style.background = ''; }, 1800);
- }
  if (error) {
   _showToast('Erro ao salvar obra: ' + _supaErrPt(error.message), 'erro');
  } else if (vincErro) {
@@ -1797,6 +1804,7 @@ function _spOnEmpresaChange() {
  // empresa atual só na hora de abrir (_spObContatoFilter lê sp-empresa-id
  // ao vivo, não precisa reconstruir nada aqui).
  if (typeof _spObContatoSelectItem === 'function') _spObContatoSelectItem('', '');
+ if (typeof _obraScheduleAutoSave === 'function') _obraScheduleAutoSave();
 }
 // Abre o painel de detalhe da empresa/contato já escolhido nos campos de
 // "Empresa & Contato" — sem isso, a única forma de chegar lá era descer até
@@ -1946,6 +1954,7 @@ function _spObContatoSelectItem(id, label) {
  if (clrEl) clrEl.style.display = _spObContatoSelected ? '' : 'none';
  _spObContatoClose();
  _spToggleContatoOpenBtn();
+ if (typeof _obraScheduleAutoSave === 'function') _obraScheduleAutoSave();
 }
 function _spObContatoClear() { _spObContatoSelectItem('', ''); }
 function _spObContatoKey(e) { if (e.key === 'Escape') _spObContatoClose(); }
