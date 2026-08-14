@@ -1901,7 +1901,6 @@ async function _spCriarContato() {
  }
  const payload = {
   nome_completo: nome,
-  empresa_id: empId || null,
   email:  emailVal || null,
   telefone: telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
   // Cargo agora é o select buscável _spCttCargoMarkup (mesmo componente já
@@ -1909,13 +1908,13 @@ async function _spCriarContato() {
   // no hidden input #sp-ctt-cargo, não mais um <input> de texto solto.
   cargo: document.getElementById('sp-ctt-cargo')?.value || null,
  };
+ // Tabela contatos NÃO tem coluna empresa_id (confirmado via schema real) —
+ // o vínculo com a empresa vive só na junção N:N contatos_empresas abaixo,
+ // igual ao que _cttCriarContato (empresas.js) já faz. Um insert anterior
+ // aqui tentava gravar empresa_id direto em contatos e quebrava com
+ // "Could not find the 'empresa_id' column of 'contatos'".
  const { data, error } = await _sb.from('contatos').insert(payload).select().single();
  if (error || !data) { alert('Erro ao criar contato: ' + (error?.message || '')); return; }
- // Grava também na junção N:N contatos_empresas — não só na FK direta
- // contatos.empresa_id acima. Achado real: a tela de Empresas/Contatos só lê
- // da junção (ver _cttEmpresaPrimaria/_spEmpresas), então um contato criado
- // só com a FK direta ficava "invisível" como vinculado em todo o resto do
- // sistema, mesmo já tendo uma empresa associada no banco.
  if (empId) {
   const { error: linkError } = await _sb.from('contatos_empresas').insert({ contato_id: data.id, empresa_id: empId, is_primary: true });
   if (linkError) console.error('[Obras] erro ao vincular contato_empresas na criação rápida:', linkError);
