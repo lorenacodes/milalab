@@ -650,7 +650,19 @@ function _spContatoById(id) {
   + '<div id="sp-ctt-link-empresa" style="display:none;margin-bottom:8px"></div>'
   + '<div id="sp-ctt-empresas" class="sp-rel-chips-wrap">'
   + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando empresas...</div>'
-  + '</div></div>',
+  + '</div></div>'
+  // Auditoria — mesmo bloco/campos de _spEmpresas (criado_por/created_at/
+  // ultima_alteracao_por já mantidos pelo trigger set_audit_fields();
+  // "Última modificação" aqui usa updated_at, já que contatos não tem a
+  // coluna ultima_modificacao específica que empresas/obras têm — vem do
+  // trigger genérico set_updated_at(), sempre fresco a cada UPDATE).
+  + '<div style="margin-top:24px;border-top:1px solid var(--border);padding-top:12px">'
+  + '<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;opacity:.85">Auditoria</div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">'+(c.criado_por||'—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de criação</span><span class="drw-audit-val">'+(c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">'+(c.ultima_alteracao_por||'—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última modificação</span><span class="drw-audit-val">'+(c.updated_at ? new Date(c.updated_at).toLocaleString('pt-BR') : '—')+'</span></div>'
+  + '</div>',
   // Mesmo padrão de _spDeleteEmpresa: "Excluir" fica no painel de detalhe
   // (com confirm() nativo), não só na listagem — é a única ação destrutiva.
   '<button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);margin-right:auto" onclick="_spDeleteContato(\''+_spCttCurrentId+'\',\''+nome.replace(/'/g,"\\'")+'\')">Excluir contato</button> '
@@ -1030,7 +1042,7 @@ async function _dbLoadContatos() {
  var allData = []; var from = 0; var more = true;
  while (more) {
   var res = await _sb.from('contatos')
-   .select('id, nome_completo, cargo, email, telefone, created_at, ultima_alteracao_por, contatos_empresas(is_primary, empresa:empresa_id(id, nome, fase_ciclo_vida, categoria, estado))')
+   .select('id, nome_completo, cargo, email, telefone, created_at, updated_at, criado_por, ultima_alteracao_por, contatos_empresas(is_primary, empresa:empresa_id(id, nome, fase_ciclo_vida, categoria, estado))')
    .order('nome_completo').range(from, from + 999);
   if (res.error || !res.data || !res.data.length) break;
   allData = allData.concat(res.data);
