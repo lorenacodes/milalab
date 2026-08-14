@@ -840,7 +840,11 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
 .gestor-group-hd{position:sticky;top:38px;z-index:7;background:var(--surface2);border-bottom:1px solid rgba(255,255,255,.16)}
 body.light .gestor-group-hd{background:var(--surface2);border-bottom-color:rgba(255,255,255,.65)}
 .gestor-group-hd td{background:transparent!important;padding:6px 12px;cursor:pointer;border-left:3px solid var(--navy)}
-.gestor-group-hd:hover td{filter:brightness(1.05)}
+/* Hover tingido na cor do próprio acento (--navy), não um brightness()
+   genérico — o brightness deixava a linha inteira "acender" igual botão,
+   confundindo cabeçalho de seção com ação clicável. Mesma cor da borda
+   lateral reforça que é o MESMO elemento reagindo, não um controle novo. */
+.gestor-group-hd:hover td{background:rgba(61,79,209,.07)!important}
 .gestor-group-hd strong{text-transform:uppercase;font-size:11px;letter-spacing:.3px}
 /* Gantt */
 .gestor-timeline-wrap{overflow:auto;flex:1;min-height:0;background:var(--surface)}

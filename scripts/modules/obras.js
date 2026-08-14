@@ -419,6 +419,22 @@ function _normObraAssoc(o) {
  return o;
 }
 
+// Documento "Proposta Comercial" existe pra uma obra? Dado real vem
+// misturado em duas grafias (Airtable sincronizou "Proposta Comercial",
+// upload manual pelo wizard grava "proposta_comercial") — ilike cobre as
+// duas de uma vez. Uma única query agregada pra todas as obras (não dá pra
+// verificar isso por obra individualmente sem 1500+ requests).
+async function _obrasCarregarPropostaSet() {
+ var set = {}; var from = 0; var pageSize = 1000; var more = true;
+ while (more) {
+  var res = await _sb.from('documentos').select('obra_id').ilike('tipo', '%proposta%comercial%').not('obra_id', 'is', null).range(from, from + pageSize - 1);
+  if (res.error || !res.data || !res.data.length) break;
+  res.data.forEach(function(d){ if (d.obra_id) set[d.obra_id] = true; });
+  more = res.data.length === pageSize; from += pageSize;
+ }
+ return set;
+}
+
 async function _dbLoadObras() {
  var allObras=[]; var from=0; var pageSize=1000; var more=true;
  while(more){
@@ -435,6 +451,8 @@ async function _dbLoadObras() {
   var emp = (o.empresa && o.empresa.nome) || '';
   _obraIdMap[o.id] = { nome: o.nome || '', empresa: emp };
  });
+ var propostaSet = {};
+ try { propostaSet = await _obrasCarregarPropostaSet(); } catch (e) { console.error('[Obras] erro ao verificar propostas comerciais:', e); }
  var tbody=document.getElementById('obras-tbody'); if(!tbody)return;
  tbody.innerHTML=allObras.map(function(o){
   var tipos=o.tipo_obra||[]; var etapa=o.etapa_negocio||''; var eCls=_etapaClsBd[etapa]||'bm';
@@ -444,17 +462,22 @@ async function _dbLoadObras() {
   var dataEnvio=o.data_envio_proposta?new Date(o.data_envio_proposta+'T00:00:00').toLocaleDateString('pt-BR'):'—';
   var valor=(o.valor!=null)?'R$ '+Number(o.valor).toLocaleString('pt-BR',{minimumFractionDigits:0}):'—';
   var qtd=(o.quantidade!=null)?o.quantidade:'—';
+  var temProposta=!!propostaSet[o.id];
+  var propostaTag=temProposta?'<span class="nt-tag nt-tag-green">Sim</span>':'<span class="nt-tag nt-tag-gray">Não</span>';
   // "Gerar Orçamento" vive só dentro do painel da Obra (Calculadora Modular
   // para Modular, Proposta Comercial para Solar) — aqui só abre o painel.
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'obras\',this)"'
    +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'"'
-   +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'">'
+   +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'" data-proposta="'+(temProposta?'sim':'nao')+'">'
    +'<td><div style="font-weight:500">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
    +'<td><div class="oc-tags" style="margin-bottom:0">'+catBadges+'</div></td>'
+   +'<td style="color:var(--muted)">'+(o.cidade||'—')+'</td>'
+   +'<td style="color:var(--muted)">'+(o.estado||'—')+'</td>'
    +'<td style="text-align:center;color:var(--muted)">'+qtd+'</td>'
    +'<td style="color:var(--muted)">'+(o.canal_vendas||'—')+'</td>'
    +'<td><span class="badge '+eCls+'">'+(etapa||'—')+'</span></td>'
    +'<td style="color:var(--muted);font-size:12px">'+dataEnvio+'</td>'
+   +'<td style="text-align:center">'+propostaTag+'</td>'
    +'<td style="font-weight:600">'+valor+'</td>'
    +'<td><button class="btn btn-ghost btn-sm" onclick="_spObraById(\''+o.id+'\')">Abrir</button></td></tr>';
  }).join('');
@@ -1347,6 +1370,14 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<input class="sp-inp" id="sp-data-proposta" type="date" value="' + (o.data_envio_proposta ? String(o.data_envio_proposta).substring(0,10) : '') + '"></div>'
   + '</div>'
 
+  // Proposta Comercial não é um campo de texto (é um documento anexado, ver
+  // aba Documentos/_spCarregarDocumentos) — aqui é só um resumo de status +
+  // atalho, populado depois via _spCarregarPropostaStatus (a busca real fica
+  // fora do render síncrono do painel, mesmo esquema do "Verificando..."
+  // de #sp-propostas-lista acima).
+  + '<div class="sp-field"><div class="sp-label">Proposta Comercial</div>'
+  + '<div id="sp-proposta-status" style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:var(--muted)">Verificando...</div></div>'
+
   + '<div class="sp-g3">'
   + '<div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-cidade" value="' + (o.cidade||'') + '"></div>'
   + '<div class="sp-field"><div class="sp-label">UF</div><input class="sp-inp" id="sp-uf" value="' + (o.estado||'') + '" maxlength="2" style="text-transform:uppercase"></div>'
@@ -1584,6 +1615,8 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + ' <button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
  );
 
+ _spCarregarPropostaStatus(o.id);
+
  if (tipo === 'Modular') {
   // Usa o id real da obra (antes era um slug do nome — colidia entre obras
   // com nomes parecidos e perdia o memorial salvo se a obra fosse renomeada;
@@ -1601,6 +1634,26 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
    + '<b>Erro ao montar o painel:</b><br><code>' + renderErr.message + '</code></div>',
    '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
   );
+ }
+}
+
+// Resumo de "Proposta Comercial" na Visão Geral — mesma checagem de tipo
+// (case-insensitive, cobre "Proposta Comercial" do Airtable e
+// "proposta_comercial" do upload manual) usada em _obrasCarregarPropostaSet
+// pra grid, só que aqui é 1 obra só. "Ver em Documentos" pula pra aba real
+// (_sptSwitch já dispara _spCarregarDocumentos sozinho).
+async function _spCarregarPropostaStatus(obraId) {
+ var el = document.getElementById('sp-proposta-status');
+ if (!el || !obraId) return;
+ var res = await _sb.from('documentos').select('id', { count: 'exact', head: true }).eq('obra_id', obraId).ilike('tipo', '%proposta%comercial%');
+ if (res.error) { el.textContent = 'Erro ao verificar.'; return; }
+ var n = res.count || 0;
+ if (!n) {
+  el.innerHTML = '<span>Nenhuma proposta anexada.</span>'
+   + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_sptSwitch(\'documentos\', document.querySelector(&quot;.spt-btn[onclick*=documentos]&quot;))">Anexar em Documentos</button>';
+ } else {
+  el.innerHTML = '<span class="nt-tag nt-tag-green">' + n + ' anexada' + (n !== 1 ? 's' : '') + '</span>'
+   + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_sptSwitch(\'documentos\', document.querySelector(&quot;.spt-btn[onclick*=documentos]&quot;))">Ver em Documentos</button>';
  }
 }
 
@@ -1849,7 +1902,7 @@ function _obrasRenderGroupNode(node, path, tbody, forceHidden) {
   hd.style.position = 'static'; // sticky faria sentido só dentro de um scroll interno (não é o caso de Obras)
   hd.onclick = function(){ _obrasToggleGroup(pathKey); };
   hd.style.display = (forceHidden || !visCount) ? 'none' : '';
-  hd.innerHTML = '<td colspan="8" style="padding-left:' + indent + 'px">'
+  hd.innerHTML = '<td colspan="11" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + (k || '—') + '</strong>'
    + '<span style="color:var(--muted);font-size:9px;margin-left:6px">(' + visCount + ')</span>'
