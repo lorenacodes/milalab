@@ -1557,7 +1557,12 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  var difalAuto    = !(projSolar && projSolar.difal_percentual != null);
  var difalDefault = (projSolar && projSolar.difal_percentual != null) ? projSolar.difal_percentual : (_difalTabelaUF[ufDestino] != null ? _difalTabelaUF[ufDestino] : '');
 
- function fmtData(d)  { return d ? String(d).substring(0,10) : '—'; }
+ // Pedido explícito: datas apareciam cruas em ISO ("YYYY-MM-DD") em vez do
+ // padrão brasileiro. new Date(d) sozinho (sem 'T00:00:00') interpreta a
+ // string como UTC meia-noite — em fusos negativos (Brasil inteiro) isso
+ // exibe o dia ANTERIOR ao gravado no banco; por isso o 'T00:00:00' fixo
+ // (mesmo truque já usado em "Data envio da proposta" etc. neste arquivo).
+ function fmtData(d)  { return d ? new Date(String(d).substring(0,10) + 'T00:00:00').toLocaleDateString('pt-BR') : '—'; }
  function fmtMoeda(v) { return v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'; }
  function fmtDias(n)  { return n ? n + ' dia' + (n != 1 ? 's' : '') : '—'; }
 
@@ -1653,22 +1658,33 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   : '<div class="sp-empty">Nenhum projeto vinculado a esta obra</div>';
 
  // ── Cards de entregas ────────────────────────────────────────────────────────
+ // Referência explícita: card do Airtable (Etapa/Quantidade/Faturamento/
+ // Transporte/Peso/Valor num grid compacto, badge de etapa colorido). Grid
+ // em vez da linha única "Etapa: X | Qtd: Y | ..." de antes — com 6 campos
+ // ao mesmo tempo a linha única ficava apertada/cortando em telas menores.
+ function _entCampo(label, valor) {
+  return '<div><div class="sp-label" style="margin-bottom:1px">' + label + '</div><div style="font-size:12px;color:var(--text)">' + valor + '</div></div>';
+ }
  var entregaCards = entregas.length
   ? entregas.map(function(e){
-     // Mesmo achado do card de Projeto: .sp-item-card já tinha cursor:pointer
-     // + hover (styles/main.css) mas nunca teve onclick — parecia clicável e
-     // não abria nada.
-     return '<div class="sp-item-card" onclick="_spOpenEntityById(\'entregas\',\'' + e.id + '\')">'
-      + '<div class="sp-item-title">' + (e.nome_entrega || '(sem nome)') + '</div>'
-      + '<div class="sp-item-meta">'
-      + (e.etapa ? '<span>Etapa: <b>' + e.etapa + '</b></span><span style="color:var(--border)">|</span>' : '')
-      + '<span>Quantidade: <b>' + (e.quantidade != null ? e.quantidade : '—') + '</b></span>'
-      + '<span style="color:var(--border)">|</span>'
-      + '<span>Faturamento: <b>' + fmtData(e.data_faturamento) + '</b></span>'
-      + (e.transporte ? '<span style="color:var(--border)">|</span><span>Transporte: <b>' + e.transporte + '</b></span>' : '')
+     var bucket = _entBucketFor(e.etapa);
+     var etapaBadge = e.etapa
+      ? '<span class="badge" style="background:' + _entBucketCor[bucket] + '22;color:' + _entBucketCor[bucket] + ';font-size:10px">' + e.etapa + '</span>'
+      : '—';
+     return '<div class="sp-item-card">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
+      + '<div class="sp-item-title" style="margin-bottom:0;cursor:pointer" onclick="_spOpenEntityById(\'entregas\',\'' + e.id + '\')">' + (e.nome_entrega || '(sem nome)') + '</div>'
+      + '<button type="button" class="sp-rel-chip-rm" title="Desvincular desta obra" onclick="event.stopPropagation();_spDesvincularEntrega(\'' + e.id + '\',\'' + (e.nome_entrega||'').replace(/'/g,"\\'") + '\')">&times;</button>'
       + '</div>'
-      + (e.valor ? '<div style="margin-top:6px;font-size:12px;font-weight:600;color:var(--green)">' + fmtMoeda(e.valor) + '</div>' : '')
-      + (e.endereco_entrega ? '<div style="margin-top:4px;font-size:11px;color:var(--muted)">' + e.endereco_entrega + '</div>' : '')
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:10px 12px">'
+      + _entCampo('Etapa', etapaBadge)
+      + _entCampo('Quantidade', e.quantidade != null ? e.quantidade : '—')
+      + _entCampo('Faturamento', fmtData(e.data_faturamento))
+      + _entCampo('Transporte', e.transporte || '—')
+      + _entCampo('Peso (kg)', e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') : '—')
+      + _entCampo('Valor', e.valor != null ? '<span style="color:var(--green);font-weight:600">' + fmtMoeda(e.valor) + '</span>' : '—')
+      + '</div>'
+      + (e.endereco_entrega ? '<div style="margin-top:8px;font-size:11px;color:var(--muted)">' + e.endereco_entrega + '</div>' : '')
       + '</div>';
     }).join('')
   : '<div class="sp-empty">Nenhuma entrega registrada para esta obra</div>';
@@ -1968,7 +1984,33 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
 
   // ── ABA: Entregas ────────────────────────────────────────────────────────────
   + '<div class="spt-panel" id="spt-entregas">'
-  + '<div class="sp-stitle" style="margin-top:0">Entregas (' + entregas.length + ')</div>'
+  // Pedido explícito: não havia jeito de criar/associar uma entrega a uma
+  // obra pelo sistema (openNovaEntrega em entregas.js é só um alert()
+  // placeholder até hoje) — mesmo formulário rápido já usado pra
+  // Empresa/Contato/Instalação, gravando direto em `entregas` com
+  // obra_id já preenchido.
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)">'
+  + '<div class="sp-stitle" style="margin:0;padding:0;border:none">Entregas (' + entregas.length + ')</div>'
+  + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEntrega()">+ Nova Entrega</button>'
+  + '</div>'
+  + '<div id="sp-nova-entrega-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">'
+  + '<div class="sp-field"><div class="sp-label">Nome da entrega *</div><input class="sp-inp" id="sp-new-ent-nome" placeholder="Ex: 1ª Entrega"></div>'
+  + '<div class="sp-g2" style="gap:8px;margin-top:8px">'
+  + '<div class="sp-field"><div class="sp-label">Etapa</div><select class="sp-inp" id="sp-new-ent-etapa">'
+  + '<option value="">Selecione...</option>'
+  + Object.keys(_entEtapaBucket).map(function(et){ return '<option>' + et + '</option>'; }).join('')
+  + '</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Data de faturamento</div><input class="sp-inp" id="sp-new-ent-data" type="date"></div>'
+  + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
+  + '<div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-new-ent-qtd" type="number" min="0" placeholder="0"></div>'
+  + '<div class="sp-field"><div class="sp-label">Peso do pedido (kg)</div><input class="sp-inp" id="sp-new-ent-peso" type="number" min="0" placeholder="0"></div>'
+  + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
+  + '<div class="sp-field"><div class="sp-label">Valor</div><input class="sp-inp" id="sp-new-ent-valor" type="number" min="0" placeholder="0"></div>'
+  + '<div class="sp-field"><div class="sp-label">Transporte</div><input class="sp-inp" id="sp-new-ent-transporte" placeholder="Ex: Mila - 01"></div>'
+  + '</div><div style="display:flex;gap:6px;margin-top:10px">'
+  + '<button class="btn btn-primary btn-sm" onclick="_spCriarEntrega()" style="flex:1;justify-content:center">Criar entrega</button>'
+  + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEntrega()">Cancelar</button>'
+  + '</div></div>'
   + entregaCards
   + '</div>'
 
@@ -2450,6 +2492,45 @@ async function _spCriarInstalacao() {
  // Promise.all rápido) do que tentar remontar só o pedaço de instalações.
  _spObraById(_obraAtiva.id);
  if (typeof _dbLoadInstalacoes === 'function') _dbLoadInstalacoes();
+}
+
+// ── Quick-create Entrega ────────────────────────────────────────────────────────
+// Mesmo espírito de _spCriarInstalacao — openNovaEntrega() (entregas.js) é
+// só um alert() de placeholder até hoje, não existia nenhuma forma de
+// criar/associar uma entrega a uma obra pelo sistema.
+function _spToggleNovaEntrega() {
+ const f = document.getElementById('sp-nova-entrega-form');
+ if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+async function _spCriarEntrega() {
+ if (!_obraAtiva || !_obraAtiva.id) return;
+ const nome = document.getElementById('sp-new-ent-nome')?.value?.trim();
+ if (!nome) { alert('Nome da entrega é obrigatório.'); return; }
+ const payload = {
+  obra_id: _obraAtiva.id,
+  nome_entrega: nome,
+  etapa: document.getElementById('sp-new-ent-etapa')?.value || null,
+  data_faturamento: document.getElementById('sp-new-ent-data')?.value || null,
+  quantidade: document.getElementById('sp-new-ent-qtd')?.value !== '' ? Number(document.getElementById('sp-new-ent-qtd')?.value) : null,
+  peso_kg: document.getElementById('sp-new-ent-peso')?.value !== '' ? Number(document.getElementById('sp-new-ent-peso')?.value) : null,
+  valor: document.getElementById('sp-new-ent-valor')?.value !== '' ? Number(document.getElementById('sp-new-ent-valor')?.value) : null,
+  transporte: document.getElementById('sp-new-ent-transporte')?.value?.trim() || null,
+ };
+ const { error } = await _sb.from('entregas').insert(payload);
+ if (error) { alert('Erro ao criar entrega: ' + (error?.message || '')); return; }
+ _spObraById(_obraAtiva.id);
+ if (typeof _dbLoadEntregas === 'function') _dbLoadEntregas();
+}
+// entregas.obra_id é coluna direta (não junção N:N como empresas/contatos)
+// — "desvincular" aqui é só limpar essa FK, sem apagar a entrega em si
+// (pedido explícito: a entrega continua existindo no sistema, só solta da
+// obra atual).
+async function _spDesvincularEntrega(id, nome) {
+ if (!confirm('Desvincular "' + (nome || 'esta entrega') + '" desta obra?\n\nA entrega não será excluída, só deixa de aparecer aqui.')) return;
+ const { error } = await _sb.from('entregas').update({ obra_id: null }).eq('id', id);
+ if (error) { alert('Erro ao desvincular: ' + (error?.message || '')); return; }
+ if (_obraAtiva && _obraAtiva.id) _spObraById(_obraAtiva.id);
+ if (typeof _dbLoadEntregas === 'function') _dbLoadEntregas();
 }
 
 function _spToggleNovoContato() {
