@@ -495,6 +495,93 @@ async function _obrasCarregarPropostaMap() {
  return map;
 }
 
+// Presença de ART/Cálculo Estrutural por obra — pros filtros "ART"/"Cálculo
+// Estrutural" da grade (pedido explícito). Mesmo esquema de página da query
+// de Proposta acima, só que aqui só interessa SE existe (não qual/status),
+// então guarda Sets em vez de mapear o documento inteiro.
+async function _obrasCarregarDocsPresenca() {
+ var temArt = new Set(), temCalculo = new Set();
+ var from = 0, pageSize = 1000, more = true;
+ while (more) {
+  var res = await _sb.from('documentos')
+   .select('obra_id, tipo')
+   .in('tipo', ['ART', 'Cálculo Estrutural'])
+   .not('obra_id', 'is', null)
+   .range(from, from + pageSize - 1);
+  if (res.error || !res.data || !res.data.length) break;
+  res.data.forEach(function(d){
+   if (d.tipo === 'ART') temArt.add(d.obra_id);
+   if (d.tipo === 'Cálculo Estrutural') temCalculo.add(d.obra_id);
+  });
+  more = res.data.length === pageSize; from += pageSize;
+ }
+ return { temArt: temArt, temCalculo: temCalculo };
+}
+
+// Agregados de Projetos por obra (Qtd./Valor/Peso total, Produtos) — pros
+// filtros/ordenações "de Projetos" pedidos na grade de Obras. Uma única
+// query paginada pra todos os projetos (não dá pra agregar isso por obra
+// individualmente sem 1500+ requests), reduzida em memória por obra_id.
+async function _obrasCarregarProjetosAgg() {
+ var agg = {}; var from = 0, pageSize = 1000, more = true;
+ while (more) {
+  var res = await _sb.from('projetos')
+   .select('obra_id, quantidade, valor_unitario, peso_kg, produto')
+   .not('obra_id', 'is', null)
+   .range(from, from + pageSize - 1);
+  if (res.error || !res.data || !res.data.length) break;
+  res.data.forEach(function(p){
+   var a = agg[p.obra_id] || (agg[p.obra_id] = { qtd: 0, valor: 0, peso: 0, produtos: new Set() });
+   a.qtd   += Number(p.quantidade) || 0;
+   a.valor += (Number(p.valor_unitario) || 0) * (Number(p.quantidade) || 1);
+   a.peso  += Number(p.peso_kg) || 0;
+   (p.produto || []).forEach(function(pr){ a.produtos.add(pr); });
+  });
+  more = res.data.length === pageSize; from += pageSize;
+ }
+ return agg;
+}
+
+// Agregados de Entregas por obra (Qtd./Valor total, entregue e a entregar) —
+// "entregue" = etapa 'Entrega realizada' (único valor real que representa
+// entrega concluída; os outros 6 valores reais — Programar entrega, Em
+// transporte, Produção etc. — são todos estágios ANTES da entrega de
+// verdade, por isso contam como "a entregar").
+async function _obrasCarregarEntregasAgg() {
+ var agg = {}; var from = 0, pageSize = 1000, more = true;
+ while (more) {
+  var res = await _sb.from('entregas')
+   .select('obra_id, quantidade, valor, etapa')
+   .not('obra_id', 'is', null)
+   .range(from, from + pageSize - 1);
+  if (res.error || !res.data || !res.data.length) break;
+  res.data.forEach(function(e){
+   var a = agg[e.obra_id] || (agg[e.obra_id] = { qtdTotal: 0, qtdEntregue: 0, valorTotal: 0, valorEntregue: 0 });
+   var qtd = Number(e.quantidade) || 0, valor = Number(e.valor) || 0;
+   a.qtdTotal   += qtd;
+   a.valorTotal += valor;
+   if (e.etapa === 'Entrega realizada') { a.qtdEntregue += qtd; a.valorEntregue += valor; }
+  });
+  more = res.data.length === pageSize; from += pageSize;
+ }
+ return agg;
+}
+
+// Sets de obra_id com pelo menos 1 Instalação / 1 Tarefa vinculada — pros
+// filtros de presença "Instalação"/"Tarefa" da grade (Projeto/Entrega já
+// têm os agregados acima, que também servem de presença: agg[obraId] existe
+// ⇔ tem pelo menos 1).
+async function _obrasCarregarPresencaSimples(tabela, coluna) {
+ var set = new Set(); var from = 0, pageSize = 1000, more = true;
+ while (more) {
+  var res = await _sb.from(tabela).select(coluna).not(coluna, 'is', null).range(from, from + pageSize - 1);
+  if (res.error || !res.data || !res.data.length) break;
+  res.data.forEach(function(r){ set.add(r[coluna]); });
+  more = res.data.length === pageSize; from += pageSize;
+ }
+ return set;
+}
+
 async function _obrasCarregarTodasObras() {
  var allObras=[]; var from=0; var pageSize=1000; var more=true;
  while(more){
@@ -507,24 +594,72 @@ async function _obrasCarregarTodasObras() {
  return allObras;
 }
 
+// Monta todos os data-* "extras" usados pelos filtros/ordenações/agrupamentos
+// pedidos na grade de Obras (Quantidade, Canal, datas, ART/Cálculo
+// Estrutural, agregados de Projetos/Entregas, presença de Instalação/
+// Tarefa...) — função única, reaproveitada tanto pela Tabela quanto pelo
+// Kanban, pra não duplicar essa lista enorme de atributos duas vezes.
+function _obrasExtraDatasetAttrs(o, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa) {
+ var proposta = propostaMap[o.id];
+ var pAgg = projAgg[o.id];
+ var eAgg = entAgg[o.id];
+ function esc(v) { return (v == null ? '' : String(v)).replace(/"/g, '&quot;'); }
+ return ' data-quantidade="' + (o.quantidade != null ? o.quantidade : '') + '"'
+  + ' data-canal="' + esc(o.canal_vendas) + '"'
+  + ' data-data-criacao="' + (o.data_criacao || '') + '"'
+  + ' data-data-fechamento="' + (o.data_fechamento || '') + '"'
+  + ' data-endereco="' + esc(o.endereco_entrega) + '"'
+  + ' data-motivo-perdido="' + esc(o.motivo_perdido) + '"'
+  + ' data-alterado-por="' + esc(o.ultima_alteracao_por) + '"'
+  + ' data-criado-por="' + esc(o.criado_por) + '"'
+  // .substring(0,10): updated_at é timestamp completo (com hora) — o filtro
+  // de data (_fbEvalCondition) só compara data pura ("T00:00:00" fixo),
+  // então guardar o timestamp inteiro aqui quebraria a comparação
+  // (new Date(raw + 'T00:00:00') vira uma string ISO inválida).
+  + ' data-updated-at="' + (o.updated_at ? String(o.updated_at).substring(0,10) : '') + '"'
+  + ' data-contato="' + esc(o.contato && o.contato.nome_completo) + '"'
+  + ' data-art="' + (docsPresenca.temArt.has(o.id) ? 'Sim' : 'Não') + '"'
+  + ' data-calculo="' + (docsPresenca.temCalculo.has(o.id) ? 'Sim' : 'Não') + '"'
+  + ' data-proposta="' + (proposta ? 'Sim' : 'Não') + '"'
+  + ' data-proj-qtd="' + (pAgg ? pAgg.qtd : 0) + '"'
+  + ' data-proj-valor="' + (pAgg ? pAgg.valor : 0) + '"'
+  + ' data-proj-peso="' + (pAgg ? pAgg.peso : 0) + '"'
+  + ' data-proj-produto="' + esc(pAgg ? Array.from(pAgg.produtos).join(', ') : '') + '"'
+  + ' data-tem-projeto="' + (pAgg ? 'Sim' : 'Não') + '"'
+  + ' data-ent-qtd-total="' + (eAgg ? eAgg.qtdTotal : 0) + '"'
+  + ' data-ent-qtd-entregue="' + (eAgg ? eAgg.qtdEntregue : 0) + '"'
+  + ' data-ent-qtd-a-entregar="' + (eAgg ? (eAgg.qtdTotal - eAgg.qtdEntregue) : 0) + '"'
+  + ' data-ent-valor-total="' + (eAgg ? eAgg.valorTotal : 0) + '"'
+  + ' data-ent-valor-entregue="' + (eAgg ? eAgg.valorEntregue : 0) + '"'
+  + ' data-ent-valor-a-entregar="' + (eAgg ? (eAgg.valorTotal - eAgg.valorEntregue) : 0) + '"'
+  + ' data-tem-entrega="' + (eAgg ? 'Sim' : 'Não') + '"'
+  + ' data-tem-instalacao="' + (temInstalacao.has(o.id) ? 'Sim' : 'Não') + '"'
+  + ' data-tem-tarefa="' + (temTarefa.has(o.id) ? 'Sim' : 'Não') + '"';
+}
+
 async function _dbLoadObras() {
- // As duas consultas são independentes (obras vs. documentos) — rodar em
- // paralelo em vez de esperar uma terminar pra começar a outra foi a
- // segunda metade do achado de lentidão (a primeira foi o índice/ilike
- // acima): antes o tempo total era obras+documentos somados, agora é só
- // o maior dos dois.
+ // Todas as consultas abaixo são independentes entre si — rodar em paralelo
+ // em vez de esperar uma terminar pra começar a outra foi a segunda metade
+ // do achado de lentidão original (a primeira foi o índice/ilike da
+ // proposta): antes o tempo total era a SOMA de todas, agora é só a mais
+ // lenta delas.
  // try/catch novo: antes, qualquer erro na busca de obras (rede, timeout,
  // RLS) deixava a Promise rejeitada sem handler nenhum — a tela ficava
  // travada em "Carregando obras..." pra sempre, sem nenhuma pista do que
  // deu errado. Agora aparece um erro real na tela + no console.
- var allObras, propostaMap;
+ var allObras, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa;
  try {
   var results = await Promise.all([
    _obrasCarregarTodasObras(),
-   _obrasCarregarPropostaMap().catch(function(e){ console.error('[Obras] erro ao verificar propostas comerciais:', e); return {}; })
+   _obrasCarregarPropostaMap().catch(function(e){ console.error('[Obras] erro ao verificar propostas comerciais:', e); return {}; }),
+   _obrasCarregarDocsPresenca().catch(function(e){ console.error('[Obras] erro ao verificar ART/Cálculo Estrutural:', e); return { temArt: new Set(), temCalculo: new Set() }; }),
+   _obrasCarregarProjetosAgg().catch(function(e){ console.error('[Obras] erro ao agregar projetos:', e); return {}; }),
+   _obrasCarregarEntregasAgg().catch(function(e){ console.error('[Obras] erro ao agregar entregas:', e); return {}; }),
+   _obrasCarregarPresencaSimples('instalacoes', 'obra_id').catch(function(e){ console.error('[Obras] erro ao verificar instalações:', e); return new Set(); }),
+   _obrasCarregarPresencaSimples('atividades_obras', 'obra_id').catch(function(e){ console.error('[Obras] erro ao verificar tarefas:', e); return new Set(); }),
   ]);
-  allObras = results[0];
-  propostaMap = results[1];
+  allObras = results[0]; propostaMap = results[1]; docsPresenca = results[2];
+  projAgg = results[3]; entAgg = results[4]; temInstalacao = results[5]; temTarefa = results[6];
  } catch (e) {
   console.error('[Obras] erro ao carregar a lista de obras:', e);
   var tbodyErr = document.getElementById('obras-tbody');
@@ -563,7 +698,8 @@ async function _dbLoadObras() {
   // para Modular, Proposta Comercial para Solar) — aqui só abre o painel.
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'obras\',this)"'
    +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'"'
-   +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'" data-proposta="'+(proposta?'sim':'nao')+'">'
+   +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'"'
+   + _obrasExtraDatasetAttrs(o, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa) + '>'
    +'<td><div style="font-weight:500">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
    +'<td><div class="oc-tags" style="margin-bottom:0">'+catBadges+'</div></td>'
    +'<td style="color:var(--muted)">'+(o.cidade||'—')+'</td>'
@@ -602,6 +738,26 @@ async function _dbLoadObrasKanban() {
  }
  if(!allObras.length)return;
 
+ // Mesmos agregados/presenças da Tabela (ver _dbLoadObras) — o Kanban tem
+ // seu próprio filtro/ordenação sobre os mesmos data-*, então precisa dos
+ // mesmos campos extras nos cards. Consultas independentes das obras acima,
+ // rodam em paralelo.
+ var propostaMap = {}, docsPresenca = { temArt: new Set(), temCalculo: new Set() }, projAgg = {}, entAgg = {}, temInstalacao = new Set(), temTarefa = new Set();
+ try {
+  var extras = await Promise.all([
+   _obrasCarregarPropostaMap(),
+   _obrasCarregarDocsPresenca(),
+   _obrasCarregarProjetosAgg(),
+   _obrasCarregarEntregasAgg(),
+   _obrasCarregarPresencaSimples('instalacoes', 'obra_id'),
+   _obrasCarregarPresencaSimples('atividades_obras', 'obra_id'),
+  ]);
+  propostaMap = extras[0]; docsPresenca = extras[1]; projAgg = extras[2]; entAgg = extras[3];
+  temInstalacao = extras[4]; temTarefa = extras[5];
+ } catch (e) {
+  console.error('[Obras] erro ao carregar agregados do Kanban:', e);
+ }
+
  // Limpa conteúdo atual de cada coluna (mantém o cabeçalho e o botão + nova obra)
  Object.values(_etapaKcId).forEach(id => {
   const col = document.getElementById(id);
@@ -631,6 +787,36 @@ async function _dbLoadObrasKanban() {
   card.dataset.valor = o.valor != null ? o.valor : 0;
   card.dataset.dataEnvio = o.data_envio_proposta || '';
   card.dataset.search = [(o.nome||''), empNome, (o.cidade||''), (o.canal_vendas||''), (o.tipo_obra||[]).join(' ')].join(' ').toLowerCase();
+  // Mesmos data-* "extras" da Tabela (_obrasExtraDatasetAttrs) — aqui via
+  // propriedades do dataset em vez de atributo HTML, já que o card é
+  // montado com createElement, não innerHTML de string.
+  var pAggK = projAgg[o.id], eAggK = entAgg[o.id], propostaK = propostaMap[o.id];
+  card.dataset.quantidade = o.quantidade != null ? o.quantidade : '';
+  card.dataset.dataCriacao = o.data_criacao || '';
+  card.dataset.dataFechamento = o.data_fechamento || '';
+  card.dataset.endereco = o.endereco_entrega || '';
+  card.dataset.motivoPerdido = o.motivo_perdido || '';
+  card.dataset.alteradoPor = o.ultima_alteracao_por || '';
+  card.dataset.criadoPor = o.criado_por || '';
+  card.dataset.updatedAt = o.updated_at ? String(o.updated_at).substring(0,10) : '';
+  card.dataset.contato = (o.contato && o.contato.nome_completo) || '';
+  card.dataset.art = docsPresenca.temArt.has(o.id) ? 'Sim' : 'Não';
+  card.dataset.calculo = docsPresenca.temCalculo.has(o.id) ? 'Sim' : 'Não';
+  card.dataset.proposta = propostaK ? 'Sim' : 'Não';
+  card.dataset.projQtd = pAggK ? pAggK.qtd : 0;
+  card.dataset.projValor = pAggK ? pAggK.valor : 0;
+  card.dataset.projPeso = pAggK ? pAggK.peso : 0;
+  card.dataset.projProduto = pAggK ? Array.from(pAggK.produtos).join(', ') : '';
+  card.dataset.temProjeto = pAggK ? 'Sim' : 'Não';
+  card.dataset.entQtdTotal = eAggK ? eAggK.qtdTotal : 0;
+  card.dataset.entQtdEntregue = eAggK ? eAggK.qtdEntregue : 0;
+  card.dataset.entQtdAEntregar = eAggK ? (eAggK.qtdTotal - eAggK.qtdEntregue) : 0;
+  card.dataset.entValorTotal = eAggK ? eAggK.valorTotal : 0;
+  card.dataset.entValorEntregue = eAggK ? eAggK.valorEntregue : 0;
+  card.dataset.entValorAEntregar = eAggK ? (eAggK.valorTotal - eAggK.valorEntregue) : 0;
+  card.dataset.temEntrega = eAggK ? 'Sim' : 'Não';
+  card.dataset.temInstalacao = temInstalacao.has(o.id) ? 'Sim' : 'Não';
+  card.dataset.temTarefa = temTarefa.has(o.id) ? 'Sim' : 'Não';
   card.draggable = true;
   card.addEventListener('dragstart', _onObraCardDragStart);
   card.addEventListener('dragend', _onObraCardDragEnd);
@@ -2363,6 +2549,12 @@ var _obrasSbFields = [
  { key: 'cidade', label: 'Cidade', type: 'text' },
  { key: 'valor', label: 'Valor', type: 'number', getValue: function(ds) { return parseFloat(ds.valor) || 0; } },
  { key: 'dataEnvio', label: 'Envio da proposta', type: 'date', getValue: function(ds) { return ds.dataEnvio || ''; } },
+ // Pedido explícito — faltavam estes 5:
+ { key: 'quantidade', label: 'Quantidade', type: 'number', getValue: function(ds) { return parseFloat(ds.quantidade) || 0; } },
+ { key: 'proposta', label: 'Proposta comercial (anexo)', type: 'text' },
+ { key: 'canal', label: 'Canal de vendas', type: 'text' },
+ { key: 'tipo', label: 'Categoria da Obra', type: 'text' },
+ { key: 'estado', label: 'Estado da Obra', type: 'text' },
 ];
 _sbInit('obras', _obrasSbFields, _obrasApplyFilters);
 
@@ -2375,6 +2567,15 @@ var _obrasGbFields = [
  { key: 'empresa', label: 'Empresa' },
  { key: 'estado',  label: 'Estado' },
  { key: 'cidade',  label: 'Cidade' },
+ // Pedido explícito — faltavam estes 5. Nome/Quantidade/Valor não são
+ // categóricos de verdade (1 "balde" por valor distinto, geralmente sem
+ // repetição pra Nome) mas o pedido foi literal: qualquer campo pode virar
+ // agrupamento, igual no Airtable.
+ { key: 'nome',       label: 'Nome da Obra' },
+ { key: 'quantidade', label: 'Quantidade' },
+ { key: 'valor',      label: 'Valor' },
+ { key: 'dataEnvio',  label: 'Data de envio da proposta' },
+ { key: 'canal',      label: 'Canal de vendas' },
 ];
 _gbInit('obras', _obrasGbFields, _obrasApplyFilters, 3);
 // Obras é a única tela de agrupamento que opera sobre <tr> já existentes no

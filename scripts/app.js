@@ -297,18 +297,67 @@ document.addEventListener('keydown', e => {
 
 /* OBRAS FILTER — Airtable style */
 
-// Campos disponíveis para filtro
+// "Sim"/"Não" — atalho pros vários campos de presença (ART, Cálculo
+// Estrutural, tem Projeto/Entrega/Instalação/Tarefa vinculado, etc.), todos
+// gravados como dataset 'sim'/'nao' (ver _obrasExtraDatasetAttrs em
+// obras.js).
+var _OBRAS_SIM_NAO = ['Sim', 'Não'];
+
+// Campos disponíveis para filtro — pedido explícito: lista bem maior que a
+// original (só tipo/etapa/estado/empresa/cidade/dataEnvio), cobrindo campos
+// diretos da obra, presença de ART/Cálculo Estrutural (documentos.tipo) e
+// agregados de Projetos/Entregas (somas calculadas em _obrasCarregarProjetosAgg/
+// _obrasCarregarEntregasAgg, obras.js) — nenhum desses agregados existe como
+// coluna de verdade em `obras`, por isso todos são "text" (compara o número
+// já formatado como string; não tem type:'number' no motor de filtro, só em
+// ordenação).
 var _obrasCampos = {
  'tipo': { label: 'Categoria da obra', type: 'select', opts: ['Telhados','Modular','Steel Frame','Solar','Misto (LSF+A36)'] },
  'etapa': { label: 'Etapa', type: 'select', opts: ['Orçamento','Atualização de orçamento','Follow-up','Negociação','Aprovação de projeto','Piloto','Projeto aprovado','Em Andamento','Pós-vendas','Concluído','Negócio perdido'] },
- // Estado/Empresa: lista de opções calculada dos dados reais (ver
- // _obrasOptionsFromDom em obras.js) — uma lista fixa aqui ficaria
+ // Estado/Empresa/Cidade/Canal: lista de opções calculada dos dados reais
+ // (ver _obrasOptionsFromDom em obras.js) — uma lista fixa aqui ficaria
  // desatualizada (era literalmente o caso de Empresa antes desta correção:
  // as 5 opções fixas não batiam com nenhuma empresa real cadastrada).
+ // Cidade também virou select por pedido explícito (era texto livre).
  'estado': { label: 'Estado', type: 'select', opts: function(){ return _obrasOptionsFromDom('estado'); } },
  'empresa': { label: 'Empresa', type: 'select', opts: function(){ return _obrasOptionsFromDom('empresa'); } },
- 'cidade': { label: 'Cidade', type: 'text' },
- 'dataEnvio': { label: 'Envio da proposta', type: 'date' }
+ 'cidade': { label: 'Cidade', type: 'select', opts: function(){ return _obrasOptionsFromDom('cidade'); } },
+ 'canal': { label: 'Canal de vendas', type: 'select', opts: function(){ return _obrasOptionsFromDom('canal'); } },
+ 'dataEnvio': { label: 'Envio da proposta', type: 'date' },
+ 'nome': { label: 'Nome da Obra', type: 'text' },
+ 'quantidade': { label: 'Quantidade', type: 'text' },
+ 'valor': { label: 'Valor', type: 'text' },
+ 'dataCriacao': { label: 'Data de criação', type: 'date' },
+ 'dataFechamento': { label: 'Data de fechamento', type: 'date' },
+ 'endereco': { label: 'Endereço de Entrega', type: 'text' },
+ 'motivoPerdido': { label: 'Motivo de Negócio perdido', type: 'text' },
+ 'alteradoPor': { label: 'Alterado por último', type: 'text' },
+ 'criadoPor': { label: 'Criado por', type: 'text' },
+ 'updatedAt': { label: 'Horário da última alteração', type: 'date' },
+ 'contato': { label: 'Contato da Obra', type: 'text' },
+ 'proposta': { label: 'Proposta comercial', type: 'select', opts: _OBRAS_SIM_NAO },
+ 'art': { label: 'ART', type: 'select', opts: _OBRAS_SIM_NAO },
+ 'calculo': { label: 'Cálculo Estrutural', type: 'select', opts: _OBRAS_SIM_NAO },
+ // Presença (tem pelo menos 1 vinculado) — "Projeto"/"Entrega"/"Instalação"/
+ // "Tarefa" da lista pedida; os detalhes de cada um continuam só dentro do
+ // detalhamento da própria Obra (ver seções Projetos/Entregas/Instalação/
+ // Tarefas no painel), aqui é só "tem ou não tem".
+ 'temProjeto': { label: 'Projeto', type: 'select', opts: _OBRAS_SIM_NAO },
+ 'temEntrega': { label: 'Entrega', type: 'select', opts: _OBRAS_SIM_NAO },
+ 'temInstalacao': { label: 'Instalação', type: 'select', opts: _OBRAS_SIM_NAO },
+ 'temTarefa': { label: 'Tarefa', type: 'select', opts: _OBRAS_SIM_NAO },
+ // Agregados de Projetos (soma de todos os projetos vinculados à obra)
+ 'projQtd': { label: 'Quantidade Total (Projetos)', type: 'text' },
+ 'projValor': { label: 'Valor Total da Obra (Projetos)', type: 'text' },
+ 'projPeso': { label: 'Peso Total (Projetos)', type: 'text' },
+ 'projProduto': { label: 'Produto (Projetos)', type: 'text' },
+ // Agregados de Entregas
+ 'entValorTotal': { label: 'Valor total - soma (Entregas)', type: 'text' },
+ 'entValorEntregue': { label: 'Valor entregue - soma (Entregas)', type: 'text' },
+ 'entValorAEntregar': { label: 'Valor a entregar - soma (Entregas)', type: 'text' },
+ 'entQtdTotal': { label: 'Qtd total (Entregas)', type: 'text' },
+ 'entQtdEntregue': { label: 'Qtd entregue (Entregas)', type: 'text' },
+ 'entQtdAEntregar': { label: 'Qtd a entregar (Entregas)', type: 'text' },
 };
 
 // Operadores por tipo — padrão Airtable
