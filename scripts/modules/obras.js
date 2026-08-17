@@ -1453,7 +1453,10 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
  // ── Cards de entregas ────────────────────────────────────────────────────────
  var entregaCards = entregas.length
   ? entregas.map(function(e){
-     return '<div class="sp-item-card">'
+     // Mesmo achado do card de Projeto: .sp-item-card já tinha cursor:pointer
+     // + hover (styles/main.css) mas nunca teve onclick — parecia clicável e
+     // não abria nada.
+     return '<div class="sp-item-card" onclick="_spOpenEntityById(\'entregas\',\'' + e.id + '\')">'
       + '<div class="sp-item-title">' + (e.nome_entrega || '(sem nome)') + '</div>'
       + '<div class="sp-item-meta">'
       + (e.etapa ? '<span>Etapa: <b>' + e.etapa + '</b></span><span style="color:var(--border)">|</span>' : '')
@@ -1471,7 +1474,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
  // ── Cards de instalacoes ─────────────────────────────────────────────────────
  var instCards = instalacoes.length
   ? instalacoes.map(function(i){
-     return '<div class="sp-item-card">'
+     return '<div class="sp-item-card" onclick="_spOpenEntityById(\'instalacoes\',\'' + i.id + '\')">'
       + '<div class="sp-item-title">' + (i.tipo_servico || '(sem tipo)') + '</div>'
       + '<div class="sp-item-meta">'
       + (i.funil ? '<span>Funil: <b>' + i.funil + '</b></span><span style="color:var(--border)">|</span>' : '')
@@ -1750,7 +1753,36 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
 
   // ── ABA: Instalação ──────────────────────────────────────────────────────────
   + '<div class="spt-panel" id="spt-instalacao">'
-  + '<div class="sp-stitle" style="margin-top:0">Instalações (' + instalacoes.length + ')</div>'
+  // Pedido explícito: não havia jeito nenhum de criar/associar uma
+  // instalação a uma obra por aqui — a única forma de "existir" uma
+  // instalação era já ter vindo migrada do Airtable. openNovaInstalacao()
+  // (instalacoes.js) é só um alert() de placeholder até hoje; em vez de
+  // depender dela, este formulário rápido grava direto em `instalacoes`
+  // com obra_id já preenchido, mesmo espírito do quick-create de Empresa/
+  // Contato.
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)">'
+  + '<div class="sp-stitle" style="margin:0;padding:0;border:none">Instalações (' + instalacoes.length + ')</div>'
+  + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaInstalacao()">+ Nova Instalação</button>'
+  + '</div>'
+  + '<div id="sp-nova-instalacao-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">'
+  + '<div class="sp-g2" style="gap:8px">'
+  + '<div class="sp-field"><div class="sp-label">Tipo de serviço</div><select class="sp-inp" id="sp-new-inst-tipo">'
+  + '<option value="">Selecione...</option>'
+  + ['Instalação','Montagem fábrica','Treinamento piloto','Assistência técnica'].map(function(t){ return '<option>' + t + '</option>'; }).join('')
+  + '</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Funil</div><select class="sp-inp" id="sp-new-inst-funil">'
+  + ['A programar','Programado','Em execução','Finalizado'].map(function(f,i){ return '<option' + (i===0?' selected':'') + '>' + f + '</option>'; }).join('')
+  + '</select></div>'
+  + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
+  + '<div class="sp-field"><div class="sp-label">Data início</div><input class="sp-inp" id="sp-new-inst-inicio" type="date"></div>'
+  + '<div class="sp-field"><div class="sp-label">Data fim</div><input class="sp-inp" id="sp-new-inst-fim" type="date"></div>'
+  + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
+  + '<div class="sp-field"><div class="sp-label">Valor total gasto</div><input class="sp-inp" id="sp-new-inst-valor" type="number" min="0" placeholder="0"></div>'
+  + '<div class="sp-field"><div class="sp-label">Detalhes</div><input class="sp-inp" id="sp-new-inst-detalhes" placeholder="Observações..."></div>'
+  + '</div><div style="display:flex;gap:6px;margin-top:10px">'
+  + '<button class="btn btn-primary btn-sm" onclick="_spCriarInstalacao()" style="flex:1;justify-content:center">Criar instalação</button>'
+  + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaInstalacao()">Cancelar</button>'
+  + '</div></div>'
   + instCards
   + '</div>'
 
@@ -2163,6 +2195,31 @@ async function _spCriarEmpresaObra() {
 }
 
 // ── Quick-create Contato ──────────────────────────────────────────────────────
+// ── Quick-create Instalação ────────────────────────────────────────────────────
+function _spToggleNovaInstalacao() {
+ const f = document.getElementById('sp-nova-instalacao-form');
+ if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+async function _spCriarInstalacao() {
+ if (!_obraAtiva || !_obraAtiva.id) return;
+ const payload = {
+  obra_id: _obraAtiva.id,
+  tipo_servico: document.getElementById('sp-new-inst-tipo')?.value || null,
+  funil: document.getElementById('sp-new-inst-funil')?.value || null,
+  data_inicio: document.getElementById('sp-new-inst-inicio')?.value || null,
+  data_fim: document.getElementById('sp-new-inst-fim')?.value || null,
+  valor_total_gasto: document.getElementById('sp-new-inst-valor')?.value !== '' ? Number(document.getElementById('sp-new-inst-valor')?.value) : null,
+  detalhes: document.getElementById('sp-new-inst-detalhes')?.value?.trim() || null,
+ };
+ const { error } = await _sb.from('instalacoes').insert(payload);
+ if (error) { alert('Erro ao criar instalação: ' + (error?.message || '')); return; }
+ // Instalação nova muda a contagem/lista mostrada nesta mesma seção — mais
+ // simples e seguro recarregar o painel inteiro (_spObraById já faz um
+ // Promise.all rápido) do que tentar remontar só o pedaço de instalações.
+ _spObraById(_obraAtiva.id);
+ if (typeof _dbLoadInstalacoes === 'function') _dbLoadInstalacoes();
+}
+
 function _spToggleNovoContato() {
  const f = document.getElementById('sp-novo-contato-form');
  if (!f) return;
