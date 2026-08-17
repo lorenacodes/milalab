@@ -777,14 +777,72 @@ async function _spObraById(id) {
  }
 }
 
-// ── Troca de aba no painel de obra ────────────────────────────────────────────
+// ── Navegação por âncora no painel de obra ────────────────────────────────────
+// Pedido explícito: o painel virou 1 página só de rolagem contínua — as
+// "abas" (.spt-panel) todas ficam visíveis o tempo todo (ver CSS), então
+// clicar aqui só rola suave até a seção. Documentos não é mais carregado sob
+// demanda (não existe mais "clicar na aba" pra revelar algo escondido) —
+// _spObrasRender já chama _spCarregarDocumentos direto, junto com
+// _spCarregarPropostaStatus.
 function _sptSwitch(id, btn) {
- document.querySelectorAll('#sp-body .spt-panel').forEach(function(p){ p.classList.remove('active'); });
- document.querySelectorAll('#sp-body .spt-btn').forEach(function(b){ b.classList.remove('active'); });
  var panel = document.getElementById('spt-' + id);
- if (panel) panel.classList.add('active');
+ if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+ document.querySelectorAll('#sp-body .spt-btn').forEach(function(b){ b.classList.remove('active'); });
  if (btn) btn.classList.add('active');
- if (id === 'documentos' && _obraAtiva && _obraAtiva.id) _spCarregarDocumentos(_obraAtiva.id);
+}
+
+// Destaca a aba correspondente à seção mais próxima do topo visível enquanto
+// o usuário rola livremente pela página (sem clicar em nenhuma aba) — pedido
+// explícito: "destacar visualmente a seção ativa conforme o usuário navega".
+// Feito por scroll (não IntersectionObserver) porque as seções têm alturas
+// bem diferentes (Visão Geral é grande, Documentos pode ficar pequena) — o
+// que importa aqui é só "qual seção já passou da linha da barra sticky",
+// não "qual está mais visível na tela".
+var _sptScrollSpyBound = false;
+var _sptScrollSpyRaf = null;
+function _sptInitScrollSpy() {
+ var root = document.getElementById('sp-body');
+ if (!root) return;
+ if (!_sptScrollSpyBound) {
+  root.addEventListener('scroll', _sptScrollSpyOnScroll, { passive: true });
+  _sptScrollSpyBound = true;
+ }
+ _sptScrollSpyUpdate();
+}
+function _sptScrollSpyOnScroll() {
+ if (_sptScrollSpyRaf) return;
+ _sptScrollSpyRaf = requestAnimationFrame(function(){ _sptScrollSpyRaf = null; _sptScrollSpyUpdate(); });
+}
+// Mesmo valor do scroll-margin-top de .spt-panel (styles/main.css) — usar a
+// altura real da .spt-bar aqui (~39px) em vez desta constante fixa parecia
+// certo, mas ficava ~15px MENOR que o scroll-margin-top usado pelo
+// scrollIntoView pra posicionar a seção; resultado: clicar numa aba rolava
+// pra lá, mas a aba clicada não acendia como ativa até rolar mais um
+// pouquinho — os dois precisam concordar no mesmo número.
+var _SPT_SCROLL_ANCHOR = 54;
+function _sptScrollSpyUpdate() {
+ var root = document.getElementById('sp-body');
+ if (!root) return;
+ var panels = root.querySelectorAll('.spt-panel');
+ if (!panels.length) return;
+ var atualId;
+ // Rolou até o fim de verdade: a última seção (Documentos) pode nunca ter
+ // conteúdo suficiente ABAIXO dela pra empurrar o próprio topo além da
+ // linha de corte (isso só existe se sobrar altura de sobra depois dela) —
+ // sem este caso especial, a última aba nunca acendia mesmo com a página
+ // inteira já rolada.
+ if (root.scrollTop + root.clientHeight >= root.scrollHeight - 2) {
+  atualId = panels[panels.length - 1].id;
+ } else {
+  var limite = root.getBoundingClientRect().top + _SPT_SCROLL_ANCHOR + 4;
+  atualId = panels[0].id;
+  for (var i = 0; i < panels.length; i++) {
+   if (panels[i].getBoundingClientRect().top <= limite) atualId = panels[i].id;
+  }
+ }
+ root.querySelectorAll('.spt-btn').forEach(function(b){
+  b.classList.toggle('active', b.dataset.target === atualId);
+ });
 }
 
 // ── Documentos: carregar por obra com navegação por tipo ──────────────────────
@@ -1468,15 +1526,15 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
 
   // Barra de abas
   + '<div class="spt-bar">'
-  + '<button class="spt-btn active" onclick="_sptSwitch(\'geral\',this)">Visão Geral</button>'
-  + '<button class="spt-btn" onclick="_sptSwitch(\'orcamentos\',this)">Projetos' + badge(projetos.length) + '</button>'
-  + '<button class="spt-btn" onclick="_sptSwitch(\'entregas\',this)">Entregas' + badge(entregas.length) + '</button>'
-  + '<button class="spt-btn" onclick="_sptSwitch(\'instalacao\',this)">Instalação' + badge(instalacoes.length) + '</button>'
-  + '<button class="spt-btn" onclick="_sptSwitch(\'documentos\',this)">Documentos</button>'
+  + '<button class="spt-btn active" data-target="spt-geral" onclick="_sptSwitch(\'geral\',this)">Visão Geral</button>'
+  + '<button class="spt-btn" data-target="spt-orcamentos" onclick="_sptSwitch(\'orcamentos\',this)">Projetos' + badge(projetos.length) + '</button>'
+  + '<button class="spt-btn" data-target="spt-entregas" onclick="_sptSwitch(\'entregas\',this)">Entregas' + badge(entregas.length) + '</button>'
+  + '<button class="spt-btn" data-target="spt-instalacao" onclick="_sptSwitch(\'instalacao\',this)">Instalação' + badge(instalacoes.length) + '</button>'
+  + '<button class="spt-btn" data-target="spt-documentos" onclick="_sptSwitch(\'documentos\',this)">Documentos</button>'
   + '</div>'
 
-  // ── ABA: Visão Geral ─────────────────────────────────────────────────────────
-  + '<div class="spt-panel active" id="spt-geral">'
+  // ── SEÇÃO: Visão Geral ───────────────────────────────────────────────────────
+  + '<div class="spt-panel" id="spt-geral">'
 
   + '<div class="sp-stitle" style="margin-top:0">Identificação</div>'
   + '<div class="sp-field"><div class="sp-label">Nome da obra</div>'
@@ -1580,23 +1638,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoContato()">Cancelar</button>'
   + '</div></div>'
 
-  // ── Registros vinculados (Obra→Projeto) ────────────────────────────────────
-  // "Empresa(s) vinculada(s)" foi removida daqui — pedido explícito: ficava
-  // redundante com o campo Empresa logo acima, que já mostra a mesma empresa
-  // e agora tem seu próprio atalho "›" pra abrir o detalhamento
-  // (_spAbrirEmpresaSelecionada). Projetos: reverse FK (projetos.obra_id),
-  // já recebido como parâmetro `projetos` desta função — nenhuma query nova
-  // necessária. Usa o chip clicável padrão (_spRelChipHTML, ver
-  // side-panel.js), mesmo componente já usado no painel de Empresa.
-  + '<div class="sp-stitle">Projetos vinculados</div>'
-  + '<div class="sp-rel-chips-wrap" style="margin-bottom:16px">'
-  + (projetos.length
-     ? projetos.map(function(p){
-        return _spRelChipHTML('projetos', p.id, p.nome || '(sem nome)');
-       }).join('')
-     : '<div class="sp-empty">Nenhum projeto vinculado a esta obra.</div>')
-  + '</div>'
-
+  // "Empresa(s) vinculada(s)" e "Projetos vinculados" (chips) foram removidas
+  // daqui — pedido explícito de reestruturação: a página virou uma ficha
+  // única de rolagem contínua, e esses chips já eram redundantes com o campo
+  // Empresa logo acima (que tem seu próprio atalho "›") e com a seção
+  // Projetos completa mais abaixo (mesma rolagem, não mais uma aba separada)
+  // — mostrar a lista de projetos duas vezes na mesma página não ajuda em
+  // nada. "Resumo" continua: é agregado (totais), não repete a lista.
   + '<div class="sp-stitle">Resumo</div>'
   + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px">'
   + '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">'
@@ -1743,7 +1791,11 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<button onclick="_spEnviarDocObra()" id="sp-upload-send-btn" style="flex:1;font-size:12px;font-weight:700;padding:8px 14px;border:none;border-radius:7px;background:var(--green);color:#fff;cursor:pointer;transition:opacity .15s">Enviar documento</button>'
   + '<button onclick="_spToggleUploadDoc()" style="font-size:12px;padding:8px 14px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--muted);cursor:pointer">Cancelar</button>'
   + '</div></div>'
-  + '<div id="sp-propostas-lista"><div class="sp-empty"><div style="font-size:11px;color:var(--muted)">Clique na aba para carregar...</div></div></div>'
+  // Antes só carregava ao clicar na aba "Documentos" (_sptSwitch disparava
+  // _spCarregarDocumentos sob demanda) — como não existe mais aba de
+  // verdade (é tudo 1 página só), carrega direto (ver chamada logo após
+  // _spSet mais abaixo, junto com _spCarregarPropostaStatus).
+  + '<div id="sp-propostas-lista"><div class="sp-empty"><div style="font-size:11px;color:var(--muted)">Carregando...</div></div></div>'
   + '</div>'; // fim spt-panel documentos
 
  // Sem botão "Salvar" — pedido explícito: qualquer alteração no formulário
@@ -1755,6 +1807,8 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
  );
 
  _spCarregarPropostaStatus(o.id);
+ _spCarregarDocumentos(o.id);
+ _sptInitScrollSpy();
 
  if (tipo === 'Modular') {
   // Usa o id real da obra (antes era um slug do nome — colidia entre obras

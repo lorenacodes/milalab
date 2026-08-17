@@ -1067,13 +1067,25 @@ td{font-size:13px}
 .sp-g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .sp-stitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--navy);margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
 .sp-actions{padding:12px 18px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:8px;flex-wrap:wrap;background:var(--surface)}
-/* ── Abas do painel de obra ────────────────────────────────── */
-.spt-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin:-18px -18px 18px;padding:0 18px;background:var(--surface);flex-shrink:0;overflow-x:auto}
+/* ── Navegação por âncora do painel de obra ────────────────── */
+/* Pedido explícito: o painel de Obra virou 1 página só com rolagem
+   contínua — as "abas" (.spt-btn) não escondem/mostram mais nada, só
+   rolam até a seção (.spt-panel, sempre visível) e destacam qual está
+   ativa. A barra fica sticky no topo do .sp-body pra continuar
+   funcionando como navegação enquanto o usuário rola (mesmo truque de
+   margin negativa de antes, só que agora "grudada" em vez de estática). */
+.spt-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin:-18px -18px 18px;padding:0 18px;background:var(--surface);flex-shrink:0;overflow-x:auto;position:sticky;top:0;z-index:5}
 .spt-btn{font-size:12px;font-weight:600;padding:10px 14px;border:none;background:none;cursor:pointer;color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;font-family:inherit}
 .spt-btn:hover{color:var(--text)}
 .spt-btn.active{color:var(--navy);border-bottom-color:var(--navy)}
-.spt-panel{display:none}
-.spt-panel.active{display:block}
+/* scroll-margin-top compensa a altura da .spt-bar sticky ao rolar até a
+   âncora (scrollIntoView já respeita essa propriedade nativamente) — sem
+   isso, a barra fixa cobriria a primeira linha de cada seção. Borda +
+   respiro no topo de cada seção (exceto a 1ª) separam visualmente o fim
+   de uma e o começo da próxima, já que agora ficam uma embaixo da outra
+   na mesma rolagem, não mais em telas separadas. */
+.spt-panel{display:block;scroll-margin-top:54px}
+.spt-panel + .spt-panel{margin-top:28px;padding-top:24px;border-top:1px solid var(--border)}
 .spt-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;border-radius:var(--r-md);background:var(--border);color:var(--muted);font-size:10px;font-weight:700;padding:0 4px;margin-left:4px;vertical-align:middle}
 .spt-badge.has-data{background:#1B1B8F;color:#fff}
 /* ── Cards de itens nas abas ───────────────────────────────── */
