@@ -393,6 +393,14 @@ function _mcPrintNow() { window.print(); }
 var _tipoClsBd = {
  'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by','Misto (LSF+A36)':'bn'
 };
+// Cor do badge "Tipo de orçamento" na tabela de Projetos (dentro do
+// detalhamento de Obra) — pedido explícito: seguir o mesmo padrão de cores
+// de categoria (verde/roxo/azul/amarelo), com laranja pra qualquer valor
+// fora dos 4 conhecidos (ex.: "Misto (LSF + A36)", que só tem 1 registro
+// real e grafia inconsistente com _tipoClsBd — não vale a pena mapear à
+// parte, laranja já cobre "outro" corretamente).
+var _tipoOrcamentoCls = { 'Telhados':'bg', 'Steel Frame':'bp', 'Modular':'bb', 'Solar':'by' };
+function _tipoOrcamentoBadgeCls(tipo) { return _tipoOrcamentoCls[tipo] || 'bo'; }
 var _etapaClsBd = {
  'Orçamento':'bb','Atualização de orçamento':'bb','Follow-up':'by','Negociação':'bp',
  'Aprovação de projeto':'by','Piloto':'bn','Projeto aprovado':'bn','Em Andamento':'bn',
@@ -1624,7 +1632,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
         + (pEtapa ? '<span class="badge ' + (etapaCls[pEtapa]||'bm') + '" style="font-size:10px">' + pEtapa + '</span>' : '<span style="color:var(--muted)">—</span>')
         + '</td>'
         + '<td style="padding:8px 10px;white-space:nowrap">'
-        + (pTipo ? '<span class="badge bp" style="font-size:10px">' + pTipo + '</span>' : '<span style="color:var(--muted)">—</span>')
+        + (pTipo ? '<span class="badge ' + _tipoOrcamentoBadgeCls(pTipo) + '" style="font-size:10px">' + pTipo + '</span>' : '<span style="color:var(--muted)">—</span>')
         + '</td>'
         + '<td style="padding:8px 10px;white-space:nowrap">'
         + (pProd !== '—' ? '<span class="badge bm" style="font-size:10px">' + pProd + '</span>' : '<span style="color:var(--muted)">—</span>')

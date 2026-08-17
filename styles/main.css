@@ -9,7 +9,8 @@
  --yellow: #B8790A; --yellow-dim: rgba(184,121,10,0.20);
  --red: #D6433C; --red-dim: rgba(214,67,60,0.20);
  --blue: #2E5FD9; --blue-dim: rgba(46,95,217,0.20);
- --purple: #8B6FE8; --purple-dim: rgba(139,111,232,0.20); --sidebar-w: 224px;
+ --purple: #8B6FE8; --purple-dim: rgba(139,111,232,0.20);
+ --orange: #C2661C; --orange-dim: rgba(194,102,28,0.20); --sidebar-w: 224px;
  }
  body.light {
  /* Modo claro — mesmos tons de marca/status do tema escuro (MilaLab Design System);
@@ -157,6 +158,7 @@ body.light .dash-panel{
  .bb{background:var(--blue-dim);color:var(--blue)}
  .bp{background:rgba(137,87,229,.12);color:var(--purple)}
  .bm{background:rgba(139,148,158,.12);color:var(--muted)}
+ .bo{background:var(--orange-dim);color:var(--orange)}
  /* KPI */
  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
  .kpi-card{background:var(--surface);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-lg);padding:16px 20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
