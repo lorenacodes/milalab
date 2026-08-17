@@ -73,14 +73,16 @@ body.light .dash-panel{
   border-color: rgba(255,255,255,.65);
   box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255,255,255,.8);
 }
- /* Fundo: UM ÚNICO gradiente, aqui no body, cobrindo a tela inteira — não em
-    `.main`/`.page.active` separadamente (evita a costura entre sidebar e main).
-    Opacidade dos blobs reduzida (era .38/.32/.28 escuro e .30/.24/.20 claro) —
-    mais discreta, e como toda superfície de vidro agora tem cortina própria
-    (acima), a legibilidade do texto não depende mais de quão forte o degradê
-    fica aqui. --bg continua o preto neutro (decisão da usuária). */
- body{font-family:'Inter',sans-serif;background:radial-gradient(circle at 12% 0%, rgba(61,79,209,.22) 0%, transparent 48%),radial-gradient(circle at 92% 18%, rgba(63,191,180,.18) 0%, transparent 48%),radial-gradient(circle at 32% 100%, rgba(139,111,232,.16) 0%, transparent 55%),var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
- body.light{background:radial-gradient(circle at 12% 0%, rgba(61,79,209,.16) 0%, transparent 48%),radial-gradient(circle at 92% 18%, rgba(63,191,180,.13) 0%, transparent 48%),radial-gradient(circle at 32% 100%, rgba(139,111,232,.11) 0%, transparent 55%),var(--bg)}
+ /* Fundo sólido (era um gradiente radial de 3 "blobs" cobrindo a tela
+    inteira) — pedido explícito: qualquer área com scroll horizontal por
+    cima do gradiente (ex.: Kanban de Obras) ficava com um "corte" visível
+    conforme a barra deslocava, porque o gradiente é fixo ao body enquanto o
+    conteúdo por cima se movia — sem fluidez nenhuma. Decisão: funcional
+    antes de bonito, tira o degradê do sistema inteiro em vez de tentar
+    consertar caso a caso. --bg continua o preto neutro (decisão da
+    usuária); só o efeito decorativo em cima saiu. */
+ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px}
+ body.light{background:var(--bg)}
  h1,h2,h3,h4,.modal-title,.kpi-val,.gestor-hd-title{font-family:'Inter',sans-serif;font-weight:700;letter-spacing:-.2px}
  /* SIDEBAR — MilaLab Design System: painel permanentemente escuro (indigo-900),
     igual nos dois temas do app (claro/escuro só trocam o conteúdo principal,

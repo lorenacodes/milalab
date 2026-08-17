@@ -749,11 +749,15 @@ async function _spObraById(id) {
  document.getElementById('sp-drawer').classList.add('sp-open');
 
  try {
-  const [obraRes, projRes, entregasRes, instRes] = await Promise.all([
+  const [obraRes, projRes, entregasRes, instRes, atividadesRes] = await Promise.all([
    _sb.from('obras').select('*, empresas_obras(empresa_id,empresa:empresa_id(id,nome,cnpj)), contatos_obras(contato_id,contato:contato_id(id,nome_completo))').eq('id', id).single(),
    _sb.from('projetos').select('*').eq('obra_id', id).order('created_at'),
    _sb.from('entregas').select('*').eq('obra_id', id).order('data_faturamento', { ascending: false, nullsFirst: false }),
-   _sb.from('instalacoes').select('*').eq('obra_id', id).order('data_inicio')
+   _sb.from('instalacoes').select('*').eq('obra_id', id).order('data_inicio'),
+   // "Tarefas": Atividades do Gestor de Tarefas vinculadas a esta obra —
+   // pedido explícito. obra_id não é mais coluna direta de atividades (ver
+   // scripts/lib/atividades-vinculos.js), vive na junção atividades_obras.
+   _sb.from('atividades_obras').select('atividade:atividade_id(id, titulo, status, prioridade, data_prazo, responsavel)').eq('obra_id', id)
   ]);
 
   if (obraRes.error) {
@@ -762,15 +766,18 @@ async function _spObraById(id) {
   }
   if (entregasRes.error) console.error('[MilaTec] Erro ao carregar entregas:', entregasRes.error);
   if (instRes.error) console.error('[MilaTec] Erro ao carregar instalações:', instRes.error);
+  if (atividadesRes.error) console.error('[MilaTec] Erro ao carregar tarefas vinculadas:', atividadesRes.error);
 
   const projetos  = projRes.data || [];
   projetos.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
   const entregas  = entregasRes.data || [];
   const instalacoes = instRes.data || [];
+  const atividades = (atividadesRes.data || []).map(function(link){ return link.atividade; }).filter(Boolean);
+  atividades.forEach(function(a){ if (Array.isArray(a.responsavel)) a.responsavel = _emailsToNomes(a.responsavel); });
 
   _obraAtiva = _normObraAssoc(obraRes.data);
   _obraAtiva.projetos = projetos;
-  await _spObrasRender(_obraAtiva, projetos, entregas, instalacoes);
+  await _spObrasRender(_obraAtiva, projetos, entregas, instalacoes, atividades);
  } catch(err) {
   console.error('[MilaTec] Erro ao carregar obra:', err);
   _spSet('Obra', 'Erro interno', '<div style="color:var(--red);padding:20px">Erro inesperado: ' + err.message + '</div>', '');
@@ -1323,9 +1330,10 @@ async function _spAtualizarStatusDoc(id, status) {
 }
 
 // ── Renderer principal do painel de obra (com abas) ───────────────────────────
-async function _spObrasRender(o, projetos, entregas, instalacoes) {
+async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  entregas    = entregas    || [];
  instalacoes = instalacoes || [];
+ atividades  = atividades  || [];
  try {
  var tipoArr = o.tipo_obra || [];
  var tipo    = tipoArr[0] || '';
@@ -1490,6 +1498,24 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
     }).join('')
   : '<div class="sp-empty">Nenhuma instalação registrada para esta obra</div>';
 
+ // ── Cards de tarefas (Atividades do Gestor de Tarefas vinculadas à obra,
+ // via junção atividades_obras) ────────────────────────────────────────────
+ var _taskStatusCor = { 'Concluída':'var(--green)', 'Concluido':'var(--green)', 'Em andamento':'var(--navy)', 'Em progresso':'var(--navy)', 'Bloqueado':'var(--red)', 'Impedida':'var(--red)', 'Atrasado':'var(--red)' };
+ var atividadeCards = atividades.length
+  ? atividades.map(function(a){
+     var respTxt = Array.isArray(a.responsavel) ? a.responsavel.join(', ') : (a.responsavel || '');
+     return '<div class="sp-item-card" onclick="_taskDrawerOpen(\'' + a.id + '\')">'
+      + '<div class="sp-item-title">' + (a.titulo || '(sem título)') + '</div>'
+      + '<div class="sp-item-meta">'
+      + (a.status ? '<span style="color:' + (_taskStatusCor[a.status] || 'var(--muted)') + ';font-weight:600">' + a.status + '</span><span style="color:var(--border)">|</span>' : '')
+      + (a.prioridade ? '<span>Prioridade: <b>' + a.prioridade + '</b></span><span style="color:var(--border)">|</span>' : '')
+      + '<span>Prazo: <b>' + fmtData(a.data_prazo) + '</b></span>'
+      + '</div>'
+      + (respTxt ? '<div style="margin-top:4px;font-size:11px;color:var(--muted)">' + respTxt + '</div>' : '')
+      + '</div>';
+    }).join('')
+  : '<div class="sp-empty">Nenhuma tarefa vinculada a esta obra</div>';
+
  // ── Badge de contagem ────────────────────────────────────────────────────────
  function badge(n) {
   return '<span class="spt-badge' + (n > 0 ? ' has-data' : '') + '">' + n + '</span>';
@@ -1533,6 +1559,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<button class="spt-btn" data-target="spt-orcamentos" onclick="_sptSwitch(\'orcamentos\',this)">Projetos' + badge(projetos.length) + '</button>'
   + '<button class="spt-btn" data-target="spt-entregas" onclick="_sptSwitch(\'entregas\',this)">Entregas' + badge(entregas.length) + '</button>'
   + '<button class="spt-btn" data-target="spt-instalacao" onclick="_sptSwitch(\'instalacao\',this)">Instalação' + badge(instalacoes.length) + '</button>'
+  + '<button class="spt-btn" data-target="spt-tarefas" onclick="_sptSwitch(\'tarefas\',this)">Tarefas' + badge(atividades.length) + '</button>'
   + '<button class="spt-btn" data-target="spt-documentos" onclick="_sptSwitch(\'documentos\',this)">Documentos</button>'
   + '</div>'
 
@@ -1784,6 +1811,17 @@ async function _spObrasRender(o, projetos, entregas, instalacoes) {
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaInstalacao()">Cancelar</button>'
   + '</div></div>'
   + instCards
+  + '</div>'
+
+  // ── SEÇÃO: Tarefas (Atividades do Gestor de Tarefas vinculadas à obra) ────────
+  // Pedido explícito — não existia nenhuma forma de ver, a partir do
+  // detalhamento de uma Obra, quais atividades estão associadas a ela.
+  // Criação de tarefa fica de fora por ora (o fluxo de criação já existe,
+  // completo, no Gestor de Tarefas — abrir aqui só uma versão simplificada
+  // reduzida seria pior que direcionar pra lá).
+  + '<div class="spt-panel" id="spt-tarefas">'
+  + '<div class="sp-stitle" style="margin-top:0">Tarefas (' + atividades.length + ')</div>'
+  + atividadeCards
   + '</div>'
 
   // ── ABA: Documentos ──────────────────────────────────────────────────────────
