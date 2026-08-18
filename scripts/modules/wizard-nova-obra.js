@@ -5,11 +5,17 @@ var _noContatoId = '';
 var _produtosArr = [];      // cache: [{id, nome, categoria}]
 var _NO_TIPOS_OPCOES = ['Telhados','Modular','Steel Frame','Solar','Misto (LSF + A36)'];
 var _NO_ETAPA_NEGOCIO_OPCOES = Object.keys(_etapaKcId);
-var _NO_CANAL_VENDAS_SUGESTOES = [
- 'Inbound (cliente recorrente)','Inbound (Indicação de clientes)','Inbound (cliente inativo)',
- 'Inbound (social media)','Outbound (prospecção ativa)','Outbound (feiras)','Outbound (cliente inativo)',
- 'Representante comercial','FICONS 2024'
-];
+
+// Canal de vendas — pedido explícito: virou select buscável/criável (mesmo
+// componente _srchSel já usado no painel de Obra, kind 'canal') em vez de
+// <input list>+<datalist> nativo, que deixava parecer que digitar era
+// obrigatório em vez de escolher de uma lista. Reaproveita
+// CANAL_VENDAS_OPCOES (obras.js) — o vocabulário REAL por distribuição no
+// banco, não a lista genérica menor que existia só aqui antes (sem os
+// nomes de representante reais).
+_srchSelRegister('noCanal', {
+ options: function(){ return CANAL_VENDAS_OPCOES; }, creatable: true, placeholder: 'Selecione o canal...',
+});
 
 // Cache de cidades para não buscar a mesma UF duas vezes
 var _cidadeCache = {};
@@ -69,7 +75,7 @@ async function openNovaObra() {
  var searchEl0 = document.getElementById('no-empresa-search'); if (searchEl0) searchEl0.value = '';
  _noEmpresaDropdownToggle(false);
  document.getElementById('no-empresa-control-label')?.classList.add('placeholder');
- var canalEl = document.getElementById('no-canal'); if (canalEl) canalEl.value = '';
+ var canalWrap = document.getElementById('no-canal-wrap'); if (canalWrap) canalWrap.innerHTML = _srchSelMarkup('noCanal', 'no-canal', '');
  var estadoSel = document.getElementById('no-estado'); if (estadoSel) estadoSel.value = '';
  var cidadeSel = document.getElementById('no-cidade');
  if (cidadeSel) { cidadeSel.innerHTML = '<option value="">Selecione primeiro o estado</option>'; cidadeSel.disabled = true; }
@@ -85,9 +91,6 @@ async function openNovaObra() {
   etapaSel.selectedIndex = 0;
   _selColorize(etapaSel, _etapaDot);
  }
-
- var datalist = document.getElementById('no-canal-datalist');
- if (datalist) datalist.innerHTML = _NO_CANAL_VENDAS_SUGESTOES.map(function(c){ return '<option value="'+c+'">'; }).join('');
 
  _noTipoGridRender();
  _noEmpresaFilterRender();
