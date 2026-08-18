@@ -461,10 +461,10 @@ function _noWizardValidate() {
    if (!(p.nome || '').trim()) faltando.push('Nome');
    if (!p.etapaProjeto) faltando.push('Etapa do projeto');
    if (!p.tipoObra) faltando.push('Tipo de obra');
-   if (!p.produtoIds.length) faltando.push('Produto');
+   if (!p.produtoNomes.length) faltando.push('Produto');
    if (!p.responsavelEmails.length) faltando.push('Responsável');
-   if (!p.qtd) faltando.push('Quantidade');
-   if (!p.vuni) faltando.push('Valor unitário');
+   // Quantidade/Valor unit. NÃO são mais obrigatórios (pedido explícito) —
+   // nem toda obra já tem preço fechado no momento da criação do projeto.
    if (faltando.length) { _showToast('Projeto ' + (i+1) + ' — preencha: ' + faltando.join(', '), 'aviso'); return false; }
   }
  }
@@ -494,8 +494,10 @@ async function submitNovaObra() {
     var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
     return {
      nome: p.nome, tipo_obra: p.tipoObra, etapa_projeto: p.etapaProjeto,
-     produto: p.produtoIds.map(function(id){ var pr = _produtosArr.find(function(x){ return x.id === id; }); return pr ? pr.nome : null; }).filter(Boolean),
-     responsavel: p.responsavelEmails, quantidade: p.qtd || null, valor_unitario: p.vuni || null,
+     produto: p.produtoNomes, responsavel: p.responsavelEmails,
+     quantidade: p.qtd || null, valor_unitario: p.vuni || null,
+     m2_arquitetura: p.m2Arquitetura || null, m2_estrutura: p.m2Estrutura || null,
+     tipologia_telhado: p.tipologiaTelhado, tipologia_telha: p.tipologiaTelha,
      descritivo: p.descritivo || null, empresa_id: _noEmpresaIds[0] || null,
      frete: isSolar ? p.frete : null,
      aliquota_icms: isSolar ? p.icms : null,
@@ -561,7 +563,7 @@ async function submitNovaObra() {
 }
 
 async function _noGerarPropostaSolar(obraId, projetoId, p, userEmail) {
- var produtoNome = p.produtoIds.map(function(id){ var pr = _produtosArr.find(function(x){ return x.id === id; }); return pr ? pr.nome : null; }).filter(Boolean)[0];
+ var produtoNome = p.produtoNomes[0];
  var qtd = parseFloat(p.qtd) || 0;
  var vuni = parseFloat(p.vuni) || 0;
  if (!produtoNome || !qtd || !vuni || !p.frete || !p.icms) return false;
@@ -599,11 +601,31 @@ async function _noGerarPropostaSolar(obraId, projetoId, p, userEmail) {
 var _noProjLista = [];
 var _NO_SOLAR_TIPO = 'Solar';
 var _NO_PROJETO_ETAPA_OPCOES = _projetosKanbanEtapaOrder;
+// Vocabulário REAL — conferido direto no Airtable (base MilaTec, tabela
+// Projetos, campos "Tipologia do Telhado"/"Tipo de telha", via MCP), não
+// inventado: a usuária confirmou que esses 2 campos existem lá e ainda não
+// tinham sido migrados pro Supabase (só "tipologia_telhado" existia como
+// coluna; "tipologia_telha" foi criada nesta rodada).
+var _NO_TIPOLOGIA_TELHADO_OPCOES = [
+ '1 água','2 águas','3 águas','4 águas','Aparente','Borboleta','Calha metálica',
+ 'Com Laje','Embutido (Platibanda)','Invertido','Mansarda','Misto','Rufo metálico','Sem laje',
+];
+var _NO_TIPO_TELHA_OPCOES = [
+ 'Cerâmica/Esmaltada','Concreto','Ecológica/PET','Fibrocimento','Metálica/Sanduíche',
+ 'PVC','Sanduíche','Shingle','Transparente (Vidro/Policarbonato)',
+];
 
 function _noProjAdd() {
  _noProjLista.push({
   nome: '', etapaProjeto: '', tipoObra: (_noTipos.length === 1 ? _noTipos[0] : ''),
-  produtoIds: [], responsavelEmails: [], descritivo: '', qtd: '', vuni: '',
+  // produtoNomes (não produtoIds): a coluna projetos.produto é um array de
+  // NOMES (texto), não de ids — o código antigo guardava ids só pra marcar
+  // os checkboxes e convertia pra nome na hora de montar o payload
+  // (submitNovaObra). Guardar o nome direto elimina essa indireção e
+  // combina com o componente de multi-select reaproveitado abaixo
+  // (_msRenderDropdown trabalha com valores string, não pares id/label).
+  produtoNomes: [], responsavelEmails: [], descritivo: '', qtd: '', vuni: '',
+  m2Arquitetura: '', m2Estrutura: '', tipologiaTelhado: [], tipologiaTelha: [],
   melhorias: [], frete: 'CIF', icms: '12', consumidorFinal: false, difal: '', gerarProposta: false
  });
  _noProjRender();
@@ -624,18 +646,6 @@ function _noProjToggleConsFinal(idx, checked) {
  }
  _noProjRender();
 }
-function _noProjProdutoToggle(idx, produtoId) {
- var arr = _noProjLista[idx].produtoIds;
- var i = arr.indexOf(produtoId);
- if (i >= 0) arr.splice(i, 1); else arr.push(produtoId);
- _noProjRender();
-}
-function _noProjRespToggle(idx, email) {
- var arr = _noProjLista[idx].responsavelEmails;
- var i = arr.indexOf(email);
- if (i >= 0) arr.splice(i, 1); else arr.push(email);
- _noProjRender();
-}
 function _noProjMelhoriaAdd(idx) { _noProjLista[idx].melhorias.push({ nome: '', area: '' }); _noProjRender(); }
 function _noProjMelhoriaRemove(idx, mIdx) { _noProjLista[idx].melhorias.splice(mIdx, 1); _noProjRender(); }
 function _noProjMelhoriaSet(idx, mIdx, field, val) { _noProjLista[idx].melhorias[mIdx][field] = val; }
@@ -643,9 +653,8 @@ function _noProjMelhoriaSet(idx, mIdx, field, val) { _noProjLista[idx].melhorias
 function _noProjPodeProposta(idx) {
  var p = _noProjLista[idx];
  var missing = [];
- var pecasAvulsas = _produtosArr.find(function(x){ return x.nome === 'Peças Avulsas'; });
- if (!p.produtoIds.length) missing.push('Produto');
- else if (pecasAvulsas && p.produtoIds.indexOf(pecasAvulsas.id) >= 0) missing.push('Produto não pode ser "Peças Avulsas"');
+ if (!p.produtoNomes.length) missing.push('Produto');
+ else if (p.produtoNomes.indexOf('Peças Avulsas') >= 0) missing.push('Produto não pode ser "Peças Avulsas"');
  if (!_noEmpresaIds.length) missing.push('Empresa (passo 1)');
  if (!p.qtd) missing.push('Quantidade');
  if (!p.vuni) missing.push('Valor Unitário');
@@ -664,9 +673,92 @@ async function _noSalvarNovoProduto(idx) {
  var res = await _sb.from('produtos').insert({ nome: nome, categoria: categoria }).select('id,nome,categoria').single();
  if (res.error) { _showToast('Erro ao criar produto: ' + res.error.message, 'erro'); return; }
  _produtosArr.push(res.data);
- _noProjLista[idx].produtoIds.push(res.data.id);
+ _noProjLista[idx].produtoNomes.push(res.data.nome);
  _noProjRender();
  _showToast('Produto criado com sucesso!', 'ok');
+}
+
+// ── Multi-selects compactos (Produto/Responsável/Tipologia do Telhado/Tipo
+// de Telha) — pedido explícito: as listas de checkbox roláveis não
+// combinavam com "o resto do sistema", que usa o dropdown buscável
+// _msRenderDropdown (multiselect-ui.js, mesmo componente já usado em
+// Fornecedor: Cidade(s)/Setor). Cada toggle re-renderiza só o dropdown
+// específico (não o card do projeto inteiro) e reabre o painel na hora —
+// se recarregasse o card inteiro a cada clique, o dropdown fechava depois
+// de marcar 1 item, impossibilitando selecionar vários.
+function _noReabrirDropdown(wrapId) {
+ var painel = document.querySelector('#' + wrapId + ' .fb-msel-panel');
+ if (painel) painel.classList.add('open');
+}
+function _noProjRenderProdutoDropdown(idx) {
+ var wrap = document.getElementById('no-proj-produto-dd-' + idx);
+ if (!wrap) return;
+ var p = _noProjLista[idx];
+ var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
+ var opcoes = _produtosArr.filter(function(pr){ return isSolar ? pr.categoria === 'Solar' : true; }).map(function(pr){ return pr.nome; });
+ wrap.innerHTML = _msRenderDropdown('projProduto' + idx, opcoes, p.produtoNomes, '_noProjProdutoToggle', 'Selecione o(s) produto(s)...');
+}
+function _noProjProdutoToggle(campo, nome, checked) {
+ var idx = parseInt(campo.replace('projProduto', ''), 10);
+ _noProjLista[idx].produtoNomes = _msToggle(_noProjLista[idx].produtoNomes, nome, checked);
+ _noProjRenderProdutoDropdown(idx);
+ _noReabrirDropdown('no-proj-produto-dd-' + idx);
+}
+function _noProjRenderRespDropdown(idx) {
+ var wrap = document.getElementById('no-proj-resp-dd-' + idx);
+ if (wrap) wrap.innerHTML = _noRespDropdownMarkup(idx);
+}
+// Componente próprio (não _msRenderDropdown) só pra Responsável: aqui o
+// valor GRAVADO precisa ser o e-mail (é o que projetos.responsavel
+// armazena), mas o TEXTO exibido deve ser o nome — _msRenderDropdown usa a
+// mesma string pras duas coisas, então não serve pra esse caso sem alterar
+// um componente compartilhado (usado também em Fornecedor) só por causa
+// deste formulário. Mesmas classes .fb-msel-* pra ficar visualmente idêntico.
+function _noRespDropdownMarkup(idx) {
+ var p = _noProjLista[idx];
+ var usuarios = _usuariosCache || [];
+ var sel = p.responsavelEmails || [];
+ var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s){ return (s||'').toLowerCase(); };
+ var btnLabel = sel.length ? sel.length + ' selecionado(s)' : 'Selecione o(s) responsável(is)...';
+ var searchHtml = usuarios.length > _MS_SEARCH_THRESHOLD
+  ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">'
+  : '';
+ var itemsHtml = usuarios.map(function(u) {
+  var label = u.nome_display || u.email;
+  var emailEsc = String(u.email).replace(/"/g,'&quot;');
+  var ck = sel.indexOf(u.email) !== -1 ? ' checked' : '';
+  return '<label class="fb-msel-item" data-norm="' + normalizar(label) + '"><input type="checkbox" value="' + emailEsc + '"' + ck
+   + ' onchange="_noProjRespToggle(' + idx + ',this.value,this.checked)"> ' + label.replace(/</g,'&lt;') + '</label>';
+ }).join('');
+ return '<div class="fb-msel-wrap">'
+  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabel + '</button>'
+  + '<div class="fb-msel-panel">' + searchHtml + '<div class="fb-msel-list">' + (itemsHtml || '<div style="padding:8px;font-size:11px;color:var(--muted)">Nenhum usuário cadastrado</div>') + '</div></div>'
+  + '</div>';
+}
+function _noProjRespToggle(idx, email, checked) {
+ _noProjLista[idx].responsavelEmails = _msToggle(_noProjLista[idx].responsavelEmails, email, checked);
+ _noProjRenderRespDropdown(idx);
+ _noReabrirDropdown('no-proj-resp-dd-' + idx);
+}
+function _noProjRenderTelhadoDropdown(idx) {
+ var wrap = document.getElementById('no-proj-telhado-dd-' + idx);
+ if (wrap) wrap.innerHTML = _msRenderDropdown('projTelhado' + idx, _NO_TIPOLOGIA_TELHADO_OPCOES, _noProjLista[idx].tipologiaTelhado, '_noProjTelhadoToggle', 'Selecione a(s) tipologia(s)...');
+}
+function _noProjTelhadoToggle(campo, valor, checked) {
+ var idx = parseInt(campo.replace('projTelhado', ''), 10);
+ _noProjLista[idx].tipologiaTelhado = _msToggle(_noProjLista[idx].tipologiaTelhado, valor, checked);
+ _noProjRenderTelhadoDropdown(idx);
+ _noReabrirDropdown('no-proj-telhado-dd-' + idx);
+}
+function _noProjRenderTelhaDropdown(idx) {
+ var wrap = document.getElementById('no-proj-telha-dd-' + idx);
+ if (wrap) wrap.innerHTML = _msRenderDropdown('projTelha' + idx, _NO_TIPO_TELHA_OPCOES, _noProjLista[idx].tipologiaTelha, '_noProjTelhaToggle', 'Selecione o(s) tipo(s)...');
+}
+function _noProjTelhaToggle(campo, valor, checked) {
+ var idx = parseInt(campo.replace('projTelha', ''), 10);
+ _noProjLista[idx].tipologiaTelha = _msToggle(_noProjLista[idx].tipologiaTelha, valor, checked);
+ _noProjRenderTelhaDropdown(idx);
+ _noReabrirDropdown('no-proj-telha-dd-' + idx);
 }
 
 function _noProjRender() {
@@ -677,8 +769,6 @@ function _noProjRender() {
   container.innerHTML = '<div style="padding:16px;border:1px dashed var(--border);border-radius:8px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6">Nenhum projeto adicionado ainda.<br>É obrigatório ao menos 1 projeto para criar a obra.</div>';
   return;
  }
-
- var usuarios = _usuariosCache || [];
 
  container.innerHTML = _noProjLista.map(function(p, idx) {
   var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
@@ -713,37 +803,43 @@ function _noProjRender() {
    + (!_noTipos.length ? '<div style="font-size:10px;color:var(--muted);margin-top:4px">Selecione o(s) tipo(s) da obra no passo 1 primeiro.</div>' : '')
    + '</div>';
 
-  html += '<div class="mf" style="margin:0"><label style="font-size:11px">Produto <span class="req">*</span></label>'
-   + '<div class="no-check-list" style="border:1px solid var(--border);border-radius:8px;max-height:110px;margin-top:4px">'
-   + (produtosDisponiveis.map(function(pr){
-      var checked = p.produtoIds.indexOf(pr.id) >= 0;
-      return '<label class="no-check-row">'
-       + '<input type="checkbox" ' + (checked?'checked':'') + ' onchange="_noProjProdutoToggle(' + idx + ',\'' + pr.id + '\')">'
-       + '<span class="no-check-row-title">' + pr.nome + '</span></label>';
-     }).join('') || '<div class="no-dd-empty">Nenhum produto cadastrado</div>')
-   + '</div>'
-   + '<button type="button" onclick="_noToggleNovoProduto(' + idx + ')" style="margin-top:4px;font-size:11px;color:var(--navy);background:none;border:none;cursor:pointer;font-weight:600">+ Cadastrar novo produto</button>'
+  html += '<div class="modal-grid col2" style="gap:12px">'
+   + '<div class="mf" style="margin:0"><label style="font-size:11px">Produto <span class="req">*</span></label>'
+   + '<div id="no-proj-produto-dd-' + idx + '" style="margin-top:4px">' + _msRenderDropdown('projProduto' + idx, produtosDisponiveis.map(function(pr){ return pr.nome; }), p.produtoNomes, '_noProjProdutoToggle', 'Selecione o(s) produto(s)...') + '</div>'
+   + '<button type="button" onclick="_noToggleNovoProduto(' + idx + ')" style="margin-top:6px;font-size:11px;color:var(--navy);background:none;border:none;cursor:pointer;font-weight:600">+ Cadastrar novo produto</button>'
    + '<div id="no-novo-produto-box-' + idx + '" style="display:none;margin-top:6px;gap:6px">'
    + '<input id="no-np-nome-' + idx + '" class="sp-inp" style="font-size:12px" placeholder="Nome do novo produto">'
    + '<button type="button" onclick="_noSalvarNovoProduto(' + idx + ')" style="font-size:11px;font-weight:600;padding:6px 12px;border:none;border-radius:6px;background:var(--green);color:#fff;cursor:pointer;margin-top:6px">Salvar produto</button>'
    + '</div>'
+   + '</div>'
+   + '<div class="mf" style="margin:0"><label style="font-size:11px">Responsável <span class="req">*</span></label>'
+   + '<div id="no-proj-resp-dd-' + idx + '" style="margin-top:4px">' + _noRespDropdownMarkup(idx) + '</div>'
+   + '</div>'
    + '</div>';
 
-  html += '<div class="mf" style="margin:0"><label style="font-size:11px">Responsável <span class="req">*</span></label>'
-   + '<div class="no-check-list" style="border:1px solid var(--border);border-radius:8px;max-height:100px;margin-top:4px">'
-   + (usuarios.map(function(u){
-      var checked = p.responsavelEmails.indexOf(u.email) >= 0;
-      return '<label class="no-check-row">'
-       + '<input type="checkbox" ' + (checked?'checked':'') + ' onchange="_noProjRespToggle(' + idx + ',\'' + u.email + '\')">'
-       + '<span class="no-check-row-title">' + (u.nome_display || u.email) + '</span></label>';
-     }).join('') || '<div class="no-dd-empty">Nenhum usuário cadastrado</div>')
-   + '</div></div>';
+  html += '<div class="modal-grid col2" style="gap:12px">'
+   + '<div class="mf" style="margin:0"><label style="font-size:11px">Tipologia do Telhado</label>'
+   + '<div id="no-proj-telhado-dd-' + idx + '" style="margin-top:4px">' + _msRenderDropdown('projTelhado' + idx, _NO_TIPOLOGIA_TELHADO_OPCOES, p.tipologiaTelhado, '_noProjTelhadoToggle', 'Selecione a(s) tipologia(s)...') + '</div>'
+   + '</div>'
+   + '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de Telha</label>'
+   + '<div id="no-proj-telha-dd-' + idx + '" style="margin-top:4px">' + _msRenderDropdown('projTelha' + idx, _NO_TIPO_TELHA_OPCOES, p.tipologiaTelha, '_noProjTelhaToggle', 'Selecione o(s) tipo(s)...') + '</div>'
+   + '</div>'
+   + '</div>';
+
+  // Quantidade/Valor unit. deixaram de ser obrigatórios (pedido explícito) —
+  // nem toda obra tem preço fechado na hora da criação do projeto.
+  html += '<div class="modal-grid col2" style="gap:12px">'
+   + '<div class="mf" style="margin:0"><label style="font-size:11px">Quantidade</label>'
+   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.qtd||'') + '" oninput="_noProjSet(' + idx + ',\'qtd\',this.value)"></div>'
+   + '<div class="mf" style="margin:0"><label style="font-size:11px">Valor unit. (R$)</label>'
+   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.vuni||'') + '" oninput="_noProjSet(' + idx + ',\'vuni\',this.value)"></div>'
+   + '</div>';
 
   html += '<div class="modal-grid col2" style="gap:12px">'
-   + '<div class="mf" style="margin:0"><label style="font-size:11px">Quantidade <span class="req">*</span></label>'
-   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.qtd||'') + '" oninput="_noProjSet(' + idx + ',\'qtd\',this.value)"></div>'
-   + '<div class="mf" style="margin:0"><label style="font-size:11px">Valor unit. (R$) <span class="req">*</span></label>'
-   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.vuni||'') + '" oninput="_noProjSet(' + idx + ',\'vuni\',this.value)"></div>'
+   + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Arquitetura</label>'
+   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.m2Arquitetura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Arquitetura\',this.value)"></div>'
+   + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Estrutura</label>'
+   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.m2Estrutura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Estrutura\',this.value)"></div>'
    + '</div>';
 
   html += '<div class="mf" style="margin:0"><label style="font-size:11px">Descritivo do projeto</label>'
