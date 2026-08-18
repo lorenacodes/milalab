@@ -107,7 +107,11 @@ function _noDocDropzone(inputId, labelId) {
   + ' ondragover="event.preventDefault();this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.07)\'"'
   + ' ondragleave="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
   + ' ondrop="_noDocFileDrop(event,\'' + inputId + '\',\'' + labelId + '\')">'
-  + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>'
+  // Ícone trocado: o antigo (nuvem + seta, mesmo do dropzone de Entrega)
+  // renderizava como um rabisco confuso neste tamanho — reportado por
+  // print. Ícone de upload simples (seta + bandeja), só linhas retas e um
+  // ângulo, sem curvas bezier compostas — fica nítido em qualquer tamanho.
+  + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/></svg>'
   + '<span id="' + labelId + '" style="font-size:12px;color:var(--muted);text-transform:none;font-weight:400;line-height:1.4">Clique ou arraste o arquivo aqui</span>'
   + '<input type="file" id="' + inputId + '" style="display:none" onchange="_noDocFileChange(\'' + inputId + '\',\'' + labelId + '\')">'
   + '</label>';
