@@ -1274,11 +1274,11 @@ body.light .topbar.tb-glass{
    o botão que o abre, mas cresce pra acomodar nomes compridos em vez de
    truncar tudo (item #1) — max-width trava num teto seguro pra não vazar
    da tela em popovers muito largos. */
-.fb-msel-panel{display:none;position:absolute;top:calc(100% + 3px);left:0;right:auto;z-index:10;min-width:100%;width:max-content;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:var(--shadow-2);padding:6px}
+.fb-msel-panel{display:none;position:absolute;top:calc(100% + 3px);left:0;right:auto;z-index:10;min-width:100%;width:max-content;max-width:340px;max-height:320px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:var(--shadow-2);padding:6px}
 .fb-msel-panel.open{display:flex;flex-direction:column}
 .fb-msel-search{width:100%;box-sizing:border-box;font-size:12px;padding:6px 9px;margin-bottom:5px;border:1px solid var(--border);border-radius:var(--r-xs);background:var(--surface2);color:var(--text);font-family:inherit;outline:none;flex-shrink:0}
 .fb-msel-search:focus{border-color:var(--navy)}
-.fb-msel-list{overflow-y:auto;min-height:0}
+.fb-msel-list{overflow-y:auto;min-height:0;flex:1}
 .fb-msel-item{display:flex;align-items:center;gap:6px;padding:6px 8px;font-size:12px;color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:var(--r-xs)}
 .fb-msel-item:hover{background:var(--surface2)}
 .fb-msel-item-active{background:var(--navy-dim);color:var(--navy);font-weight:600}
