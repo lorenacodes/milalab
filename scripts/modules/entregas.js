@@ -497,10 +497,28 @@ function _spEntregaRender(e) {
  var transp    = e.transporte || '';
  var qtd       = e.quantidade != null ? e.quantidade : '';
  var peso      = e.peso_kg != null ? e.peso_kg : '';
- var dtFat     = e.data_faturamento || '';
+ // Formato dd/mm/aaaa (pt-BR) — antes exibia o ISO cru (aaaa-mm-dd) vindo
+ // direto da coluna. Meio-dia UTC evita o "dia -1" causado por fuso quando
+ // o navegador interpreta a data como UTC (mesmo truque usado em _entRowHTML).
+ var dtFatFmt  = e.data_faturamento ? new Date(e.data_faturamento + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
  var pedMila   = e.pedido_compusa_milatec || '';
  var pedMilaG  = e.pedido_compusa_mila || '';
  var maiorPeca = e.maior_peca_mm != null ? e.maior_peca_mm : '';
+
+ // Transporte — virou select buscável/criável (mesmo padrão já usado no
+ // formulário de criação da entrega, "entTransporte"), em vez de texto
+ // livre. Kind próprio ("entDetTransporte") em vez de reaproveitar
+ // "entTransporte": esta tela pode ser aberta sem o painel de Obra jamais
+ // ter sido renderizado (ex.: a partir da lista/Kanban/Calendário de
+ // Entregas), então não dá pra depender do registro que _spObraRender faz.
+ _srchSelRegister('entDetTransporte', {
+  options: function(){ return _obraTransporteCache || []; }, creatable: true, placeholder: 'Selecione o transporte...',
+  onOpen: _obraCarregarTransportes,
+  onSelect: function(v) {
+   if (v && (_obraTransporteCache||[]).indexOf(v) === -1) _obraTransporteCache.push(v);
+   _spEntDetSalvarCampo(e.id, { transporte: v || null });
+  },
+ });
 
  _spSet('Entrega', titulo, `
   <div class="sp-field"><div class="sp-label">Entrega</div>
@@ -511,7 +529,7 @@ function _spEntregaRender(e) {
   </div>
   <div class="sp-g2">
    <div class="sp-field"><div class="sp-label">Faturamento</div>
-    <input class="sp-inp" type="text" value="${dtFat}">
+    <input class="sp-inp" value="${dtFatFmt}" readonly style="opacity:.75">
    </div>
    <div class="sp-field"><div class="sp-label">Cidade/UF</div>
     <input class="sp-inp" value="${cidadeUf}" readonly style="opacity:.75">
@@ -519,7 +537,7 @@ function _spEntregaRender(e) {
   </div>
   <div class="sp-g2">
    <div class="sp-field"><div class="sp-label">Transporte</div>
-    <input class="sp-inp" value="${transp}">
+    ${_srchSelMarkup('entDetTransporte', 'sp-entdet-transporte', transp)}
    </div>
    <div class="sp-field"><div class="sp-label">Peso (kg)</div>
     <input class="sp-inp" type="number" value="${peso}">
@@ -541,6 +559,12 @@ function _spEntregaRender(e) {
     <input class="sp-inp" value="${pedMilaG}" readonly style="opacity:.6">
    </div>
   </div>
+  <div class="sp-field">
+   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text)">
+    <input type="checkbox" id="sp-entdet-produzido" ${e.pedido_produzido ? 'checked' : ''} onchange="_spEntDetSalvarCampo('${e.id}', { pedido_produzido: this.checked })">
+    Pedido produzido
+   </label>
+  </div>
   <div class="sp-field"><div class="sp-label">Status</div>
    <select class="sp-inp">
     <option ${bucket==='aguardando'?'selected':''}>${e.etapa && bucket==='aguardando' ? e.etapa : 'Aguardando produção'}</option>
@@ -553,8 +577,137 @@ function _spEntregaRender(e) {
   <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
    <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Obra vinculada</div>
    <div class="sp-rel-chips-wrap">${obraId ? _spRelChipHTML('obras', obraId, obraNome || 'Obra') : '<div class="sp-empty">Nenhuma obra vinculada a esta entrega.</div>'}</div>
+  </div>
+  <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+   <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Documentos da entrega</div>
+   <div id="sp-ent-doc-wrap"><div class="sp-empty" style="padding:10px 0;font-size:11px">Carregando documentos...</div></div>
   </div>`,
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+
+ _spCarregarDocumentosEntrega(e.id, obraId);
+}
+
+// ── Atualização pontual de um campo da entrega (Transporte/Pedido produzido)
+// — autosave imediato ao selecionar/marcar, sem botão "Salvar" (o painel de
+// Entrega nunca teve esse fluxo; ver header do arquivo). Atualiza também o
+// cache local (_entregasArr) para a Tabela/Kanban/Calendário refletirem sem
+// precisar recarregar tudo do banco.
+async function _spEntDetSalvarCampo(entregaId, patch) {
+ if (!_sb || !entregaId) return;
+ const { error } = await _sb.from('entregas').update(patch).eq('id', entregaId);
+ if (error) { alert('Erro ao salvar: ' + (error.message || '')); return; }
+ var cached = (_entregasArr || []).find(function(x){ return String(x.id) === String(entregaId); });
+ if (cached) Object.assign(cached, patch);
+ if (typeof _entApplyFilters === 'function') _entApplyFilters();
+}
+
+// ── Documentos da entrega — 4 categorias reais do formulário do Airtable
+// (Nota Fiscal / Romaneio de Entrega / Documentos Específicos da Entrega /
+// Ordem de Produção). O acervo migrado do Airtable NUNCA preencheu
+// documentos.entrega_id (auditoria: 0 linhas com entrega_id nessas 4 tipos)
+// — o vínculo real daquela época está só na tabela de junção
+// `documentos_entregas` (documento_id, entrega_id). Uploads novos feitos
+// pelo sistema (_spUploadDocEntrega) gravam entrega_id direto, sem usar a
+// junção. Por isso a carga busca dos DOIS jeitos e faz merge por id.
+var _entDetDocCats = [
+ { tipo: 'nota_fiscal',          label: 'Nota Fiscal' },
+ { tipo: 'romaneio_entrega',     label: 'Romaneio de Entrega' },
+ { tipo: 'documento_especifico', label: 'Documentos Específicos da Entrega' },
+ { tipo: 'ordem_producao',       label: 'Ordem de Produção' },
+];
+// Uploads feitos pelo formulário "Nova entrega" (obras.js) usam rótulos em
+// português ('Documento da Entrega'/'Ordem de Produção') em vez do
+// snake_case canônico — aliases para cair na mesma categoria.
+var _entDetDocTipoAlias = { 'Documento da Entrega': 'documento_especifico', 'Ordem de Produção': 'ordem_producao' };
+function _entDocCategoriaDe(tipo) {
+ if (!tipo) return 'documento_especifico';
+ if (_entDetDocCats.some(function(c){ return c.tipo === tipo; })) return tipo;
+ return _entDetDocTipoAlias[tipo] || 'documento_especifico';
+}
+
+async function _spCarregarDocumentosEntrega(entregaId, obraId) {
+ var container = document.getElementById('sp-ent-doc-wrap');
+ if (!container || !_sb) return;
+ var [diretoRes, viaJuncaoRes] = await Promise.all([
+  _sb.from('documentos').select('*').eq('entrega_id', entregaId),
+  _sb.from('documentos_entregas').select('documentos(*)').eq('entrega_id', entregaId),
+ ]);
+ if (diretoRes.error && viaJuncaoRes.error) {
+  container.innerHTML = '<div class="sp-empty" style="font-size:11px;color:var(--red)">Erro ao carregar documentos.</div>';
+  return;
+ }
+ var vistos = {};
+ var docs = [];
+ (diretoRes.data || []).forEach(function(d) { if (!vistos[d.id]) { vistos[d.id] = 1; docs.push(d); } });
+ (viaJuncaoRes.data || []).forEach(function(row) { var d = row.documentos; if (d && !vistos[d.id]) { vistos[d.id] = 1; docs.push(d); } });
+
+ var grupos = {};
+ _entDetDocCats.forEach(function(c) { grupos[c.tipo] = []; });
+ docs.forEach(function(d) { grupos[_entDocCategoriaDe(d.tipo)].push(d); });
+ Object.keys(grupos).forEach(function(k) { grupos[k].sort(function(a,b) { return new Date(b.created_at) - new Date(a.created_at); }); });
+
+ container.innerHTML = _entDetDocCats.map(function(c) { return _spEntDetCategoriaHTML(c, grupos[c.tipo], entregaId, obraId); }).join('');
+}
+
+function _spEntDetCategoriaHTML(cat, docs, entregaId, obraId) {
+ var listHtml = docs.length
+  ? docs.map(function(d) {
+     var nome = (d.nome || d.nome_arquivo || 'Documento').toString();
+     var dt = d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : '';
+     var pathSafe = String(d.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+     var nomeAttrSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--surface)">'
+      + '<div style="min-width:0">'
+      + '<div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px" title="' + nome.replace(/"/g,'&quot;') + '">' + nome + '</div>'
+      + (dt ? '<div style="font-size:9px;color:var(--muted);margin-top:2px">' + dt + '</div>' : '')
+      + '</div>'
+      + '<button type="button" class="btn btn-ghost btn-sm" onclick="_spAbrirDocStorage(\'' + pathSafe + '\',\'' + nomeAttrSafe + '\')">Visualizar</button>'
+      + '</div>';
+    }).join('')
+  : '<div class="sp-empty" style="padding:8px 0;font-size:11px">Nenhum documento enviado.</div>';
+
+ var inputId = 'sp-entdet-up-' + cat.tipo;
+ var labelId = inputId + '-lbl';
+ return '<div style="margin-bottom:16px">'
+  + '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">' + cat.label + (docs.length ? ' (' + docs.length + ')' : '') + '</div>'
+  + listHtml
+  + _spEntDetDropzone(inputId, labelId, entregaId, obraId, cat.tipo)
+  + '</div>';
+}
+
+// Dropzone com upload imediato (sem etapa de "confirmar anexo" — diferente
+// do dropzone do formulário de criação, aqui não existe mais um "Salvar"
+// geral pra piggyback, então o próprio anexo já dispara o upload).
+function _spEntDetDropzone(inputId, labelId, entregaId, obraId, tipo) {
+ return '<label style="display:flex;align-items:center;justify-content:center;gap:6px;border:2px dashed var(--border);border-radius:8px;padding:9px 8px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center;font-size:11px;color:var(--muted)"'
+  + ' onmouseover="this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.04)\'"'
+  + ' onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
+  + ' ondragover="event.preventDefault();this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.07)\'"'
+  + ' ondragleave="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
+  + ' ondrop="_spEntDetFileDrop(event,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + tipo + '\',\'' + labelId + '\')">'
+  + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.7"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>'
+  + '<span id="' + labelId + '">Clique ou arraste para anexar</span>'
+  + '<input type="file" id="' + inputId + '" multiple style="display:none" onchange="_spEntDetFileChange(this,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + tipo + '\',\'' + labelId + '\')">'
+  + '</label>';
+}
+async function _spEntDetUploadFiles(files, entregaId, obraId, tipo, labelId) {
+ if (!files || !files.length) return;
+ var lbl = document.getElementById(labelId);
+ if (lbl) lbl.textContent = 'Enviando...';
+ var erros = 0;
+ for (var i = 0; i < files.length; i++) { if (!(await _spUploadDocEntrega(files[i], entregaId, obraId || null, tipo))) erros++; }
+ if (erros) alert(erros + ' arquivo(s) não enviado(s). Tente novamente.');
+ _spCarregarDocumentosEntrega(entregaId, obraId);
+}
+function _spEntDetFileChange(input, entregaId, obraId, tipo, labelId) {
+ _spEntDetUploadFiles(Array.prototype.slice.call(input.files || []), entregaId, obraId, tipo, labelId);
+ input.value = '';
+}
+function _spEntDetFileDrop(event, entregaId, obraId, tipo, labelId) {
+ event.preventDefault();
+ var dz = event.currentTarget; dz.style.borderColor = 'var(--border)'; dz.style.background = '';
+ var files = event.dataTransfer && event.dataTransfer.files;
+ _spEntDetUploadFiles(Array.prototype.slice.call(files || []), entregaId, obraId, tipo, labelId);
 }
 
 // ── Linha da Tabela — extraída em função própria pra ser reaproveitada tanto
