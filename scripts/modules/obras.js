@@ -485,6 +485,11 @@ function _normObraAssoc(o) {
  o.empresas   = (o.empresas_obras||[]).map(function(l){ return l.empresa; }).filter(Boolean);
  o.empresa_id = (o.empresas_obras||[])[0]?.empresa_id || null;
  o.empresa    = (o.empresas_obras||[])[0]?.empresa    || null;
+ // contatos: array completo (N:N de verdade, mesmo espírito de `empresas`
+ // acima) — contato_id/contato continuam sendo o PRIMEIRO vinculado, só
+ // por compat com código que ainda lida com 1 contato (nenhum resta hoje,
+ // mas não custa manter o padrão simétrico ao de empresas).
+ o.contatos   = (o.contatos_obras||[]).map(function(l){ return l.contato; }).filter(Boolean);
  o.contato_id = (o.contatos_obras||[])[0]?.contato_id || null;
  o.contato    = (o.contatos_obras||[])[0]?.contato    || null;
  return o;
@@ -1729,12 +1734,6 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  var totalValor = projetos.reduce(function(s, p){ return s + (Number(p.valor_unitario) * Number(p.quantidade || 1) || 0); }, 0);
  var totalPeso  = projetos.reduce(function(s, p){ return s + (Number(p.peso_kg) || 0); }, 0);
 
- // ── Rótulo inicial de Contato (select buscável, ver _spObContatoMarkup) ────
- var contatoAtualObj = o.contato_id ? _contatosArr.find(function(c){ return c.id === o.contato_id; }) : null;
- var contatoLabelAtual = contatoAtualObj
-  ? (contatoAtualObj.nome_completo + (contatoAtualObj.cargo ? ' · ' + contatoAtualObj.cargo : ''))
-  : ((o.contato && o.contato.nome_completo) || '');
-
  // ── Cards de projetos ────────────────────────────────────────────────────────
  var etapaCls = {
   'Orçamento':             'bm',
@@ -2044,10 +2043,14 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEmpresa()">Cancelar</button>'
   + '</div></div>'
 
-  + '<div class="sp-field"><div class="sp-label">Contato do orçamento</div>'
-  + '<div style="display:flex;gap:6px;align-items:center">'
-  + _spObContatoMarkup(o.contato_id, contatoLabelAtual)
-  + '<button class="btn btn-ghost btn-sm" id="sp-contato-open-btn" onclick="_spAbrirContatoSelecionado()" title="Abrir contato" style="display:' + (o.contato_id ? '' : 'none') + '">›</button>'
+  // Pedido explícito: mesmo esquema de Empresas — uma Obra pode ter mais de
+  // 1 contato vinculado, seja de uma empresa que já tem vários contatos
+  // cadastrados, seja criando mais um. Chips de "vinculado(s)" no lugar do
+  // antigo select único.
+  + '<div class="sp-field"><div class="sp-label">Contatos vinculados</div>'
+  + '<div class="sp-rel-chips-wrap" id="sp-ob-contatos-chips">' + _spContatosChipsHTML(o.contatos) + '</div>'
+  + '<div style="display:flex;gap:6px;align-items:center;margin-top:8px">'
+  + _spObContatoMarkup()
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoContato()" title="Criar novo contato">+</button>'
   + '</div></div>'
   + '<div id="sp-novo-contato-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">'
@@ -2424,7 +2427,6 @@ async function _spSaveObraFull() {
  if (_obraAutoSaveTimer) { clearTimeout(_obraAutoSaveTimer); _obraAutoSaveTimer = null; }
  if (!_obraAtiva) return;
  const id = document.getElementById('sp-obra-id')?.value;
- const novoContatoId = document.getElementById('sp-contato-id')?.value || null;
  const payload = {
   nome:              document.getElementById('sp-nome')?.value || '',
   tipo_obra:         [document.getElementById('sp-tipo')?.value || ''],
@@ -2440,41 +2442,21 @@ async function _spSaveObraFull() {
   endereco_entrega:  document.getElementById('sp-end-entrega')?.value?.trim() || null,
   updated_at:        new Date().toISOString(),
  };
+ // Empresa(s) e Contato(s) NÃO são mais tocados aqui — cada vínculo/
+ // desvínculo já é gravado na hora (_spObEmpresaSelectItem/
+ // _spDesvincularEmpresaObra/_spCriarEmpresaObra e os equivalentes de
+ // Contato), mesmo padrão de Entregas/Instalações. Antes este autosave
+ // geral apagava/reinseria só 1 empresa e fazia upsert de só 1 contato a
+ // cada edição de qualquer campo — incompatível com uma obra ter mais de
+ // uma Empresa/Contato vinculado (pedido explícito).
  var { error } = await _sb.from('obras').update(payload).eq('id', id);
- var vincErro = null;
- if (!error) {
-  // Empresa(s) NÃO são mais tocadas aqui — cada vínculo/desvínculo já é
-  // gravado na hora (_spObEmpresaSelectItem/_spDesvincularEmpresaObra/
-  // _spCriarEmpresaObra), mesmo padrão de Entregas/Instalações. Antes este
-  // autosave geral apagava TODAS as empresas_obras e reinseria só 1 a cada
-  // edição de qualquer campo — incompatível com uma obra ter mais de uma
-  // empresa vinculada (pedido explícito).
-  // Garante que o contato selecionado está vinculado (sem remover outros)
-  if (novoContatoId) {
-   var upsCtt = await _sb.from('contatos_obras').upsert({ obra_id: id, contato_id: novoContatoId }, { onConflict: 'obra_id,contato_id', ignoreDuplicates: true });
-   if (upsCtt.error) vincErro = upsCtt.error;
-  }
- }
  if (error) {
   _showToast('Erro ao salvar obra: ' + _supaErrPt(error.message), 'erro');
- } else if (vincErro) {
-  _showToast('Obra salva, mas houve erro ao vincular contato: ' + _supaErrPt(vincErro.message), 'erro');
- }
- if (!error) {
-  _obraAtiva = { ..._obraAtiva, ...payload, contato_id: novoContatoId };
+ } else {
+  _obraAtiva = { ..._obraAtiva, ...payload };
   _dbLoadObras();
   _dbLoadObrasKanban();
  }
-}
-
-function _spAbrirContatoSelecionado() {
- const id = document.getElementById('sp-contato-id')?.value;
- if (id) _spOpenEntityById('contatos', id);
-}
-function _spToggleContatoOpenBtn() {
- const id = document.getElementById('sp-contato-id')?.value;
- const btn = document.getElementById('sp-contato-open-btn');
- if (btn) btn.style.display = id ? '' : 'none';
 }
 
 // ── Empresa: caixa "Adicionar empresa existente" (busca componente srch-sel,
@@ -2590,19 +2572,20 @@ async function _spDesvincularEmpresaObra(empresaId) {
 function _spObContatoGateUpdate() {
  var temEmpresa = !!((_obraAtiva && _obraAtiva.empresas || []).length);
  var valEl = document.getElementById('sp-ob-contato-val');
- if (valEl && !_spObContatoSelected) valEl.textContent = temEmpresa ? 'Selecione o contato...' : 'Selecione uma empresa primeiro';
+ if (valEl) valEl.textContent = temEmpresa ? 'Adicionar contato existente...' : 'Selecione uma empresa primeiro';
 }
 function _spObEmpresaKey(e) { if (e.key === 'Escape') _spObEmpresaClose(); }
 
-var _spObContatoSelected = '';
-function _spObContatoMarkup(atualId, atualLabel) {
- _spObContatoSelected = atualId || '';
- var temValor = !!_spObContatoSelected;
- return '<input type="hidden" id="sp-contato-id" value="' + _spObContatoSelected.replace(/"/g,'&quot;') + '">'
-  + '<div class="srch-sel" id="sp-ob-contato-srch" style="flex:1">'
+// ── Contato: caixa "Adicionar contato existente" — mesmo espírito de
+// _spObEmpresaMarkup acima (uma Obra pode ter mais de 1 contato). Cada
+// escolha já dispara o insert em contatos_obras e a caixa volta pro estado
+// neutro; quem representa o estado de verdade é a lista de chips
+// "Contatos vinculados" (_spContatosChipsHTML), lida de _obraAtiva.contatos.
+function _spObContatoMarkup() {
+ var temEmpresa = !!((_obraAtiva && _obraAtiva.empresas || []).length);
+ return '<div class="srch-sel" id="sp-ob-contato-srch" style="flex:1">'
   + '<div class="srch-sel-box" id="sp-ob-contato-box" onclick="_spObContatoToggle()">'
-  + '<span class="srch-sel-val' + (temValor?'':' placeholder') + '" id="sp-ob-contato-val">' + (temValor ? (atualLabel||'').replace(/</g,'&lt;') : 'Selecione a empresa primeiro') + '</span>'
-  + '<button class="srch-sel-clr" id="sp-ob-contato-clr" style="display:' + (temValor?'':'none') + '" onclick="event.stopPropagation();_spObContatoClear()" title="Remover">✕</button>'
+  + '<span class="srch-sel-val placeholder" id="sp-ob-contato-val">' + (temEmpresa ? 'Adicionar contato existente...' : 'Selecione uma empresa primeiro') + '</span>'
   + '<span class="srch-sel-chevron">▾</span>'
   + '</div>'
   + '<div class="srch-sel-drop" id="sp-ob-contato-drop">'
@@ -2634,37 +2617,66 @@ function _spObContatoFilter(q) {
  if (!list) return;
  // Pool = contatos cuja empresa PRIMÁRIA (c.empresa_id, sintetizado em
  // _dbLoadContatos) está entre QUALQUER uma das empresas vinculadas a esta
- // obra — antes só considerava 1 empresa fixa.
+ // obra, MENOS os que já estão vinculados (sem sentido "adicionar" de novo).
  var empIds = (_obraAtiva && _obraAtiva.empresas || []).map(function(e){ return e.id; });
- var pool = empIds.length ? (_contatosArr || []).filter(function(c){ return empIds.indexOf(c.empresa_id) !== -1; }) : [];
+ var jaVinculados = new Set((_obraAtiva && _obraAtiva.contatos || []).map(function(c){ return c.id; }));
+ var pool = empIds.length ? (_contatosArr || []).filter(function(c){ return empIds.indexOf(c.empresa_id) !== -1 && !jaVinculados.has(c.id); }) : [];
  var matches = pool.filter(function(c){
   return (c.nome_completo||'').toLowerCase().indexOf(q) !== -1 || (c.cargo||'').toLowerCase().indexOf(q) !== -1;
  });
  if (!matches.length) { list.innerHTML = '<div class="srch-sel-empty">Nenhum contato encontrado.</div>'; return; }
  list.innerHTML = matches.map(function(c){
-  var sel = c.id === _spObContatoSelected ? ' selected' : '';
   var label = c.nome_completo + (c.cargo ? ' · ' + c.cargo : '');
-  return '<div class="srch-sel-opt' + sel + '" onclick="_spObContatoSelectItem(\'' + c.id + '\',\'' + label.replace(/'/g,"\\'") + '\')">' + label.replace(/</g,'&lt;') + '</div>';
+  return '<div class="srch-sel-opt" onclick="_spObContatoSelectItem(\'' + c.id + '\',\'' + label.replace(/'/g,"\\'") + '\')">' + label.replace(/</g,'&lt;') + '</div>';
  }).join('');
 }
-function _spObContatoSelectItem(id, label) {
- _spObContatoSelected = id || '';
- var hidEl = document.getElementById('sp-contato-id');
- var valEl = document.getElementById('sp-ob-contato-val');
- var clrEl = document.getElementById('sp-ob-contato-clr');
- if (hidEl) hidEl.value = _spObContatoSelected;
- if (valEl) {
-  var semEmpresa = !((_obraAtiva && _obraAtiva.empresas || []).length);
-  valEl.textContent = label || (semEmpresa ? 'Selecione a empresa primeiro' : 'Selecione o contato...');
-  valEl.classList.toggle('placeholder', !_spObContatoSelected);
- }
- if (clrEl) clrEl.style.display = _spObContatoSelected ? '' : 'none';
+async function _spObContatoSelectItem(id, label) {
  _spObContatoClose();
- _spToggleContatoOpenBtn();
- if (typeof _obraScheduleAutoSave === 'function') _obraScheduleAutoSave();
+ if (!id || !_obraAtiva || !_obraAtiva.id) return;
+ if ((_obraAtiva.contatos || []).some(function(c){ return c.id === id; })) return; // já vinculado
+ var ins = await _sb.from('contatos_obras').upsert({ obra_id: _obraAtiva.id, contato_id: id }, { onConflict: 'obra_id,contato_id', ignoreDuplicates: true });
+ if (ins.error) { alert('Erro ao vincular contato: ' + (ins.error.message || '')); return; }
+ var cttObj = (_contatosArr || []).find(function(c){ return c.id === id; }) || { id: id, nome_completo: label };
+ _spContatoObraLocalAdd(cttObj);
 }
-function _spObContatoClear() { _spObContatoSelectItem('', ''); }
 function _spObContatoKey(e) { if (e.key === 'Escape') _spObContatoClose(); }
+
+// ── Contatos vinculados: chips + estado local (mesmo padrão de
+// _spEmpresasChipsHTML/_spEmpresaObraLocalAdd acima). ──────────────────────
+function _spContatosChipsHTML(contatos) {
+ var lista = contatos || [];
+ if (!lista.length) return '<div class="sp-empty">Nenhum contato vinculado.</div>';
+ return lista.map(function(c){
+  var label = c.nome_completo || '(sem nome)';
+  return _spRelChipHTML('contatos', c.id, label, c.cargo || null, "_spDesvincularContatoObra('" + c.id + "')");
+ }).join('');
+}
+function _spContatoObraLocalAdd(cttObj) {
+ if (!_obraAtiva) return;
+ _obraAtiva.contatos_obras = (_obraAtiva.contatos_obras || []).concat([{ contato_id: cttObj.id, contato: cttObj }]);
+ _obraAtiva.contatos = (_obraAtiva.contatos || []).concat([cttObj]);
+ if (!_obraAtiva.contato_id) { _obraAtiva.contato_id = cttObj.id; _obraAtiva.contato = cttObj; }
+ var wrap = document.getElementById('sp-ob-contatos-chips');
+ if (wrap) wrap.innerHTML = _spContatosChipsHTML(_obraAtiva.contatos);
+}
+// Desvincular (não exclui o contato, só solta da obra) — mesmo padrão de
+// _spDesvincularEmpresaObra.
+async function _spDesvincularContatoObra(contatoId) {
+ if (!_obraAtiva || !_obraAtiva.id) return;
+ var ctt = (_obraAtiva.contatos || []).find(function(c){ return c.id === contatoId; });
+ if (!confirm('Desvincular "' + (ctt ? ctt.nome_completo : 'este contato') + '" desta obra?')) return;
+ var del = await _sb.from('contatos_obras').delete().eq('obra_id', _obraAtiva.id).eq('contato_id', contatoId);
+ if (del.error) { alert('Erro ao desvincular: ' + (del.error.message || '')); return; }
+ _obraAtiva.contatos_obras = (_obraAtiva.contatos_obras || []).filter(function(l){ return l.contato_id !== contatoId; });
+ _obraAtiva.contatos = (_obraAtiva.contatos || []).filter(function(c){ return c.id !== contatoId; });
+ if (_obraAtiva.contato_id === contatoId) {
+  var proximo = _obraAtiva.contatos[0] || null;
+  _obraAtiva.contato_id = proximo ? proximo.id : null;
+  _obraAtiva.contato = proximo;
+ }
+ var wrap = document.getElementById('sp-ob-contatos-chips');
+ if (wrap) wrap.innerHTML = _spContatosChipsHTML(_obraAtiva.contatos);
+}
 document.addEventListener('click', function(e) {
  var eDrop = document.getElementById('sp-ob-empresa-drop'), eBox = document.getElementById('sp-ob-empresa-box');
  if (eDrop && eBox && !eBox.contains(e.target) && !eDrop.contains(e.target)) _spObEmpresaClose();
@@ -2975,8 +2987,15 @@ async function _spCriarContato() {
   const { error: obraLinkError } = await _sb.from('contatos_obras').upsert({ obra_id: _obraAtiva.id, contato_id: data.id }, { onConflict: 'obra_id,contato_id', ignoreDuplicates: true });
   if (obraLinkError) console.error('[Obras] erro ao vincular contato à obra na criação rápida:', obraLinkError);
  }
+ // Sintetiza empresa_id local (mesmo cálculo de _dbLoadContatos em
+ // empresas.js) — sem isso, o contato recém-criado não aparece no pool de
+ // "adicionar contato existente" de NENHUMA obra até a próxima carga da
+ // tabela de contatos inteira.
+ data.empresa_id = empId || null;
  _contatosArr.push(data);
- if (typeof _spObContatoSelectItem === 'function') _spObContatoSelectItem(data.id, data.nome_completo + (data.cargo ? ' · ' + data.cargo : ''));
+ // _spContatoObraLocalAdd (não _spObContatoSelectItem) — o vínculo já foi
+ // gravado acima; só falta refletir no estado local/chips.
+ if (typeof _spContatoObraLocalAdd === 'function') _spContatoObraLocalAdd(data);
  _spToggleNovoContato();
 }
 
