@@ -456,6 +456,26 @@ async function _obraCarregarCidades() {
  return _obraCidadesCache;
 }
 
+// Transporte de Entregas: mesmo espírito de Cidade acima (16 valores reais
+// hoje — "Mila - 01".."Mila - 08", "Retirada", "Frete Terceirizado" etc. —
+// cresce quando um caminhão/frota novo aparece, por isso "creatable" em vez
+// de lista fechada). .trim() por causa de "Mila - 03 " (espaço extra real
+// no banco) virar duplicata de "Mila - 03" na lista.
+var _obraTransporteCache = null;
+async function _obraCarregarTransportes() {
+ if (_obraTransporteCache) return _obraTransporteCache;
+ var set = {};
+ var from = 0, pageSize = 1000, more = true;
+ while (more) {
+  var res = await _sb.from('entregas').select('transporte').not('transporte', 'is', null).range(from, from + pageSize - 1);
+  if (res.error || !res.data || !res.data.length) break;
+  res.data.forEach(function(r){ var v = (r.transporte||'').trim(); if (v) set[v] = true; });
+  more = res.data.length === pageSize; from += pageSize;
+ }
+ _obraTransporteCache = Object.keys(set).sort(function(a,b){ return a.localeCompare(b, 'pt-BR'); });
+ return _obraTransporteCache;
+}
+
 function _normObraAssoc(o) {
  o.empresa_id = (o.empresas_obras||[])[0]?.empresa_id || null;
  o.empresa    = (o.empresas_obras||[])[0]?.empresa    || null;
@@ -1759,6 +1779,16 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
    _obraScheduleAutoSave();
   },
  });
+ // Transporte (quick-create de Entrega) — pedido explícito: virou select
+ // buscável em vez de texto livre, mesmo padrão de Cidade/Canal (criável,
+ // já que a lista de caminhões/fretes cresce).
+ _srchSelRegister('entTransporte', {
+  options: function(){ return _obraTransporteCache || []; }, creatable: true, placeholder: 'Selecione o transporte...',
+  onOpen: _obraCarregarTransportes,
+  onSelect: function(v) {
+   if (v && (_obraTransporteCache||[]).indexOf(v) === -1) _obraTransporteCache.push(v);
+  },
+ });
 
  // ── HTML completo com abas ───────────────────────────────────────────────────
  var html = '<input type="hidden" id="sp-obra-id" value="' + o.id + '">'
@@ -1994,19 +2024,38 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEntrega()">+ Nova Entrega</button>'
   + '</div>'
   + '<div id="sp-nova-entrega-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">'
-  + '<div class="sp-field"><div class="sp-label">Nome da entrega *</div><input class="sp-inp" id="sp-new-ent-nome" placeholder="Ex: 1ª Entrega"></div>'
+  // Campos obrigatórios (*) seguem exatamente o formulário real do
+  // Airtable (referência enviada): Entrega, Etapa da entrega, Data de
+  // faturamento e Quantidade — validados em _spCriarEntrega antes do insert.
+  + '<div class="sp-field"><div class="sp-label">Entrega <span style="color:var(--red)">*</span></div><input class="sp-inp" id="sp-new-ent-nome" placeholder="Ex: 1ª Entrega"></div>'
   + '<div class="sp-g2" style="gap:8px;margin-top:8px">'
-  + '<div class="sp-field"><div class="sp-label">Etapa</div><select class="sp-inp" id="sp-new-ent-etapa">'
+  + '<div class="sp-field"><div class="sp-label">Etapa da entrega <span style="color:var(--red)">*</span></div><select class="sp-inp" id="sp-new-ent-etapa">'
   + '<option value="">Selecione...</option>'
   + Object.keys(_entEtapaBucket).map(function(et){ return '<option>' + et + '</option>'; }).join('')
   + '</select></div>'
-  + '<div class="sp-field"><div class="sp-label">Data de faturamento</div><input class="sp-inp" id="sp-new-ent-data" type="date"></div>'
+  + '<div class="sp-field"><div class="sp-label">Data de faturamento <span style="color:var(--red)">*</span></div><input class="sp-inp" id="sp-new-ent-data" type="date"></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
-  + '<div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-new-ent-qtd" type="number" min="0" placeholder="0"></div>'
+  + '<div class="sp-field"><div class="sp-label">Quantidade <span style="color:var(--red)">*</span></div><input class="sp-inp" id="sp-new-ent-qtd" type="number" min="0" placeholder="0"></div>'
   + '<div class="sp-field"><div class="sp-label">Peso do pedido (kg)</div><input class="sp-inp" id="sp-new-ent-peso" type="number" min="0" placeholder="0"></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">Valor</div><input class="sp-inp" id="sp-new-ent-valor" type="number" min="0" placeholder="0"></div>'
-  + '<div class="sp-field"><div class="sp-label">Transporte</div><input class="sp-inp" id="sp-new-ent-transporte" placeholder="Ex: Mila - 01"></div>'
+  + '<div class="sp-field"><div class="sp-label">Transporte</div>' + _srchSelMarkup('entTransporte', 'sp-new-ent-transporte', '') + '</div>'
+  + '</div>'
+  + '<div style="display:flex;align-items:center;gap:6px;margin-top:10px">'
+  + '<input type="checkbox" id="sp-new-ent-produzido">'
+  + '<label for="sp-new-ent-produzido" class="sp-label" style="margin:0">Pedido produzido</label>'
+  + '</div>'
+  // Upload fica opcional e roda DEPOIS do insert da entrega (só existe
+  // entrega_id pra vincular o documento depois que a linha é criada) —
+  // mesmo bucket/mecânica de upload já usada em Documentos da Obra
+  // (_spEnviarDocObra), só que aqui o documento carrega entrega_id além
+  // de obra_id (coluna nova, migração add_entrega_id_to_documentos).
+  + '<div class="sp-g2" style="gap:8px;margin-top:10px">'
+  + '<div class="sp-field"><div class="sp-label">Documentos específicos da entrega</div>'
+  + '<input type="file" class="sp-inp" id="sp-new-ent-doc" multiple style="padding:5px 8px"></div>'
+  + '<div class="sp-field"><div class="sp-label">Ordem de Produção</div>'
+  + '<input type="file" class="sp-inp" id="sp-new-ent-op" style="padding:5px 8px"></div>'
+  + '</div>'
   + '</div><div style="display:flex;gap:6px;margin-top:10px">'
   + '<button class="btn btn-primary btn-sm" onclick="_spCriarEntrega()" style="flex:1;justify-content:center">Criar entrega</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEntrega()">Cancelar</button>'
@@ -2500,24 +2549,66 @@ async function _spCriarInstalacao() {
 // criar/associar uma entrega a uma obra pelo sistema.
 function _spToggleNovaEntrega() {
  const f = document.getElementById('sp-nova-entrega-form');
- if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+ if (!f) return;
+ var abrir = f.style.display === 'none';
+ f.style.display = abrir ? 'block' : 'none';
+ // Reseta a seleção de Transporte a cada abertura — sem isso, um valor
+ // escolhido antes de cancelar ficava "preso" na próxima abertura do
+ // mesmo formulário (painel não recarrega inteiro só de abrir/fechar).
+ if (abrir && typeof _srchSelSelectItem === 'function') _srchSelSelectItem('entTransporte', '');
+}
+// Upload de um documento específico da entrega — mesma mecânica de
+// _spEnviarDocObra (bucket documentos_obras), só que aqui o registro carrega
+// entrega_id (coluna nova) além de obra_id, e o "tipo" identifica se é
+// "Documento da Entrega" ou "Ordem de Produção" (os 2 anexos do formulário
+// do Airtable). Erro de upload não derruba a criação da entrega em si —
+// ela já foi criada com sucesso quando isto roda; só avisa.
+async function _spUploadDocEntrega(file, entregaId, obraId, tipo) {
+ var ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+ var path = 'entregas/' + entregaId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.\-]/g,'_');
+ var up = await _sb.storage.from('documentos_obras').upload(path, file, { upsert: false });
+ if (up.error) { console.error('[Obras] erro ao enviar anexo de entrega:', up.error); return false; }
+ var ins = await _sb.from('documentos').insert({
+  obra_id: obraId, entrega_id: entregaId, nome_arquivo: file.name, nome: file.name,
+  tipo: tipo, categoria: 'Técnico', caminho_storage: path, tamanho_bytes: file.size,
+  mime_type: file.type, status: 'Ativo', versao: 1, origem: 'upload_manual',
+ });
+ if (ins.error) { console.error('[Obras] erro ao registrar anexo de entrega:', ins.error); return false; }
+ return true;
 }
 async function _spCriarEntrega() {
  if (!_obraAtiva || !_obraAtiva.id) return;
+ // Obrigatórios (*), igual ao formulário real do Airtable: Entrega, Etapa
+ // da entrega, Data de faturamento, Quantidade.
  const nome = document.getElementById('sp-new-ent-nome')?.value?.trim();
- if (!nome) { alert('Nome da entrega é obrigatório.'); return; }
+ const etapa = document.getElementById('sp-new-ent-etapa')?.value || '';
+ const data = document.getElementById('sp-new-ent-data')?.value || '';
+ const qtdStr = document.getElementById('sp-new-ent-qtd')?.value || '';
+ const faltando = [];
+ if (!nome) faltando.push('Entrega');
+ if (!etapa) faltando.push('Etapa da entrega');
+ if (!data) faltando.push('Data de faturamento');
+ if (qtdStr === '') faltando.push('Quantidade');
+ if (faltando.length) { alert('Preencha os campos obrigatórios: ' + faltando.join(', ') + '.'); return; }
  const payload = {
   obra_id: _obraAtiva.id,
   nome_entrega: nome,
-  etapa: document.getElementById('sp-new-ent-etapa')?.value || null,
-  data_faturamento: document.getElementById('sp-new-ent-data')?.value || null,
-  quantidade: document.getElementById('sp-new-ent-qtd')?.value !== '' ? Number(document.getElementById('sp-new-ent-qtd')?.value) : null,
+  etapa: etapa,
+  data_faturamento: data,
+  quantidade: Number(qtdStr),
   peso_kg: document.getElementById('sp-new-ent-peso')?.value !== '' ? Number(document.getElementById('sp-new-ent-peso')?.value) : null,
   valor: document.getElementById('sp-new-ent-valor')?.value !== '' ? Number(document.getElementById('sp-new-ent-valor')?.value) : null,
   transporte: document.getElementById('sp-new-ent-transporte')?.value?.trim() || null,
+  pedido_produzido: !!document.getElementById('sp-new-ent-produzido')?.checked,
  };
- const { error } = await _sb.from('entregas').insert(payload);
- if (error) { alert('Erro ao criar entrega: ' + (error?.message || '')); return; }
+ const { data: nova, error } = await _sb.from('entregas').insert(payload).select().single();
+ if (error || !nova) { alert('Erro ao criar entrega: ' + (error?.message || '')); return; }
+ const docFiles = Array.from(document.getElementById('sp-new-ent-doc')?.files || []);
+ const opFile = document.getElementById('sp-new-ent-op')?.files?.[0];
+ let anexosComErro = 0;
+ for (const f of docFiles) { if (!(await _spUploadDocEntrega(f, nova.id, _obraAtiva.id, 'Documento da Entrega'))) anexosComErro++; }
+ if (opFile) { if (!(await _spUploadDocEntrega(opFile, nova.id, _obraAtiva.id, 'Ordem de Produção'))) anexosComErro++; }
+ if (anexosComErro) alert('Entrega criada, mas ' + anexosComErro + ' anexo(s) não foram enviados. Você pode anexá-los depois pela aba Documentos.');
  _spObraById(_obraAtiva.id);
  if (typeof _dbLoadEntregas === 'function') _dbLoadEntregas();
 }
