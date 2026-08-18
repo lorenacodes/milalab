@@ -17,6 +17,17 @@ _srchSelRegister('noCanal', {
  options: function(){ return CANAL_VENDAS_OPCOES; }, creatable: true, placeholder: 'Selecione o canal...',
 });
 
+// Estado — mesmo pedido/motivo do Canal de vendas acima: era um <select>
+// nativo (só 27 opções, mas sem busca — pedido explícito de trocar por um
+// componente com barra de pesquisa, mesmo padrão já usado no painel de
+// Obra, kind 'uf'). UF_BRASIL é geografia fechada do Brasil, não precisa
+// de "creatable". onSelect dispara loadCidades(v) — mesmo gatilho que o
+// onchange do <select> antigo tinha, pra manter a cascata Estado→Cidade.
+_srchSelRegister('noEstado', {
+ options: function(){ return UF_BRASIL; }, placeholder: 'UF',
+ onSelect: function(v){ loadCidades(v); },
+});
+
 // Cache de cidades para não buscar a mesma UF duas vezes
 var _cidadeCache = {};
 
@@ -76,7 +87,7 @@ async function openNovaObra() {
  _noEmpresaDropdownToggle(false);
  document.getElementById('no-empresa-control-label')?.classList.add('placeholder');
  var canalWrap = document.getElementById('no-canal-wrap'); if (canalWrap) canalWrap.innerHTML = _srchSelMarkup('noCanal', 'no-canal', '');
- var estadoSel = document.getElementById('no-estado'); if (estadoSel) estadoSel.value = '';
+ var estadoWrap = document.getElementById('no-estado-wrap'); if (estadoWrap) estadoWrap.innerHTML = _srchSelMarkup('noEstado', 'no-estado', '');
  var cidadeSel = document.getElementById('no-cidade');
  if (cidadeSel) { cidadeSel.innerHTML = '<option value="">Selecione primeiro o estado</option>'; cidadeSel.disabled = true; }
  ['no-doc-enviado-cliente','no-doc-proposta-comercial'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
