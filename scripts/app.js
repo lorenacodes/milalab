@@ -346,6 +346,10 @@ var _obrasCampos = {
  'temEntrega': { label: 'Entrega', type: 'select', opts: _OBRAS_SIM_NAO },
  'temInstalacao': { label: 'Instalação', type: 'select', opts: _OBRAS_SIM_NAO },
  'temTarefa': { label: 'Tarefa', type: 'select', opts: _OBRAS_SIM_NAO },
+ // "Registro" = tem ao menos 1 foto (documentos.tipo='fotos_obra') em
+ // algum Projeto vinculado à obra — ver aba "Registros" do painel de Obra
+ // e _obrasCarregarRegistrosPresenca em obras.js.
+ 'temRegistro': { label: 'Registro', type: 'select', opts: _OBRAS_SIM_NAO },
  // Agregados de Projetos (soma de todos os projetos vinculados à obra)
  'projQtd': { label: 'Quantidade Total (Projetos)', type: 'text' },
  'projValor': { label: 'Valor Total da Obra (Projetos)', type: 'text' },

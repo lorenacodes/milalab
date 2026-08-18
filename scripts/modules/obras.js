@@ -610,6 +610,29 @@ async function _obrasCarregarPresencaSimples(tabela, coluna) {
  return set;
 }
 
+// Set de obra_id com pelo menos 1 registro fotográfico (documentos.tipo=
+// 'fotos_obra') em algum Projeto vinculado — igual em espírito a
+// _obrasCarregarPresencaSimples, mas fotos_obra não tem obra_id direto (fica
+// em projeto_id, ver aba "Registros"), então precisa do passo extra de
+// mapear projeto_id → obra_id antes de checar presença.
+async function _obrasCarregarRegistrosPresenca() {
+ var projObraMap = {}; var from = 0, pageSize = 1000, more = true;
+ while (more) {
+  var res = await _sb.from('projetos').select('id, obra_id').not('obra_id', 'is', null).range(from, from + pageSize - 1);
+  if (res.error || !res.data || !res.data.length) break;
+  res.data.forEach(function(p){ projObraMap[p.id] = p.obra_id; });
+  more = res.data.length === pageSize; from += pageSize;
+ }
+ var set = new Set(); from = 0; more = true;
+ while (more) {
+  var res2 = await _sb.from('documentos').select('projeto_id').eq('tipo', 'fotos_obra').not('projeto_id', 'is', null).range(from, from + pageSize - 1);
+  if (res2.error || !res2.data || !res2.data.length) break;
+  res2.data.forEach(function(d){ var obraId = projObraMap[d.projeto_id]; if (obraId) set.add(obraId); });
+  more = res2.data.length === pageSize; from += pageSize;
+ }
+ return set;
+}
+
 async function _obrasCarregarTodasObras() {
  var allObras=[]; var from=0; var pageSize=1000; var more=true;
  while(more){
@@ -627,7 +650,7 @@ async function _obrasCarregarTodasObras() {
 // Estrutural, agregados de Projetos/Entregas, presença de Instalação/
 // Tarefa...) — função única, reaproveitada tanto pela Tabela quanto pelo
 // Kanban, pra não duplicar essa lista enorme de atributos duas vezes.
-function _obrasExtraDatasetAttrs(o, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa) {
+function _obrasExtraDatasetAttrs(o, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa, temRegistro) {
  var proposta = propostaMap[o.id];
  var pAgg = projAgg[o.id];
  var eAgg = entAgg[o.id];
@@ -662,7 +685,8 @@ function _obrasExtraDatasetAttrs(o, propostaMap, docsPresenca, projAgg, entAgg, 
   + ' data-ent-valor-a-entregar="' + (eAgg ? (eAgg.valorTotal - eAgg.valorEntregue) : 0) + '"'
   + ' data-tem-entrega="' + (eAgg ? 'Sim' : 'Não') + '"'
   + ' data-tem-instalacao="' + (temInstalacao.has(o.id) ? 'Sim' : 'Não') + '"'
-  + ' data-tem-tarefa="' + (temTarefa.has(o.id) ? 'Sim' : 'Não') + '"';
+  + ' data-tem-tarefa="' + (temTarefa.has(o.id) ? 'Sim' : 'Não') + '"'
+  + ' data-tem-registro="' + (temRegistro.has(o.id) ? 'Sim' : 'Não') + '"';
 }
 
 async function _dbLoadObras() {
@@ -675,7 +699,7 @@ async function _dbLoadObras() {
  // RLS) deixava a Promise rejeitada sem handler nenhum — a tela ficava
  // travada em "Carregando obras..." pra sempre, sem nenhuma pista do que
  // deu errado. Agora aparece um erro real na tela + no console.
- var allObras, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa;
+ var allObras, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa, temRegistro;
  try {
   var results = await Promise.all([
    _obrasCarregarTodasObras(),
@@ -685,9 +709,10 @@ async function _dbLoadObras() {
    _obrasCarregarEntregasAgg().catch(function(e){ console.error('[Obras] erro ao agregar entregas:', e); return {}; }),
    _obrasCarregarPresencaSimples('instalacoes', 'obra_id').catch(function(e){ console.error('[Obras] erro ao verificar instalações:', e); return new Set(); }),
    _obrasCarregarPresencaSimples('atividades_obras', 'obra_id').catch(function(e){ console.error('[Obras] erro ao verificar tarefas:', e); return new Set(); }),
+   _obrasCarregarRegistrosPresenca().catch(function(e){ console.error('[Obras] erro ao verificar registros:', e); return new Set(); }),
   ]);
   allObras = results[0]; propostaMap = results[1]; docsPresenca = results[2];
-  projAgg = results[3]; entAgg = results[4]; temInstalacao = results[5]; temTarefa = results[6];
+  projAgg = results[3]; entAgg = results[4]; temInstalacao = results[5]; temTarefa = results[6]; temRegistro = results[7];
  } catch (e) {
   console.error('[Obras] erro ao carregar a lista de obras:', e);
   var tbodyErr = document.getElementById('obras-tbody');
@@ -727,7 +752,7 @@ async function _dbLoadObras() {
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'obras\',this)"'
    +' data-id="'+(o.id||'')+'" data-tipo="'+tipos.join(', ')+'" data-etapa="'+etapa+'" data-empresa="'+empNome+'" data-cidade="'+(o.cidade||'')+'" data-estado="'+(o.estado||'')+'"'
    +' data-nome="'+(o.nome||'').replace(/"/g,'&quot;')+'" data-valor="'+(o.valor!=null?o.valor:0)+'" data-data-envio="'+(o.data_envio_proposta||'')+'"'
-   + _obrasExtraDatasetAttrs(o, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa) + '>'
+   + _obrasExtraDatasetAttrs(o, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa, temRegistro) + '>'
    +'<td><div style="font-weight:500">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
    +'<td><div class="oc-tags" style="margin-bottom:0">'+catBadges+'</div></td>'
    +'<td style="color:var(--muted)">'+(o.cidade||'—')+'</td>'
@@ -770,7 +795,7 @@ async function _dbLoadObrasKanban() {
  // seu próprio filtro/ordenação sobre os mesmos data-*, então precisa dos
  // mesmos campos extras nos cards. Consultas independentes das obras acima,
  // rodam em paralelo.
- var propostaMap = {}, docsPresenca = { temArt: new Set(), temCalculo: new Set() }, projAgg = {}, entAgg = {}, temInstalacao = new Set(), temTarefa = new Set();
+ var propostaMap = {}, docsPresenca = { temArt: new Set(), temCalculo: new Set() }, projAgg = {}, entAgg = {}, temInstalacao = new Set(), temTarefa = new Set(), temRegistro = new Set();
  try {
   var extras = await Promise.all([
    _obrasCarregarPropostaMap(),
@@ -779,9 +804,10 @@ async function _dbLoadObrasKanban() {
    _obrasCarregarEntregasAgg(),
    _obrasCarregarPresencaSimples('instalacoes', 'obra_id'),
    _obrasCarregarPresencaSimples('atividades_obras', 'obra_id'),
+   _obrasCarregarRegistrosPresenca(),
   ]);
   propostaMap = extras[0]; docsPresenca = extras[1]; projAgg = extras[2]; entAgg = extras[3];
-  temInstalacao = extras[4]; temTarefa = extras[5];
+  temInstalacao = extras[4]; temTarefa = extras[5]; temRegistro = extras[6];
  } catch (e) {
   console.error('[Obras] erro ao carregar agregados do Kanban:', e);
  }
@@ -845,6 +871,7 @@ async function _dbLoadObrasKanban() {
   card.dataset.temEntrega = eAggK ? 'Sim' : 'Não';
   card.dataset.temInstalacao = temInstalacao.has(o.id) ? 'Sim' : 'Não';
   card.dataset.temTarefa = temTarefa.has(o.id) ? 'Sim' : 'Não';
+  card.dataset.temRegistro = temRegistro.has(o.id) ? 'Sim' : 'Não';
   card.draggable = true;
   card.addEventListener('dragstart', _onObraCardDragStart);
   card.addEventListener('dragend', _onObraCardDragEnd);
