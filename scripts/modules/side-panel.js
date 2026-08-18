@@ -3,18 +3,23 @@
 // _spRender decide qual renderer específico chamar por entidade (_spObras,
 // _spProjetos, _spEmpresas, etc. — cada um no seu próprio módulo).
 // ═══════════════════════════════════════════════════════════════════════════════
-// ── Pilha de navegação ("Voltar") ────────────────────────────────────────────
-// Pedido explícito: abrir um Projeto/Empresa/Contato/etc. de dentro do
-// painel de OUTRA entidade (ex.: Obra → Projeto) não pode mais "perder" a
-// entidade de origem — antes não existia nenhuma pilha, então a única forma
-// de voltar pra Obra era fechar o painel e abrir de novo pela tabela.
+// ── Pilha de navegação ─────────────────────────────────────────────────────
+// Pedido explícito (2 rodadas): abrir um Projeto/Empresa/Contato/etc. de
+// dentro do painel de OUTRA entidade (ex.: Obra → Projeto) não pode
+// "perder" a entidade de origem. A 1ª tentativa foi um botão "‹ Voltar"
+// separado — a usuária esperava que o "Fechar"/× de sempre já fizesse
+// isso (fechar o Projeto = reaparecer na Obra de onde ele foi aberto), não
+// um botão novo. Por isso closePanel() agora É a navegação de volta: com
+// pilha não vazia, desempilha e reabre a entidade anterior em vez de
+// fechar o drawer inteiro; só fecha de verdade quando a pilha esvazia
+// (voltou até a raiz de onde a navegação começou).
 // _spCurrentSection/_spCurrentId rastreiam o que está aberto agora;
 // _spNavStack guarda de onde se veio. `row.isConnected` é o que distingue
 // as duas origens de _spOpen: uma <tr> REAL da tabela (isConnected=true,
 // clique direto do usuário) sempre começa uma navegação "do zero" e reseta
 // a pilha; uma <tr> SINTÉTICA (isConnected=false, criada por
-// _spOpenEntityById/_spVoltar só pra transportar o id) é uma navegação por
-// dentro de outro painel e já gerencia a pilha ela mesma — sem essa
+// _spOpenEntityById/closePanel só pra transportar o id) é uma navegação
+// por dentro de outro painel e já gerencia a pilha ela mesma — sem essa
 // distinção, _spOpenEntityById chamando _spOpen internamente apagaria a
 // pilha que acabou de empilhar.
 var _spNavStack = [];
@@ -29,26 +34,30 @@ function _spOpen(section, row) {
  const dr = document.getElementById('sp-drawer');
  ov.classList.add('sp-open');
  dr.classList.add('sp-open');
- if (row.isConnected) { _spNavStack = []; _spUpdateBackBtn(); }
+ if (row.isConnected) _spNavStack = [];
  _spRender(section, row);
  _spCurrentSection = section;
  _spCurrentId = row.dataset.id || null;
  document.addEventListener('keydown', _spEsc, {once:true});
 }
 
-function _spUpdateBackBtn() {
- var btn = document.getElementById('sp-back-btn');
- if (btn) btn.style.display = _spNavStack.length ? '' : 'none';
-}
-
 function _spEsc(e) { if (e.key === 'Escape') closePanel(); }
 
+// Usado por TODOS os "fechar" do painel (× do cabeçalho, botão "Fechar" de
+// cada entidade, Esc, clique no overlay) — mesma função de sempre, agora
+// ciente da pilha.
 function closePanel() {
+ if (_spNavStack.length) {
+  var anterior = _spNavStack.pop();
+  var row = document.createElement('tr');
+  row.dataset.id = anterior.id;
+  _spOpen(anterior.section, row);
+  return;
+ }
  document.getElementById('sp-overlay').classList.remove('sp-open');
  document.getElementById('sp-drawer').classList.remove('sp-open');
  if (_spRow) { _spRow.classList.remove('sp-active'); _spRow = null; }
- _spNavStack = []; _spCurrentSection = null; _spCurrentId = null;
- _spUpdateBackBtn();
+ _spCurrentSection = null; _spCurrentId = null;
 }
 
 // ── Resize do painel lateral (arrastar borda esquerda) ────────────────────────
@@ -107,7 +116,8 @@ function _spSet(tag, title, bodyHTML, actionsHTML) {
 function _spOpenEntityById(section, id) {
  if (!id) return;
  // Painel já aberto mostrando outra entidade → empilha ela antes de trocar,
- // pra "Voltar" funcionar (ver comentário da pilha acima de _spOpen).
+ // pra o "Fechar" desta nova entidade voltar pra ela (ver comentário da
+ // pilha acima de _spOpen/closePanel).
  var drawerAberto = document.getElementById('sp-drawer')?.classList.contains('sp-open');
  if (drawerAberto && _spCurrentSection && _spCurrentId) {
   _spNavStack.push({ section: _spCurrentSection, id: _spCurrentId });
@@ -115,18 +125,6 @@ function _spOpenEntityById(section, id) {
  var row = document.createElement('tr');
  row.dataset.id = id;
  _spOpen(section, row);
- _spUpdateBackBtn();
-}
-// Volta pra entidade anterior da pilha — NÃO empilha a atual de novo (senão
-// "Voltar" empurraria pra frente igual um "Avançar", nunca esvaziando a
-// pilha).
-function _spVoltar() {
- var anterior = _spNavStack.pop();
- if (!anterior) return;
- var row = document.createElement('tr');
- row.dataset.id = anterior.id;
- _spOpen(anterior.section, row);
- _spUpdateBackBtn();
 }
 
 // ── Chip de "registro vinculado" (padrão Airtable) ─────────────────────────────
