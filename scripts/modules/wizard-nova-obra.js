@@ -90,7 +90,22 @@ async function openNovaObra() {
  var estadoWrap = document.getElementById('no-estado-wrap'); if (estadoWrap) estadoWrap.innerHTML = _srchSelMarkup('noEstado', 'no-estado', '');
  var cidadeSel = document.getElementById('no-cidade');
  if (cidadeSel) { cidadeSel.innerHTML = '<option value="">Selecione primeiro o estado</option>'; cidadeSel.disabled = true; }
- ['no-doc-enviado-cliente','no-doc-proposta-comercial'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
+ // Dropzone estilizada (mesmo componente _spEntDropzone já usado nos
+ // anexos de Entrega, obras.js) em vez do <input type="file"> cru — pedido
+ // explícito: o input cru simplesmente não aparecia (regra global
+ // ".mf input[type=file]{display:none}" em main.css escondia esses 2
+ // inputs específicos sem nenhum substituto visível, então o passo
+ // "Documentação" do wizard nunca teve upload de verdade acessível).
+ // _spEntDropzone já embute seu próprio <input type="file" style="display:
+ // none">, então a regra CSS continua inofensiva — o que fica visível é o
+ // <label> ao redor.
+ [
+  { wrap: 'no-doc-enviado-cliente-wrap', input: 'no-doc-enviado-cliente' },
+  { wrap: 'no-doc-proposta-comercial-wrap', input: 'no-doc-proposta-comercial' },
+ ].forEach(function(d){
+  var wrap = document.getElementById(d.wrap);
+  if (wrap) wrap.innerHTML = _spEntDropzone(d.input, d.input + '-lbl', false);
+ });
  ['no-nova-empresa-box','no-novo-contato-box'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = 'none'; });
 
  var dataEl = document.getElementById('no-data-criacao');
