@@ -92,6 +92,49 @@ async function loadCidades(uf) {
  }
 }
 
+// ── Dropzone de documentos (passo 3) — própria do wizard, não reaproveita
+// _spEntDropzone (obras.js) de propósito: aquele componente é uma <label>
+// simples, sem reset de tipografia, e dentro do .mf deste wizard herdava
+// text-transform:uppercase + font-size/weight da regra ".mf label{...}"
+// (que existe pra rotular os campos do formulário, não pra texto de
+// dropzone) — o texto saía em CAIXA ALTA e comprimido, feio o bastante pra
+// ser reportado. Ícone maior (22px) e padding mais generoso (20px 16px),
+// mesmo espírito visual do dropzone de "Anexar documento" do painel de Obra.
+function _noDocDropzone(inputId, labelId) {
+ return '<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:2px dashed var(--border);border-radius:8px;padding:22px 16px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center;text-transform:none;font-weight:400"'
+  + ' onmouseover="this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.04)\'"'
+  + ' onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
+  + ' ondragover="event.preventDefault();this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.07)\'"'
+  + ' ondragleave="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
+  + ' ondrop="_noDocFileDrop(event,\'' + inputId + '\',\'' + labelId + '\')">'
+  + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>'
+  + '<span id="' + labelId + '" style="font-size:12px;color:var(--muted);text-transform:none;font-weight:400;line-height:1.4">Clique ou arraste o arquivo aqui</span>'
+  + '<input type="file" id="' + inputId + '" style="display:none" onchange="_noDocFileChange(\'' + inputId + '\',\'' + labelId + '\')">'
+  + '</label>';
+}
+function _noDocFileChange(inputId, labelId) {
+ var input = document.getElementById(inputId);
+ var lbl = document.getElementById(labelId);
+ if (!input || !lbl) return;
+ var f = input.files && input.files[0];
+ if (!f) { lbl.textContent = 'Clique ou arraste o arquivo aqui'; return; }
+ lbl.innerHTML = '<span style="color:var(--green);font-weight:700">✓ ' + f.name + '</span>';
+}
+function _noDocFileDrop(event, inputId, labelId) {
+ event.preventDefault();
+ var dz = event.currentTarget; dz.style.borderColor = 'var(--border)'; dz.style.background = '';
+ var files = event.dataTransfer && event.dataTransfer.files;
+ if (!files || !files.length) return;
+ var input = document.getElementById(inputId);
+ if (!input) return;
+ try {
+  var dt = new DataTransfer();
+  dt.items.add(files[0]);
+  input.files = dt.files;
+  _noDocFileChange(inputId, labelId);
+ } catch(e) { _showToast('Arraste não suportado — use o botão de seleção', 'aviso'); }
+}
+
 async function openNovaObra() {
  _noTipos = [];
  _noEmpresaIds = [];
@@ -108,21 +151,24 @@ async function openNovaObra() {
  var canalWrap = document.getElementById('no-canal-wrap'); if (canalWrap) canalWrap.innerHTML = _srchSelMarkup('noCanal', 'no-canal', '');
  var estadoWrap = document.getElementById('no-estado-wrap'); if (estadoWrap) estadoWrap.innerHTML = _srchSelMarkup('noEstado', 'no-estado', '');
  _noCidadeRenderDisabled('Selecione o estado primeiro');
- // Dropzone estilizada (mesmo componente _spEntDropzone já usado nos
- // anexos de Entrega, obras.js) em vez do <input type="file"> cru — pedido
- // explícito: o input cru simplesmente não aparecia (regra global
- // ".mf input[type=file]{display:none}" em main.css escondia esses 2
- // inputs específicos sem nenhum substituto visível, então o passo
- // "Documentação" do wizard nunca teve upload de verdade acessível).
- // _spEntDropzone já embute seu próprio <input type="file" style="display:
- // none">, então a regra CSS continua inofensiva — o que fica visível é o
- // <label> ao redor.
+ // Dropzone própria do wizard (_noDocDropzone) em vez do <input type="file">
+ // cru — pedido explícito: o input cru simplesmente não aparecia (regra
+ // global ".mf input[type=file]{display:none}" em main.css escondia esses
+ // 2 inputs sem nenhum substituto visível). A 1ª tentativa reaproveitou
+ // _spEntDropzone (mesmo componente das Entregas), mas por ser uma <label>
+ // dentro de um .mf ela herdava text-transform:uppercase/tipografia da
+ // regra ".mf label{...}" do próprio wizard — o texto saía em CAIXA ALTA e
+ // desproporcional (achado real, reportado por print). _noDocDropzone é
+ // maior (ícone 22px, padding 20px 16px, mesmo estilo do dropzone de
+ // "Anexar documento" já usado no painel de Obra) e neutraliza
+ // text-transform/font-weight explicitamente, então não depende de nunca
+ // mais ser colocada dentro de um .mf sem quebrar.
  [
   { wrap: 'no-doc-enviado-cliente-wrap', input: 'no-doc-enviado-cliente' },
   { wrap: 'no-doc-proposta-comercial-wrap', input: 'no-doc-proposta-comercial' },
  ].forEach(function(d){
   var wrap = document.getElementById(d.wrap);
-  if (wrap) wrap.innerHTML = _spEntDropzone(d.input, d.input + '-lbl', false);
+  if (wrap) wrap.innerHTML = _noDocDropzone(d.input, d.input + '-lbl');
  });
  ['no-nova-empresa-box','no-novo-contato-box'].forEach(function(id){ var el = document.getElementById(id); if (el) el.style.display = 'none'; });
 
