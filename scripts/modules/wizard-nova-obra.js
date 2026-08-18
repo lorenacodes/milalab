@@ -503,7 +503,6 @@ async function submitNovaObra() {
      aliquota_icms: isSolar ? p.icms : null,
      consumidor_final: isSolar ? p.consumidorFinal : null,
      difal_percentual: isSolar ? (parseFloat(p.difal) || null) : null,
-     melhorias: p.melhorias.filter(function(m){ return (m.nome || '').trim(); })
     };
    })
   };
@@ -626,7 +625,7 @@ function _noProjAdd() {
   // (_msRenderDropdown trabalha com valores string, não pares id/label).
   produtoNomes: [], responsavelEmails: [], descritivo: '', qtd: '', vuni: '',
   m2Arquitetura: '', m2Estrutura: '', tipologiaTelhado: [], tipologiaTelha: [],
-  melhorias: [], frete: 'CIF', icms: '12', consumidorFinal: false, difal: '', gerarProposta: false
+  frete: 'CIF', icms: '12', consumidorFinal: false, difal: '', gerarProposta: false
  });
  _noProjRender();
  setTimeout(function(){
@@ -646,10 +645,6 @@ function _noProjToggleConsFinal(idx, checked) {
  }
  _noProjRender();
 }
-function _noProjMelhoriaAdd(idx) { _noProjLista[idx].melhorias.push({ nome: '', area: '' }); _noProjRender(); }
-function _noProjMelhoriaRemove(idx, mIdx) { _noProjLista[idx].melhorias.splice(mIdx, 1); _noProjRender(); }
-function _noProjMelhoriaSet(idx, mIdx, field, val) { _noProjLista[idx].melhorias[mIdx][field] = val; }
-
 function _noProjPodeProposta(idx) {
  var p = _noProjLista[idx];
  var missing = [];
@@ -844,21 +839,6 @@ function _noProjRender() {
 
   html += '<div class="mf" style="margin:0"><label style="font-size:11px">Descritivo do projeto</label>'
    + '<textarea class="sp-inp" style="font-size:12px;height:56px" oninput="_noProjSet(' + idx + ',\'descritivo\',this.value)">' + (p.descritivo||'') + '</textarea></div>';
-
-  html += '<div style="border:1px dashed var(--border);border-radius:8px;padding:12px">'
-   + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-   + '<span style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted)">Melhorias (opcional)</span>'
-   + '<button type="button" onclick="_noProjMelhoriaAdd(' + idx + ')" style="font-size:11px;color:var(--navy);background:none;border:none;cursor:pointer;font-weight:600">+ Adicionar</button>'
-   + '</div>'
-   + (p.melhorias.length ? p.melhorias.map(function(m, mIdx){
-      return '<div class="modal-grid col2" style="gap:8px;margin-bottom:6px">'
-       + '<input class="sp-inp" style="font-size:12px" placeholder="Nome da melhoria" value="' + (m.nome||'') + '" oninput="_noProjMelhoriaSet(' + idx + ',' + mIdx + ',\'nome\',this.value)">'
-       + '<div style="display:flex;gap:6px">'
-       + '<input class="sp-inp" style="font-size:12px;flex:1" placeholder="Área" value="' + (m.area||'') + '" oninput="_noProjMelhoriaSet(' + idx + ',' + mIdx + ',\'area\',this.value)">'
-       + '<button type="button" onclick="_noProjMelhoriaRemove(' + idx + ',' + mIdx + ')" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:11px">✕</button>'
-       + '</div></div>';
-     }).join('') : '<div style="font-size:11px;color:var(--muted)">Nenhuma melhoria adicionada.</div>')
-   + '</div>';
 
   if (isSolar) {
    html += '<div style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:14px">'
