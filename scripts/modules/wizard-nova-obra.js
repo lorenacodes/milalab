@@ -30,21 +30,40 @@ _srchSelRegister('noEstado', {
 
 // Cache de cidades para não buscar a mesma UF duas vezes
 var _cidadeCache = {};
+// UF cujas cidades estão carregadas em _cidadeCache e prontas pra exibir no
+// select buscável agora — usado pela função `options` de 'noCidade' abaixo,
+// já que o mesmo cache serve várias UFs mas só uma é "a atual" no formulário.
+var _noCidadeUfAtual = '';
+
+// Cidade — mesmo pedido/motivo do Estado acima: <select> nativo (às vezes
+// com 400+ municípios pra estados grandes) sem barra de busca nenhuma.
+// creatable:true também cobre o fallback de quando a API do IBGE falha
+// (ver catch abaixo) — em vez de travar o campo com uma mensagem de erro,
+// o usuário ainda consegue digitar a cidade manualmente.
+_srchSelRegister('noCidade', {
+ options: function(){ return (_cidadeCache[_noCidadeUfAtual] || []).map(function(c){ return c.nome; }); },
+ creatable: true, placeholder: 'Selecione a cidade...',
+});
+function _noCidadeRenderDisabled(placeholder) {
+ _noCidadeUfAtual = '';
+ var wrap = document.getElementById('no-cidade-wrap');
+ if (!wrap) return;
+ wrap.innerHTML = '<input type="hidden" id="no-cidade" value="">'
+  + '<div class="srch-sel-box" style="opacity:.55;cursor:not-allowed"><span class="srch-sel-val placeholder">' + placeholder + '</span></div>';
+}
+function _noCidadeRenderReady(uf) {
+ _noCidadeUfAtual = uf;
+ var wrap = document.getElementById('no-cidade-wrap');
+ if (wrap) wrap.innerHTML = _srchSelMarkup('noCidade', 'no-cidade', '');
+}
 
 async function loadCidades(uf) {
- const sel = document.getElementById('no-cidade');
  const loading = document.getElementById('no-cidade-loading');
 
- if (!uf) {
- sel.innerHTML = '<option value="">Selecione primeiro o estado</option>';
- sel.disabled = true;
- return;
- }
+ if (!uf) { _noCidadeRenderDisabled('Selecione o estado primeiro'); return; }
 
- // Mostrar loading
- sel.disabled = true;
- sel.innerHTML = '<option value="">Carregando...</option>';
- if (loading) loading.style.display = 'block';
+ _noCidadeRenderDisabled('Carregando...');
+ if (loading) loading.style.display = 'flex';
 
  try {
  let cidades = _cidadeCache[uf];
@@ -61,12 +80,12 @@ async function loadCidades(uf) {
  _cidadeCache[uf] = cidades;
  }
 
- sel.innerHTML = '<option value="">Selecione a cidade</option>' +
- cidades.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
- sel.disabled = false;
+ _noCidadeRenderReady(uf);
  } catch (err) {
- sel.innerHTML = '<option value="">Abra via "Iniciar MilaTec.bat" para carregar cidades</option>';
- sel.disabled = false;
+ // Fallback sem a lista real do IBGE: campo continua usável (creatable),
+ // só sem sugestões — antes travava com uma <option> de erro fixa.
+ _cidadeCache[uf] = [];
+ _noCidadeRenderReady(uf);
  console.warn('IBGE API:', err.message, '— Use o servidor.py para habilitar a API do IBGE');
  } finally {
  if (loading) loading.style.display = 'none';
@@ -88,8 +107,7 @@ async function openNovaObra() {
  document.getElementById('no-empresa-control-label')?.classList.add('placeholder');
  var canalWrap = document.getElementById('no-canal-wrap'); if (canalWrap) canalWrap.innerHTML = _srchSelMarkup('noCanal', 'no-canal', '');
  var estadoWrap = document.getElementById('no-estado-wrap'); if (estadoWrap) estadoWrap.innerHTML = _srchSelMarkup('noEstado', 'no-estado', '');
- var cidadeSel = document.getElementById('no-cidade');
- if (cidadeSel) { cidadeSel.innerHTML = '<option value="">Selecione primeiro o estado</option>'; cidadeSel.disabled = true; }
+ _noCidadeRenderDisabled('Selecione o estado primeiro');
  // Dropzone estilizada (mesmo componente _spEntDropzone já usado nos
  // anexos de Entrega, obras.js) em vez do <input type="file"> cru — pedido
  // explícito: o input cru simplesmente não aparecia (regra global
