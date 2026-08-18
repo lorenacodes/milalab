@@ -2059,7 +2059,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div class="sp-field"><div class="sp-label">Ordem de Produção</div>'
   + '<input type="file" class="sp-inp" id="sp-new-ent-op" style="padding:5px 8px"></div>'
   + '</div>'
-  + '</div><div style="display:flex;gap:6px;margin-top:10px">'
+  // Bug real encontrado ao testar: um "</div>" a mais aqui fechava
+  // #sp-nova-entrega-form ANTES da hora — a linha de botões "Criar
+  // entrega"/"Cancelar" acabava como IRMÃ do formulário (sempre visível,
+  // mesmo com o formulário fechado) em vez de FILHA dele. Por isso
+  // aparecia um botão grande logo abaixo do cabeçalho "Entregas (N)" +
+  // "+ Nova Entrega", com os campos de verdade escondidos/fora de ordem.
+  + '<div style="display:flex;gap:6px;margin-top:10px">'
   + '<button class="btn btn-primary btn-sm" onclick="_spCriarEntrega()" style="flex:1;justify-content:center">Criar entrega</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEntrega()">Cancelar</button>'
   + '</div></div>'
