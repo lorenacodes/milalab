@@ -152,12 +152,23 @@ async function openNovaObra() {
 }
 
 // ── Passo 1: tipo(s) de obra (multi-toggle) ───────────────────────────────
+// Cores de identidade — pedido explícito, mesmo padrão já usado nos badges
+// de categoria da grade de Obras/Projetos (verde/roxo/azul/amarelo, laranja
+// pro restante): verde p/ Telhados, roxo p/ Steel Frame, azul p/ Modular,
+// amarelo p/ Solar, laranja p/ Misto. Antes os botões do wizard eram todos
+// navy genérico (selecionado) ou cinza (não selecionado), sem nenhuma
+// relação visual com a cor que o tipo tem no resto do sistema.
+var _NO_TIPO_COR = {
+ 'Telhados': 'var(--green)', 'Steel Frame': 'var(--purple)', 'Modular': 'var(--blue)',
+ 'Solar': 'var(--yellow)', 'Misto (LSF + A36)': 'var(--orange)',
+};
 function _noTipoGridRender() {
  var el = document.getElementById('no-tipo-grid');
  if (!el) return;
  el.innerHTML = _NO_TIPOS_OPCOES.map(function(t) {
   var sel = _noTipos.indexOf(t) >= 0;
-  return '<button type="button" onclick="_noTipoToggle(\'' + t.replace(/'/g, "\\'") + '\')" style="padding:8px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid ' + (sel?'var(--navy)':'var(--border)') + ';background:' + (sel?'var(--navy)':'transparent') + ';color:' + (sel?'#fff':'var(--text)') + '">' + t + '</button>';
+  var cor = _NO_TIPO_COR[t] || 'var(--navy)';
+  return '<button type="button" onclick="_noTipoToggle(\'' + t.replace(/'/g, "\\'") + '\')" style="padding:8px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid ' + cor + ';background:' + (sel?cor:'transparent') + ';color:' + (sel?'#fff':cor) + '">' + t + '</button>';
  }).join('');
 }
 function _noTipoToggle(t) {
