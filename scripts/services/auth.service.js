@@ -24,7 +24,14 @@ function _loginSuccess(user) {
  var metaNome  = (user.user_metadata && user.user_metadata.full_name) || '';
  var firstName = (metaNome || email).split(/[@\s]/)[0];
  firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
- _currentUser = { id: user.id, email: email, name: metaNome || firstName, firstName: firstName };
+ // isAdmin calculado logo abaixo (mesma regra de sempre) — guardado aqui
+ // pra qualquer tela do sistema poder checar "_currentUser.isAdmin" sem
+ // duplicar a lógica de _ALLOWED_EMAILS/user_metadata.role. Antes só
+ // existia como variável local desta função (usada só pro menu/badge de
+ // Admin), então nenhuma outra tela conseguia perguntar "este usuário é
+ // admin?" — pedido explícito: botões de excluir Obra/Entrega só pra admin.
+ var isAdminUser = _ALLOWED_EMAILS.indexOf(email) !== -1 || (user.user_metadata && user.user_metadata.role === 'admin');
+ _currentUser = { id: user.id, email: email, name: metaNome || firstName, firstName: firstName, isAdmin: isAdminUser };
  var ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'none';
  if (!localStorage.getItem('pp-name')) localStorage.setItem('pp-name', metaNome || firstName);
  localStorage.setItem('milatec-user-email', email);
@@ -37,7 +44,7 @@ function _loginSuccess(user) {
  // Antes só checava a lista fixa aqui: promover alguém a admin pelo painel
  // gravava o role certinho no banco, mas essa pessoa continuava sem ver o
  // menu/acesso de Admin ao entrar, porque o login nunca olhava pro role.
- var isAdmin  = _ALLOWED_EMAILS.indexOf(email) !== -1 || (user.user_metadata && user.user_metadata.role === 'admin');
+ var isAdmin  = isAdminUser;
  var navAdmin = document.getElementById('nav-admin');
  if (navAdmin) navAdmin.style.display = isAdmin ? '' : 'none';
  if (isAdmin) {

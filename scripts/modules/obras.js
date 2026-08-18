@@ -1695,10 +1695,20 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      // do título respondia ao clique, o resto do card (grid de campos)
      // parecia clicável (cursor:pointer herdado de .sp-item-card) mas não
      // fazia nada.
+     // Excluir (permanente) é diferente de desvincular (só solta da obra) —
+     // pedido explícito: só admin pode ver/usar esse botão. Checagem só do
+     // lado do cliente (esconder o botão) não bastaria sozinha — a política
+     // de DELETE em `entregas` também foi restrita a admin no banco
+     // (migração restrict_obras_entregas_delete_to_admin), senão qualquer
+     // usuário autenticado ainda conseguiria apagar via console.
+     var isAdmin = !!(_currentUser && _currentUser.isAdmin);
      return '<div class="sp-item-card" onclick="_spOpenEntityById(\'entregas\',\'' + e.id + '\')">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
       + '<div class="sp-item-title" style="margin-bottom:0">' + (e.nome_entrega || '(sem nome)') + '</div>'
+      + '<div style="display:flex;align-items:center;gap:2px;flex-shrink:0">'
+      + (isAdmin ? '<button type="button" class="sp-rel-chip-rm" title="Excluir entrega (permanente)" onclick="event.stopPropagation();_spExcluirEntrega(\'' + e.id + '\',\'' + (e.nome_entrega||'').replace(/'/g,"\\'") + '\')"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 4h12M5.5 4V2.5a1 1 0 011-1h3a1 1 0 011 1V4M6.5 7.5v4M9.5 7.5v4M3.5 4l.7 8.5a1 1 0 001 .9h5.6a1 1 0 001-.9L12.5 4"/></svg></button>' : '')
       + '<button type="button" class="sp-rel-chip-rm" title="Desvincular desta obra" onclick="event.stopPropagation();_spDesvincularEntrega(\'' + e.id + '\',\'' + (e.nome_entrega||'').replace(/'/g,"\\'") + '\')">&times;</button>'
+      + '</div>'
       + '</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:10px 12px">'
       + _entCampo('Etapa', etapaBadge)
@@ -2171,9 +2181,17 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  // Sem botão "Salvar" — pedido explícito: qualquer alteração no formulário
  // já salva sozinha (ver _obraScheduleAutoSave/_spSaveObraFull), mesmo
  // padrão de autosave já usado nos painéis de Empresa/Contato/Atividade.
+ // "Excluir obra" só aparece pra admin (mesmo padrão de "Excluir
+ // contato"/"Excluir empresa" — botão à esquerda, vermelho, margin-right:auto
+ // empurra "Fechar" pro canto certo) — a política de DELETE de `obras` no
+ // banco também só libera pra admin (migração
+ // restrict_obras_entregas_delete_to_admin), então esconder o botão aqui não
+ // é a única barreira.
+ var isAdminObra = !!(_currentUser && _currentUser.isAdmin);
  _spSet('Obra', (o.nome||'').split('—')[0]?.trim() || o.nome || 'Obra',
   html,
-  '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
+  (isAdminObra ? '<button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);margin-right:auto" onclick="_spExcluirObra(\'' + o.id + '\',\'' + (o.nome||'').replace(/'/g,"\\'") + '\')">Excluir obra</button> ' : '')
+  + '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
  );
 
  _spCarregarPropostaStatus(o.id);
@@ -2680,6 +2698,32 @@ async function _spDesvincularEntrega(id, nome) {
  if (error) { alert('Erro ao desvincular: ' + (error?.message || '')); return; }
  if (_obraAtiva && _obraAtiva.id) _spObraById(_obraAtiva.id);
  if (typeof _dbLoadEntregas === 'function') _dbLoadEntregas();
+}
+// Exclusão de verdade (não é o "desvincular" acima) — só admin (botão só
+// aparece pra admin, e a política de DELETE de `entregas` no banco também
+// só libera pra admin; ver migração restrict_obras_entregas_delete_to_admin).
+// ON DELETE CASCADE em documentos/documentos_entregas cuida dos anexos.
+async function _spExcluirEntrega(id, nome) {
+ if (!confirm('Excluir "' + (nome || 'esta entrega') + '" PERMANENTEMENTE?\n\nOs documentos anexados a ela também serão excluídos. Esta ação não pode ser desfeita.')) return;
+ const { error } = await _sb.from('entregas').delete().eq('id', id);
+ if (error) { alert('Erro ao excluir: ' + (error?.message || '')); return; }
+ if (_obraAtiva && _obraAtiva.id) _spObraById(_obraAtiva.id);
+ if (typeof _dbLoadEntregas === 'function') _dbLoadEntregas();
+}
+// Exclusão de Obra — só admin (botão + política de DELETE no banco, mesmo
+// esquema de _spExcluirEntrega). Cascata real do schema (ver FKs de obras):
+// empresas_obras/contatos_obras/atividades_obras/documentos/
+// memorial_calculo_obras são apagados junto (ON DELETE CASCADE); Projetos/
+// Entregas/Instalações NÃO são excluídos, só ficam com obra_id nulo (ON
+// DELETE SET NULL) — aviso disso no próprio confirm(), pra não parecer que
+// a obra "sumiu com tudo".
+async function _spExcluirObra(id, nome) {
+ if (!confirm('Excluir "' + (nome || 'esta obra') + '" PERMANENTEMENTE?\n\nDocumentos e vínculos com empresa/contato/tarefas desta obra também serão excluídos. Projetos, Entregas e Instalações vinculados NÃO serão excluídos — só ficam sem obra associada. Esta ação não pode ser desfeita.')) return;
+ const { error } = await _sb.from('obras').delete().eq('id', id);
+ if (error) { alert('Erro ao excluir: ' + (error?.message || '')); return; }
+ closePanel();
+ if (typeof _dbLoadObras === 'function') _dbLoadObras();
+ if (typeof _dbLoadObrasKanban === 'function') _dbLoadObrasKanban();
 }
 
 function _spToggleNovoContato() {
