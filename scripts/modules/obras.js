@@ -1179,6 +1179,111 @@ async function _spCarregarDocumentos(obraId) {
  container.dataset.obraGrupos = JSON.stringify(grupos);
 }
 
+// ── Registros fotográficos: agrega `documentos` tipo='fotos_obra' de TODOS
+// os Projetos vinculados a esta Obra (o campo de fotos vive em Projetos no
+// Airtable, não em Obras — auditoria via SQL: 439/439 linhas com
+// projeto_id preenchido, 0 com obra_id). Bucket próprio no Storage
+// (`documentos_projetos`, confirmado via storage.objects), diferente do
+// bucket de documentos "normais" da obra.
+async function _spCarregarRegistros(obraId, projetos) {
+ var container = document.getElementById('sp-registros-lista');
+ var infoEl = document.getElementById('sp-registros-info');
+ if (!container) return;
+ var projIds = (projetos || []).map(function(p){ return p.id; });
+ if (!projIds.length) { container.innerHTML = ''; if (infoEl) infoEl.textContent = ''; return; }
+
+ var res = await _sb.from('documentos').select('*').eq('tipo', 'fotos_obra').in('projeto_id', projIds).order('created_at', { ascending: false });
+ if (res.error) { container.innerHTML = '<div class="sp-empty" style="color:var(--red)">Erro ao carregar registros.</div>'; return; }
+ var fotos = res.data || [];
+ if (infoEl) infoEl.textContent = fotos.length ? (fotos.length + (fotos.length === 1 ? ' foto' : ' fotos')) : '';
+ if (!fotos.length) { container.innerHTML = '<div class="sp-empty">Nenhum registro fotográfico enviado ainda.</div>'; return; }
+
+ // Assinatura em lote — todas as fotos vêm do mesmo bucket, então 1 chamada
+ // resolve as URLs de todas em vez de 1 signed URL por foto.
+ var paths = fotos.map(function(f){ return f.caminho_storage; }).filter(Boolean);
+ var signedMap = {};
+ if (paths.length) {
+  var sig = await _sb.storage.from('documentos_projetos').createSignedUrls(paths, 3600);
+  if (!sig.error) (sig.data || []).forEach(function(s){ if (s.signedUrl && s.path) signedMap[s.path] = s.signedUrl; });
+ }
+
+ var projNome = {};
+ (projetos || []).forEach(function(p){ projNome[p.id] = p.nome || 'Projeto sem nome'; });
+ var grupos = {}; var ordem = [];
+ fotos.forEach(function(f) {
+  var k = f.projeto_id || '—';
+  if (!grupos[k]) { grupos[k] = []; ordem.push(k); }
+  grupos[k].push(f);
+ });
+
+ container.innerHTML = ordem.map(function(k) {
+  var itens = grupos[k].map(function(f) {
+   var url = signedMap[f.caminho_storage];
+   var nome = (f.nome_arquivo || 'Foto').toString();
+   var pathSafe = String(f.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+   var nomeSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+   var onclickAttr = url ? " onclick=\"_spAbrirDocStorage('" + pathSafe + "','" + nomeSafe + "','documentos_projetos')\"" : '';
+   return '<div' + onclickAttr + ' title="' + nome.replace(/"/g,'&quot;') + '" style="cursor:' + (url ? 'pointer' : 'default') + ';border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1;background:var(--surface2)">'
+    + (url
+       ? '<img src="' + url + '" alt="' + nome.replace(/"/g,'&quot;') + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">'
+       : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:10px;text-align:center;padding:4px">Sem prévia</div>')
+    + '</div>';
+  }).join('');
+  return '<div style="margin-bottom:18px">'
+   + '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">' + (projNome[k] || 'Projeto') + ' (' + grupos[k].length + ')</div>'
+   + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px">' + itens + '</div>'
+   + '</div>';
+ }).join('');
+}
+
+function _spRegistrosDropzone() {
+ return '<label id="sp-registros-dz" style="display:flex;align-items:center;justify-content:center;gap:6px;height:100%;border:2px dashed var(--border);border-radius:8px;padding:9px 8px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center;font-size:11px;color:var(--muted)"'
+  + ' onmouseover="this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.04)\'"'
+  + ' onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
+  + ' ondragover="event.preventDefault();this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.07)\'"'
+  + ' ondragleave="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
+  + ' ondrop="_spRegistrosDrop(event)">'
+  + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.7"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>'
+  + '<span id="sp-registros-dz-lbl">Clique ou arraste fotos para adicionar</span>'
+  + '<input type="file" id="sp-registros-file" accept="image/*" multiple style="display:none" onchange="_spRegistrosFileChange(this)">'
+  + '</label>';
+}
+async function _spUploadRegistro(file, projetoId, obraId) {
+ var path = 'projetos/' + projetoId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.\-]/g,'_');
+ var up = await _sb.storage.from('documentos_projetos').upload(path, file, { upsert: false });
+ if (up.error) { console.error('[Obras] erro ao enviar registro:', up.error); return false; }
+ var ins = await _sb.from('documentos').insert({
+  projeto_id: projetoId, obra_id: obraId, nome_arquivo: file.name, tipo: 'fotos_obra',
+  categoria: 'Técnico', caminho_storage: path, tamanho_bytes: file.size, mime_type: file.type,
+  status: 'Ativo', versao: 1, origem: 'upload_manual',
+ });
+ if (ins.error) { console.error('[Obras] erro ao registrar foto:', ins.error); return false; }
+ return true;
+}
+async function _spRegistrosUploadFiles(files) {
+ if (!files || !files.length) return;
+ var projetoId = document.getElementById('sp-registros-projeto')?.value;
+ var obraId = _obraAtiva && _obraAtiva.id;
+ if (!projetoId) { alert('Selecione o projeto ao qual as fotos pertencem.'); return; }
+ var lbl = document.getElementById('sp-registros-dz-lbl');
+ if (lbl) lbl.textContent = 'Enviando...';
+ var erros = 0;
+ for (var i = 0; i < files.length; i++) { if (!(await _spUploadRegistro(files[i], projetoId, obraId))) erros++; }
+ if (lbl) lbl.textContent = 'Clique ou arraste fotos para adicionar';
+ if (erros) alert(erros + ' foto(s) não enviada(s). Tente novamente.');
+ _spCarregarRegistros(obraId, (_obraAtiva && _obraAtiva.projetos) || []);
+}
+function _spRegistrosFileChange(input) {
+ _spRegistrosUploadFiles(Array.prototype.slice.call(input.files || []));
+ input.value = '';
+}
+function _spRegistrosDrop(event) {
+ event.preventDefault();
+ var dz = event.currentTarget; dz.style.borderColor = 'var(--border)'; dz.style.background = '';
+ var files = event.dataTransfer && event.dataTransfer.files;
+ _spRegistrosUploadFiles(Array.prototype.slice.call(files || []));
+}
+
 function _spDocTipoFilter(tipo) {
  _docTipoAtivo = tipo;
  var container = document.getElementById('sp-propostas-lista');
@@ -1815,6 +1920,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<button class="spt-btn" data-target="spt-instalacao" onclick="_sptSwitch(\'instalacao\',this)">Instalação' + badge(instalacoes.length) + '</button>'
   + '<button class="spt-btn" data-target="spt-tarefas" onclick="_sptSwitch(\'tarefas\',this)">Tarefas' + badge(atividades.length) + '</button>'
   + '<button class="spt-btn" data-target="spt-documentos" onclick="_sptSwitch(\'documentos\',this)">Documentos</button>'
+  + '<button class="spt-btn" data-target="spt-registros" onclick="_sptSwitch(\'registros\',this)">Registros</button>'
   + '</div>'
 
   // ── SEÇÃO: Visão Geral ───────────────────────────────────────────────────────
@@ -2176,7 +2282,29 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // verdade (é tudo 1 página só), carrega direto (ver chamada logo após
   // _spSet mais abaixo, junto com _spCarregarPropostaStatus).
   + '<div id="sp-propostas-lista"><div class="sp-empty"><div style="font-size:11px;color:var(--muted)">Carregando...</div></div></div>'
-  + '</div>'; // fim spt-panel documentos
+  + '</div>' // fim spt-panel documentos
+
+  // ── SEÇÃO: Registros (fotográficos) ───────────────────────────────────────
+  // Pedido explícito: sub-aba "Registros" dentro do detalhamento de Obra —
+  // no Airtable esse campo de fotos (multipleAttachments) vive na tabela
+  // Projetos ("fotos_obra", ver auditoria de schema), não em Obras; como uma
+  // Obra pode ter vários Projetos, a aba agrega as fotos de TODOS os
+  // projetos vinculados a esta obra num só lugar, agrupadas por projeto.
+  + '<div class="spt-panel" id="spt-registros">'
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">'
+  + '<div style="font-size:12px;font-weight:700;color:var(--text)">Registros fotográficos</div>'
+  + '<span style="font-size:10px;color:var(--muted)" id="sp-registros-info"></span>'
+  + '</div>'
+  + (projetos.length
+     ? ('<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:14px">'
+        + '<select class="sp-inp" id="sp-registros-projeto" style="max-width:240px;font-size:12px;flex-shrink:0">'
+        + projetos.map(function(p){ return '<option value="' + p.id + '">' + (p.nome || 'Projeto sem nome').replace(/</g,'&lt;') + '</option>'; }).join('')
+        + '</select>'
+        + '<div style="flex:1">' + _spRegistrosDropzone() + '</div>'
+        + '</div>')
+     : '<div class="sp-empty" style="margin-bottom:14px">Vincule um projeto a esta obra para poder registrar fotos.</div>')
+  + '<div id="sp-registros-lista"><div class="sp-empty"><div style="font-size:11px;color:var(--muted)">Carregando...</div></div></div>'
+  + '</div>'; // fim spt-panel registros
 
  // Sem botão "Salvar" — pedido explícito: qualquer alteração no formulário
  // já salva sozinha (ver _obraScheduleAutoSave/_spSaveObraFull), mesmo
@@ -2196,6 +2324,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
 
  _spCarregarPropostaStatus(o.id);
  _spCarregarDocumentos(o.id);
+ _spCarregarRegistros(o.id, projetos);
  _sptInitScrollSpy();
 
  if (tipo === 'Modular') {
