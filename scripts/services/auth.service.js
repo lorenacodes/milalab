@@ -26,11 +26,17 @@ function _loginSuccess(user) {
  firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
  // isAdmin calculado logo abaixo (mesma regra de sempre) — guardado aqui
  // pra qualquer tela do sistema poder checar "_currentUser.isAdmin" sem
- // duplicar a lógica de _ALLOWED_EMAILS/user_metadata.role. Antes só
+ // duplicar a lógica de _ALLOWED_EMAILS/app_metadata.role. Antes só
  // existia como variável local desta função (usada só pro menu/badge de
  // Admin), então nenhuma outra tela conseguia perguntar "este usuário é
  // admin?" — pedido explícito: botões de excluir Obra/Entrega só pra admin.
- var isAdminUser = _ALLOWED_EMAILS.indexOf(email) !== -1 || (user.user_metadata && user.user_metadata.role === 'admin');
+ // app_metadata (NÃO user_metadata) — user_metadata é editável pelo
+ // próprio usuário via client SDK (supabase.auth.updateUser), então usá-lo
+ // numa decisão de admin deixaria qualquer autenticado se autopromover
+ // (achado real do linter de segurança do Supabase, mesmo problema já
+ // corrigido nas políticas de RLS de obras/entregas e na edge function
+ // auth-admin — as 3 fontes agora leem do mesmo campo seguro).
+ var isAdminUser = _ALLOWED_EMAILS.indexOf(email) !== -1 || (user.app_metadata && user.app_metadata.role === 'admin');
  _currentUser = { id: user.id, email: email, name: metaNome || firstName, firstName: firstName, isAdmin: isAdminUser };
  var ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'none';
  if (!localStorage.getItem('pp-name')) localStorage.setItem('pp-name', metaNome || firstName);
@@ -38,7 +44,7 @@ function _loginSuccess(user) {
  var tu  = document.getElementById('topbar-user');   if (tu)  tu.style.display  = 'flex';
  var tn  = document.getElementById('topbar-user-name'); if (tn) tn.textContent  = email;
  // Admin = e-mail na lista fixa (bootstrap original) OU role='admin' salvo
- // no user_metadata pelo próprio painel de Admin (_adminAlterarRole →
+ // no app_metadata pelo próprio painel de Admin (_adminAlterarRole →
  // auth-admin/alterar-role) — mesma regra já usada do lado do servidor
  // (Edge Function auth-admin: "ADMINS.includes(email) || role==='admin'").
  // Antes só checava a lista fixa aqui: promover alguém a admin pelo painel
