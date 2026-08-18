@@ -1847,10 +1847,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div class="sp-field"><div class="sp-label">UF</div>' + _srchSelMarkup('uf', 'sp-uf', (o.estado||'').toUpperCase()) + '</div>'
   + '<div class="sp-field"><div class="sp-label">Canal de vendas</div>' + _srchSelMarkup('canal', 'sp-canal', o.canal_vendas || '') + '</div>'
   + '</div>'
-  + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">CNO (Cadastro Nacional de Obras)</div><input class="sp-inp" id="sp-cno" value="' + (o.cno||'') + '" placeholder="00.000.000.000-0" oninput="_obraScheduleAutoSave()"></div>'
+  // Pedido explícito: endereço ficava espremido lado a lado com CNO (2
+  // colunas) — endereços reais são longos (rua + número + cidade/UF +
+  // às vezes até link de mapa, ver exemplo real "Rua Erlicio Martins,
+  // Canindé/CE.https://maps.app...") e cortavam visualmente. Linha
+  // própria, largura cheia, pra aparecer inteiro assim que abre o painel.
   + '<div class="sp-field"><div class="sp-label">Endereço de Entrega</div><input class="sp-inp" id="sp-end-entrega" value="' + (o.endereco_entrega||'') + '" placeholder="Rua, nº, cidade..." oninput="_obraScheduleAutoSave()"></div>'
-  + '</div>'
 
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-obra-quantidade" type="number" min="0" placeholder="—" value="' + (o.quantidade != null ? o.quantidade : '') + '" oninput="_obraScheduleAutoSave()"></div>'
