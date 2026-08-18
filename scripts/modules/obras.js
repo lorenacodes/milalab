@@ -1691,9 +1691,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      var etapaBadge = e.etapa
       ? '<span class="badge" style="background:' + _entBucketCor[bucket] + '22;color:' + _entBucketCor[bucket] + ';font-size:10px">' + e.etapa + '</span>'
       : '—';
-     return '<div class="sp-item-card">'
+     // onclick no card inteiro (não só no título) — achado real: só o texto
+     // do título respondia ao clique, o resto do card (grid de campos)
+     // parecia clicável (cursor:pointer herdado de .sp-item-card) mas não
+     // fazia nada.
+     return '<div class="sp-item-card" onclick="_spOpenEntityById(\'entregas\',\'' + e.id + '\')">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
-      + '<div class="sp-item-title" style="margin-bottom:0;cursor:pointer" onclick="_spOpenEntityById(\'entregas\',\'' + e.id + '\')">' + (e.nome_entrega || '(sem nome)') + '</div>'
+      + '<div class="sp-item-title" style="margin-bottom:0">' + (e.nome_entrega || '(sem nome)') + '</div>'
       + '<button type="button" class="sp-rel-chip-rm" title="Desvincular desta obra" onclick="event.stopPropagation();_spDesvincularEntrega(\'' + e.id + '\',\'' + (e.nome_entrega||'').replace(/'/g,"\\'") + '\')">&times;</button>'
       + '</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:10px 12px">'
@@ -2053,11 +2057,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // mesmo bucket/mecânica de upload já usada em Documentos da Obra
   // (_spEnviarDocObra), só que aqui o documento carrega entrega_id além
   // de obra_id (coluna nova, migração add_entrega_id_to_documentos).
+  // _spEntDropzone: mesmo visual de dropzone (ícone + "clique ou arraste")
+  // já usado em Documentos da Obra — pedido explícito: o <input type=file>
+  // cru (com o "Escolher arquivo/Nenhum arquivo escolhido" padrão do
+  // navegador) destoava completamente do resto do design do sistema.
   + '<div class="sp-g2" style="gap:8px;margin-top:10px">'
-  + '<div class="sp-field"><div class="sp-label">Documentos específicos da entrega</div>'
-  + '<input type="file" class="sp-inp" id="sp-new-ent-doc" multiple style="padding:5px 8px"></div>'
-  + '<div class="sp-field"><div class="sp-label">Ordem de Produção</div>'
-  + '<input type="file" class="sp-inp" id="sp-new-ent-op" style="padding:5px 8px"></div>'
+  + '<div class="sp-field"><div class="sp-label">Documentos específicos da entrega</div>' + _spEntDropzone('sp-new-ent-doc', 'sp-new-ent-doc-lbl', true) + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Ordem de Produção</div>' + _spEntDropzone('sp-new-ent-op', 'sp-new-ent-op-lbl', false) + '</div>'
   + '</div>'
   // Bug real encontrado ao testar: um "</div>" a mais aqui fechava
   // #sp-nova-entrega-form ANTES da hora — a linha de botões "Criar
@@ -2572,6 +2578,49 @@ function _spToggleNovaEntrega() {
 // "Documento da Entrega" ou "Ordem de Produção" (os 2 anexos do formulário
 // do Airtable). Erro de upload não derruba a criação da entrega em si —
 // ela já foi criada com sucesso quando isto roda; só avisa.
+// ── Dropzone genérico (Documentos específicos da entrega / Ordem de Produção) ──
+// Mesmo visual (ícone + "clique ou arraste") do dropzone único já usado em
+// Documentos da Obra (_spUploadDrop/#sp-upload-dropzone), só que
+// parametrizado por par de ids — aqui precisa de 2 instâncias lado a lado
+// (compactas), então não dava pra reaproveitar direto os ids fixos daquele.
+function _spEntDropzone(inputId, labelId, multi) {
+ return '<label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px dashed var(--border);border-radius:8px;padding:12px 8px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center"'
+  + ' onmouseover="this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.04)\'"'
+  + ' onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
+  + ' ondragover="event.preventDefault();this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.07)\'"'
+  + ' ondragleave="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
+  + ' ondrop="_spEntFileDrop(event,\'' + inputId + '\',\'' + labelId + '\',' + (multi ? 'true' : 'false') + ')">'
+  + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.7"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>'
+  + '<span id="' + labelId + '" style="font-size:10px;color:var(--muted)">Clique ou arraste aqui</span>'
+  + '<input type="file" id="' + inputId + '"' + (multi ? ' multiple' : '') + ' style="display:none" onchange="_spEntFileChange(\'' + inputId + '\',\'' + labelId + '\',' + (multi ? 'true' : 'false') + ')">'
+  + '</label>';
+}
+function _spEntFileChange(inputId, labelId) {
+ var input = document.getElementById(inputId);
+ var lbl = document.getElementById(labelId);
+ if (!input || !lbl) return;
+ var files = input.files;
+ if (!files || !files.length) { lbl.textContent = 'Clique ou arraste aqui'; return; }
+ lbl.innerHTML = files.length > 1
+  ? '<span style="color:var(--green);font-weight:700">✓ ' + files.length + ' arquivos</span>'
+  : '<span style="color:var(--green);font-weight:700">✓ ' + files[0].name + '</span>';
+}
+function _spEntFileDrop(event, inputId, labelId, multi) {
+ event.preventDefault();
+ var dz = event.currentTarget;
+ dz.style.borderColor = 'var(--border)'; dz.style.background = '';
+ var files = event.dataTransfer && event.dataTransfer.files;
+ if (!files || !files.length) return;
+ var input = document.getElementById(inputId);
+ if (!input) return;
+ try {
+  var dt = new DataTransfer();
+  var toAdd = multi ? Array.from(files) : [files[0]];
+  toAdd.forEach(function(f){ dt.items.add(f); });
+  input.files = dt.files;
+  _spEntFileChange(inputId, labelId);
+ } catch(e) { _showToast('Arraste não suportado — use o botão de seleção', 'aviso'); }
+}
 async function _spUploadDocEntrega(file, entregaId, obraId, tipo) {
  var ext = (file.name.split('.').pop() || 'bin').toLowerCase();
  var path = 'entregas/' + entregaId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.\-]/g,'_');
