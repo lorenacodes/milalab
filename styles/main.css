@@ -1079,7 +1079,17 @@ td{font-size:13px}
    funcionando como navegação enquanto o usuário rola (mesmo truque de
    margin negativa de antes, só que agora "grudada" em vez de estática). */
 .spt-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin:-18px -18px 18px;padding:0 18px;background:var(--surface);flex-shrink:0;overflow-x:auto;position:sticky;top:0;z-index:5}
-.spt-btn{font-size:12px;font-weight:600;padding:10px 14px;border:none;background:none;cursor:pointer;color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;font-family:inherit}
+/* padding/fonte reduzidos (eram 14px/12px) — com a 7ª aba (Registros)
+   somada às 6 originais + badges de contagem, o total media ~709px de
+   largura natural contra ~615px disponíveis no painel em sua largura
+   padrão (620px) — 94px de estouro, forçando uma barra de rolagem
+   horizontal desnecessária mesmo sem o usuário ter encolhido o painel.
+   Medido via getBoundingClientRect (não só olhando na tela) pra achar um
+   valor com folga real, não só "cabe por 1px": com 10px 6px + 11px de
+   fonte + badge mais compacto, a largura natural cai pra ~560px, ~55px
+   de sobra. overflow-x:auto do .spt-bar continua como salvaguarda só pra
+   quando o painel É encolhido manualmente abaixo do necessário. */
+.spt-btn{font-size:11px;font-weight:600;padding:10px 6px;border:none;background:none;cursor:pointer;color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s;font-family:inherit}
 .spt-btn:hover{color:var(--text)}
 .spt-btn.active{color:var(--navy);border-bottom-color:var(--navy)}
 /* scroll-margin-top compensa a altura da .spt-bar sticky ao rolar até a
@@ -1090,7 +1100,7 @@ td{font-size:13px}
    na mesma rolagem, não mais em telas separadas. */
 .spt-panel{display:block;scroll-margin-top:54px}
 .spt-panel + .spt-panel{margin-top:28px;padding-top:24px;border-top:1px solid var(--border)}
-.spt-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;border-radius:var(--r-md);background:var(--border);color:var(--muted);font-size:10px;font-weight:700;padding:0 4px;margin-left:4px;vertical-align:middle}
+.spt-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;border-radius:var(--r-md);background:var(--border);color:var(--muted);font-size:9px;font-weight:700;padding:0 3px;margin-left:3px;vertical-align:middle}
 .spt-badge.has-data{background:#1B1B8F;color:#fff}
 /* ── Cards de itens nas abas ───────────────────────────────── */
 .sp-item-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
