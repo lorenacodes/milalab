@@ -656,12 +656,19 @@ function _spEntDetCategoriaHTML(cat, docs, entregaId, obraId) {
      var dt = d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : '';
      var pathSafe = String(d.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
      var nomeAttrSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+     // Acervo migrado do Airtable foi enviado direto pro bucket
+     // `documentos_entregas` (não `documentos_obras`, onde os uploads NOVOS
+     // caem via _spUploadDocEntrega) — sem essa distinção o signed URL
+     // saía sempre pro bucket errado e a Storage retornava "Object not
+     // found" pra qualquer NF/romaneio antigo (nunca chegava a checar
+     // permissão de verdade, o objeto nem existe naquele bucket).
+     var bucket = d.origem === 'airtable_importado' ? 'documentos_entregas' : 'documentos_obras';
      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--surface)">'
       + '<div style="min-width:0">'
       + '<div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px" title="' + nome.replace(/"/g,'&quot;') + '">' + nome + '</div>'
       + (dt ? '<div style="font-size:9px;color:var(--muted);margin-top:2px">' + dt + '</div>' : '')
       + '</div>'
-      + '<button type="button" class="btn btn-ghost btn-sm" onclick="_spAbrirDocStorage(\'' + pathSafe + '\',\'' + nomeAttrSafe + '\')">Visualizar</button>'
+      + '<button type="button" class="btn btn-ghost btn-sm" onclick="_spAbrirDocStorage(\'' + pathSafe + '\',\'' + nomeAttrSafe + '\',\'' + bucket + '\')">Visualizar</button>'
       + '</div>';
     }).join('')
   : '<div class="sp-empty" style="padding:8px 0;font-size:11px">Nenhum documento enviado.</div>';

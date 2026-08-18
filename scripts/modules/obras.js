@@ -1438,13 +1438,13 @@ async function _spDownloadProposta(propostaId) {
  setTimeout(function(){ var m = document.getElementById('proposta-modal'); if (m) { var b = m.querySelector('button[onclick*="print"]'); if (b) b.click(); } }, 800);
 }
 
-async function _spAbrirDocStorage(path, nomeArquivo) {
+async function _spAbrirDocStorage(path, nomeArquivo, bucket) {
  if (!_dbOk) { _showToast('Banco de dados offline', 'erro'); return; }
  if (!path) { _showToast('Caminho do arquivo não encontrado', 'erro'); return; }
  // Mostrar modal com loading
  _spDocPdfModal(null, nomeArquivo || 'Documento');
  try {
-  var res = await _sb.storage.from('documentos_obras').createSignedUrl(path, 3600);
+  var res = await _sb.storage.from(bucket || 'documentos_obras').createSignedUrl(path, 3600);
   if (res.error) {
    console.error('[Storage] createSignedUrl erro:', res.error, '| path:', path);
    _spDocPdfModalErro('Erro ao carregar: ' + (res.error.message || 'Sem permissão ou arquivo não encontrado'));
