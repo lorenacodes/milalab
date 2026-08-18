@@ -999,6 +999,11 @@ async function _spObraById(id) {
  _spSet('Obra', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
  document.getElementById('sp-overlay').classList.add('sp-open');
  document.getElementById('sp-drawer').classList.add('sp-open');
+ // Chamada direta (Kanban/botão "Abrir"), sem passar por _spOpen — precisa
+ // se anunciar pra pilha de navegação (ver _spTrackDirectOpen em
+ // side-panel.js), senão abrir um Projeto de dentro desta Obra depois não
+ // sabe pra onde voltar ao fechar.
+ if (typeof _spTrackDirectOpen === 'function') _spTrackDirectOpen('obras', id);
 
  try {
   const [obraRes, projRes, entregasRes, instRes, atividadesRes] = await Promise.all([

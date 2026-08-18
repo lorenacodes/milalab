@@ -35,9 +35,16 @@ function _spOpen(section, row) {
  ov.classList.add('sp-open');
  dr.classList.add('sp-open');
  if (row.isConnected) _spNavStack = [];
- _spRender(section, row);
+ // Marcado ANTES de _spRender (não depois): alguns renderers de destino
+ // (_spObraById/_spEntregaById) chamam _spTrackDirectOpen elas mesmas pra
+ // cobrir quando são acionadas direto por Kanban/calendário — se
+ // _spCurrentSection/_spCurrentId só fossem atualizados DEPOIS de
+ // _spRender rodar, essa chamada interna ainda veria os valores da
+ // entidade ANTERIOR e resetaria a pilha que _spOpenEntityById acabou de
+ // empilhar um instante atrás.
  _spCurrentSection = section;
  _spCurrentId = row.dataset.id || null;
+ _spRender(section, row);
  document.addEventListener('keydown', _spEsc, {once:true});
 }
 
@@ -125,6 +132,26 @@ function _spOpenEntityById(section, id) {
  var row = document.createElement('tr');
  row.dataset.id = id;
  _spOpen(section, row);
+}
+
+// Algumas entidades (Obra, Entrega) têm renderers "XById" (_spObraById,
+// _spEntregaById) chamados DIRETO por card de Kanban/evento de calendário/
+// botão "Abrir" da tabela — abrem o overlay/drawer sozinhos, sem passar por
+// _spOpen. Isso deixava _spCurrentSection/_spCurrentId nunca atualizados
+// nesses casos: abrir uma Obra pelo Kanban e depois um Projeto de dentro
+// dela não empilhava nada (_spOpenEntityById via de checar
+// _spCurrentSection/_spCurrentId, que continuavam null), então "Fechar" o
+// Projeto fechava tudo em vez de voltar pra Obra — o bug relatado
+// continuava mesmo com a pilha implementada. Essas funções chamam este
+// helper pra se anunciar do mesmo jeito que _spOpen já faz. Só reseta a
+// pilha quando é de fato uma entidade/id NOVO — uma chamada de refresh da
+// própria entidade já aberta (ex.: depois de salvar) não deve apagar a
+// pilha de quem a abriu.
+function _spTrackDirectOpen(section, id) {
+ var mesmaEntidade = _spCurrentSection === section && String(_spCurrentId) === String(id);
+ if (!mesmaEntidade) _spNavStack = [];
+ _spCurrentSection = section;
+ _spCurrentId = id;
 }
 
 // ── Chip de "registro vinculado" (padrão Airtable) ─────────────────────────────

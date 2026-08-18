@@ -471,6 +471,12 @@ function _spEntregas(row, tds) {
 // ── Renderer: Entrega por id ────────────────────────────────────────────────
 function _spEntregaById(id) {
  if (!id) return;
+ // Chamada direta (card de Kanban/evento de calendário), sem passar por
+ // _spOpen — precisa se anunciar pra pilha de navegação (ver
+ // _spTrackDirectOpen em side-panel.js) ANTES do atalho de cache abaixo,
+ // já que na prática é esse atalho que roda quando vem do Kanban/
+ // calendário (a lista já está carregada em memória).
+ if (typeof _spTrackDirectOpen === 'function') _spTrackDirectOpen('entregas', id);
  var e = (_entregasArr || []).find(function(x){ return String(x.id) === String(id); });
  if (e) { _spEntregaRender(e); return; }
 
