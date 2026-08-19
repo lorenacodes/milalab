@@ -366,7 +366,13 @@ body.light .dash-panel{
  .mf.span2{grid-column:span 2}
  .mf label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:3px}
  .mf label .req{color:var(--red);font-size:13px;line-height:1}
- .mf input,.mf select,.mf textarea{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s;width:100%}
+ /* :not([type=checkbox]):not([type=radio]) — sem essa exclusão, width:100%
+    vazava pra dentro de QUALQUER checkbox/radio aninhado num .mf (ex.: os
+    checkboxes do multiselect de Produto/Responsável/Tipologia no wizard de
+    Nova Obra, que ficam dentro de um .mf ancestral), esticando a caixinha
+    do checkbox pra ocupar a linha inteira e empurrando o texto do item pra
+    a borda direita — reportado como "mal formatado". */
+ .mf input:not([type="checkbox"]):not([type="radio"]),.mf select,.mf textarea{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 12px;font-size:13px;color:var(--text);font-family:inherit;outline:none;transition:border-color .15s,box-shadow .15s;width:100%}
  .mf input:focus,.mf select:focus,.mf textarea:focus{border-color:var(--navy);box-shadow:0 0 0 3px var(--navy-dim)}
  .mf select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16' fill='none' stroke='%238B949E' stroke-width='2'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
  .mf textarea{resize:vertical;min-height:72px;line-height:1.5}
@@ -1297,3 +1303,15 @@ body.light .topbar.tb-glass{
 .fb-msel-item{display:flex;align-items:center;gap:6px;padding:6px 8px;font-size:12px;color:var(--text);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:var(--r-xs)}
 .fb-msel-item:hover{background:var(--surface2)}
 .fb-msel-item-active{background:var(--navy-dim);color:var(--navy);font-weight:600}
+/* .fb-msel-* nasceu pro popover ESTREITO de condição de filtro (.fb-pop,
+   560px de largura, dividido com outros seletores da mesma linha) — daí o
+   max-width:340px/ellipsis acima. No wizard de Nova Obra (Produto/
+   Responsável/Tipologia do Telhado/Tipo de Telha) o campo ocupa uma coluna
+   BEM mais larga (.modal-grid.col2 dentro do modal de 900px), e o teto
+   estreito deixava o painel/itens "mal formatados" nesse contexto (texto
+   cortado sem necessidade, sobrando espaço). .no-msel-wide escopa a
+   correção só pro wizard — Filtro/Fornecedor continuam com o padrão
+   estreito original, sem mudança nenhuma. */
+.no-msel-wide .fb-msel-wrap{width:100%}
+.no-msel-wide .fb-msel-panel{width:100%;max-width:none;box-sizing:border-box}
+.no-msel-wide .fb-msel-item{white-space:normal;overflow:visible;text-overflow:clip}

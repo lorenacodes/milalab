@@ -636,6 +636,20 @@ function _noProjAdd() {
 }
 function _noProjRemove(idx) { _noProjLista.splice(idx, 1); _noProjRender(); }
 function _noProjSet(idx, field, val) { _noProjLista[idx][field] = val; if (field === 'tipoObra') _noProjRender(); }
+// Valor unit.: mesmo padrão de Fornecedor (empresas.js, "Valor unitário" de
+// Produtos orçados) — máscara de digitação (_moedaMascarar) + valor
+// numérico real guardado à parte (_moedaParaNumero) pra não misturar o
+// texto mascarado ("1.234,56") com o que de fato vai pro payload da RPC.
+function _noProjVuniInput(idx, inputEl) {
+ inputEl.value = _moedaMascarar(inputEl.value);
+ _noProjLista[idx].vuni = _moedaParaNumero(inputEl.value);
+ _noProjRecalcularTotal(idx);
+}
+function _noProjRecalcularTotal(idx) {
+ var p = _noProjLista[idx];
+ var totEl = document.getElementById('no-proj-total-' + idx);
+ if (totEl) totEl.textContent = _moedaFormatarBRL((parseFloat(p.qtd) || 0) * (parseFloat(p.vuni) || 0));
+}
 function _noProjToggleConsFinal(idx, checked) {
  var p = _noProjLista[idx];
  p.consumidorFinal = checked;
@@ -798,16 +812,25 @@ function _noProjRender() {
    + '</select></div>'
    + '</div>';
 
+  // Pills coloridas (mesmo padrão do grid de "Tipo(s) de obra" do Passo 1,
+  // _noTipoGridRender/_NO_TIPO_COR) em vez de <select> nativo sem cor —
+  // pedido explícito: essa identidade visual (verde/roxo/azul/amarelo/
+  // laranja por tipo) deveria valer aqui também. <option> de <select> não
+  // aceita cor de fundo/borda de forma confiável entre navegadores, então
+  // vira botões (seleção única: só 1 fica "preenchido" por vez).
   html += '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de obra do projeto <span class="req">*</span></label>'
-   + '<select class="sp-inp" style="font-size:12px" onchange="_noProjSet(' + idx + ',\'tipoObra\',this.value)">'
-   + '<option value="">Selecione...</option>'
-   + tipoOpts.map(function(t){ return '<option' + (t===p.tipoObra?' selected':'') + '>' + t + '</option>'; }).join('')
-   + '</select>'
+   + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'
+   + tipoOpts.map(function(t) {
+      var selT = t === p.tipoObra;
+      var corT = _NO_TIPO_COR[t] || 'var(--navy)';
+      return '<button type="button" onclick="_noProjSet(' + idx + ',\'tipoObra\',\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + corT + ';background:' + (selT?corT:'transparent') + ';color:' + (selT?'#fff':corT) + '">' + t + '</button>';
+     }).join('')
+   + '</div>'
    + '</div>';
 
   html += '<div class="modal-grid col2" style="gap:12px">'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Produto <span class="req">*</span></label>'
-   + '<div id="no-proj-produto-dd-' + idx + '" style="margin-top:4px">' + _msRenderDropdown('projProduto' + idx, produtosDisponiveis.map(function(pr){ return pr.nome; }), p.produtoNomes, '_noProjProdutoToggle', 'Selecione o(s) produto(s)...') + '</div>'
+   + '<div id="no-proj-produto-dd-' + idx + '" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('projProduto' + idx, produtosDisponiveis.map(function(pr){ return pr.nome; }), p.produtoNomes, '_noProjProdutoToggle', 'Selecione o(s) produto(s)...') + '</div>'
    + '<button type="button" onclick="_noToggleNovoProduto(' + idx + ')" style="margin-top:6px;font-size:11px;color:var(--navy);background:none;border:none;cursor:pointer;font-weight:600">+ Cadastrar novo produto</button>'
    + '<div id="no-novo-produto-box-' + idx + '" style="display:none;margin-top:6px;gap:6px">'
    + '<input id="no-np-nome-' + idx + '" class="sp-inp" style="font-size:12px" placeholder="Nome do novo produto">'
@@ -815,27 +838,34 @@ function _noProjRender() {
    + '</div>'
    + '</div>'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Responsável <span class="req">*</span></label>'
-   + '<div id="no-proj-resp-dd-' + idx + '" style="margin-top:4px">' + _noRespDropdownMarkup(idx) + '</div>'
+   + '<div id="no-proj-resp-dd-' + idx + '" class="no-msel-wide" style="margin-top:4px">' + _noRespDropdownMarkup(idx) + '</div>'
    + '</div>'
    + '</div>';
 
   html += '<div class="modal-grid col2" style="gap:12px">'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Tipologia do Telhado</label>'
-   + '<div id="no-proj-telhado-dd-' + idx + '" style="margin-top:4px">' + _msRenderDropdown('projTelhado' + idx, _NO_TIPOLOGIA_TELHADO_OPCOES, p.tipologiaTelhado, '_noProjTelhadoToggle', 'Selecione a(s) tipologia(s)...') + '</div>'
+   + '<div id="no-proj-telhado-dd-' + idx + '" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('projTelhado' + idx, _NO_TIPOLOGIA_TELHADO_OPCOES, p.tipologiaTelhado, '_noProjTelhadoToggle', 'Selecione a(s) tipologia(s)...') + '</div>'
    + '</div>'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de Telha</label>'
-   + '<div id="no-proj-telha-dd-' + idx + '" style="margin-top:4px">' + _msRenderDropdown('projTelha' + idx, _NO_TIPO_TELHA_OPCOES, p.tipologiaTelha, '_noProjTelhaToggle', 'Selecione o(s) tipo(s)...') + '</div>'
+   + '<div id="no-proj-telha-dd-' + idx + '" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('projTelha' + idx, _NO_TIPO_TELHA_OPCOES, p.tipologiaTelha, '_noProjTelhaToggle', 'Selecione o(s) tipo(s)...') + '</div>'
    + '</div>'
    + '</div>';
 
   // Quantidade/Valor unit. deixaram de ser obrigatórios (pedido explícito) —
   // nem toda obra tem preço fechado na hora da criação do projeto.
+  // Valor unit. ganha máscara de moeda (mesmo padrão do campo "Valor
+  // unitário" de Fornecedor, empresas.js: input type=text + _moedaMascarar
+  // no oninput) + uma célula de "Valor total" ao lado, também no mesmo
+  // padrão (Qtd × Valor unit., formatado com _moedaFormatarBRL) — pedido
+  // explícito: antes não tinha nem máscara, nem a célula de total em R$.
   html += '<div class="modal-grid col2" style="gap:12px">'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Quantidade</label>'
-   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.qtd||'') + '" oninput="_noProjSet(' + idx + ',\'qtd\',this.value)"></div>'
+   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.qtd||'') + '" oninput="_noProjSet(' + idx + ',\'qtd\',this.value);_noProjRecalcularTotal(' + idx + ')"></div>'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Valor unit. (R$)</label>'
-   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.vuni||'') + '" oninput="_noProjSet(' + idx + ',\'vuni\',this.value)"></div>'
+   + '<input class="sp-inp" style="font-size:12px;text-align:right" type="text" inputmode="numeric" placeholder="0,00" value="' + (p.vuni ? _moedaFormatar(p.vuni) : '') + '" oninput="_noProjVuniInput(' + idx + ',this)"></div>'
    + '</div>';
+  html += '<div class="mf" style="margin:0"><label style="font-size:11px">Valor total</label>'
+   + '<div id="no-proj-total-' + idx + '" style="font-size:13px;font-weight:600;color:var(--text);padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);text-align:right">' + _moedaFormatarBRL((parseFloat(p.qtd)||0) * (parseFloat(p.vuni)||0)) + '</div></div>';
 
   html += '<div class="modal-grid col2" style="gap:12px">'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Arquitetura</label>'
