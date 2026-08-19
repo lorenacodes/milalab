@@ -1774,12 +1774,19 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
        var pEtapa = p.etapa_projeto  || '';
        var pProd  = (p.produto || [])[0] || '—';
        var pCompl = p.complexidade   || '';
-       var pResp  = p.responsavel    || '';
        var pValor = p.valor_unitario != null
         ? (p.quantidade != null ? fmtMoeda(Number(p.valor_unitario) * Number(p.quantidade)) : fmtMoeda(p.valor_unitario))
         : '—';
-       var initials = pResp
-        ? pResp.trim().split(/\s+/).slice(0,2).map(function(w){ return w[0] || ''; }).join('').toUpperCase()
+       // "Alterado por último" é quem editou o REGISTRO por último
+       // (projetos.atualizado_por, e-mail setado pelo trigger
+       // trg_projetos_atualizado_por a cada INSERT/UPDATE — mesmo padrão de
+       // atividades.atualizado_por em tarefas.js), não o responsável pelo
+       // projeto — antes essa coluna mostrava p.responsavel, dando a entender
+       // (errado) que o responsável tinha sido quem fez a última alteração.
+       var pAtuU = (_usuariosCache || []).find(function(x){ return x.email === p.atualizado_por; });
+       var pAtu  = p.atualizado_por ? ((pAtuU && pAtuU.nome_display) || p.atualizado_por) : '';
+       var initials = pAtu
+        ? pAtu.trim().split(/\s+/).slice(0,2).map(function(w){ return w[0] || ''; }).join('').toUpperCase()
         : '';
        // Linha já vinha com cursor:pointer + hover, mas nunca teve onclick —
        // parecia clicável e não fazia nada. _spOpenEntityById (side-panel.js)
@@ -1805,10 +1812,10 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
         + '<td style="padding:8px 8px;text-align:right;font-size:12px;color:var(--green);font-weight:600;white-space:nowrap">' + pValor + '</td>'
         + '<td style="padding:8px 8px;text-align:right;font-size:12px;color:var(--text);white-space:nowrap">' + (p.quantidade != null ? p.quantidade : '—') + '</td>'
         + '<td style="padding:8px 10px">'
-        + (pResp
+        + (pAtu
            ? '<div style="display:flex;align-items:center;gap:6px">'
              + '<div style="width:22px;height:22px;border-radius:50%;background:var(--navy-dim);border:1px solid var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--navy);flex-shrink:0">' + initials + '</div>'
-             + '<span style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">' + pResp + '</span>'
+             + '<span style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">' + pAtu + '</span>'
              + '</div>'
            : '<span style="color:var(--muted)">—</span>')
         + '</td>'

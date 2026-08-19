@@ -60,9 +60,14 @@ test('_msRenderDropdown: chama a função de toggle certa com o campo certo', ()
  assert.match(html, /_fornMultiToggle\('segmentos',this\.value,this\.checked\)/);
 });
 
-test('_msRenderDropdown: só mostra busca acima do limiar de opções', () => {
+test('_msRenderDropdown: busca aparece sempre que há ao menos 1 opção (sem limiar de quantidade)', () => {
+ // Pedido explícito (Nova Obra: Produto/Responsável) — a busca sumia com
+ // poucas opções (ex.: só 5 produtos "Solar"), escondida atrás de um
+ // limiar; agora aparece com qualquer quantidade >= 1.
  var poucas = _msRenderDropdown('x', ['A', 'B'], [], '_fornMultiToggle');
- assert.doesNotMatch(poucas, /fb-msel-search/);
+ assert.match(poucas, /fb-msel-search/);
  var muitas = _msRenderDropdown('x', Array.from({ length: 10 }, (_, i) => 'Opcao ' + i), [], '_fornMultiToggle');
  assert.match(muitas, /fb-msel-search/);
+ var nenhuma = _msRenderDropdown('x', [], [], '_fornMultiToggle');
+ assert.doesNotMatch(nenhuma, /fb-msel-search/);
 });

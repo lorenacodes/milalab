@@ -73,7 +73,39 @@ async function _srchSelToggle(kind) {
  drop.classList.add('open'); if (box) box.classList.add('open');
  var inp = document.getElementById('sp-srch-' + kind + '-inp');
  if (inp) { inp.value = ''; inp.focus(); }
+ // Filtra ANTES de posicionar: a decisão de abrir pra cima/baixo usa a
+ // altura real do dropdown já com a lista preenchida (drop.offsetHeight),
+ // não uma estimativa de antes do conteúdo existir.
  _srchSelFilter(kind, '');
+ _srchSelPosition(kind);
+}
+// position:fixed (não absolute) de propósito: quando este componente é
+// usado dentro de um modal com área rolável (ex.: wizard de Nova Obra,
+// passo Projetos, campo "Projeto existente" perto do fim do formulário),
+// um dropdown absolute era cortado pela div com overflow-y:auto do modal —
+// os resultados carregavam certinho (confirmado testando: 21 opções no
+// DOM), só ficavam invisíveis, cortados pela borda do container. fixed
+// escapa desse recorte por definição, com a posição calculada aqui via
+// getBoundingClientRect() — e vira "pra cima" quando não sobra espaço
+// embaixo (comum quando o campo fica perto do fim do modal/tela).
+function _srchSelPosition(kind) {
+ var drop = document.getElementById('sp-srch-' + kind + '-drop');
+ var box  = document.getElementById('sp-srch-' + kind + '-box');
+ if (!drop || !box) return;
+ var boxRect = box.getBoundingClientRect();
+ var dropH = drop.offsetHeight || 240; // estimativa antes do 1º layout
+ var vh = window.innerHeight;
+ var margin = 8;
+ var abreParaCima = (boxRect.bottom + dropH + margin > vh) && (boxRect.top - dropH - margin > 0);
+ drop.style.left = boxRect.left + 'px';
+ drop.style.width = boxRect.width + 'px';
+ if (abreParaCima) {
+  drop.style.top = 'auto';
+  drop.style.bottom = (vh - boxRect.top + 4) + 'px';
+ } else {
+  drop.style.bottom = 'auto';
+  drop.style.top = (boxRect.bottom + 4) + 'px';
+ }
 }
 function _srchSelClose(kind) {
  var drop = document.getElementById('sp-srch-' + kind + '-drop');
@@ -122,6 +154,17 @@ if (typeof document !== 'undefined') {
    if (drop && box && !box.contains(e.target) && !drop.contains(e.target)) _srchSelClose(kind);
   });
  });
+ // position:fixed não acompanha o scroll do container do modal (diferente
+ // de position:absolute) — sem isso, rolar o formulário com o dropdown
+ // aberto deixaria ele "flutuando" longe do campo. Fecha em vez de tentar
+ // reposicionar em tempo real (simples e sem jank); capture:true pra pegar
+ // o scroll de QUALQUER ancestral rolável, não só o document.
+ document.addEventListener('scroll', function(e) {
+  Object.keys(_srchSelState).forEach(function(kind) {
+   var drop = document.getElementById('sp-srch-' + kind + '-drop');
+   if (drop && drop.classList.contains('open') && !drop.contains(e.target)) _srchSelClose(kind);
+  });
+ }, true);
 }
 
 if (typeof module !== 'undefined' && module.exports) {

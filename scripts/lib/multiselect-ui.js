@@ -7,7 +7,12 @@
 // _fornMultiToggle no empresas.js).
 // ═══════════════════════════════════════════════════════════════════════════
 
-var _MS_SEARCH_THRESHOLD = 8; // mesma referência do _FB_SEARCH_THRESHOLD
+// Pedido explícito (Nova Obra: Produto/Responsável): a barra de busca
+// sumia sempre que a lista tinha poucas opções (ex.: só 5 produtos
+// "Solar"), escondida atrás de um limiar de itens — mas nada impede a
+// lista de crescer depois, e escondida "às vezes" parecia bug ("não tem
+// busca") em vez de comportamento condicional. Busca agora aparece sempre
+// que há pelo menos 1 opção, sem limiar de quantidade.
 
 // onToggleFnName: nome (string) de uma função global com assinatura
 // (campo, valor, checked) — ex.: "_fornMultiToggle". Passar o nome (não a
@@ -15,7 +20,7 @@ var _MS_SEARCH_THRESHOLD = 8; // mesma referência do _FB_SEARCH_THRESHOLD
 function _msRenderDropdown(campo, opcoes, selecionados, onToggleFnName, placeholder) {
  var sel = Array.isArray(selecionados) ? selecionados : [];
  var btnLabel = sel.length ? sel.length + ' selecionado(s)' : (placeholder || 'Selecionar...');
- var searchHtml = opcoes.length > _MS_SEARCH_THRESHOLD
+ var searchHtml = opcoes.length > 0
   ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">'
   : '';
  var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s){ return (s||'').toLowerCase(); };
@@ -68,5 +73,5 @@ function _msFiltrarDOM(inputEl) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _msRenderDropdown, _msFiltrar, _msToggle, _msFiltrarDOM, _MS_SEARCH_THRESHOLD };
+ module.exports = { _msRenderDropdown, _msFiltrar, _msToggle, _msFiltrarDOM };
 }
