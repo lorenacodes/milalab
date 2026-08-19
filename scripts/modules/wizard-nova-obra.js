@@ -144,10 +144,6 @@ async function openNovaObra() {
  _noEmpresaIds = [];
  _noContatoId = '';
  _noProjLista = [];
- // null (não []) força recarregar a cada abertura do wizard — a lista de
- // projetos "sem obra" pode ter mudado desde a última vez (outro projeto
- // pode ter sido vinculado, criado ou passado a ter obra).
- _noProjetosExistentesCache = null;
 
  var nomeEl = document.getElementById('no-nome'); if (nomeEl) nomeEl.value = '';
  ['no-ne-nome','no-ne-cnpj','no-ne-uf','no-ne-cidade','no-nc-nome','no-nc-email','no-nc-cargo'].forEach(function(id){
@@ -200,7 +196,6 @@ async function openNovaObra() {
   _produtosArr = pr.data || [];
  }
  await _loadUsuariosCache();
- await _noProjetosExistentesLoad();
 
  document.getElementById('modal-nova-obra').classList.add('open');
  _noWizardInit();
@@ -462,10 +457,6 @@ function _noWizardValidate() {
   if (!_noProjLista.length) { _showToast('Adicione ao menos um projeto — é obrigatório', 'aviso'); return false; }
   for (var i = 0; i < _noProjLista.length; i++) {
    var p = _noProjLista[i];
-   if (p.modo === 'existente') {
-    if (!p.projetoExistenteId) { _showToast('Projeto ' + (i+1) + ' — selecione o projeto existente', 'aviso'); return false; }
-    continue;
-   }
    var faltando = [];
    if (!(p.nome || '').trim()) faltando.push('Nome');
    if (!p.etapaProjeto) faltando.push('Etapa do projeto');
@@ -496,22 +487,11 @@ async function submitNovaObra() {
   var userEmail = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || null;
 
   // Separa os cards em "novos" (viram INSERT via payload.projetos, na RPC)
-  // e "existentes" (só recebem UPDATE obra_id — payload.projeto_ids_existentes).
-  // novosComIdx guarda o índice ORIGINAL em _noProjLista de cada "novo", pra
-  // _noProjPodeProposta(idx) (mais abaixo) continuar lendo o card certo.
-  var novosComIdx = [];
-  var projetoIdsExistentes = [];
-  _noProjLista.forEach(function(p, i) {
-   if (p.modo === 'existente') { if (p.projetoExistenteId) projetoIdsExistentes.push(p.projetoExistenteId); }
-   else novosComIdx.push({ p: p, origIdx: i });
-  });
-
   var payload = {
    nome: nome, tipo_obra: _noTipos, etapa_negocio: etapa, cidade: cidade, estado: estado,
    canal_vendas: canal || null, criado_por: userEmail,
    empresa_ids: _noEmpresaIds, contato_id: _noContatoId || null,
-   projetos: novosComIdx.map(function(o) {
-    var p = o.p;
+   projetos: _noProjLista.map(function(p) {
     var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
     return {
      nome: p.nome, tipo_obra: p.tipoObra, etapa_projeto: p.etapaProjeto,
@@ -525,17 +505,12 @@ async function submitNovaObra() {
      consumidor_final: isSolar ? p.consumidorFinal : null,
      difal_percentual: isSolar ? (parseFloat(p.difal) || null) : null,
     };
-   }),
-   projeto_ids_existentes: projetoIdsExistentes,
+   })
   };
 
   var rpcRes = await _sb.rpc('criar_obra_completa', { payload: payload });
   if (rpcRes.error) { _showToast('Erro ao criar obra: ' + _supaErrPt(rpcRes.error.message), 'erro'); return; }
   var obraId = rpcRes.data.obra_id;
-  // projeto_ids: ids dos projetos NOVOS (na mesma ordem de payload.projetos),
-  // seguidos dos ids dos projetos EXISTENTES vinculados — ver migration da
-  // RPC. projetoIds[pi] abaixo só é usado pra alinhar com novosComIdx,
-  // então só a parte "novos" do array importa aqui.
   var projetoIds = rpcRes.data.projeto_ids || [];
 
   // Documentos opcionais (passo 3)
@@ -564,14 +539,11 @@ async function submitNovaObra() {
    }
   }
 
-  // Propostas Solar — só cards "novos" têm esse formulário (projeto
-  // existente já foi criado antes, sem esse fluxo); projetoIds[pi] alinha
-  // com novosComIdx[pi] porque ambos seguem a mesma ordem de payload.projetos.
+  // Propostas Solar
   var geradas = 0;
-  for (var pi = 0; pi < novosComIdx.length; pi++) {
-   var p = novosComIdx[pi].p;
-   var origIdx = novosComIdx[pi].origIdx;
-   if (p.tipoObra === _NO_SOLAR_TIPO && p.gerarProposta && _noProjPodeProposta(origIdx).ok) {
+  for (var pi = 0; pi < _noProjLista.length; pi++) {
+   var p = _noProjLista[pi];
+   if (p.tipoObra === _NO_SOLAR_TIPO && p.gerarProposta && _noProjPodeProposta(pi).ok) {
     var ok = await _noGerarPropostaSolar(obraId, projetoIds[pi], p, userEmail);
     if (ok) geradas++;
    }
@@ -645,10 +617,6 @@ var _NO_TIPO_TELHA_OPCOES = [
 
 function _noProjAdd() {
  _noProjLista.push({
-  // modo 'novo' (padrão, cria projeto do zero) ou 'existente' (vincula um
-  // projeto já cadastrado, sem obra — pedido explícito: antes só dava pra
-  // criar novo, não existia jeito de vincular um projeto já existente).
-  modo: 'novo', projetoExistenteId: '',
   nome: '', etapaProjeto: '', tipoObra: (_noTipos.length === 1 ? _noTipos[0] : ''),
   // produtoNomes (não produtoIds): a coluna projetos.produto é um array de
   // NOMES (texto), não de ids — o código antigo guardava ids só pra marcar
@@ -668,39 +636,6 @@ function _noProjAdd() {
 }
 function _noProjRemove(idx) { _noProjLista.splice(idx, 1); _noProjRender(); }
 function _noProjSet(idx, field, val) { _noProjLista[idx][field] = val; if (field === 'tipoObra') _noProjRender(); }
-
-// ── Vincular projeto já existente (sem obra) em vez de criar um novo ───────
-// null = ainda não carregou; [] = carregou e não achou nenhum projeto órfão.
-var _noProjetosExistentesCache = null;
-async function _noProjetosExistentesLoad() {
- if (_noProjetosExistentesCache !== null) return;
- var res = await _sb.from('projetos').select('id, nome, empresa:empresa_id(nome)').is('obra_id', null).order('nome');
- _noProjetosExistentesCache = (res.data || []).map(function(p) {
-  var nome = p.nome || '(sem nome)';
-  var emp = p.empresa && p.empresa.nome;
-  return { id: p.id, nome: nome, label: emp ? (nome + ' — ' + emp) : nome };
- });
-}
-function _noProjExisteLabelById(id) {
- var found = (_noProjetosExistentesCache || []).find(function(pe){ return pe.id === id; });
- return found ? found.label : '';
-}
-function _noProjExisteOptions(idx) {
- // Um mesmo projeto órfão não pode ser escolhido em 2 cards ao mesmo tempo.
- var usadosPorOutros = _noProjLista.filter(function(pp, i){ return i !== idx && pp.modo === 'existente' && pp.projetoExistenteId; })
-  .map(function(pp){ return pp.projetoExistenteId; });
- return (_noProjetosExistentesCache || []).filter(function(pe){ return usadosPorOutros.indexOf(pe.id) === -1; }).map(function(pe){ return pe.label; });
-}
-function _noProjExistenteSelect(idx, label) {
- var found = (_noProjetosExistentesCache || []).find(function(pe){ return pe.label === label; });
- _noProjLista[idx].projetoExistenteId = found ? found.id : '';
- _noProjLista[idx].nome = found ? found.nome : '';
-}
-function _noProjSetModo(idx, modo) {
- _noProjLista[idx].modo = modo;
- if (modo === 'existente') _noProjLista[idx].projetoExistenteId = '';
- _noProjRender();
-}
 function _noProjToggleConsFinal(idx, checked) {
  var p = _noProjLista[idx];
  p.consumidorFinal = checked;
@@ -852,29 +787,6 @@ function _noProjRender() {
    + '<button type="button" onclick="_noProjRemove(' + idx + ')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px">Remover</button>'
    + '</div>';
   html += '<div style="padding:16px;display:flex;flex-direction:column;gap:14px">';
-
-  // Alternância "Criar novo" / "Vincular existente" — pedido explícito: não
-  // dava pra escolher um projeto já cadastrado (só criar um novo do zero).
-  // Só projetos SEM obra vinculada (obra_id is null) aparecem na busca —
-  // ver _noProjetosExistentesLoad/_noProjExisteOptions.
-  html += '<div class="view-toggle" style="align-self:flex-start">'
-   + '<button type="button" class="vt-btn' + (p.modo!=='existente'?' active':'') + '" onclick="_noProjSetModo(' + idx + ',\'novo\')">Criar novo</button>'
-   + '<button type="button" class="vt-btn' + (p.modo==='existente'?' active':'') + '" onclick="_noProjSetModo(' + idx + ',\'existente\')">Vincular existente</button>'
-   + '</div>';
-
-  if (p.modo === 'existente') {
-   _srchSelRegister('noProjExistente' + idx, {
-    options: function(){ return _noProjExisteOptions(idx); },
-    placeholder: 'Buscar projeto sem obra vinculada...',
-    onSelect: function(label){ _noProjExistenteSelect(idx, label); },
-   });
-   html += '<div class="mf" style="margin:0"><label style="font-size:11px">Projeto existente <span class="req">*</span></label>'
-    + '<div style="margin-top:4px">' + _srchSelMarkup('noProjExistente' + idx, 'no-proj-existente-' + idx, _noProjExisteLabelById(p.projetoExistenteId)) + '</div>'
-    + '<div style="font-size:10px;color:var(--muted);margin-top:4px">Só aparecem projetos que ainda não têm obra vinculada.</div>'
-    + '</div>';
-   html += '</div></div>';
-   return html;
-  }
 
   html += '<div class="modal-grid col2" style="gap:12px">'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Nome do projeto <span class="req">*</span></label>'
