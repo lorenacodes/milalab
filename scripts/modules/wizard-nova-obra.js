@@ -334,6 +334,10 @@ function _noToggleNovaEmpresa() {
 async function _noSalvarNovaEmpresa() {
  var nome = (document.getElementById('no-ne-nome')?.value || '').trim();
  if (!nome) { _showToast('Informe o nome da empresa', 'aviso'); return; }
+ // Estado também obrigatório (pedido explícito) — mesma regra vale pro
+ // formulário equivalente do detalhamento de Obra (_spCriarEmpresaObra).
+ var estado = document.getElementById('no-ne-uf')?.value || '';
+ if (!estado) { _showToast('Selecione o estado da empresa', 'aviso'); return; }
  var cnpjDigits = (document.getElementById('no-ne-cnpj')?.value || '').replace(/\D/g, '');
  if (cnpjDigits.length > 0 && cnpjDigits.length < 14) {
   _showToast('CNPJ incompleto — informe os 14 dígitos, ou deixe em branco.', 'aviso');
@@ -347,7 +351,7 @@ async function _noSalvarNovaEmpresa() {
  var payload = {
   nome: nome,
   cnpj: cnpj,
-  estado: document.getElementById('no-ne-uf')?.value || null,
+  estado: estado,
   fase_ciclo_vida: document.getElementById('no-ne-fase')?.value || null,
   categoria: (_noNeCategoriaSel || []).slice(),
   url_site: document.getElementById('no-ne-site')?.value?.trim() || null,

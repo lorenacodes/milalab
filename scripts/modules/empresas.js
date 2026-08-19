@@ -60,6 +60,7 @@ function _spEmpEstadoToggle() {
  var inp = document.getElementById('sp-emp-estado-inp');
  if (inp) { inp.value = ''; inp.focus(); }
  _spEmpEstadoFilter('');
+ _srchSelPositionEl(drop, box);
 }
 function _spEmpEstadoClose() {
  var drop = document.getElementById('sp-emp-estado-drop');
@@ -148,6 +149,7 @@ function _spCttCargoToggle() {
  var inp = document.getElementById('sp-ctt-cargo-inp');
  if (inp) { inp.value = ''; inp.focus(); }
  _spCttCargoFilter('');
+ _srchSelPositionEl(drop, box);
 }
 function _spCttCargoClose() {
  var drop = document.getElementById('sp-ctt-cargo-drop');

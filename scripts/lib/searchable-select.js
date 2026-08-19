@@ -91,6 +91,20 @@ async function _srchSelToggle(kind) {
 function _srchSelPosition(kind) {
  var drop = document.getElementById('sp-srch-' + kind + '-drop');
  var box  = document.getElementById('sp-srch-' + kind + '-box');
+ _srchSelPositionEl(drop, box);
+}
+// Versão que recebe os elementos direto em vez de um "kind" registrado —
+// reaproveitada por TODO dropdown estilo .srch-sel-drop que não passa pelo
+// registro genérico _srchSelState (Cargo/Estado do cadastro de Empresa,
+// Empresa/Contato do detalhamento de Obra, Obra/Projeto/Colaborador do
+// Gestor de Tarefas — cada um com sua própria implementação hand-rolled,
+// só reaproveitando as classes .srch-sel-*). .srch-sel-drop virou
+// position:fixed (ver comentário de _srchSelToggle acima) sem nenhum
+// top/left/width no CSS — sem chamar isto depois de abrir, o dropdown
+// nunca ganha posição nenhuma e fica invisível (achado real, reportado:
+// "botão de cargo não aparece as opções" — as opções carregavam
+// certinho no DOM, só ficavam sem coordenada nenhuma pra aparecer na tela).
+function _srchSelPositionEl(drop, box) {
  if (!drop || !box) return;
  var boxRect = box.getBoundingClientRect();
  var dropH = drop.offsetHeight || 240; // estimativa antes do 1º layout
@@ -163,6 +177,18 @@ if (typeof document !== 'undefined') {
   Object.keys(_srchSelState).forEach(function(kind) {
    var drop = document.getElementById('sp-srch-' + kind + '-drop');
    if (drop && drop.classList.contains('open') && !drop.contains(e.target)) _srchSelClose(kind);
+  });
+  // Mesmo motivo, agora pros dropdowns hand-rolled que reaproveitam as
+  // classes .srch-sel-* sem passar pelo _srchSelState acima (Cargo/Estado
+  // de Empresa, Empresa/Contato de Obra, Obra/Projeto/Colaborador do
+  // Gestor de Tarefas) — genérico por classe + convenção de id
+  // "{prefixo}-drop"/"{prefixo}-box", não precisa saber o nome de cada
+  // função de fechar.
+  document.querySelectorAll('.srch-sel-drop.open').forEach(function(drop) {
+   if (drop.contains(e.target)) return;
+   drop.classList.remove('open');
+   var box = document.getElementById(drop.id.replace(/-drop$/, '-box'));
+   if (box) box.classList.remove('open');
   });
  }, true);
 }

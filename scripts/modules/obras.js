@@ -2041,7 +2041,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div class="sp-field"><div class="sp-label">Nome *</div><input class="sp-inp" id="sp-new-emp-nome" placeholder="Razão social"></div>'
   + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-new-emp-cnpj" value="' + _empCnpjMaskValue('') + '" oninput="_empCnpjMask(this)"></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
-  + '<div class="sp-field"><div class="sp-label">Estado</div><select class="sp-inp" id="sp-new-emp-uf">' + _spEmpOptSelect(EMPRESA_ESTADO_OPCOES, '') + '</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Estado *</div><select class="sp-inp" id="sp-new-emp-uf">' + _spEmpOptSelect(EMPRESA_ESTADO_OPCOES, '') + '</select></div>'
   + '<div class="sp-field"><div class="sp-label">Fase do Ciclo de Vida</div><select class="sp-inp" id="sp-new-emp-fase">' + _spEmpOptSelect(EMPRESA_FASE_OPCOES, '') + '</select></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   // Mesmo componente de chips coloridos já usado em openNovaEmpresa()
@@ -2499,6 +2499,7 @@ function _spObEmpresaToggle() {
  var inp = document.getElementById('sp-ob-empresa-inp');
  if (inp) { inp.value = ''; inp.focus(); }
  _spObEmpresaFilter('');
+ _srchSelPositionEl(drop, box);
 }
 function _spObEmpresaClose() {
  var drop = document.getElementById('sp-ob-empresa-drop');
@@ -2616,6 +2617,7 @@ function _spObContatoToggle() {
  var inp = document.getElementById('sp-ob-contato-inp');
  if (inp) { inp.value = ''; inp.focus(); }
  _spObContatoFilter('');
+ _srchSelPositionEl(drop, box);
 }
 function _spObContatoClose() {
  var drop = document.getElementById('sp-ob-contato-drop');
@@ -2718,6 +2720,10 @@ function _spToggleNovaEmpresa() {
 async function _spCriarEmpresaObra() {
  const nome = document.getElementById('sp-new-emp-nome')?.value?.trim();
  if (!nome) { alert('Nome da empresa é obrigatório.'); return; }
+ // Estado também obrigatório (pedido explícito) — mesma regra vale pro
+ // formulário equivalente do wizard de Nova Obra (_noSalvarNovaEmpresa).
+ const estado = document.getElementById('sp-new-emp-uf')?.value || '';
+ if (!estado) { alert('Estado da empresa é obrigatório.'); return; }
  // Mesma regra de _spCriarEmpresa/_spCriarContato (empresas.js): CNPJ vazio
  // é permitido, incompleto bloqueia — o molde preenche posições vazias com
  // "_", então quem decide é a contagem de dígitos reais, não um if(!cnpj).
@@ -2735,7 +2741,7 @@ async function _spCriarEmpresaObra() {
  const payload = {
   nome,
   cnpj,
-  estado: document.getElementById('sp-new-emp-uf')?.value || null,
+  estado,
   fase_ciclo_vida: document.getElementById('sp-new-emp-fase')?.value || null,
   categoria: (_spEmpCategoriaSel || []).slice(),
   url_site: document.getElementById('sp-new-emp-site')?.value?.trim() || null,

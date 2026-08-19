@@ -1898,6 +1898,7 @@ function _obraSearchToggle() {
  var inp = document.getElementById('nt-obra-inp');
  if (inp) { inp.value = ''; inp.focus(); }
  _obraSearchFilter('');
+ _srchSelPositionEl(drop, box);
 }
 function _obraSearchClose() {
  var drop = document.getElementById('nt-obra-drop');
@@ -2015,6 +2016,7 @@ function _projSearchToggle() {
  var inp = document.getElementById('nt-projeto-inp');
  if (inp) { inp.value = ''; inp.focus(); }
  _projSearchFilter('');
+ _srchSelPositionEl(drop, box);
 }
 function _projSearchClose() {
  var drop = document.getElementById('nt-projeto-drop');
@@ -2106,6 +2108,7 @@ function _colabReceptSearchToggle() {
  var inp = document.getElementById('drw-colab-receptor-inp');
  if (inp) { inp.value = ''; inp.focus(); }
  _colabReceptSearchFilter('');
+ _srchSelPositionEl(drop, box);
 }
 function _colabReceptSearchClose() {
  var drop = document.getElementById('drw-colab-receptor-drop');
