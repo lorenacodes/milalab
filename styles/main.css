@@ -570,7 +570,12 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
  .srch-sel-clr:hover{opacity:1;color:var(--red)}
  .srch-sel-chevron{color:var(--muted);font-size:10px;flex-shrink:0;transition:transform .15s}
  .srch-sel-box.open .srch-sel-chevron{transform:rotate(180deg)}
- .srch-sel-drop{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:1200;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-3);overflow:hidden}
+ /* position:fixed (não absolute) — dropdown escapa de qualquer ancestral
+    com overflow:hidden/auto (ex.: a área rolável do modal de Nova Obra),
+    que cortava a lista de opções mesmo com os dados carregados certinho.
+    top/left/width calculados via JS em _srchSelPosition (searchable-
+    select.js) — não dependem mais da posição do .srch-sel pai. */
+ .srch-sel-drop{display:none;position:fixed;z-index:1200;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);box-shadow:var(--shadow-3);overflow:hidden}
  .srch-sel-drop.open{display:block}
  .srch-sel-inp{width:100%;box-sizing:border-box;padding:8px 12px;border:none;border-bottom:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:12px;font-family:inherit;outline:none}
  .srch-sel-inp:focus{background:var(--surface)}
