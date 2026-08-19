@@ -1,7 +1,7 @@
 /* MODAL NOVA OBRA */
 var _noTipos = [];          // tipos de obra selecionados (multi)
 var _noEmpresaIds = [];     // empresas selecionadas (multi)
-var _noContatoId = '';
+var _noContatoIds = [];     // contatos selecionados (multi) — pedido explícito, era 1 só
 var _produtosArr = [];      // cache: [{id, nome, categoria}]
 var _NO_TIPOS_OPCOES = ['Telhados','Modular','Steel Frame','Solar','Misto (LSF + A36)'];
 var _NO_ETAPA_NEGOCIO_OPCOES = Object.keys(_etapaKcId);
@@ -142,7 +142,7 @@ function _noDocFileDrop(event, inputId, labelId) {
 async function openNovaObra() {
  _noTipos = [];
  _noEmpresaIds = [];
- _noContatoId = '';
+ _noContatoIds = [];
  _noProjLista = [];
 
  var nomeEl = document.getElementById('no-nome'); if (nomeEl) nomeEl.value = '';
@@ -159,6 +159,10 @@ async function openNovaObra() {
  var searchEl0 = document.getElementById('no-empresa-search'); if (searchEl0) searchEl0.value = '';
  _noEmpresaDropdownToggle(false);
  document.getElementById('no-empresa-control-label')?.classList.add('placeholder');
+ var searchEl1 = document.getElementById('no-contato-search'); if (searchEl1) searchEl1.value = '';
+ _noContatoDropdownToggle(false);
+ var contatoLabelEl = document.getElementById('no-contato-control-label');
+ if (contatoLabelEl) { contatoLabelEl.textContent = 'Selecione uma empresa primeiro...'; contatoLabelEl.classList.add('placeholder'); }
  var canalWrap = document.getElementById('no-canal-wrap'); if (canalWrap) canalWrap.innerHTML = _srchSelMarkup('noCanal', 'no-canal', '');
  var estadoWrap = document.getElementById('no-estado-wrap'); if (estadoWrap) estadoWrap.innerHTML = _srchSelMarkup('noEstado', 'no-estado', '');
  _noCidadeRenderDisabled('Selecione o estado primeiro');
@@ -195,7 +199,7 @@ async function openNovaObra() {
 
  _noTipoGridRender();
  _noEmpresaFilterRender();
- _noContatoRender();
+ _noContatoFilterRender();
  _noProjRender();
 
  if (!_produtosArr.length) {
@@ -297,7 +301,15 @@ function _noEmpresaToggle(id) {
  var i = _noEmpresaIds.indexOf(id);
  if (i >= 0) _noEmpresaIds.splice(i, 1); else _noEmpresaIds.push(id);
  _noEmpresaFilterRender();
- _noContatoRender();
+ // Desvincular uma empresa pode deixar contato(s) já selecionados fora do
+ // pool válido (pool = contatos da(s) empresa(s) atual(is)) — remove
+ // silenciosamente, mesma regra de "sem empresa correspondente, não faz
+ // sentido manter selecionado".
+ _noContatoIds = _noContatoIds.filter(function(cid){
+  var c = (_contatosArr||[]).find(function(x){ return x.id === cid; });
+  return c && _noEmpresaIds.indexOf(c.empresa_id) >= 0;
+ });
+ _noContatoFilterRender();
 }
 // Formulário "Nova Empresa" — pedido explícito: os campos aqui não seguiam
 // o mesmo padrão já usado no detalhamento de Obra (_spCriarEmpresaObra,
@@ -347,7 +359,7 @@ async function _noSalvarNovaEmpresa() {
  _noToggleNovaEmpresa();
  var searchEl = document.getElementById('no-empresa-search'); if (searchEl) searchEl.value = '';
  _noEmpresaFilterRender();
- _noContatoRender();
+ _noContatoFilterRender();
  _showToast('Empresa criada com sucesso!', 'ok');
 }
 
@@ -393,24 +405,71 @@ document.addEventListener('click', function(e) {
  }
 });
 
-function _noContatoRender() {
- var sel = document.getElementById('no-contato-id');
- if (!sel) return;
- if (!_noEmpresaIds.length) {
-  sel.innerHTML = '<option value="">Selecione uma empresa primeiro...</option>';
-  _noContatoId = '';
-  return;
+// ── Contato(s): mesmo mecanismo de dropdown+checkbox de Empresa(s) acima
+// (_noEmpresaDropdownToggle/_noEmpresaFilterRender/_noEmpresaToggle) — pedido
+// explícito: Contato virou obrigatório e aceita mais de 1 vínculo (era um
+// <select> nativo de valor único). Pool sempre restrito às empresas já
+// selecionadas (mesma regra de sempre: sem empresa, não tem a quem
+// associar o contato).
+var _noContatoDropdownOpen = false;
+function _noContatoDropdownToggle(forceOpen) {
+ if (!_noEmpresaIds.length) { if (forceOpen !== false) _showToast('Selecione uma empresa primeiro', 'aviso'); return; }
+ var open = typeof forceOpen === 'boolean' ? forceOpen : !_noContatoDropdownOpen;
+ _noContatoDropdownOpen = open;
+ var panel = document.getElementById('no-contato-panel');
+ var ctrl = document.getElementById('no-contato-control');
+ if (panel) panel.classList.toggle('open', open);
+ if (ctrl) ctrl.classList.toggle('open', open);
+ if (open) {
+  _noContatoFilterRender();
+  setTimeout(function(){ document.getElementById('no-contato-search')?.focus(); }, 50);
  }
- var filtrados = (_contatosArr || []).filter(function(c){ return _noEmpresaIds.indexOf(c.empresa_id) >= 0; });
- sel.innerHTML = '<option value="">Selecionar contato...</option>'
-  + filtrados.map(function(c){ return '<option value="' + c.id + '">' + c.nome_completo + (c.cargo ? ' · ' + c.cargo : '') + '</option>'; }).join('')
-  + '<option value="__novo__">+ Cadastrar novo contato</option>';
- sel.value = _noContatoId || '';
 }
-function _noContatoSelectChange(val) {
+document.addEventListener('click', function(e) {
+ if (!_noContatoDropdownOpen) return;
+ var panel = document.getElementById('no-contato-panel');
+ var ctrl = document.getElementById('no-contato-control');
+ if (panel && ctrl && !panel.contains(e.target) && !ctrl.contains(e.target)) _noContatoDropdownToggle(false);
+});
+function _noContatoControlLabelUpdate() {
+ var label = document.getElementById('no-contato-control-label');
+ if (!label) return;
+ if (!_noEmpresaIds.length) { label.textContent = 'Selecione uma empresa primeiro...'; label.classList.add('placeholder'); return; }
+ if (!_noContatoIds.length) { label.textContent = 'Selecione um ou mais contatos...'; label.classList.add('placeholder'); return; }
+ label.classList.remove('placeholder');
+ var nomes = _noContatoIds.map(function(id){ var c = (_contatosArr||[]).find(function(x){ return x.id === id; }); return c ? c.nome_completo : null; }).filter(Boolean);
+ label.textContent = nomes.length > 2 ? (nomes.slice(0,2).join(', ') + ' +' + (nomes.length - 2)) : nomes.join(', ');
+}
+function _noContatoFilterRender() {
+ var el = document.getElementById('no-contato-lista');
+ if (!el) return;
+ _noContatoControlLabelUpdate();
+ var q = (document.getElementById('no-contato-search')?.value || '').toLowerCase();
+ var pool = (_contatosArr || []).filter(function(c){ return _noEmpresaIds.indexOf(c.empresa_id) >= 0; });
+ var lista = pool.filter(function(c){
+  if (!q) return true;
+  return (c.nome_completo||'').toLowerCase().indexOf(q) >= 0 || (c.cargo||'').toLowerCase().indexOf(q) >= 0;
+ });
+ if (!lista.length) { el.innerHTML = '<div class="no-dd-empty">Nenhum contato encontrado' + (q ? ' para "' + q + '"' : '') + '.</div>'; return; }
+ el.innerHTML = lista.map(function(c){
+  var checked = _noContatoIds.indexOf(c.id) >= 0;
+  return '<label class="no-check-row">'
+   + '<input type="checkbox" ' + (checked?'checked':'') + ' onchange="_noContatoToggle(\'' + c.id + '\')">'
+   + '<span class="no-check-row-main"><span class="no-check-row-title">' + c.nome_completo + '</span>'
+   + (c.cargo ? '<span class="no-check-row-sub">' + c.cargo + '</span>' : '') + '</span>'
+   + '</label>';
+ }).join('');
+}
+function _noContatoToggle(id) {
+ var i = _noContatoIds.indexOf(id);
+ if (i >= 0) _noContatoIds.splice(i, 1); else _noContatoIds.push(id);
+ _noContatoFilterRender();
+}
+function _noToggleNovoContato() {
+ if (!_noEmpresaIds.length) { _showToast('Selecione uma empresa primeiro', 'aviso'); return; }
  var box = document.getElementById('no-novo-contato-box');
- if (box) box.style.display = val === '__novo__' ? 'block' : 'none';
- _noContatoId = (val === '__novo__') ? '' : val;
+ if (!box) return;
+ box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
 }
 async function _noSalvarNovoContato() {
  var nome = (document.getElementById('no-nc-nome')?.value || '').trim();
@@ -421,17 +480,19 @@ async function _noSalvarNovoContato() {
   cargo: document.getElementById('no-nc-cargo')?.value?.trim() || null,
  }).select('id,nome_completo,cargo').single();
  if (res.error) { _showToast('Erro ao criar contato: ' + res.error.message, 'erro'); return; }
- var empresaId = _noEmpresaIds[0];
+ // Associa já à(s) empresa(s) selecionada(s) na hora de criar — pedido
+ // explícito, mesmo espírito de _spCriarContato no detalhamento de Obra.
  var linkErro = null;
- if (empresaId) {
-  var linkRes = await _sb.from('contatos_empresas').insert({ contato_id: res.data.id, empresa_id: empresaId });
+ for (var i = 0; i < _noEmpresaIds.length; i++) {
+  var linkRes = await _sb.from('contatos_empresas').insert({ contato_id: res.data.id, empresa_id: _noEmpresaIds[i] });
   if (linkRes.error) linkErro = linkRes.error;
  }
- res.data.empresa_id = empresaId;
+ res.data.empresa_id = _noEmpresaIds[0] || null;
  _contatosArr = (_contatosArr || []).concat([res.data]);
- _noContatoId = res.data.id;
+ _noContatoIds.push(res.data.id);
  document.getElementById('no-novo-contato-box').style.display = 'none';
- _noContatoRender();
+ var searchEl = document.getElementById('no-contato-search'); if (searchEl) searchEl.value = '';
+ _noContatoFilterRender();
  if (linkErro) {
   console.error('[Wizard] erro ao vincular contato à empresa:', linkErro);
   _showToast('Contato criado, mas não foi possível vincular à empresa: ' + _supaErrPt(linkErro.message), 'erro');
@@ -441,8 +502,6 @@ async function _noSalvarNovoContato() {
 }
 function _noCancelarNovoContato() {
  document.getElementById('no-novo-contato-box').style.display = 'none';
- var sel = document.getElementById('no-contato-id'); if (sel) sel.value = '';
- _noContatoId = '';
 }
 
 function closeNovaObra() {
@@ -525,6 +584,10 @@ function _noWizardValidate() {
   if (!_noTipos.length) { _showToast('Selecione ao menos um tipo de obra', 'aviso'); return false; }
   if (!document.getElementById('no-etapa')?.value) { _showToast('Selecione a etapa do negócio', 'aviso'); return false; }
   if (!_noEmpresaIds.length) { _showToast('Selecione ao menos uma empresa', 'aviso'); return false; }
+  // Contato virou obrigatório (pedido explícito) — mesmo espírito de
+  // Empresa(s): sem contato nenhum, a obra fica sem ninguém pra falar do
+  // orçamento.
+  if (!_noContatoIds.length) { _showToast('Selecione ao menos um contato', 'aviso'); return false; }
  }
  if (_noStep === 2) {
   if (!document.getElementById('no-estado')?.value) { _showToast('Selecione o estado', 'aviso'); return false; }
@@ -568,7 +631,7 @@ async function submitNovaObra() {
   var payload = {
    nome: nome, tipo_obra: _noTipos, etapa_negocio: etapa, cidade: cidade, estado: estado,
    canal_vendas: canal || null, criado_por: userEmail,
-   empresa_ids: _noEmpresaIds, contato_id: _noContatoId || null,
+   empresa_ids: _noEmpresaIds, contato_ids: _noContatoIds,
    projetos: _noProjLista.map(function(p) {
     var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
     return {
