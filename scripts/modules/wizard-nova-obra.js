@@ -209,6 +209,12 @@ async function openNovaObra() {
   _produtosArr = pr.data || [];
  }
  await _loadUsuariosCache();
+ // Avatares do responsável (pedido explícito) vêm de _respUsuarios/
+ // _avatarCache (dashboard.js/avatar-helpers.js) — carrega em paralelo e
+ // re-renderiza o card de projeto quando chegar, sem travar a abertura do
+ // wizard nisso (mesmo espírito de _loadAvatarCacheFast, best-effort).
+ if (typeof _respLoadUsers === 'function') _respLoadUsers().then(function(){ _noProjRender(); }).catch(function(){});
+ if (typeof _loadAvatarCacheFast === 'function') _loadAvatarCacheFast().then(function(){ _noProjRender(); }).catch(function(){});
 
  document.getElementById('modal-nova-obra').classList.add('open');
  _noWizardInit();
@@ -973,19 +979,31 @@ function _noRespDropdownMarkup(idx) {
  var usuarios = _usuariosCache || [];
  var sel = p.responsavelEmails || [];
  var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s){ return (s||'').toLowerCase(); };
- var btnLabel = sel.length ? sel.length + ' selecionado(s)' : 'Selecione o(s) responsável(is)...';
+ // Rótulo do botão com os nomes de verdade (não "N selecionado(s)") — mesmo
+ // helper do _msRenderDropdown genérico (multiselect-ui.js), só que aqui
+ // precisa converter e-mail (o que fica gravado) pro nome de exibição antes.
+ var selNomes = sel.map(function(email){
+  var u = usuarios.find(function(x){ return x.email === email; });
+  return (u && u.nome_display) || email;
+ });
+ var btnLabel = (typeof _msBtnLabel === 'function') ? _msBtnLabel(selNomes, 'Selecione o(s) responsável(is)...') : (sel.length ? selNomes.join(', ') : 'Selecione o(s) responsável(is)...');
  // Busca sempre visível quando há pelo menos 1 usuário — mesmo ajuste do
  // _msRenderDropdown genérico (multiselect-ui.js): antes só aparecia acima
  // de um limiar de quantidade, o que fazia sumir com poucos usuários.
  var searchHtml = usuarios.length > 0
   ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">'
   : '';
+ // Foto/avatar de cada usuário (pedido explícito: sempre que for escolher
+ // responsável, em qualquer lugar do sistema) — _userAvatarByName
+ // (avatar-helpers.js) já é o helper compartilhado com Dashboard/Gestor de
+ // Tarefas, com fallback pras iniciais quando não há foto.
  var itemsHtml = usuarios.map(function(u) {
   var label = u.nome_display || u.email;
   var emailEsc = String(u.email).replace(/"/g,'&quot;');
   var ck = sel.indexOf(u.email) !== -1 ? ' checked' : '';
+  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(label, 20) : '';
   return '<label class="fb-msel-item" data-norm="' + normalizar(label) + '"><input type="checkbox" value="' + emailEsc + '"' + ck
-   + ' onchange="_noProjRespToggle(' + idx + ',this.value,this.checked)"> ' + label.replace(/</g,'&lt;') + '</label>';
+   + ' onchange="_noProjRespToggle(' + idx + ',this.value,this.checked)">' + avatarHtml + '<span>' + label.replace(/</g,'&lt;') + '</span></label>';
  }).join('');
  return '<div class="fb-msel-wrap">'
   + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabel + '</button>'
@@ -1111,11 +1129,21 @@ function _noProjRender() {
   html += '<div class="mf" style="margin:0"><label style="font-size:11px">Valor total</label>'
    + '<div id="no-proj-total-' + idx + '" style="font-size:13px;font-weight:600;color:var(--text);padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);text-align:right">' + _moedaFormatarBRL((parseFloat(p.qtd)||0) * (parseFloat(p.vuni)||0)) + '</div></div>';
 
+  // Símbolo "m²" ao lado do número (pedido explícito) — <input type=number>
+  // não aceita texto dentro do próprio valor, então o sufixo é um <span>
+  // sobreposto (padding-right no input abre espaço pra não cobrir os
+  // dígitos digitados).
   html += '<div class="modal-grid col2" style="gap:12px">'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Arquitetura</label>'
-   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.m2Arquitetura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Arquitetura\',this.value)"></div>'
+   + '<div style="position:relative">'
+   + '<input class="sp-inp" style="font-size:12px;padding-right:30px" type="number" min="0" step="0.01" value="' + (p.m2Arquitetura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Arquitetura\',this.value)">'
+   + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none">m²</span>'
+   + '</div></div>'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Estrutura</label>'
-   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.m2Estrutura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Estrutura\',this.value)"></div>'
+   + '<div style="position:relative">'
+   + '<input class="sp-inp" style="font-size:12px;padding-right:30px" type="number" min="0" step="0.01" value="' + (p.m2Estrutura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Estrutura\',this.value)">'
+   + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none">m²</span>'
+   + '</div></div>'
    + '</div>';
 
   html += '<div class="mf" style="margin:0"><label style="font-size:11px">Descritivo do projeto</label>'

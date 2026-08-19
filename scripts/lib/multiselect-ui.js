@@ -17,9 +17,19 @@
 // onToggleFnName: nome (string) de uma função global com assinatura
 // (campo, valor, checked) — ex.: "_fornMultiToggle". Passar o nome (não a
 // função) porque o HTML é montado como string pro onchange inline.
+// Pedido explícito: o botão mostrava só "N selecionado(s)" — a pessoa
+// tinha que abrir o dropdown de novo pra lembrar o que já tinha marcado.
+// Agora mostra os nomes de verdade (até 2 por extenso, "+N" pro resto),
+// mesmo padrão já usado em _noEmpresaControlLabelUpdate/
+// _noContatoControlLabelUpdate (wizard-nova-obra.js).
+function _msBtnLabel(sel, placeholder) {
+ if (!sel.length) return placeholder || 'Selecionar...';
+ var nomes = sel.length > 2 ? sel.slice(0, 2).join(', ') + ' +' + (sel.length - 2) : sel.join(', ');
+ return nomes.replace(/</g, '&lt;');
+}
 function _msRenderDropdown(campo, opcoes, selecionados, onToggleFnName, placeholder) {
  var sel = Array.isArray(selecionados) ? selecionados : [];
- var btnLabel = sel.length ? sel.length + ' selecionado(s)' : (placeholder || 'Selecionar...');
+ var btnLabel = _msBtnLabel(sel, placeholder);
  var searchHtml = opcoes.length > 0
   ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">'
   : '';
@@ -73,5 +83,5 @@ function _msFiltrarDOM(inputEl) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _msRenderDropdown, _msFiltrar, _msToggle, _msFiltrarDOM };
+ module.exports = { _msRenderDropdown, _msFiltrar, _msToggle, _msFiltrarDOM, _msBtnLabel };
 }
