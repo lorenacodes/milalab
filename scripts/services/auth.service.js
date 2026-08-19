@@ -2,7 +2,6 @@
 // AUTH SYSTEM — Supabase Auth: login, logout, sessão, recuperação de senha,
 // primeiro acesso / convite, troca de senha voluntária.
 // ═══════════════════════════════════════════════════════════════════════════════
-var _ALLOWED_EMAILS = ['lorena@milatec.ind.br', 'aloisio@milatec.ind.br'];
 // Domínios corporativos aceitos — Grupo Mila inteiro, não só a MilaTec.
 // Única fonte de verdade no cliente (login, esqueci-senha, criação de
 // usuário no admin todos chamam esta função em vez de repetir a lista).
@@ -36,20 +35,20 @@ function _loginSuccess(user) {
  // (achado real do linter de segurança do Supabase, mesmo problema já
  // corrigido nas políticas de RLS de obras/entregas e na edge function
  // auth-admin — as 3 fontes agora leem do mesmo campo seguro).
- var isAdminUser = _ALLOWED_EMAILS.indexOf(email) !== -1 || (user.app_metadata && user.app_metadata.role === 'admin');
+ var isAdminUser = !!(user.app_metadata && user.app_metadata.role === 'admin');
  _currentUser = { id: user.id, email: email, name: metaNome || firstName, firstName: firstName, isAdmin: isAdminUser };
  var ls = document.getElementById('login-screen'); if (ls) ls.style.display = 'none';
  if (!localStorage.getItem('pp-name')) localStorage.setItem('pp-name', metaNome || firstName);
  localStorage.setItem('milatec-user-email', email);
  var tu  = document.getElementById('topbar-user');   if (tu)  tu.style.display  = 'flex';
  var tn  = document.getElementById('topbar-user-name'); if (tn) tn.textContent  = email;
- // Admin = e-mail na lista fixa (bootstrap original) OU role='admin' salvo
- // no app_metadata pelo próprio painel de Admin (_adminAlterarRole →
- // auth-admin/alterar-role) — mesma regra já usada do lado do servidor
- // (Edge Function auth-admin: "ADMINS.includes(email) || role==='admin'").
- // Antes só checava a lista fixa aqui: promover alguém a admin pelo painel
- // gravava o role certinho no banco, mas essa pessoa continuava sem ver o
- // menu/acesso de Admin ao entrar, porque o login nunca olhava pro role.
+ // Admin = role='admin' salvo no app_metadata pelo próprio painel de Admin
+ // (_adminAlterarRole → auth-admin/alterar-role) — mesma regra do lado do
+ // servidor (Edge Function auth-admin: "role==='admin'"). Antigamente havia
+ // também uma lista fixa de e-mails de bootstrap aqui e na edge function;
+ // removida (2026-08-19) por expor e-mails pessoais no repositório público —
+ // os dois admins já tinham role='admin' gravado no banco, então a lista
+ // era redundante.
  var isAdmin  = isAdminUser;
  var navAdmin = document.getElementById('nav-admin');
  if (navAdmin) navAdmin.style.display = isAdmin ? '' : 'none';
