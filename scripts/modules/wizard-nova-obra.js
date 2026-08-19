@@ -911,7 +911,13 @@ async function _noSalvarNovoProduto(idx) {
  var input = document.getElementById('no-np-nome-' + idx);
  var nome = (input?.value || '').trim();
  if (!nome) { _showToast('Informe o nome do produto', 'aviso'); return; }
- var categoria = _noProjLista[idx].tipoObra === _NO_SOLAR_TIPO ? 'Solar' : 'Geral';
+ // categoria segue o tipo de obra do PRÓPRIO projeto onde o produto está
+ // sendo cadastrado (pedido explícito: "ler automaticamente o tipo de
+ // acordo com o que foi selecionado no projeto") — antes só existia a
+ // distinção binária Solar/Geral; agora usa o vocabulário real de tipo_obra
+ // (Telhados/Modular/Steel Frame/Solar/Misto), com 'Geral' como fallback
+ // pra quando o tipo do projeto ainda não foi escolhido nesse momento.
+ var categoria = _noProjLista[idx].tipoObra || 'Geral';
  var res = await _sb.from('produtos').insert({ nome: nome, categoria: categoria }).select('id,nome,categoria').single();
  if (res.error) { _showToast('Erro ao criar produto: ' + res.error.message, 'erro'); return; }
  _produtosArr.push(res.data);
@@ -932,12 +938,18 @@ function _noReabrirDropdown(wrapId) {
  var painel = document.querySelector('#' + wrapId + ' .fb-msel-panel');
  if (painel) painel.classList.add('open');
 }
+// Produtos disponíveis pro tipo de obra do projeto: os marcados com a
+// mesma categoria do tipo escolhido, mais os marcados 'Geral' (itens
+// cross-tipo, ex.: "Administração", "Área de Lazer" — não fazem sentido
+// travados num tipo só). Sem tipo escolhido ainda, mostra só os 'Geral'.
+function _noProdutosDisponiveis(tipoObra) {
+ return _produtosArr.filter(function(pr){ return pr.categoria === tipoObra || pr.categoria === 'Geral'; });
+}
 function _noProjRenderProdutoDropdown(idx) {
  var wrap = document.getElementById('no-proj-produto-dd-' + idx);
  if (!wrap) return;
  var p = _noProjLista[idx];
- var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
- var opcoes = _produtosArr.filter(function(pr){ return isSolar ? pr.categoria === 'Solar' : true; }).map(function(pr){ return pr.nome; });
+ var opcoes = _noProdutosDisponiveis(p.tipoObra).map(function(pr){ return pr.nome; });
  wrap.innerHTML = _msRenderDropdown('projProduto' + idx, opcoes, p.produtoNomes, '_noProjProdutoToggle', 'Selecione o(s) produto(s)...');
 }
 function _noProjProdutoToggle(campo, nome, checked) {
@@ -1022,7 +1034,7 @@ function _noProjRender() {
   // projeto — antes ficava travado só no(s) tipo(s) marcado(s) pra obra no
   // passo 1 (ex.: obra "Solar" só deixava escolher "Solar" aqui).
   var tipoOpts = _NO_TIPOS_OPCOES;
-  var produtosDisponiveis = _produtosArr.filter(function(pr){ return isSolar ? pr.categoria === 'Solar' : true; });
+  var produtosDisponiveis = _noProdutosDisponiveis(p.tipoObra);
   var propostaCheck = isSolar ? _noProjPodeProposta(idx) : null;
 
   var html = '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)">';
