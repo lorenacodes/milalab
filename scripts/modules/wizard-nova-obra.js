@@ -146,9 +146,16 @@ async function openNovaObra() {
  _noProjLista = [];
 
  var nomeEl = document.getElementById('no-nome'); if (nomeEl) nomeEl.value = '';
- ['no-ne-nome','no-ne-cnpj','no-ne-uf','no-ne-cidade','no-nc-nome','no-nc-email','no-nc-cargo'].forEach(function(id){
+ ['no-nc-nome','no-nc-email','no-nc-cargo'].forEach(function(id){
   var el = document.getElementById(id); if (el) el.value = '';
  });
+ var neNomeEl = document.getElementById('no-ne-nome'); if (neNomeEl) neNomeEl.value = '';
+ var neCnpjEl = document.getElementById('no-ne-cnpj'); if (neCnpjEl) neCnpjEl.value = _empCnpjMaskValue('');
+ var neUfEl = document.getElementById('no-ne-uf'); if (neUfEl) neUfEl.innerHTML = _spEmpOptSelect(EMPRESA_ESTADO_OPCOES, '');
+ var neFaseEl = document.getElementById('no-ne-fase'); if (neFaseEl) neFaseEl.innerHTML = _spEmpOptSelect(EMPRESA_FASE_OPCOES, '');
+ var neSiteEl = document.getElementById('no-ne-site'); if (neSiteEl) neSiteEl.value = '';
+ _noNeCategoriaSel = [];
+ _noNeCategoriaRender();
  var searchEl0 = document.getElementById('no-empresa-search'); if (searchEl0) searchEl0.value = '';
  _noEmpresaDropdownToggle(false);
  document.getElementById('no-empresa-control-label')?.classList.add('placeholder');
@@ -292,28 +299,99 @@ function _noEmpresaToggle(id) {
  _noEmpresaFilterRender();
  _noContatoRender();
 }
+// Formulário "Nova Empresa" — pedido explícito: os campos aqui não seguiam
+// o mesmo padrão já usado no detalhamento de Obra (_spCriarEmpresaObra,
+// obras.js), que tem Nome/CNPJ/Estado/Fase do Ciclo de Vida/Categoria/Site
+// (com máscara e validação de CNPJ) em vez de só Nome/CNPJ/UF/Cidade sem
+// validação nenhuma. Reaproveita as mesmas listas/máscaras globais
+// (EMPRESA_ESTADO_OPCOES, EMPRESA_FASE_OPCOES, _empCnpjMask*,
+// _empCnpjJaExiste — empresas.js) só que com estado/ids PRÓPRIOS
+// (_noNeCategoriaSel, #no-ne-*) em vez dos globais _spEmpCategoriaSel/
+// #sp-emp-categoria-dropdown — o formulário do wizard fica sempre no DOM
+// (só escondido), diferente dos formulários de Empresa/Obra que só
+// existem enquanto o painel deles está aberto; usar o MESMO id nos dois
+// faria _spEmpRenderCategoriaDropdown (chamada por 3 telas diferentes)
+// escrever no elemento errado se as duas telas coexistissem no DOM.
 function _noToggleNovaEmpresa() {
  var box = document.getElementById('no-nova-empresa-box');
- if (box) box.style.display = (box.style.display === 'none' || !box.style.display) ? 'block' : 'none';
+ if (!box) return;
+ var abrir = box.style.display === 'none' || !box.style.display;
+ box.style.display = abrir ? 'block' : 'none';
+ if (abrir) { _noNeCategoriaSel = []; _noNeCategoriaRender(); }
 }
 async function _noSalvarNovaEmpresa() {
  var nome = (document.getElementById('no-ne-nome')?.value || '').trim();
  if (!nome) { _showToast('Informe o nome da empresa', 'aviso'); return; }
- var res = await _sb.from('empresas').insert({
+ var cnpjDigits = (document.getElementById('no-ne-cnpj')?.value || '').replace(/\D/g, '');
+ if (cnpjDigits.length > 0 && cnpjDigits.length < 14) {
+  _showToast('CNPJ incompleto — informe os 14 dígitos, ou deixe em branco.', 'aviso');
+  return;
+ }
+ var cnpj = cnpjDigits.length === 14 ? _empCnpjMaskValue(cnpjDigits) : null;
+ if (cnpj && await _empCnpjJaExiste(cnpj, null)) {
+  _showToast('Já existe uma empresa cadastrada com este CNPJ.', 'aviso');
+  return;
+ }
+ var payload = {
   nome: nome,
-  cnpj: document.getElementById('no-ne-cnpj')?.value?.trim() || null,
-  estado: document.getElementById('no-ne-uf')?.value?.trim()?.toUpperCase() || null,
-  cidade: document.getElementById('no-ne-cidade')?.value?.trim() || null,
- }).select('id,nome,cidade,estado,cnpj').single();
+  cnpj: cnpj,
+  estado: document.getElementById('no-ne-uf')?.value || null,
+  fase_ciclo_vida: document.getElementById('no-ne-fase')?.value || null,
+  categoria: (_noNeCategoriaSel || []).slice(),
+  url_site: document.getElementById('no-ne-site')?.value?.trim() || null,
+ };
+ var res = await _sb.from('empresas').insert(payload).select('id,nome,cidade,estado,cnpj').single();
  if (res.error) { _showToast('Erro ao criar empresa: ' + res.error.message, 'erro'); return; }
  _empresasArr = (_empresasArr || []).concat([res.data]);
  _noEmpresaIds.push(res.data.id);
- document.getElementById('no-nova-empresa-box').style.display = 'none';
+ _noToggleNovaEmpresa();
  var searchEl = document.getElementById('no-empresa-search'); if (searchEl) searchEl.value = '';
  _noEmpresaFilterRender();
  _noContatoRender();
  _showToast('Empresa criada com sucesso!', 'ok');
 }
+
+// ── Categoria (chips coloridos) — versão do wizard de
+// _spEmpRenderCategoriaDropdown (empresas.js), mesmo visual, estado/id
+// próprios (ver comentário acima de _noToggleNovaEmpresa).
+var _noNeCategoriaSel = [];
+function _noNeCategoriaRender() {
+ var wrap = document.getElementById('no-ne-categoria-dropdown');
+ if (!wrap) return;
+ var chips = (_noNeCategoriaSel || []).map(function(c) {
+  var esc = c.replace(/'/g,"\\'");
+  return '<span class="nt-tag ' + _empCategoriaTagCls(c) + '" style="display:inline-flex;align-items:center;gap:4px">'
+   + c.replace(/</g,'&lt;')
+   + '<button type="button" onclick="_noNeCategoriaRemove(\''+esc+'\')" title="Remover" '
+   + 'style="background:none;border:none;cursor:pointer;padding:0;line-height:1;color:inherit;opacity:.65;font-size:12px">×</button></span>';
+ }).join('');
+ wrap.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;position:relative">'
+  + chips
+  + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_noNeCategoriaOpenAdd()">+</button>'
+  + '<div id="no-ne-categoria-add" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:20;min-width:170px"></div>'
+  + '</div>';
+}
+function _noNeCategoriaOpenAdd() {
+ var box = document.getElementById('no-ne-categoria-add');
+ if (!box) return;
+ var abrir = box.style.display === 'none';
+ box.style.display = abrir ? 'block' : 'none';
+ if (!abrir) { box.innerHTML = ''; return; }
+ var restantes = EMPRESA_CATEGORIA_OPCOES.filter(function(o){ return (_noNeCategoriaSel||[]).indexOf(o) === -1; });
+ box.innerHTML = '<div class="srch-sel-drop open" style="position:static">'
+  + '<div class="srch-sel-list">' + (restantes.length ? restantes.map(function(o) {
+     var esc = o.replace(/'/g,"\\'");
+     return '<div class="srch-sel-opt" onclick="_noNeCategoriaAdd(\''+esc+'\')"><span class="nt-tag ' + _empCategoriaTagCls(o) + '" style="pointer-events:none">' + o + '</span></div>';
+    }).join('') : '<div class="srch-sel-empty">Todas já selecionadas.</div>') + '</div></div>';
+}
+function _noNeCategoriaAdd(valor) { _noNeCategoriaSel = _msToggle(_noNeCategoriaSel, valor, true); _noNeCategoriaRender(); }
+function _noNeCategoriaRemove(valor) { _noNeCategoriaSel = _msToggle(_noNeCategoriaSel, valor, false); _noNeCategoriaRender(); }
+document.addEventListener('click', function(e) {
+ var addBox = document.getElementById('no-ne-categoria-add');
+ if (addBox && addBox.style.display !== 'none' && !addBox.contains(e.target) && !e.target.closest('#no-ne-categoria-dropdown')) {
+  addBox.style.display = 'none'; addBox.innerHTML = '';
+ }
+});
 
 function _noContatoRender() {
  var sel = document.getElementById('no-contato-id');

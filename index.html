@@ -368,12 +368,23 @@
       <div id="no-empresa-lista" class="no-check-list"></div>
       <div class="no-dd-footer">
        <button type="button" onclick="_noToggleNovaEmpresa()" style="font-size:11px;color:var(--navy);background:none;border:none;cursor:pointer;font-weight:600">+ Cadastrar nova empresa</button>
+       <!-- Mesmo padrão de campos do formulário "Nova Empresa" já usado no
+            detalhamento de Obra (_spCriarEmpresaObra, obras.js) — pedido
+            explícito. Estado/Fase/Categoria populados via JS
+            (openNovaObra/_noToggleNovaEmpresa), mesmo esquema já usado pra
+            Etapa do Negócio (no-etapa) mais acima. -->
        <div id="no-nova-empresa-box" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
         <div class="modal-grid col2" style="gap:10px">
-         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">Razão social <span class="req">*</span></label><input id="no-ne-nome" class="sp-inp" placeholder="Nome da empresa" style="margin-top:4px"></div>
-         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">CNPJ</label><input id="no-ne-cnpj" class="sp-inp" placeholder="00.000.000/0001-00" style="margin-top:4px"></div>
-         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">UF</label><input id="no-ne-uf" class="sp-inp" placeholder="SE" maxlength="2" style="text-transform:uppercase;margin-top:4px"></div>
-         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">Cidade</label><input id="no-ne-cidade" class="sp-inp" placeholder="Aracaju" style="margin-top:4px"></div>
+         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">Nome <span class="req">*</span></label><input id="no-ne-nome" class="sp-inp" placeholder="Razão social" style="margin-top:4px"></div>
+         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">CNPJ</label><input id="no-ne-cnpj" class="sp-inp" placeholder="00.000.000/0001-00" oninput="_empCnpjMask(this)" style="margin-top:4px"></div>
+        </div>
+        <div class="modal-grid col2" style="gap:10px;margin-top:8px">
+         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">Estado</label><select id="no-ne-uf" class="sp-inp" style="margin-top:4px"></select></div>
+         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">Fase do Ciclo de Vida</label><select id="no-ne-fase" class="sp-inp" style="margin-top:4px"></select></div>
+        </div>
+        <div class="modal-grid col2" style="gap:10px;margin-top:8px">
+         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">Categoria</label><div id="no-ne-categoria-dropdown" style="margin-top:4px"></div></div>
+         <div class="mf" style="margin:0"><label style="font-size:10px;font-weight:600;color:var(--muted)">Site</label><input id="no-ne-site" class="sp-inp" placeholder="https://" style="margin-top:4px"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px">
          <button type="button" onclick="_noSalvarNovaEmpresa()" style="font-size:12px;font-weight:600;padding:7px 16px;border:none;border-radius:7px;background:var(--green);color:#fff;cursor:pointer">Salvar empresa</button>
