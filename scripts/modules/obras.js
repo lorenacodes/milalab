@@ -1696,6 +1696,11 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  entregas    = entregas    || [];
  instalacoes = instalacoes || [];
  atividades  = atividades  || [];
+ // Snapshot pro lock otimista do autosave (compare-and-swap via updated_at,
+ // ver _spSaveObraFull) — captura o valor que o painel carregou AGORA, pra
+ // detectar se alguém salva por cima entre a abertura do painel e o
+ // próximo autosave deste usuário.
+ _obraLoadedUpdatedAt = o.updated_at || null;
  try {
  var tipoArr = o.tipo_obra || [];
  var tipo    = tipoArr[0] || '';
@@ -1963,6 +1968,18 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<button class="spt-btn" data-target="spt-tarefas" onclick="_sptSwitch(\'tarefas\',this)">Tarefas' + badge(atividades.length) + '</button>'
   + '<button class="spt-btn" data-target="spt-documentos" onclick="_sptSwitch(\'documentos\',this)">Documentos</button>'
   + '<button class="spt-btn" data-target="spt-registros" onclick="_sptSwitch(\'registros\',this)">Registros</button>'
+  + '</div>'
+
+  // ── Bloco de auditoria (pedido explícito): sempre visível no topo,
+  // independente da sub-aba ativa — "logo abaixo da subaba Registros"
+  // significa abaixo da BARRA de abas (que termina em "Registros"), não
+  // dentro do conteúdo de uma aba específica. _spCarregarAuditoria
+  // preenche os 3 valores + o indicador de autosave de forma assíncrona
+  // logo depois do _spSet (mesmo padrão de _spCarregarDocumentos/
+  // _spCarregarRegistros abaixo).
+  + '<div id="sp-obra-audit" style="margin:14px 0 4px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+  + '<div id="sp-obra-audit-info" style="display:flex;gap:20px;flex-wrap:wrap;font-size:11px;color:var(--muted)">Carregando auditoria...</div>'
+  + '<div id="sp-obra-save-status" style="font-size:11px;font-weight:600;white-space:nowrap"></div>'
   + '</div>'
 
   // ── SEÇÃO: Visão Geral ───────────────────────────────────────────────────────
@@ -2369,6 +2386,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  _spCarregarPropostaStatus(o.id);
  _spCarregarDocumentos(o.id);
  _spCarregarRegistros(o.id, projetos);
+ _spCarregarAuditoria(o.id);
  _sptInitScrollSpy();
 
  if (tipo === 'Modular') {
@@ -2429,10 +2447,73 @@ function _spValorBlur(el) {
 // Debounce de 700ms (mesmo valor usado em Empresa) pra não bater no banco a
 // cada tecla digitada.
 var _obraAutoSaveTimer = null;
+// Snapshot do updated_at carregado no painel — usado como token de lock
+// otimista (compare-and-swap) em _spSaveObraFull. Setado em
+// _spObrasRender toda vez que o painel (re)carrega uma obra.
+var _obraLoadedUpdatedAt = null;
 function _obraScheduleAutoSave() {
  if (_obraAutoSaveTimer) clearTimeout(_obraAutoSaveTimer);
  _obraAutoSaveTimer = setTimeout(function(){ _spSaveObraFull(); }, 700);
 }
+
+// Nomes de exibição (pt-BR) das colunas rastreadas por obra_updates_log —
+// usado só pra exibição do bloco de auditoria, não pra gravação.
+var OBRA_CAMPO_LABEL = {
+ nome: 'Nome da obra', tipo_obra: 'Tipo de obra', etapa_negocio: 'Etapa do negócio',
+ canal_vendas: 'Canal de vendas', endereco_entrega: 'Endereço de entrega',
+ cidade: 'Cidade', estado: 'Estado', data_criacao: 'Data do orçamento',
+ data_envio_proposta: 'Data de envio da proposta', quantidade: 'Quantidade', valor: 'Valor da obra',
+};
+
+// Indicador de autosave (pedido explícito: feedback visual sutil) — texto
+// inline no bloco de auditoria, sem popup/toast repetido a cada tecla.
+var _obraSaveStatusFadeTimer = null;
+function _obraSetSaveStatus(state) {
+ var el = document.getElementById('sp-obra-save-status');
+ if (!el) return;
+ clearTimeout(_obraSaveStatusFadeTimer);
+ if (state === 'salvando') {
+  el.textContent = 'Salvando...'; el.style.color = 'var(--muted)';
+ } else if (state === 'salvo') {
+  el.textContent = '✓ Salvo automaticamente'; el.style.color = 'var(--green)';
+  _obraSaveStatusFadeTimer = setTimeout(function(){ var e2 = document.getElementById('sp-obra-save-status'); if (e2) e2.textContent = ''; }, 2500);
+ } else if (state === 'erro') {
+  el.textContent = '⚠ Erro ao salvar — verifique a conexão'; el.style.color = 'var(--red)';
+ } else if (state === 'conflito') {
+  el.textContent = '⚠ Alterado por outra pessoa — recarregando...'; el.style.color = 'var(--yellow)';
+ } else {
+  el.textContent = '';
+ }
+}
+
+// Bloco "Criado por / Última edição / Data" (pedido explícito) — lê
+// criado_por (mantido por trigger set_audit_fields, ver migração
+// obras_set_audit_fields_trigger) + o registro mais recente de
+// obra_updates_log (trigger log_obra_field_changes, uma linha por campo
+// realmente alterado, gravada no banco pra qualquer caminho que dê UPDATE
+// em obras — painel, kanban, wizard). Sem dependência de estado local:
+// os 2 dados vêm direto do Supabase toda vez que o painel abre ou salva.
+async function _spCarregarAuditoria(obraId) {
+ var el = document.getElementById('sp-obra-audit-info');
+ if (!el || !_obraAtiva) return;
+ var criadoPor = _obraAtiva.criado_por || null;
+ var res = await _sb.from('obra_updates_log')
+  .select('campo_alterado,usuario_email,created_at')
+  .eq('obra_id', obraId).order('created_at', { ascending: false }).limit(1);
+ var ultimo = (!res.error && res.data && res.data[0]) ? res.data[0] : null;
+ var ultimoEmail = ultimo ? ultimo.usuario_email : (_obraAtiva.ultima_alteracao_por || null);
+ var ultimoData  = ultimo ? ultimo.created_at : (_obraAtiva.updated_at || null);
+ var ultimoCampo = ultimo ? (OBRA_CAMPO_LABEL[ultimo.campo_alterado] || ultimo.campo_alterado) : null;
+ // Não é mais o mesmo painel que a resposta partiu (usuário já trocou de
+ // obra) — evita escrever no elemento errado.
+ el = document.getElementById('sp-obra-audit-info');
+ if (!el || document.getElementById('sp-obra-id')?.value !== obraId) return;
+ var fmtData = function(iso){ return iso ? new Date(iso).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'; };
+ el.innerHTML = '<span>Criado por <strong style="color:var(--text)">' + (criadoPor || '—') + '</strong></span>'
+  + '<span>Última edição <strong style="color:var(--text)">' + (ultimoEmail || '—') + '</strong>' + (ultimoCampo ? ' — ' + ultimoCampo : '') + '</span>'
+  + '<span>' + fmtData(ultimoData) + '</span>';
+}
+
 async function _spSaveObraFull() {
  if (_obraAutoSaveTimer) { clearTimeout(_obraAutoSaveTimer); _obraAutoSaveTimer = null; }
  if (!_obraAtiva) return;
@@ -2449,7 +2530,6 @@ async function _spSaveObraFull() {
   quantidade:        document.getElementById('sp-obra-quantidade')?.value !== '' ? Number(document.getElementById('sp-obra-quantidade')?.value) : null,
   valor:             (function(){ var v=(document.getElementById('sp-obra-valor')?.value||'').trim(); if(!v)return null; var n=parseFloat(v.replace(/\./g,'').replace(',','.')); return isNaN(n)?null:n; })(),
   endereco_entrega:  document.getElementById('sp-end-entrega')?.value?.trim() || null,
-  updated_at:        new Date().toISOString(),
  };
  // Empresa(s) e Contato(s) NÃO são mais tocados aqui — cada vínculo/
  // desvínculo já é gravado na hora (_spObEmpresaSelectItem/
@@ -2458,14 +2538,41 @@ async function _spSaveObraFull() {
  // geral apagava/reinseria só 1 empresa e fazia upsert de só 1 contato a
  // cada edição de qualquer campo — incompatível com uma obra ter mais de
  // uma Empresa/Contato vinculado (pedido explícito).
- var { error } = await _sb.from('obras').update(payload).eq('id', id);
+ // updated_at NÃO entra no payload — trg_obras_updated_at (set_updated_at())
+ // já sobrescreve com now() em todo UPDATE, o cliente nunca escolhe esse
+ // valor. É usado só como FILTRO abaixo (lock otimista).
+ _obraSetSaveStatus('salvando');
+ // Lock otimista (compare-and-swap via updated_at, pedido explícito:
+ // "evitar sobrescrita de dados em edições simultâneas"): o WHERE só bate
+ // se ninguém mudou a obra desde que este painel a carregou. Sem
+ // _obraLoadedUpdatedAt ainda setado (nunca deveria acontecer com o painel
+ // aberto, mas por segurança), salva sem a trava em vez de travar o
+ // usuário.
+ var query = _sb.from('obras').update(payload).eq('id', id);
+ if (_obraLoadedUpdatedAt) query = query.eq('updated_at', _obraLoadedUpdatedAt);
+ var { data, error } = await query.select('updated_at');
  if (error) {
   _showToast('Erro ao salvar obra: ' + _supaErrPt(error.message), 'erro');
- } else {
-  _obraAtiva = { ..._obraAtiva, ...payload };
-  _dbLoadObras();
-  _dbLoadObrasKanban();
+  _obraSetSaveStatus('erro');
+  return;
  }
+ if (!data || !data.length) {
+  // 0 linhas afetadas = o filtro por updated_at não bateu: outra pessoa
+  // salvou essa obra entre a abertura do painel e agora. Recarrega o
+  // painel inteiro com os dados reais em vez de tentar de novo — tentar
+  // de novo às cegas sobrescreveria exatamente o campo que a outra pessoa
+  // acabou de mudar.
+  _obraSetSaveStatus('conflito');
+  _showToast('Esta obra foi atualizada por outra pessoa enquanto você editava. Recarregando os dados mais recentes.', 'erro');
+  if (typeof _spObraById === 'function') _spObraById(id);
+  return;
+ }
+ _obraLoadedUpdatedAt = data[0].updated_at;
+ _obraAtiva = { ..._obraAtiva, ...payload, updated_at: _obraLoadedUpdatedAt };
+ _dbLoadObras();
+ _dbLoadObrasKanban();
+ _spCarregarAuditoria(id);
+ _obraSetSaveStatus('salvo');
 }
 
 // ── Empresa: caixa "Adicionar empresa existente" (busca componente srch-sel,
