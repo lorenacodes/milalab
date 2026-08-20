@@ -1698,7 +1698,6 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  atividades  = atividades  || [];
  try {
  var tipoArr = o.tipo_obra || [];
- var tipo    = tipoArr[0] || '';
  var etapas  = Object.keys(_etapaKcId);
  // Lista antiga ('Indicação','Google Ads','Instagram'...) era um enum de
  // marketing inventado que nunca bateu com o que o Airtable de fato usa —
@@ -1972,16 +1971,16 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div class="sp-field"><div class="sp-label">Nome da obra</div>'
   + '<input class="sp-inp" id="sp-nome" style="text-transform:uppercase" value="' + (o.nome||'').replace(/"/g,'&quot;') + '" placeholder="Nome da obra..." oninput="_upperCaseInput(this);_obraScheduleAutoSave()"></div>'
 
-  + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Tipo</div><select class="sp-inp" id="sp-tipo" onchange="_obraScheduleAutoSave()">'
-  + '<option' + (tipo==='Telhados'?' selected':'') + '>Telhados</option>'
-  + '<option' + (tipo==='Steel Frame'?' selected':'') + '>Steel Frame</option>'
-  + '<option' + (tipo==='Modular'?' selected':'') + '>Modular</option>'
-  + '<option' + (tipo==='Solar'?' selected':'') + '>Solar</option>'
-  + '</select></div>'
+  // Tipo(s) de obra é ARRAY (o.tipo_obra) — o <select> de valor único
+  // anterior só mostrava/gravava o PRIMEIRO tipo, perdendo silenciosamente
+  // os demais no próximo autosave (achado real: obra criada com Telhados
+  // + Modular abria mostrando só "Telhados", e qualquer edição salvava de
+  // volta só esse 1 tipo). Pills multi-select (mesmo padrão de cor do
+  // wizard/Passo 1 e do Tipo do Projeto) substituem o select nativo.
+  + '<div class="sp-field"><div class="sp-label">Tipo(s) de obra</div>'
+  + '<div id="sp-tipo-pills" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">' + _spTipoPillsHTML(tipoArr) + '</div></div>'
   + '<div class="sp-field"><div class="sp-label">Etapa do Negócio</div>'
   + _srchSelMarkup('etapa', 'sp-etapa', o.etapa_negocio || '') + '</div>'
-  + '</div>'
 
   + '<div class="sp-g2">'
   // Antes era readonly (mostrava created_at, um timestamp de sistema) —
@@ -2437,6 +2436,35 @@ function _spValorBlur(el) {
 // _empScheduleAutoSave (empresas.js)/_taskAutoSaveQueue (Gestor de Tarefas).
 // Debounce de 700ms (mesmo valor usado em Empresa) pra não bater no banco a
 // cada tecla digitada.
+// Pills multi-select de Tipo(s) de obra (painel de detalhamento) — mesmo
+// padrão de cor de _NO_TIPO_COR (wizard-nova-obra.js). O estado de verdade
+// vive em _obraAtiva.tipo_obra (array), mutado a cada clique — não tem
+// <select> nativo pra ler no autosave, então _spSaveObraFull lê direto
+// dali em vez de um elemento do DOM, diferente dos outros campos.
+function _spTipoPillsHTML(tiposAtuais) {
+ var opcoes = (typeof _NO_TIPOS_OPCOES !== 'undefined' && _NO_TIPOS_OPCOES) || ['Telhados','Modular','Steel Frame','Solar','Misto (LSF + A36)'];
+ return opcoes.map(function(t) {
+  var sel = (tiposAtuais||[]).indexOf(t) >= 0;
+  var cor = (typeof _NO_TIPO_COR !== 'undefined' && _NO_TIPO_COR[t]) || 'var(--navy)';
+  return '<button type="button" onclick="_spTipoObraToggle(\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + cor + ';background:' + (sel?cor:'transparent') + ';color:' + (sel?'#fff':cor) + '">' + t + '</button>';
+ }).join('');
+}
+function _spTipoObraToggle(t) {
+ if (!_obraAtiva) return;
+ var arr = (_obraAtiva.tipo_obra || []).slice();
+ var i = arr.indexOf(t);
+ if (i >= 0) {
+  if (arr.length === 1) { _showToast('A obra precisa ter ao menos 1 tipo.', 'aviso'); return; }
+  arr.splice(i, 1);
+ } else {
+  arr.push(t);
+ }
+ _obraAtiva.tipo_obra = arr;
+ var wrap = document.getElementById('sp-tipo-pills');
+ if (wrap) wrap.innerHTML = _spTipoPillsHTML(arr);
+ _obraScheduleAutoSave();
+}
+
 var _obraAutoSaveTimer = null;
 function _obraScheduleAutoSave() {
  if (_obraAutoSaveTimer) clearTimeout(_obraAutoSaveTimer);
@@ -2448,7 +2476,7 @@ async function _spSaveObraFull() {
  const id = document.getElementById('sp-obra-id')?.value;
  const payload = {
   nome:              (document.getElementById('sp-nome')?.value || '').toUpperCase(),
-  tipo_obra:         [document.getElementById('sp-tipo')?.value || ''],
+  tipo_obra:         (_obraAtiva.tipo_obra && _obraAtiva.tipo_obra.length) ? _obraAtiva.tipo_obra : [],
   etapa_negocio:     document.getElementById('sp-etapa')?.value || '',
   data_criacao:        document.getElementById('sp-data-criacao')?.value || null,
   data_envio_proposta: document.getElementById('sp-data-proposta')?.value || null,
