@@ -484,7 +484,7 @@ function _spEntregaById(id) {
  document.getElementById('sp-overlay').classList.add('sp-open');
  document.getElementById('sp-drawer').classList.add('sp-open');
  if (!_sb) return;
- _sb.from('entregas').select('*, obra:obra_id(nome, cidade, estado, empresas_obras(empresa:empresa_id(nome)))').eq('id', id).single().then(function(res) {
+ _sb.from('entregas').select('*, obra:obra_id(nome, cidade, estado, tipo_obra, empresas_obras(empresa:empresa_id(nome)))').eq('id', id).single().then(function(res) {
   if (res.error || !res.data) {
    _spSet('Entrega', 'Erro', '<div style="color:var(--red);padding:20px">Entrega não encontrada.</div>', '');
    return;
@@ -585,12 +585,213 @@ function _spEntregaRender(e) {
    <div class="sp-rel-chips-wrap">${obraId ? _spRelChipHTML('obras', obraId, obraNome || 'Obra') : '<div class="sp-empty">Nenhuma obra vinculada a esta entrega.</div>'}</div>
   </div>
   <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">Projeto(s) da obra</div>
+    ${obraId ? '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_entProjToggleForm(\'' + obraId + '\')">+ Adicionar projeto</button>' : ''}
+   </div>
+   <div class="sp-rel-chips-wrap" id="sp-ent-proj-chips">${obraId ? '<div class="sp-empty" style="padding:4px 0;font-size:11px">Carregando...</div>' : '<div class="sp-empty">Sem obra vinculada.</div>'}</div>
+   <div id="ent-proj-form-box" style="display:none;margin-top:10px"></div>
+  </div>
+  <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
    <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Documentos da entrega</div>
    <div id="sp-ent-doc-wrap"><div class="sp-empty" style="padding:10px 0;font-size:11px">Carregando documentos...</div></div>
   </div>`,
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 
  _spCarregarDocumentosEntrega(e.id, obraId);
+ if (obraId) _spCarregarProjetosEntrega(obraId, (e.obra && e.obra.tipo_obra) || []);
+}
+
+// ── Projeto(s) da obra, vistos de dentro do painel de Entrega — pedido
+// explícito: faltava a opção de adicionar um projeto por aqui, e a
+// criação deve seguir o MESMO modelo já usado no passo 4 do wizard de
+// Nova Obra (_noProjRender) — inclusive a regra de o tipo do projeto só
+// poder ser um dos tipos já marcados pra obra (_NO_TIPO_COR/pills), não
+// qualquer um dos 5. Reaproveita os vocabulários/globais do wizard
+// (_NO_PROJETO_ETAPA_OPCOES, _NO_TIPOLOGIA_TELHADO_OPCOES,
+// _NO_TIPO_TELHA_OPCOES, _noProdutosDisponiveis) — carregados globalmente
+// mesmo a entrega abrindo sem o painel de Obra ter sido renderizado.
+async function _spCarregarProjetosEntrega(obraId, tipoObraOpcoes) {
+ var wrap = document.getElementById('sp-ent-proj-chips');
+ if (!wrap || !_sb) return;
+ var res = await _sb.from('projetos').select('id,nome').eq('obra_id', obraId).order('created_at');
+ wrap = document.getElementById('sp-ent-proj-chips'); // painel pode ter trocado enquanto a busca corria
+ if (!wrap) return;
+ if (res.error) { wrap.innerHTML = '<div class="sp-empty">Erro ao carregar projetos.</div>'; return; }
+ var lista = res.data || [];
+ wrap.innerHTML = lista.length
+  ? lista.map(function(p){ return _spRelChipHTML('projetos', p.id, p.nome || 'Projeto sem nome'); }).join('')
+  : '<div class="sp-empty">Nenhum projeto vinculado a esta obra ainda.</div>';
+ wrap.dataset.tipoObra = JSON.stringify(tipoObraOpcoes || []);
+}
+
+var _entNovoProj = null;
+function _entProjToggleForm(obraId) {
+ var box = document.getElementById('ent-proj-form-box');
+ if (!box) return;
+ var abrir = box.style.display === 'none' || !box.style.display;
+ if (abrir) {
+  var chipsWrap = document.getElementById('sp-ent-proj-chips');
+  var tipoObraOpcoes = [];
+  try { tipoObraOpcoes = JSON.parse((chipsWrap && chipsWrap.dataset.tipoObra) || '[]'); } catch(e) {}
+  _entNovoProj = {
+   obraId: obraId, nome: '', etapaProjeto: '', tipoObra: tipoObraOpcoes.length === 1 ? tipoObraOpcoes[0] : '',
+   produtoNomes: [], responsavelEmails: [], qtd: '', vuni: '', m2Arquitetura: '', m2Estrutura: '',
+   tipologiaTelhado: [], tipologiaTelha: [], descritivo: '', tipoObraOpcoes: tipoObraOpcoes,
+  };
+  box.innerHTML = _entProjFormHTML();
+  box.style.display = 'block';
+  if (typeof _loadUsuariosCache === 'function') _loadUsuariosCache().then(function(){ box.innerHTML = _entProjFormHTML(); });
+  if (typeof _respLoadUsers === 'function') _respLoadUsers().then(function(){ box.innerHTML = _entProjFormHTML(); }).catch(function(){});
+  if (typeof _loadAvatarCacheFast === 'function') _loadAvatarCacheFast().then(function(){ box.innerHTML = _entProjFormHTML(); }).catch(function(){});
+  if (!_produtosArr.length && _sb) {
+   _sb.from('produtos').select('id,nome,categoria').order('nome').then(function(r){ _produtosArr = r.data || []; box.innerHTML = _entProjFormHTML(); });
+  }
+ } else {
+  box.style.display = 'none';
+  box.innerHTML = '';
+  _entNovoProj = null;
+ }
+}
+function _entProjSet(field, value) {
+ if (!_entNovoProj) return;
+ _entNovoProj[field] = value;
+ if (field === 'tipoObra') {
+  var box = document.getElementById('ent-proj-form-box');
+  if (box) box.innerHTML = _entProjFormHTML();
+ }
+}
+function _entProjFormHTML() {
+ var p = _entNovoProj;
+ if (!p) return '';
+ var produtosDisponiveis = (typeof _noProdutosDisponiveis === 'function') ? _noProdutosDisponiveis(p.tipoObra) : (_produtosArr || []);
+ var html = '<div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface2);display:flex;flex-direction:column;gap:12px">';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Nome do projeto <span class="req">*</span></label>'
+  + '<input class="sp-inp" style="font-size:12px;text-transform:uppercase" value="' + (p.nome||'') + '" oninput="_upperCaseInput(this);_entProjSet(\'nome\',this.value)"></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Etapa do projeto <span class="req">*</span></label>'
+  + '<select class="sp-inp" style="font-size:12px" onchange="_entProjSet(\'etapaProjeto\',this.value)">'
+  + '<option value="">Selecione...</option>'
+  + (_NO_PROJETO_ETAPA_OPCOES||[]).map(function(et){ return '<option' + (et===p.etapaProjeto?' selected':'') + '>' + et + '</option>'; }).join('')
+  + '</select></div>'
+  + '</div>';
+ // Pills restritas aos tipos já marcados pra obra (pedido explícito, mesma
+ // regra do wizard) — não usa _NO_TIPOS_OPCOES inteiro.
+ html += '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de obra do projeto <span class="req">*</span></label>'
+  + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'
+  + (p.tipoObraOpcoes||[]).map(function(t) {
+     var selT = t === p.tipoObra;
+     var corT = (_NO_TIPO_COR && _NO_TIPO_COR[t]) || 'var(--navy)';
+     return '<button type="button" onclick="_entProjSet(\'tipoObra\',\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + corT + ';background:' + (selT?corT:'transparent') + ';color:' + (selT?'#fff':corT) + '">' + t + '</button>';
+    }).join('')
+  + '</div></div>';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Produto <span class="req">*</span></label>'
+  + '<div id="ent-proj-produto-dd" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('entProjProduto', produtosDisponiveis.map(function(pr){return pr.nome;}), p.produtoNomes, '_entProjMultiToggle', 'Selecione o(s) produto(s)...') + '</div></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Responsável <span class="req">*</span></label>'
+  + '<div id="ent-proj-resp-dd" class="no-msel-wide" style="margin-top:4px">' + _entProjRespDropdownMarkup() + '</div></div>'
+  + '</div>';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Tipologia do Telhado</label>'
+  + '<div id="ent-proj-telhado-dd" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('entProjTelhado', _NO_TIPOLOGIA_TELHADO_OPCOES||[], p.tipologiaTelhado, '_entProjMultiToggle', 'Selecione a(s) tipologia(s)...') + '</div></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de Telha</label>'
+  + '<div id="ent-proj-telha-dd" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('entProjTelha', _NO_TIPO_TELHA_OPCOES||[], p.tipologiaTelha, '_entProjMultiToggle', 'Selecione o(s) tipo(s)...') + '</div></div>'
+  + '</div>';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Quantidade</label>'
+  + '<input class="sp-inp" style="font-size:12px" type="number" min="0" value="' + (p.qtd||'') + '" oninput="_entProjSet(\'qtd\',this.value)"></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Valor unit. (R$)</label>'
+  + '<input class="sp-inp" style="font-size:12px" type="text" value="' + (p.vuni||'') + '" oninput="_entProjSet(\'vuni\',this.value)"></div>'
+  + '</div>';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Arquitetura</label>'
+  + '<div style="position:relative"><input class="sp-inp" style="font-size:12px;padding-right:30px" type="number" min="0" step="0.01" value="' + (p.m2Arquitetura||'') + '" oninput="_entProjSet(\'m2Arquitetura\',this.value)">'
+  + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none">m²</span></div></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Estrutura</label>'
+  + '<div style="position:relative"><input class="sp-inp" style="font-size:12px;padding-right:30px" type="number" min="0" step="0.01" value="' + (p.m2Estrutura||'') + '" oninput="_entProjSet(\'m2Estrutura\',this.value)">'
+  + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none">m²</span></div></div>'
+  + '</div>';
+ html += '<div class="mf" style="margin:0"><label style="font-size:11px">Descritivo do projeto</label>'
+  + '<textarea class="sp-inp" style="font-size:12px;height:56px" oninput="_entProjSet(\'descritivo\',this.value)">' + (p.descritivo||'') + '</textarea></div>';
+ html += '<div style="display:flex;gap:8px">'
+  + '<button type="button" onclick="_entProjSalvar()" style="font-size:12px;font-weight:600;padding:7px 16px;border:none;border-radius:7px;background:var(--green);color:#fff;cursor:pointer">Salvar projeto</button>'
+  + '<button type="button" onclick="_entProjToggleForm(\'' + p.obraId + '\')" style="font-size:12px;padding:7px 16px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--muted);cursor:pointer">Cancelar</button>'
+  + '</div>';
+ html += '</div>';
+ return html;
+}
+function _entProjMultiToggle(campo, valor, checked) {
+ if (!_entNovoProj) return;
+ var field = campo === 'entProjProduto' ? 'produtoNomes' : campo === 'entProjTelhado' ? 'tipologiaTelhado' : 'tipologiaTelha';
+ _entNovoProj[field] = _msToggle(_entNovoProj[field], valor, checked);
+ var ddId = campo === 'entProjProduto' ? 'ent-proj-produto-dd' : campo === 'entProjTelhado' ? 'ent-proj-telhado-dd' : 'ent-proj-telha-dd';
+ var opcoes = campo === 'entProjProduto'
+  ? ((typeof _noProdutosDisponiveis === 'function' ? _noProdutosDisponiveis(_entNovoProj.tipoObra) : _produtosArr).map(function(pr){return pr.nome;}))
+  : campo === 'entProjTelhado' ? (_NO_TIPOLOGIA_TELHADO_OPCOES||[]) : (_NO_TIPO_TELHA_OPCOES||[]);
+ var wrap = document.getElementById(ddId);
+ if (wrap) {
+  wrap.innerHTML = _msRenderDropdown(campo, opcoes, _entNovoProj[field], '_entProjMultiToggle', 'Selecione...');
+  var painel = wrap.querySelector('.fb-msel-panel');
+  if (painel) painel.classList.add('open');
+ }
+}
+function _entProjRespDropdownMarkup() {
+ var p = _entNovoProj;
+ var usuarios = _usuariosCache || [];
+ var sel = (p && p.responsavelEmails) || [];
+ var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s){ return (s||'').toLowerCase(); };
+ var selNomes = sel.map(function(email){
+  var u = usuarios.find(function(x){ return x.email === email; });
+  return (u && u.nome_display) || email;
+ });
+ var btnLabel = (typeof _msBtnLabel === 'function') ? _msBtnLabel(selNomes, 'Selecione o(s) responsável(is)...') : (sel.length ? selNomes.join(', ') : 'Selecione o(s) responsável(is)...');
+ var searchHtml = usuarios.length > 0 ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">' : '';
+ var itemsHtml = usuarios.map(function(u) {
+  var label = u.nome_display || u.email;
+  var emailEsc = String(u.email).replace(/"/g,'&quot;');
+  var ck = sel.indexOf(u.email) !== -1 ? ' checked' : '';
+  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(label, 20) : '';
+  return '<label class="fb-msel-item" data-norm="' + normalizar(label) + '"><input type="checkbox" value="' + emailEsc + '"' + ck
+   + ' onchange="_entProjRespToggle(this.value,this.checked)">' + avatarHtml + '<span>' + label.replace(/</g,'&lt;') + '</span></label>';
+ }).join('');
+ return '<div class="fb-msel-wrap">'
+  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabel + '</button>'
+  + '<div class="fb-msel-panel">' + searchHtml + '<div class="fb-msel-list">' + (itemsHtml || '<div style="padding:8px;font-size:11px;color:var(--muted)">Nenhum usuário cadastrado</div>') + '</div></div>'
+  + '</div>';
+}
+function _entProjRespToggle(email, checked) {
+ if (!_entNovoProj) return;
+ _entNovoProj.responsavelEmails = _msToggle(_entNovoProj.responsavelEmails, email, checked);
+ var wrap = document.getElementById('ent-proj-resp-dd');
+ if (wrap) {
+  wrap.innerHTML = _entProjRespDropdownMarkup();
+  var painel = wrap.querySelector('.fb-msel-panel');
+  if (painel) painel.classList.add('open');
+ }
+}
+async function _entProjSalvar() {
+ var p = _entNovoProj;
+ if (!p) return;
+ var faltando = [];
+ if (!(p.nome||'').trim()) faltando.push('Nome');
+ if (!p.etapaProjeto) faltando.push('Etapa do projeto');
+ if (!p.tipoObra) faltando.push('Tipo de obra');
+ if (!p.produtoNomes.length) faltando.push('Produto');
+ if (!p.responsavelEmails.length) faltando.push('Responsável');
+ if (faltando.length) { _showToast('Preencha: ' + faltando.join(', '), 'aviso'); return; }
+ var payload = {
+  nome: (p.nome||'').trim().toUpperCase(), obra_id: p.obraId, tipo_orcamento: p.tipoObra,
+  etapa_projeto: p.etapaProjeto, produto: p.produtoNomes, responsavel: p.responsavelEmails,
+  quantidade: p.qtd || null, valor_unitario: p.vuni ? parseFloat(String(p.vuni).replace(/\./g,'').replace(',','.')) || null : null,
+  m2_arquitetura: p.m2Arquitetura || null, m2_estrutura: p.m2Estrutura || null,
+  tipologia_telhado: p.tipologiaTelhado, tipologia_telha: p.tipologiaTelha,
+  descritivo: p.descritivo || null,
+ };
+ var res = await _sb.from('projetos').insert(payload).select('id,nome').single();
+ if (res.error) { _showToast('Erro ao criar projeto: ' + res.error.message, 'erro'); return; }
+ _showToast('Projeto criado com sucesso!', 'ok');
+ _entProjToggleForm(p.obraId);
+ _spCarregarProjetosEntrega(p.obraId, p.tipoObraOpcoes);
 }
 
 // ── Atualização pontual de um campo da entrega (Transporte/Pedido produzido)
@@ -765,7 +966,7 @@ async function _dbLoadEntregas() {
  while (true) {
   var res = await _sb
    .from('entregas')
-   .select('*, obra:obra_id(nome, cidade, estado, empresas_obras(empresa:empresa_id(nome)))')
+   .select('*, obra:obra_id(nome, cidade, estado, tipo_obra, empresas_obras(empresa:empresa_id(nome)))')
    .order('created_at', { ascending: false })
    .range(from, from + pageSize - 1);
   if (res.error) { error = res.error; break; }
