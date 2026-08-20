@@ -150,6 +150,7 @@ async function openNovaObra() {
   var el = document.getElementById(id); if (el) el.value = '';
  });
  var ncCargoWrap = document.getElementById('no-nc-cargo-wrap'); if (ncCargoWrap) ncCargoWrap.innerHTML = _noNcCargoMarkup('');
+ var ncTelEl = document.getElementById('no-nc-tel'); if (ncTelEl) ncTelEl.value = _cttTelMaskValue('');
  var neNomeEl = document.getElementById('no-ne-nome'); if (neNomeEl) neNomeEl.value = '';
  var neCnpjEl = document.getElementById('no-ne-cnpj'); if (neCnpjEl) neCnpjEl.value = _empCnpjMaskValue('');
  var neUfEl = document.getElementById('no-ne-uf'); if (neUfEl) neUfEl.innerHTML = _spEmpOptSelect(EMPRESA_ESTADO_OPCOES, '');
@@ -479,10 +480,19 @@ function _noToggleNovoContato() {
 async function _noSalvarNovoContato() {
  var nome = (document.getElementById('no-nc-nome')?.value || '').trim();
  if (!nome) { _showToast('Informe o nome do contato', 'aviso'); return; }
+ // Telefone obrigatório (pedido explícito): precisa ter exatamente 10 ou
+ // 11 dígitos reais, ignorando a máscara — mesma regra de _cttCriarContato
+ // (empresas.js) e _spCriarContato (obras.js).
+ var telDigits = (document.getElementById('no-nc-tel')?.value || '').replace(/\D/g, '');
+ if (telDigits.length < 10 || telDigits.length > 11) {
+  _showToast('Telefone é obrigatório — informe DDD + número (10 ou 11 dígitos).', 'aviso');
+  return;
+ }
  var res = await _sb.from('contatos').insert({
   nome_completo: nome,
   email: document.getElementById('no-nc-email')?.value?.trim() || null,
-  cargo: document.getElementById('no-nc-cargo')?.value?.trim() || null,
+  telefone: _cttTelMaskValue(telDigits),
+  cargo: document.getElementById('no-nc-cargo')?.value || null,
  }).select('id,nome_completo,cargo').single();
  if (res.error) { _showToast('Erro ao criar contato: ' + res.error.message, 'erro'); return; }
  // Associa já à(s) empresa(s) selecionada(s) na hora de criar — pedido
