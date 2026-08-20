@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const smartSearch = require('./smart-search.js');
 global._ssNormalize = smartSearch._ssNormalize;
 global._ssMatch = smartSearch._ssMatch;
-const { _msRenderDropdown, _msFiltrar, _msToggle, _msBtnLabel } = require('./multiselect-ui.js');
+const { _msRenderDropdown, _msFiltrar, _msToggle } = require('./multiselect-ui.js');
 
 test('_msToggle: adiciona quando ausente, remove quando presente', () => {
  assert.deepEqual(_msToggle([], 'Aracaju'), ['Aracaju']);
@@ -45,16 +45,9 @@ test('_msRenderDropdown: marca "checked" só os selecionados', () => {
  assert.doesNotMatch(html, /value="Aracaju" checked/);
 });
 
-test('_msRenderDropdown: rótulo do botão mostra os nomes selecionados, não a contagem', () => {
+test('_msRenderDropdown: rótulo do botão mostra contagem quando há seleção', () => {
  var html = _msRenderDropdown('setores', ['A', 'B', 'C'], ['A', 'B'], '_fornMultiToggle', 'Selecionar...');
- assert.match(html, />A, B</);
-});
-
-test('_msBtnLabel: até 2 selecionados mostra por extenso, 3+ trunca em "+N"', () => {
- assert.equal(_msBtnLabel([], 'Selecione...'), 'Selecione...');
- assert.equal(_msBtnLabel(['Telhados'], 'Selecione...'), 'Telhados');
- assert.equal(_msBtnLabel(['Telhados', 'Modular'], 'Selecione...'), 'Telhados, Modular');
- assert.equal(_msBtnLabel(['Telhados', 'Modular', 'Solar'], 'Selecione...'), 'Telhados, Modular +1');
+ assert.match(html, />2 selecionado\(s\)</);
 });
 
 test('_msRenderDropdown: sem seleção mostra o placeholder', () => {
