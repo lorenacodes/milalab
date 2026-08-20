@@ -703,10 +703,7 @@ function _noWizardValidate() {
 async function submitNovaObra() {
  if (!_noWizardValidate()) return;
 
- // Nome sempre em CAIXA ALTA (pedido explícito) — o campo já força isso
- // enquanto digita (_upperCaseInput), .toUpperCase() aqui é só a garantia
- // final antes de gravar (cobre paste/autofill que não passa por oninput).
- var nome   = (document.getElementById('no-nome')?.value || '').trim().toUpperCase();
+ var nome   = (document.getElementById('no-nome')?.value || '').trim();
  var estado = document.getElementById('no-estado')?.value || '';
  var cidade = document.getElementById('no-cidade')?.value || '';
  var etapa  = document.getElementById('no-etapa')?.value || '';
@@ -726,7 +723,7 @@ async function submitNovaObra() {
    projetos: _noProjLista.map(function(p) {
     var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
     return {
-     nome: (p.nome || '').toUpperCase(), tipo_obra: p.tipoObra, etapa_projeto: p.etapaProjeto,
+     nome: p.nome, tipo_obra: p.tipoObra, etapa_projeto: p.etapaProjeto,
      produto: p.produtoNomes, responsavel: p.responsavelEmails,
      quantidade: p.qtd || null, valor_unitario: p.vuni || null,
      m2_arquitetura: p.m2Arquitetura || null, m2_estrutura: p.m2Estrutura || null,
@@ -1036,7 +1033,7 @@ function _noProjRender() {
 
   html += '<div class="modal-grid col2" style="gap:12px">'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Nome do projeto <span class="req">*</span></label>'
-   + '<input class="sp-inp" style="font-size:12px;text-transform:uppercase" value="' + (p.nome||'') + '" oninput="_upperCaseInput(this);_noProjSet(' + idx + ',\'nome\',this.value)"></div>'
+   + '<input class="sp-inp" style="font-size:12px" value="' + (p.nome||'') + '" oninput="_noProjSet(' + idx + ',\'nome\',this.value)"></div>'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Etapa do projeto <span class="req">*</span></label>'
    + '<select class="sp-inp" style="font-size:12px" onchange="_noProjSet(' + idx + ',\'etapaProjeto\',this.value)">'
    + '<option value="">Selecione...</option>'
