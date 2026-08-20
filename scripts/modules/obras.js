@@ -950,13 +950,21 @@ async function updateObraEtapa(id, novaEtapa, origem) {
 
  _aplicarEtapaObraUI(id, novaEtapa);
 
- const res = await _sb.from('obras').update({ etapa_negocio: novaEtapa, updated_at: new Date().toISOString() }).eq('id', id);
+ const res = await _sb.from('obras').update({ etapa_negocio: novaEtapa }).eq('id', id).select('updated_at');
  if (res.error) {
   _showToast('Erro ao atualizar etapa: ' + _supaErrPt(res.error.message), 'erro');
   if (etapaAnterior) _aplicarEtapaObraUI(id, etapaAnterior);
   return;
  }
- if (_obraAtiva && _obraAtiva.id === id) _obraAtiva.etapa_negocio = novaEtapa;
+ if (_obraAtiva && _obraAtiva.id === id) {
+  _obraAtiva.etapa_negocio = novaEtapa;
+  // Esta escrita bate direto no banco, fora do fluxo do autosave do painel
+  // (_spSaveObraFull) — sem atualizar o snapshot aqui, o próximo autosave
+  // usaria um updated_at velho no lock otimista e SEMPRE bateria como
+  // "conflito" (mesmo sendo o mesmo usuário), recarregando o painel à toa
+  // toda vez que a Etapa mudasse. Bug real encontrado ao vivo.
+  if (res.data && res.data[0]) _obraLoadedUpdatedAt = res.data[0].updated_at;
+ }
  _showToast('Etapa atualizada para "' + novaEtapa + '"', 'ok');
 }
 
@@ -1927,7 +1935,12 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  // fechadas de verdade.
  _srchSelRegister('etapa', {
   options: etapas, placeholder: 'Nenhuma etapa',
-  onSelect: function(v) { _spOnEtapaChange(v); _obraScheduleAutoSave(); },
+  // Só _spOnEtapaChange — ele já salva etapa_negocio na hora (updateObraEtapa)
+  // e mantém _obraLoadedUpdatedAt sincronizado. Chamar _obraScheduleAutoSave()
+  // aqui também duplicava a escrita à toa (o valor já estava salvo) e, antes
+  // do fix em updateObraEtapa, causava falso "conflito" no lock otimista a
+  // cada troca de etapa (o updated_at mudava por fora do snapshot do painel).
+  onSelect: function(v) { _spOnEtapaChange(v); },
  });
  _srchSelRegister('uf', {
   options: UF_BRASIL, placeholder: 'Selecione o UF...',
@@ -1968,21 +1981,12 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<button class="spt-btn" data-target="spt-tarefas" onclick="_sptSwitch(\'tarefas\',this)">Tarefas' + badge(atividades.length) + '</button>'
   + '<button class="spt-btn" data-target="spt-documentos" onclick="_sptSwitch(\'documentos\',this)">Documentos</button>'
   + '<button class="spt-btn" data-target="spt-registros" onclick="_sptSwitch(\'registros\',this)">Registros</button>'
-  + '</div>'
-
-  // ── Bloco de auditoria (pedido explícito): sempre visível no topo,
-  // independente da sub-aba ativa — "logo abaixo da subaba Registros"
-  // significa abaixo da BARRA de abas (que termina em "Registros"), não
-  // dentro do conteúdo de uma aba específica. _spCarregarAuditoria
-  // preenche os 3 valores + o indicador de autosave de forma assíncrona
-  // logo depois do _spSet (mesmo padrão de _spCarregarDocumentos/
-  // _spCarregarRegistros abaixo).
-  + '<div id="sp-obra-audit" style="margin:24px 0 20px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">'
-  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
-  + '<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;opacity:.85">Auditoria</div>'
-  + '<div id="sp-obra-save-status" style="font-size:11px;font-weight:600;white-space:nowrap"></div>'
-  + '</div>'
-  + '<div id="sp-obra-audit-info" style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);line-height:1.5">Carregando auditoria...</div>'
+  // Indicador de autosave (pedido explícito): fica na própria barra de
+  // abas (sticky, sempre visível independente da sub-aba ativa) porque a
+  // edição normalmente acontece em "Visão Geral" — diferente do bloco
+  // "Criado por/Última edição", que é só informativo e mora abaixo de
+  // "Registros fotográficos" (pedido explícito à parte).
+  + '<span id="sp-obra-save-status" style="margin-left:auto;align-self:center;font-size:11px;font-weight:600;white-space:nowrap;padding-left:12px"></span>'
   + '</div>'
 
   // ── SEÇÃO: Visão Geral ───────────────────────────────────────────────────────
@@ -2368,6 +2372,20 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
         + '</div>')
      : '<div class="sp-empty" style="margin-bottom:14px">Vincule um projeto a esta obra para poder registrar fotos.</div>')
   + '<div id="sp-registros-lista"><div class="sp-empty"><div style="font-size:11px;color:var(--muted)">Carregando...</div></div></div>'
+
+  // ── Bloco de auditoria (pedido explícito: abaixo de "Registros
+  // fotográficos", não no topo do painel) — _spCarregarAuditoria preenche
+  // os valores + o indicador de autosave de forma assíncrona, chamado
+  // logo depois do _spSet (mesmo padrão de _spCarregarDocumentos/
+  // _spCarregarRegistros).
+  + '<div id="sp-obra-audit" style="margin:20px 0 4px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">'
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+  + '<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;opacity:.85">Auditoria</div>'
+  + '<div id="sp-obra-save-status" style="font-size:11px;font-weight:600;white-space:nowrap"></div>'
+  + '</div>'
+  + '<div id="sp-obra-audit-info" style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);line-height:1.5">Carregando auditoria...</div>'
+  + '</div>'
+
   + '</div>'; // fim spt-panel registros
 
  // Sem botão "Salvar" — pedido explícito: qualquer alteração no formulário
