@@ -1035,12 +1035,17 @@ function _noProjRender() {
  }
 
  container.innerHTML = _noProjLista.map(function(p, idx) {
+  // Pedido explícito: o tipo do projeto só pode ser um dos tipos já
+  // marcados pra obra no passo 1 — se a obra é "Solar" e "Telhados", não
+  // faz sentido criar um projeto "Steel Frame" dentro dela. Fallback pra
+  // todas as opções só por segurança (nunca deveria ficar vazio aqui,
+  // já que o passo 1 exige pelo menos 1 tipo marcado antes de avançar).
+  var tipoOpts = _noTipos.length ? _noTipos : _NO_TIPOS_OPCOES;
+  // Se a obra teve seu(s) tipo(s) alterado(s) depois do projeto já ter um
+  // tipo escolhido, e esse tipo não é mais válido, reseta em vez de
+  // deixar o card preso num valor que não aparece mais nos botões.
+  if (p.tipoObra && tipoOpts.indexOf(p.tipoObra) === -1) p.tipoObra = tipoOpts.length === 1 ? tipoOpts[0] : '';
   var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
-  // Pedido explícito: o tipo do projeto tem que oferecer TODAS as opções
-  // (Solar/Steel Frame/Telhados/Modular/Misto), igual à criação normal de
-  // projeto — antes ficava travado só no(s) tipo(s) marcado(s) pra obra no
-  // passo 1 (ex.: obra "Solar" só deixava escolher "Solar" aqui).
-  var tipoOpts = _NO_TIPOS_OPCOES;
   var produtosDisponiveis = _produtosArr.filter(function(pr){ return isSolar ? pr.categoria === 'Solar' : true; });
   var propostaCheck = isSolar ? _noProjPodeProposta(idx) : null;
 
