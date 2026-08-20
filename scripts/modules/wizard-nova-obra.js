@@ -357,7 +357,7 @@ async function _noSalvarNovaEmpresa() {
   categoria: (_noNeCategoriaSel || []).slice(),
   url_site: document.getElementById('no-ne-site')?.value?.trim() || null,
  };
- var res = await _sb.from('empresas').insert(payload).select('id,nome,cidade,estado,cnpj').single();
+ var res = await _sb.from('empresas').insert(payload).select('id,nome,estado,cnpj').single();
  if (res.error) { _showToast('Erro ao criar empresa: ' + res.error.message, 'erro'); return; }
  _empresasArr = (_empresasArr || []).concat([res.data]);
  _noEmpresaIds.push(res.data.id);
