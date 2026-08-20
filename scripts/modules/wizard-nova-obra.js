@@ -1099,11 +1099,21 @@ function _noProjRender() {
   html += '<div class="mf" style="margin:0"><label style="font-size:11px">Valor total</label>'
    + '<div id="no-proj-total-' + idx + '" style="font-size:13px;font-weight:600;color:var(--text);padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);text-align:right">' + _moedaFormatarBRL((parseFloat(p.qtd)||0) * (parseFloat(p.vuni)||0)) + '</div></div>';
 
+  // Símbolo "m²" ao lado do número (pedido explícito) — <input type=number>
+  // não aceita texto dentro do próprio valor, então o sufixo é um <span>
+  // sobreposto (padding-right no input abre espaço pra não cobrir os
+  // dígitos digitados).
   html += '<div class="modal-grid col2" style="gap:12px">'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Arquitetura</label>'
-   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.m2Arquitetura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Arquitetura\',this.value)"></div>'
+   + '<div style="position:relative">'
+   + '<input class="sp-inp" style="font-size:12px;padding-right:30px" type="number" min="0" step="0.01" value="' + (p.m2Arquitetura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Arquitetura\',this.value)">'
+   + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none">m²</span>'
+   + '</div></div>'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Estrutura</label>'
-   + '<input class="sp-inp" style="font-size:12px" type="number" min="0" step="0.01" value="' + (p.m2Estrutura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Estrutura\',this.value)"></div>'
+   + '<div style="position:relative">'
+   + '<input class="sp-inp" style="font-size:12px;padding-right:30px" type="number" min="0" step="0.01" value="' + (p.m2Estrutura||'') + '" oninput="_noProjSet(' + idx + ',\'m2Estrutura\',this.value)">'
+   + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none">m²</span>'
+   + '</div></div>'
    + '</div>';
 
   html += '<div class="mf" style="margin:0"><label style="font-size:11px">Descritivo do projeto</label>'
