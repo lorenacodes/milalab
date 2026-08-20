@@ -418,7 +418,7 @@ async function _spEmpresas(row, tds) {
   + '<div class="sp-field"><div class="sp-label">Fase</div><select class="sp-inp" id="sp-emp-fase" onchange="_empScheduleAutoSave()">'+_spEmpOptSelect(EMPRESA_FASE_OPCOES, fase)+'</select></div>'
   + '</div>'
   + '<div class="sp-field"><div class="sp-label">URL do site</div>'
-  + '<input class="sp-inp" id="sp-emp-site" type="url" placeholder="https://..." value="'+site.replace(/"/g,'&quot;')+'" oninput="_empScheduleAutoSave()"></div>'
+  + _siteInputHTML('sp-emp-site', site, '_empScheduleAutoSave()') + '</div>'
   + '<input type="hidden" id="sp-emp-id" value="'+empId+'">'
   + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
   + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
@@ -2207,7 +2207,7 @@ function openNovaEmpresa() {
   + '<div class="sp-field"><div class="sp-label">Fase</div><select class="sp-inp" id="sp-emp-fase">'+_spEmpOptSelect(EMPRESA_FASE_OPCOES,'')+'</select></div>'
   + '</div>'
   + '<div class="sp-field"><div class="sp-label">URL do site</div>'
-  + '<input class="sp-inp" id="sp-emp-site" type="url" placeholder="https://..."></div>'
+  + _siteInputHTML('sp-emp-site', '', '') + '</div>'
   + _spNovaVinculosHTML(),
   '<button class="btn btn-primary" id="sp-emp-criar-btn" onclick="_spCriarEmpresa()">Criar empresa</button> <button class="btn btn-ghost" onclick="closePanel()">Cancelar</button>'
  );

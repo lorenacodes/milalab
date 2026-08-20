@@ -2048,7 +2048,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // _spToggleNovaEmpresa() antes de abrir este formulário, então não há
   // risco de arrastar seleção de uma sessão de criação anterior.
   + '<div class="sp-field"><div class="sp-label">Categoria</div><div id="sp-emp-categoria-dropdown"></div></div>'
-  + '<div class="sp-field"><div class="sp-label">Site</div><input class="sp-inp" id="sp-new-emp-site" placeholder="https://"></div>'
+  + '<div class="sp-field"><div class="sp-label">Site</div>' + _siteInputHTML('sp-new-emp-site', '', '') + '</div>'
   + '</div><div style="display:flex;gap:6px;margin-top:10px">'
   + '<button class="btn btn-primary btn-sm" onclick="_spCriarEmpresaObra()" style="flex:1;justify-content:center">Criar empresa</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaEmpresa()">Cancelar</button>'

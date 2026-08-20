@@ -156,6 +156,7 @@ async function openNovaObra() {
  var neUfEl = document.getElementById('no-ne-uf'); if (neUfEl) neUfEl.innerHTML = _spEmpOptSelect(EMPRESA_ESTADO_OPCOES, '');
  var neFaseEl = document.getElementById('no-ne-fase'); if (neFaseEl) neFaseEl.innerHTML = _spEmpOptSelect(EMPRESA_FASE_OPCOES, '');
  var neSiteEl = document.getElementById('no-ne-site'); if (neSiteEl) neSiteEl.value = '';
+ var neSiteBtn = document.getElementById('no-ne-site-open'); if (neSiteBtn) neSiteBtn.style.display = 'none';
  _noNeCategoriaSel = [];
  _noNeCategoriaRender();
  var searchEl0 = document.getElementById('no-empresa-search'); if (searchEl0) searchEl0.value = '';

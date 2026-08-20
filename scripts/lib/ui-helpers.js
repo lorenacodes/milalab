@@ -22,3 +22,28 @@ function _upperCaseInput(el) {
  el.value = (el.value || '').toUpperCase();
  if (start != null) el.setSelectionRange(start, end);
 }
+
+// _siteInputHTML — campo de URL (Site da empresa) com botão de abrir
+// direto ao lado (pedido explícito: clicar deve levar direto pro site,
+// não só mostrar o texto da URL). Usado em todo campo "Site"/URL de
+// Empresa do sistema — padrão único, não um componente por tela.
+function _siteInputHTML(id, value, extraOninput) {
+ var esc = (value || '').replace(/"/g, '&quot;');
+ var oninput = "_siteBtnUpdate('" + id + "')" + (extraOninput ? ';' + extraOninput : '');
+ return '<div style="display:flex;gap:6px;align-items:center">'
+  + '<input class="sp-inp" id="' + id + '" type="url" placeholder="https://..." value="' + esc + '" style="flex:1" oninput="' + oninput + '">'
+  + '<button type="button" id="' + id + '-open" class="btn btn-ghost btn-sm" onclick="_siteOpen(\'' + id + '\')" title="Abrir site" style="flex-shrink:0;padding:6px 10px' + (value ? '' : ';display:none') + '">↗</button>'
+  + '</div>';
+}
+function _siteBtnUpdate(id) {
+ var el = document.getElementById(id);
+ var btn = document.getElementById(id + '-open');
+ if (btn) btn.style.display = (el && el.value.trim()) ? '' : 'none';
+}
+function _siteOpen(id) {
+ var el = document.getElementById(id);
+ var v = (el && el.value || '').trim();
+ if (!v) return;
+ var url = /^https?:\/\//i.test(v) ? v : 'https://' + v;
+ window.open(url, '_blank', 'noopener');
+}
