@@ -146,9 +146,10 @@ async function openNovaObra() {
  _noProjLista = [];
 
  var nomeEl = document.getElementById('no-nome'); if (nomeEl) nomeEl.value = '';
- ['no-nc-nome','no-nc-email','no-nc-cargo'].forEach(function(id){
+ ['no-nc-nome','no-nc-email'].forEach(function(id){
   var el = document.getElementById(id); if (el) el.value = '';
  });
+ var ncCargoWrap = document.getElementById('no-nc-cargo-wrap'); if (ncCargoWrap) ncCargoWrap.innerHTML = _noNcCargoMarkup('');
  var neNomeEl = document.getElementById('no-ne-nome'); if (neNomeEl) neNomeEl.value = '';
  var neCnpjEl = document.getElementById('no-ne-cnpj'); if (neCnpjEl) neCnpjEl.value = _empCnpjMaskValue('');
  var neUfEl = document.getElementById('no-ne-uf'); if (neUfEl) neUfEl.innerHTML = _spEmpOptSelect(EMPRESA_ESTADO_OPCOES, '');
@@ -508,6 +509,79 @@ function _noCancelarNovoContato() {
  document.getElementById('no-novo-contato-box').style.display = 'none';
 }
 
+// Cargo do "Novo contato" do wizard — mesmo componente searchable
+// single-select de _spCttCargoMarkup (empresas.js), mas com ids/estado
+// PRÓPRIOS (no-nc-cargo-*) em vez dos globais sp-ctt-cargo-*: o modal do
+// wizard fica sempre no DOM (só escondido), diferente do painel de
+// Contato que só existe enquanto está aberto — reaproveitar o mesmo id
+// faria as duas telas colidirem se coexistissem (mesmo motivo de
+// _noNeCategoriaSel acima, pra Categoria de Empresa).
+var _noNcCargoSel = '';
+function _noNcCargoMarkup(atual) {
+ _noNcCargoSel = atual || '';
+ var temValor = !!_noNcCargoSel;
+ return '<input type="hidden" id="no-nc-cargo" value="'+_noNcCargoSel.replace(/"/g,'&quot;')+'">'
+  + '<div class="srch-sel" id="no-nc-cargo-srch">'
+  + '<div class="srch-sel-box" id="no-nc-cargo-box" onclick="_noNcCargoToggle()">'
+  + '<span class="srch-sel-val'+(temValor?'':' placeholder')+'" id="no-nc-cargo-val">'+(temValor?_noNcCargoSel.replace(/</g,'&lt;'):'Selecione')+'</span>'
+  + '<button class="srch-sel-clr" id="no-nc-cargo-clr" style="display:'+(temValor?'':'none')+'" onclick="event.stopPropagation();_noNcCargoClear()" title="Remover">✕</button>'
+  + '<span class="srch-sel-chevron">▾</span>'
+  + '</div>'
+  + '<div class="srch-sel-drop" id="no-nc-cargo-drop">'
+  + '<input class="srch-sel-inp" id="no-nc-cargo-inp" type="text" placeholder="Buscar cargo..." oninput="_noNcCargoFilter(this.value)" onkeydown="_noNcCargoKey(event)">'
+  + '<div class="srch-sel-list" id="no-nc-cargo-list"></div>'
+  + '</div>'
+  + '</div>';
+}
+function _noNcCargoToggle() {
+ var drop = document.getElementById('no-nc-cargo-drop');
+ var box  = document.getElementById('no-nc-cargo-box');
+ if (!drop) return;
+ if (drop.classList.contains('open')) { _noNcCargoClose(); return; }
+ drop.classList.add('open');
+ if (box) box.classList.add('open');
+ var inp = document.getElementById('no-nc-cargo-inp');
+ if (inp) { inp.value = ''; inp.focus(); }
+ _noNcCargoFilter('');
+ _srchSelPositionEl(drop, box);
+}
+function _noNcCargoClose() {
+ var drop = document.getElementById('no-nc-cargo-drop');
+ var box  = document.getElementById('no-nc-cargo-box');
+ if (drop) drop.classList.remove('open');
+ if (box)  box.classList.remove('open');
+}
+function _noNcCargoFilter(q) {
+ q = (q || '').toLowerCase();
+ var list = document.getElementById('no-nc-cargo-list');
+ if (!list) return;
+ var matches = CONTATO_CARGO_OPCOES.filter(function(c) { return c.toLowerCase().indexOf(q) !== -1; });
+ if (!matches.length) { list.innerHTML = '<div class="srch-sel-empty">Nenhum cargo encontrado.</div>'; return; }
+ list.innerHTML = matches.map(function(c) {
+  var sel = c === _noNcCargoSel ? ' selected' : '';
+  return '<div class="srch-sel-opt' + sel + '" onclick="_noNcCargoSelectItem(\'' + c.replace(/'/g,"\\'") + '\')">' + c.replace(/</g,'&lt;') + '</div>';
+ }).join('');
+}
+function _noNcCargoSelectItem(cargo) {
+ _noNcCargoSel = cargo;
+ var hidEl = document.getElementById('no-nc-cargo');
+ var valEl = document.getElementById('no-nc-cargo-val');
+ var clrEl = document.getElementById('no-nc-cargo-clr');
+ if (hidEl) hidEl.value = cargo;
+ if (valEl) { valEl.textContent = cargo || 'Selecione'; valEl.classList.toggle('placeholder', !cargo); }
+ if (clrEl) clrEl.style.display = cargo ? '' : 'none';
+ _noNcCargoClose();
+}
+function _noNcCargoClear() { _noNcCargoSelectItem(''); }
+function _noNcCargoKey(e) { if (e.key === 'Escape') _noNcCargoClose(); }
+document.addEventListener('click', function(e) {
+ var cargoDrop = document.getElementById('no-nc-cargo-drop');
+ var cargoBox  = document.getElementById('no-nc-cargo-box');
+ if (cargoDrop && cargoBox && !cargoBox.contains(e.target) && !cargoDrop.contains(e.target)) {
+  _noNcCargoClose();
+ }
+});
+
 function closeNovaObra() {
  document.getElementById('modal-nova-obra').classList.remove('open');
 }
@@ -619,7 +693,10 @@ function _noWizardValidate() {
 async function submitNovaObra() {
  if (!_noWizardValidate()) return;
 
- var nome   = (document.getElementById('no-nome')?.value || '').trim();
+ // Nome sempre em CAIXA ALTA (pedido explícito) — o campo já força isso
+ // enquanto digita (_upperCaseInput), .toUpperCase() aqui é só a garantia
+ // final antes de gravar (cobre paste/autofill que não passa por oninput).
+ var nome   = (document.getElementById('no-nome')?.value || '').trim().toUpperCase();
  var estado = document.getElementById('no-estado')?.value || '';
  var cidade = document.getElementById('no-cidade')?.value || '';
  var etapa  = document.getElementById('no-etapa')?.value || '';
@@ -639,7 +716,7 @@ async function submitNovaObra() {
    projetos: _noProjLista.map(function(p) {
     var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
     return {
-     nome: p.nome, tipo_obra: p.tipoObra, etapa_projeto: p.etapaProjeto,
+     nome: (p.nome || '').toUpperCase(), tipo_obra: p.tipoObra, etapa_projeto: p.etapaProjeto,
      produto: p.produtoNomes, responsavel: p.responsavelEmails,
      quantidade: p.qtd || null, valor_unitario: p.vuni || null,
      m2_arquitetura: p.m2Arquitetura || null, m2_estrutura: p.m2Estrutura || null,
@@ -949,7 +1026,7 @@ function _noProjRender() {
 
   html += '<div class="modal-grid col2" style="gap:12px">'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Nome do projeto <span class="req">*</span></label>'
-   + '<input class="sp-inp" style="font-size:12px" value="' + (p.nome||'') + '" oninput="_noProjSet(' + idx + ',\'nome\',this.value)"></div>'
+   + '<input class="sp-inp" style="font-size:12px;text-transform:uppercase" value="' + (p.nome||'') + '" oninput="_upperCaseInput(this);_noProjSet(' + idx + ',\'nome\',this.value)"></div>'
    + '<div class="mf" style="margin:0"><label style="font-size:11px">Etapa do projeto <span class="req">*</span></label>'
    + '<select class="sp-inp" style="font-size:12px" onchange="_noProjSet(' + idx + ',\'etapaProjeto\',this.value)">'
    + '<option value="">Selecione...</option>'

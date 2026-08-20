@@ -87,7 +87,7 @@ async function submitNovoProjeto() {
  const obraNome = (document.getElementById('np-obra').selectedOptions[0] || {}).textContent || '';
 
  const payload = {
-  nome: obraNome + ' — ' + tipo,
+  nome: (obraNome + ' — ' + tipo).toUpperCase(),
   obra_id: obraId,
   tipo_orcamento: tipo,
   etapa_projeto: etapa || null,

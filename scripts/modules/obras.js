@@ -1970,7 +1970,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
 
   + '<div class="sp-stitle" style="margin-top:0">Identificação</div>'
   + '<div class="sp-field"><div class="sp-label">Nome da obra</div>'
-  + '<input class="sp-inp" id="sp-nome" value="' + (o.nome||'').replace(/"/g,'&quot;') + '" placeholder="Nome da obra..." oninput="_obraScheduleAutoSave()"></div>'
+  + '<input class="sp-inp" id="sp-nome" style="text-transform:uppercase" value="' + (o.nome||'').replace(/"/g,'&quot;') + '" placeholder="Nome da obra..." oninput="_upperCaseInput(this);_obraScheduleAutoSave()"></div>'
 
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Tipo</div><select class="sp-inp" id="sp-tipo" onchange="_obraScheduleAutoSave()">'
@@ -2439,7 +2439,7 @@ async function _spSaveObraFull() {
  if (!_obraAtiva) return;
  const id = document.getElementById('sp-obra-id')?.value;
  const payload = {
-  nome:              document.getElementById('sp-nome')?.value || '',
+  nome:              (document.getElementById('sp-nome')?.value || '').toUpperCase(),
   tipo_obra:         [document.getElementById('sp-tipo')?.value || ''],
   etapa_negocio:     document.getElementById('sp-etapa')?.value || '',
   data_criacao:        document.getElementById('sp-data-criacao')?.value || null,

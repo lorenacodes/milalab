@@ -10,3 +10,15 @@ function _showToast(msg, tipo) {
  document.body.appendChild(t);
  setTimeout(function(){ t.style.opacity = '0'; setTimeout(function(){ t.remove(); }, 380); }, 2600);
 }
+
+// _upperCaseInput — força caixa alta enquanto o usuário digita (pedido
+// explícito: Nome de Obra/Projeto/Instalação sempre em maiúsculas,
+// independente de como a pessoa digitou). toUpperCase() não muda o
+// tamanho da string, então o cursor não pula — só precisa ser restaurado
+// porque reatribuir .value por padrão joga o cursor pro fim do campo.
+function _upperCaseInput(el) {
+ if (!el) return;
+ var start = el.selectionStart, end = el.selectionEnd;
+ el.value = (el.value || '').toUpperCase();
+ if (start != null) el.setSelectionRange(start, end);
+}
