@@ -2070,7 +2070,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div class="sp-field"><div class="sp-label">Nome completo *</div><input class="sp-inp" id="sp-new-cont-nome" placeholder="Nome"></div>'
   + '<div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-new-cont-email" type="email" placeholder="nome@empresa.com" oninput="_cttEmailMask(this)"></div>'
-  + '<div class="sp-field"><div class="sp-label">Telefone *</div><input class="sp-inp" id="sp-new-cont-tel" value="' + _cttTelMaskValue('') + '" oninput="_cttTelMask(this)"></div>'
+  + '<div class="sp-field"><div class="sp-label">Telefone</div><input class="sp-inp" id="sp-new-cont-tel" value="' + _cttTelMaskValue('') + '" oninput="_cttTelMask(this)"></div>'
   + '</div><div class="sp-field" style="margin-top:8px"><div class="sp-label">Cargo</div>' + _spCttCargoMarkup('') + '</div>'
   + '<div style="display:flex;gap:6px;margin-top:10px">'
   + '<button class="btn btn-primary btn-sm" onclick="_spCriarContato()" style="flex:1;justify-content:center">Criar contato</button>'
@@ -2964,11 +2964,12 @@ async function _spCriarContato() {
  const empId = _obraAtiva && _obraAtiva.empresa_id;
  if (!nome) { alert('Nome do contato é obrigatório.'); return; }
  if (!empId) { alert('Vincule (ou crie) ao menos uma empresa à obra antes de adicionar um contato.'); return; }
- // Telefone obrigatório (pedido explícito): precisa ter exatamente 10 ou
- // 11 dígitos reais, ignorando a máscara — sem exceção pra campo vazio.
+ // Mesma regra de _spSaveContato (empresas.js): 10/11 dígitos salva
+ // mascarado, 0 fica em branco, 1-9 bloqueia (senão salvaria o molde
+ // incompleto — "(11) 9____-____" — como se fosse o telefone de verdade).
  const telDigits = (document.getElementById('sp-new-cont-tel')?.value || '').replace(/\D/g, '');
- if (telDigits.length < 10 || telDigits.length > 11) {
-  alert('Telefone é obrigatório — informe DDD + número (10 ou 11 dígitos).');
+ if (telDigits.length > 0 && telDigits.length < 10) {
+  alert('Telefone incompleto — informe DDD + número (10 ou 11 dígitos), ou deixe em branco.');
   return;
  }
  const emailVal = document.getElementById('sp-new-cont-email')?.value?.trim() || '';
@@ -2979,7 +2980,7 @@ async function _spCriarContato() {
  const payload = {
   nome_completo: nome,
   email:  emailVal || null,
-  telefone: _cttTelMaskValue(telDigits),
+  telefone: telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
   // Cargo agora é o select buscável _spCttCargoMarkup (mesmo componente já
   // usado no painel de Contato/"Novo Contato" da aba Contatos) — valor fica
   // no hidden input #sp-ctt-cargo, não mais um <input> de texto solto.

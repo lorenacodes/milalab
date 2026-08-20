@@ -2311,7 +2311,7 @@ function openNovoContato() {
   + '<div class="sp-field"><div class="sp-label">Cargo</div>'+_spCttCargoMarkup('')+'</div>'
   + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-ctt-email" type="email" placeholder="nome@empresa.com" oninput="_cttEmailMask(this)"></div>'
   + '</div>'
-  + '<div class="sp-field"><div class="sp-label">Telefone <span style="color:var(--red)">*</span></div>'
+  + '<div class="sp-field"><div class="sp-label">Telefone</div>'
   + '<input class="sp-inp" id="sp-ctt-telefone" type="tel" value="'+_cttTelMaskValue('')+'" oninput="_cttTelMask(this)"></div>'
   + '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">'
   + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
@@ -2330,12 +2330,12 @@ async function _cttCriarContato() {
  var nome = (nomeEl || {}).value ? nomeEl.value.trim() : '';
  if (nomeEl) { nomeEl.style.borderColor = nome ? '' : 'var(--red)'; nomeEl.style.boxShadow = nome ? '' : '0 0 0 2px rgba(239,68,68,.18)'; }
  if (!nome) { _showToast('Informe o nome do contato.', 'erro'); return; }
- // Telefone obrigatório (pedido explícito): precisa ter exatamente 10 ou
- // 11 dígitos reais, ignorando a máscara — sem exceção pra campo vazio.
+ // Mesma regra de _spSaveContato: 0 dígitos ok (fica em branco), 10/11
+ // completo, 1-9 bloqueia.
  var telEl = document.getElementById('sp-ctt-telefone');
  var telDigits = ((telEl || {}).value || '').replace(/\D/g, '');
- if (telDigits.length < 10 || telDigits.length > 11) {
-  _showToast('Telefone é obrigatório — informe DDD + número (10 ou 11 dígitos).', 'erro');
+ if (telDigits.length > 0 && telDigits.length < 10) {
+  _showToast('Telefone incompleto — informe DDD + número (10 ou 11 dígitos), ou deixe em branco.', 'erro');
   if (telEl) { telEl.style.borderColor = 'var(--red)'; setTimeout(function(){ telEl.style.borderColor = ''; }, 2500); }
   return;
  }
@@ -2353,7 +2353,7 @@ async function _cttCriarContato() {
   nome_completo: nome,
   cargo:    (document.getElementById('sp-ctt-cargo') || {}).value || null,
   email:    emailVal || null,
-  telefone: _cttTelMaskValue(telDigits),
+  telefone: telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
  };
  var res = await _sb.from('contatos').insert(payload).select().single();
  if (res.error || !res.data) {
