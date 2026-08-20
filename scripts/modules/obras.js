@@ -1977,9 +1977,12 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // preenche os 3 valores + o indicador de autosave de forma assíncrona
   // logo depois do _spSet (mesmo padrão de _spCarregarDocumentos/
   // _spCarregarRegistros abaixo).
-  + '<div id="sp-obra-audit" style="margin:14px 0 4px;padding:10px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">'
-  + '<div id="sp-obra-audit-info" style="display:flex;gap:20px;flex-wrap:wrap;font-size:11px;color:var(--muted)">Carregando auditoria...</div>'
+  + '<div id="sp-obra-audit" style="margin:24px 0 20px;padding:14px 16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px">'
+  + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'
+  + '<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;opacity:.85">Auditoria</div>'
   + '<div id="sp-obra-save-status" style="font-size:11px;font-weight:600;white-space:nowrap"></div>'
+  + '</div>'
+  + '<div id="sp-obra-audit-info" style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);line-height:1.5">Carregando auditoria...</div>'
   + '</div>'
 
   // ── SEÇÃO: Visão Geral ───────────────────────────────────────────────────────
@@ -2502,16 +2505,22 @@ async function _spCarregarAuditoria(obraId) {
   .eq('obra_id', obraId).order('created_at', { ascending: false }).limit(1);
  var ultimo = (!res.error && res.data && res.data[0]) ? res.data[0] : null;
  var ultimoEmail = ultimo ? ultimo.usuario_email : (_obraAtiva.ultima_alteracao_por || null);
- var ultimoData  = ultimo ? ultimo.created_at : (_obraAtiva.updated_at || null);
+ var ultimoData  = ultimo ? ultimo.created_at : null;
  var ultimoCampo = ultimo ? (OBRA_CAMPO_LABEL[ultimo.campo_alterado] || ultimo.campo_alterado) : null;
  // Não é mais o mesmo painel que a resposta partiu (usuário já trocou de
  // obra) — evita escrever no elemento errado.
  el = document.getElementById('sp-obra-audit-info');
  if (!el || document.getElementById('sp-obra-id')?.value !== obraId) return;
  var fmtData = function(iso){ return iso ? new Date(iso).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—'; };
- el.innerHTML = '<span>Criado por <strong style="color:var(--text)">' + (criadoPor || '—') + '</strong></span>'
-  + '<span>Última edição <strong style="color:var(--text)">' + (ultimoEmail || '—') + '</strong>' + (ultimoCampo ? ' — ' + ultimoCampo : '') + '</span>'
-  + '<span>' + fmtData(ultimoData) + '</span>';
+ // Obras cuja última edição real aconteceu ANTES desta auditoria existir
+ // não têm usuário nem campo pra mostrar — nesse caso não faz sentido
+ // exibir uma data "solta" sem autor (parece bug, não estado esperado).
+ // Assim que alguém editar de novo, esta linha passa a vir completa.
+ var ultimaEdicaoHtml = ultimoEmail
+  ? 'Última edição <strong style="color:var(--text)">' + ultimoEmail + '</strong>' + (ultimoCampo ? ' — ' + ultimoCampo : '') + (ultimoData ? ' · ' + fmtData(ultimoData) : '')
+  : 'Última edição <span style="font-style:italic">sem registro anterior à auditoria</span>';
+ el.innerHTML = '<div>Criado por <strong style="color:var(--text)">' + (criadoPor || '—') + '</strong></div>'
+  + '<div>' + ultimaEdicaoHtml + '</div>';
 }
 
 async function _spSaveObraFull() {
