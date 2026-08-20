@@ -2169,6 +2169,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div style="font-size:12px;font-weight:700;color:var(--text)">'
   + projetos.length + ' projeto' + (projetos.length !== 1 ? 's' : '') + ' vinculado' + (projetos.length !== 1 ? 's' : '')
   + '</div>'
+  + '<div style="display:flex;align-items:center;gap:14px">'
   + (projetos.length > 0
    ? '<div style="display:flex;gap:14px;font-size:11px;color:var(--muted)">'
      + '<span>Qtd <b style="color:var(--text)">' + totalQtd.toLocaleString('pt-BR') + '</b></span>'
@@ -2176,7 +2177,14 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      + '<span>Valor <b style="color:var(--green)">' + (totalValor > 0 ? fmtMoeda(totalValor) : '—') + '</b></span>'
      + '</div>'
    : '')
+  // Pedido explícito: faltava a opção de adicionar um projeto direto por
+  // aqui (só existia dentro do wizard de criação da obra) — mesmo modelo
+  // de formulário completo já usado lá (passo 4) e reaproveitado no
+  // detalhamento de Entrega (_entProj*, entregas.js).
+  + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoProjeto()">+ Adicionar projeto</button>'
   + '</div>'
+  + '</div>'
+  + '<div id="sp-novo-proj-form-box" style="display:none;margin-bottom:12px"></div>'
   + projCards
   + '</div>'
 
@@ -2792,6 +2800,182 @@ async function _spCriarInstalacao() {
  // Promise.all rápido) do que tentar remontar só o pedaço de instalações.
  _spObraById(_obraAtiva.id);
  if (typeof _dbLoadInstalacoes === 'function') _dbLoadInstalacoes();
+}
+
+// ── Quick-create Projeto (aba Projetos do detalhamento de Obra) ────────────────
+// Pedido explícito: faltava a opção de criar um projeto direto por aqui — só
+// existia dentro do wizard de Nova Obra. Segue o MESMO modelo de formulário
+// (Nome/Etapa/Tipo restrito aos tipos da obra/Produto filtrado/Responsável
+// com avatar/Tipologia/Quantidade/Valor/M²/Descritivo), com ids próprios
+// (sp-proj-*) pra não colidir com o formulário equivalente de dentro do
+// wizard (no-proj-*) nem com o de dentro do painel de Entrega (ent-proj-*) —
+// mesma cautela já aplicada nesses dois. _obraAtiva já está disponível aqui
+// (painel de Obra), diferente do painel de Entrega que pode abrir sem obra
+// carregada — então usa _obraAtiva.tipo_obra direto, sem precisar buscar.
+var _spNovoProj = null;
+function _spToggleNovoProjeto() {
+ var box = document.getElementById('sp-novo-proj-form-box');
+ if (!box || !_obraAtiva) return;
+ var abrir = box.style.display === 'none' || !box.style.display;
+ if (abrir) {
+  var tipoObraOpcoes = (_obraAtiva.tipo_obra || []).slice();
+  _spNovoProj = {
+   obraId: _obraAtiva.id, nome: '', etapaProjeto: '', tipoObra: tipoObraOpcoes.length === 1 ? tipoObraOpcoes[0] : '',
+   produtoNomes: [], responsavelEmails: [], qtd: '', vuni: '', m2Arquitetura: '', m2Estrutura: '',
+   tipologiaTelhado: [], tipologiaTelha: [], descritivo: '', tipoObraOpcoes: tipoObraOpcoes,
+  };
+  box.innerHTML = _spProjFormHTML();
+  box.style.display = 'block';
+  if (typeof _loadUsuariosCache === 'function') _loadUsuariosCache().then(function(){ box.innerHTML = _spProjFormHTML(); });
+  if (typeof _respLoadUsers === 'function') _respLoadUsers().then(function(){ box.innerHTML = _spProjFormHTML(); }).catch(function(){});
+  if (typeof _loadAvatarCacheFast === 'function') _loadAvatarCacheFast().then(function(){ box.innerHTML = _spProjFormHTML(); }).catch(function(){});
+  if (!_produtosArr.length && _sb) {
+   _sb.from('produtos').select('id,nome,categoria').order('nome').then(function(r){ _produtosArr = r.data || []; box.innerHTML = _spProjFormHTML(); });
+  }
+ } else {
+  box.style.display = 'none';
+  box.innerHTML = '';
+  _spNovoProj = null;
+ }
+}
+function _spProjSet(field, value) {
+ if (!_spNovoProj) return;
+ _spNovoProj[field] = value;
+ if (field === 'tipoObra') {
+  var box = document.getElementById('sp-novo-proj-form-box');
+  if (box) box.innerHTML = _spProjFormHTML();
+ }
+}
+function _spProjFormHTML() {
+ var p = _spNovoProj;
+ if (!p) return '';
+ var produtosDisponiveis = (typeof _noProdutosDisponiveis === 'function') ? _noProdutosDisponiveis(p.tipoObra) : (_produtosArr || []);
+ var html = '<div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface2);display:flex;flex-direction:column;gap:12px">';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Nome do projeto <span class="req">*</span></label>'
+  + '<input class="sp-inp" style="font-size:12px;text-transform:uppercase" value="' + (p.nome||'') + '" oninput="_upperCaseInput(this);_spProjSet(\'nome\',this.value)"></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Etapa do projeto <span class="req">*</span></label>'
+  + '<select class="sp-inp" style="font-size:12px" onchange="_spProjSet(\'etapaProjeto\',this.value)">'
+  + '<option value="">Selecione...</option>'
+  + (_NO_PROJETO_ETAPA_OPCOES||[]).map(function(et){ return '<option' + (et===p.etapaProjeto?' selected':'') + '>' + et + '</option>'; }).join('')
+  + '</select></div>'
+  + '</div>';
+ html += '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de obra do projeto <span class="req">*</span></label>'
+  + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'
+  + (p.tipoObraOpcoes||[]).map(function(t) {
+     var selT = t === p.tipoObra;
+     var corT = (_NO_TIPO_COR && _NO_TIPO_COR[t]) || 'var(--navy)';
+     return '<button type="button" onclick="_spProjSet(\'tipoObra\',\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + corT + ';background:' + (selT?corT:'transparent') + ';color:' + (selT?'#fff':corT) + '">' + t + '</button>';
+    }).join('')
+  + '</div></div>';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Produto <span class="req">*</span></label>'
+  + '<div id="sp-proj-produto-dd" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('spProjProduto', produtosDisponiveis.map(function(pr){return pr.nome;}), p.produtoNomes, '_spProjMultiToggle', 'Selecione o(s) produto(s)...') + '</div></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Responsável <span class="req">*</span></label>'
+  + '<div id="sp-proj-resp-dd" class="no-msel-wide" style="margin-top:4px">' + _spProjRespDropdownMarkup() + '</div></div>'
+  + '</div>';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Tipologia do Telhado</label>'
+  + '<div id="sp-proj-telhado-dd" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('spProjTelhado', _NO_TIPOLOGIA_TELHADO_OPCOES||[], p.tipologiaTelhado, '_spProjMultiToggle', 'Selecione a(s) tipologia(s)...') + '</div></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de Telha</label>'
+  + '<div id="sp-proj-telha-dd" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('spProjTelha', _NO_TIPO_TELHA_OPCOES||[], p.tipologiaTelha, '_spProjMultiToggle', 'Selecione o(s) tipo(s)...') + '</div></div>'
+  + '</div>';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Quantidade</label>'
+  + '<input class="sp-inp" style="font-size:12px" type="number" min="0" value="' + (p.qtd||'') + '" oninput="_spProjSet(\'qtd\',this.value)"></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">Valor unit. (R$)</label>'
+  + '<input class="sp-inp" style="font-size:12px" type="text" value="' + (p.vuni||'') + '" oninput="_spProjSet(\'vuni\',this.value)"></div>'
+  + '</div>';
+ html += '<div class="modal-grid col2" style="gap:12px">'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Arquitetura</label>'
+  + '<div style="position:relative"><input class="sp-inp" style="font-size:12px;padding-right:30px" type="number" min="0" step="0.01" value="' + (p.m2Arquitetura||'') + '" oninput="_spProjSet(\'m2Arquitetura\',this.value)">'
+  + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none">m²</span></div></div>'
+  + '<div class="mf" style="margin:0"><label style="font-size:11px">M² Estrutura</label>'
+  + '<div style="position:relative"><input class="sp-inp" style="font-size:12px;padding-right:30px" type="number" min="0" step="0.01" value="' + (p.m2Estrutura||'') + '" oninput="_spProjSet(\'m2Estrutura\',this.value)">'
+  + '<span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none">m²</span></div></div>'
+  + '</div>';
+ html += '<div class="mf" style="margin:0"><label style="font-size:11px">Descritivo do projeto</label>'
+  + '<textarea class="sp-inp" style="font-size:12px;height:56px" oninput="_spProjSet(\'descritivo\',this.value)">' + (p.descritivo||'') + '</textarea></div>';
+ html += '<div style="display:flex;gap:8px">'
+  + '<button type="button" onclick="_spProjSalvar()" style="font-size:12px;font-weight:600;padding:7px 16px;border:none;border-radius:7px;background:var(--green);color:#fff;cursor:pointer">Salvar projeto</button>'
+  + '<button type="button" onclick="_spToggleNovoProjeto()" style="font-size:12px;padding:7px 16px;border:1px solid var(--border);border-radius:7px;background:transparent;color:var(--muted);cursor:pointer">Cancelar</button>'
+  + '</div>';
+ html += '</div>';
+ return html;
+}
+function _spProjMultiToggle(campo, valor, checked) {
+ if (!_spNovoProj) return;
+ var field = campo === 'spProjProduto' ? 'produtoNomes' : campo === 'spProjTelhado' ? 'tipologiaTelhado' : 'tipologiaTelha';
+ _spNovoProj[field] = _msToggle(_spNovoProj[field], valor, checked);
+ var ddId = campo === 'spProjProduto' ? 'sp-proj-produto-dd' : campo === 'spProjTelhado' ? 'sp-proj-telhado-dd' : 'sp-proj-telha-dd';
+ var opcoes = campo === 'spProjProduto'
+  ? ((typeof _noProdutosDisponiveis === 'function' ? _noProdutosDisponiveis(_spNovoProj.tipoObra) : _produtosArr).map(function(pr){return pr.nome;}))
+  : campo === 'spProjTelhado' ? (_NO_TIPOLOGIA_TELHADO_OPCOES||[]) : (_NO_TIPO_TELHA_OPCOES||[]);
+ var wrap = document.getElementById(ddId);
+ if (wrap) {
+  wrap.innerHTML = _msRenderDropdown(campo, opcoes, _spNovoProj[field], '_spProjMultiToggle', 'Selecione...');
+  var painel = wrap.querySelector('.fb-msel-panel');
+  if (painel) painel.classList.add('open');
+ }
+}
+function _spProjRespDropdownMarkup() {
+ var p = _spNovoProj;
+ var usuarios = _usuariosCache || [];
+ var sel = (p && p.responsavelEmails) || [];
+ var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s){ return (s||'').toLowerCase(); };
+ var selNomes = sel.map(function(email){
+  var u = usuarios.find(function(x){ return x.email === email; });
+  return (u && u.nome_display) || email;
+ });
+ var btnLabel = (typeof _msBtnLabel === 'function') ? _msBtnLabel(selNomes, 'Selecione o(s) responsável(is)...') : (sel.length ? selNomes.join(', ') : 'Selecione o(s) responsável(is)...');
+ var searchHtml = usuarios.length > 0 ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">' : '';
+ var itemsHtml = usuarios.map(function(u) {
+  var label = u.nome_display || u.email;
+  var emailEsc = String(u.email).replace(/"/g,'&quot;');
+  var ck = sel.indexOf(u.email) !== -1 ? ' checked' : '';
+  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(label, 20) : '';
+  return '<label class="fb-msel-item" data-norm="' + normalizar(label) + '"><input type="checkbox" value="' + emailEsc + '"' + ck
+   + ' onchange="_spProjRespToggle(this.value,this.checked)">' + avatarHtml + '<span>' + label.replace(/</g,'&lt;') + '</span></label>';
+ }).join('');
+ return '<div class="fb-msel-wrap">'
+  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabel + '</button>'
+  + '<div class="fb-msel-panel">' + searchHtml + '<div class="fb-msel-list">' + (itemsHtml || '<div style="padding:8px;font-size:11px;color:var(--muted)">Nenhum usuário cadastrado</div>') + '</div></div>'
+  + '</div>';
+}
+function _spProjRespToggle(email, checked) {
+ if (!_spNovoProj) return;
+ _spNovoProj.responsavelEmails = _msToggle(_spNovoProj.responsavelEmails, email, checked);
+ var wrap = document.getElementById('sp-proj-resp-dd');
+ if (wrap) {
+  wrap.innerHTML = _spProjRespDropdownMarkup();
+  var painel = wrap.querySelector('.fb-msel-panel');
+  if (painel) painel.classList.add('open');
+ }
+}
+async function _spProjSalvar() {
+ var p = _spNovoProj;
+ if (!p || !_obraAtiva) return;
+ var faltando = [];
+ if (!(p.nome||'').trim()) faltando.push('Nome');
+ if (!p.etapaProjeto) faltando.push('Etapa do projeto');
+ if (!p.tipoObra) faltando.push('Tipo de obra');
+ if (!p.produtoNomes.length) faltando.push('Produto');
+ if (!p.responsavelEmails.length) faltando.push('Responsável');
+ if (faltando.length) { _showToast('Preencha: ' + faltando.join(', '), 'aviso'); return; }
+ var payload = {
+  nome: (p.nome||'').trim().toUpperCase(), obra_id: p.obraId, tipo_orcamento: p.tipoObra,
+  etapa_projeto: p.etapaProjeto, produto: p.produtoNomes, responsavel: p.responsavelEmails,
+  quantidade: p.qtd || null, valor_unitario: p.vuni ? parseFloat(String(p.vuni).replace(/\./g,'').replace(',','.')) || null : null,
+  m2_arquitetura: p.m2Arquitetura || null, m2_estrutura: p.m2Estrutura || null,
+  tipologia_telhado: p.tipologiaTelhado, tipologia_telha: p.tipologiaTelha,
+  descritivo: p.descritivo || null,
+ };
+ var res = await _sb.from('projetos').insert(payload).select('id,nome').single();
+ if (res.error) { _showToast('Erro ao criar projeto: ' + res.error.message, 'erro'); return; }
+ _showToast('Projeto criado com sucesso!', 'ok');
+ _spNovoProj = null;
+ _spObraById(_obraAtiva.id);
+ if (typeof _dbLoadProjetos === 'function') _dbLoadProjetos();
 }
 
 // ── Quick-create Entrega ────────────────────────────────────────────────────────
