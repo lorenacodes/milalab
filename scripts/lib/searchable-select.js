@@ -104,21 +104,46 @@ function _srchSelPosition(kind) {
 // nunca ganha posição nenhuma e fica invisível (achado real, reportado:
 // "botão de cargo não aparece as opções" — as opções carregavam
 // certinho no DOM, só ficavam sem coordenada nenhuma pra aparecer na tela).
+// Bug real encontrado ao vivo (Obra/Empresa/Contato — qualquer select
+// dentro de #sp-drawer): position:fixed normalmente ancora no viewport,
+// EXCETO quando algum ancestral tem transform/filter/perspective diferente
+// de "none" — nesse caso o fixed passa a ancorar na caixa desse ancestral,
+// não mais na tela toda. #sp-drawer usa transform:translateX pra animar a
+// entrada/saída do painel (styles/main.css), então todo .srch-sel-drop
+// dentro dele estava sendo posicionado como se a tela começasse na borda
+// esquerda do painel, não na borda esquerda real da janela — a lista
+// aparecia centenas de pixels fora da área visível, parecendo "não abrir".
+function _srchSelFixedContainingBlock(el) {
+ var node = el.parentElement;
+ while (node && node !== document.body && node !== document.documentElement) {
+  var cs = getComputedStyle(node);
+  if (cs.transform !== 'none' || cs.filter !== 'none' || cs.perspective !== 'none' || (cs.willChange || '').indexOf('transform') !== -1) {
+   return node.getBoundingClientRect();
+  }
+  node = node.parentElement;
+ }
+ return null;
+}
 function _srchSelPositionEl(drop, box) {
  if (!drop || !box) return;
  var boxRect = box.getBoundingClientRect();
+ var origin = _srchSelFixedContainingBlock(drop);
+ var offLeft = origin ? origin.left : 0;
+ var offTop  = origin ? origin.top  : 0;
+ var vh = origin ? origin.height : window.innerHeight;
+ var boxTop    = boxRect.top    - offTop;
+ var boxBottom = boxRect.bottom - offTop;
  var dropH = drop.offsetHeight || 240; // estimativa antes do 1º layout
- var vh = window.innerHeight;
  var margin = 8;
- var abreParaCima = (boxRect.bottom + dropH + margin > vh) && (boxRect.top - dropH - margin > 0);
- drop.style.left = boxRect.left + 'px';
+ var abreParaCima = (boxBottom + dropH + margin > vh) && (boxTop - dropH - margin > 0);
+ drop.style.left = (boxRect.left - offLeft) + 'px';
  drop.style.width = boxRect.width + 'px';
  if (abreParaCima) {
   drop.style.top = 'auto';
-  drop.style.bottom = (vh - boxRect.top + 4) + 'px';
+  drop.style.bottom = (vh - boxTop + 4) + 'px';
  } else {
   drop.style.bottom = 'auto';
-  drop.style.top = (boxRect.bottom + 4) + 'px';
+  drop.style.top = (boxBottom + 4) + 'px';
  }
 }
 function _srchSelClose(kind) {
