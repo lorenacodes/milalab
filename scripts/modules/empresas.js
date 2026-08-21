@@ -1406,6 +1406,126 @@ function _fornFecharProdutosView() {
  if (bd) bd.classList.remove('open');
 }
 
+// ── Sub-aba "Banco de Materiais" (pedido explícito) ─────────────────────────
+// A Calculadora de Orçamento Modular saiu do detalhamento de Obra por
+// completo; o catálogo de materiais que vivia atrás dela (num modal aberto
+// de lá, "Gerenciar database de materiais") ganhou este lugar fixo, junto
+// com uma visão agregada dos produtos já orçados com QUALQUER fornecedor
+// (antes só dava pra ver um fornecedor de cada vez, dentro do cadastro
+// dele — _fornVerProdutos). A aba "Template Calculadora" que existia junto
+// no modal antigo não foi trazida pra aqui: ela só fazia sentido como
+// ponto de partida da calculadora que não existe mais.
+function _fornTabSwitch(tab, btn) {
+ document.querySelectorAll('#page-fornecedores .spt-btn').forEach(function(b){ b.classList.remove('active'); });
+ if (btn) btn.classList.add('active');
+ var lista = document.getElementById('forn-tab-lista');
+ var materiais = document.getElementById('forn-tab-materiais');
+ if (lista) lista.style.display = tab === 'lista' ? '' : 'none';
+ if (materiais) materiais.style.display = tab === 'materiais' ? '' : 'none';
+ if (tab === 'materiais') {
+  _fmDbInit();
+  _fmCarregarProdutosOrcados();
+ }
+}
+
+var _fmDb = null;
+var _fmDbInitPromise = null;
+function _fmCatalogoToShort(r) { return { id: r.id, g: r.grupo, sg: r.subgrupo || '', cod: r.codigo || '', d: r.descricao, vl: r.valor_unitario }; }
+function _fmDbInit() {
+ if (_fmDbInitPromise) return _fmDbInitPromise;
+ _fmDbInitPromise = (async function() {
+  if (!_sb) { _fmDb = []; _fmDbRender(); return; }
+  var res = await _sb.from('materiais_catalogo').select('*').order('grupo');
+  _fmDb = res.error ? [] : res.data.map(_fmCatalogoToShort);
+  if (res.error) console.error('[Fornecedores] erro ao carregar banco de materiais:', res.error);
+  _fmDbRender();
+ })();
+ return _fmDbInitPromise;
+}
+function _fmDbRender() {
+ var body = document.getElementById('fm-db-body');
+ if (!body) return;
+ if (!_fmDb) { body.innerHTML = '<div class="sp-empty" style="padding:16px 0">Carregando catálogo...</div>'; return; }
+ var q = (document.getElementById('fm-db-search-inp')?.value || '').toLowerCase();
+ var items = q ? _fmDb.filter(function(it){ return (it.d + it.g + (it.cod||'')).toLowerCase().indexOf(q) !== -1; }) : _fmDb;
+ if (!items.length) { body.innerHTML = '<div class="sp-empty" style="padding:16px 0">Nenhum item encontrado.</div>'; return; }
+ var html = '<table class="mc-db-table"><thead><tr><th>Grupo</th><th>Cód.</th><th>Descrição</th><th class="mc-db-vl">V. Unit. (R$)</th></tr></thead><tbody>';
+ items.forEach(function(it) {
+  var realIdx = _fmDb.indexOf(it);
+  html += '<tr>'
+   + '<td><input class="mc-db-editable" value="' + (it.g||'').replace(/"/g,'&quot;') + '" onchange="_fmDbEdit(' + realIdx + ',\'g\',this.value)"></td>'
+   + '<td style="width:70px;color:var(--muted)">' + (it.cod||'') + '</td>'
+   + '<td style="min-width:220px"><input class="mc-db-editable" value="' + (it.d||'').replace(/"/g,'&quot;') + '" onchange="_fmDbEdit(' + realIdx + ',\'d\',this.value)"></td>'
+   + '<td class="mc-db-vl"><input class="mc-db-editable" type="number" style="text-align:right" value="' + (it.vl??0) + '" onchange="_fmDbEdit(' + realIdx + ',\'vl\',this.value)"></td>'
+   + '</tr>';
+ });
+ html += '</tbody></table>';
+ body.innerHTML = html;
+}
+function _fmDbEdit(idx, field, val) {
+ if (!_fmDb || !_fmDb[idx]) return;
+ _fmDb[idx][field] = field === 'vl' ? (parseFloat(val)||0) : val;
+}
+function _fmDbAddRow() {
+ if (!_fmDb) return;
+ _fmDb.push({ g: 'Novo grupo', sg: '', cod: '', d: 'Novo item', vl: 0 });
+ _fmDbRender();
+ var body = document.getElementById('fm-db-body');
+ if (body) body.scrollTop = body.scrollHeight;
+}
+async function _fmDbPersist(btn) {
+ if (!_sb || !_fmDb) return;
+ var erro = null;
+ for (var i = 0; i < _fmDb.length && !erro; i++) {
+  var c = _fmDb[i];
+  var payload = { grupo: c.g, subgrupo: c.sg || null, codigo: c.cod || null, descricao: c.d, valor_unitario: c.vl };
+  if (c.id) {
+   var up = await _sb.from('materiais_catalogo').update(payload).eq('id', c.id);
+   if (up.error) erro = up.error;
+  } else {
+   var ins = await _sb.from('materiais_catalogo').insert(payload).select('id').single();
+   if (ins.error) erro = ins.error; else c.id = ins.data.id;
+  }
+ }
+ if (erro) { _showToast('Erro ao salvar banco de materiais: ' + _supaErrPt(erro.message), 'erro'); return; }
+ _showToast('Banco de materiais salvo!', 'ok');
+ if (btn) { var txt = btn.textContent; btn.textContent = 'Salvo!'; setTimeout(function(){ btn.textContent = txt; }, 1800); }
+}
+
+// Visão agregada de fornecedores_produtos — todos os fornecedores juntos de
+// uma vez, diferente de _fornVerProdutos (um fornecedor por vez, dentro do
+// cadastro dele). Só leitura aqui — editar continua sendo feito no cadastro
+// do fornecedor específico, pra não duplicar a lógica de autosave.
+async function _fmCarregarProdutosOrcados() {
+ var body = document.getElementById('fm-produtos-body');
+ if (!body || !_sb) return;
+ var res = await _sb.from('fornecedores_produtos').select('*, fornecedor:fornecedor_id(id,nome)').order('created_at', { ascending: false });
+ if (res.error) { body.innerHTML = '<div class="sp-empty" style="padding:16px 0">Erro ao carregar produtos.</div>'; return; }
+ var rows = res.data || [];
+ if (!rows.length) { body.innerHTML = '<div class="sp-empty" style="padding:16px 0">Nenhum produto orçado ainda.</div>'; return; }
+ var td = 'padding:7px 10px;border-bottom:1px solid var(--border)';
+ var html = '<table class="nt-table"><thead><tr>'
+  + '<th>Fornecedor</th><th>Produto</th><th>Qtd</th><th>Unidade</th><th>V. Unit.</th><th>V. Total</th><th>Status</th><th>Data</th>'
+  + '</tr></thead><tbody>';
+ html += rows.map(function(p) {
+  var dataStr = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—';
+  var statusTag = p.status_cotacao ? '<span class="nt-tag ' + (_fornStatusCor[p.status_cotacao]||'nt-tag-gray') + '" style="font-size:11px">' + p.status_cotacao + '</span>' : '—';
+  var fornNome = (p.fornecedor && p.fornecedor.nome) || '—';
+  return '<tr>'
+   + '<td style="' + td + ';font-size:12px;font-weight:600">' + (p.fornecedor ? '<a href="javascript:void(0)" onclick="_fornVerProdutos(\'' + p.fornecedor.id + '\')" style="color:var(--navy);text-decoration:none">' + fornNome + '</a>' : fornNome) + '</td>'
+   + '<td style="' + td + ';font-size:12px">' + (p.nome||'—') + '</td>'
+   + '<td style="' + td + ';font-size:12px;text-align:right">' + (p.quantidade!=null?p.quantidade:'—') + '</td>'
+   + '<td style="' + td + ';font-size:12px">' + (p.unidade_medida||'—') + '</td>'
+   + '<td style="' + td + ';font-size:12px;text-align:right">' + _moedaFormatarBRL(p.valor_unitario||0) + '</td>'
+   + '<td style="' + td + ';font-size:12px;text-align:right;font-weight:600">' + _moedaFormatarBRL(p.valor_total||0) + '</td>'
+   + '<td style="' + td + '">' + statusTag + '</td>'
+   + '<td style="' + td + ';font-size:12px;color:var(--muted)">' + dataStr + '</td>'
+   + '</tr>';
+ }).join('');
+ html += '</tbody></table>';
+ body.innerHTML = html;
+}
+
 // ── Selects de opções fixas (experiência — status_cotacao agora é por
 // produto, ver addFornProdutoLinha) ──────────────────────────────────────────
 function _fornPreencherSelectsFixos() {
