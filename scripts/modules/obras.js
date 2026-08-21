@@ -1407,31 +1407,33 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      var etapaBadge = pEtapa ? '<span class="badge ' + (etapaCls[pEtapa]||'bm') + '" style="font-size:10px">' + pEtapa + '</span>' : '<span style="color:var(--muted)">—</span>';
      var tipoBadge  = pTipo  ? '<span class="badge ' + _tipoOrcamentoBadgeCls(pTipo) + '" style="font-size:10px">' + pTipo + '</span>' : '<span style="color:var(--muted)">—</span>';
      var prodBadge  = pProd !== '—' ? '<span class="badge bm" style="font-size:10px">' + pProd + '</span>' : '<span style="color:var(--muted)">—</span>';
-     var atuHtml = pAtu
-      ? '<div style="display:flex;align-items:center;gap:6px">'
-        + '<div style="width:20px;height:20px;border-radius:50%;background:var(--navy-dim);border:1px solid var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--navy);flex-shrink:0">' + initials + '</div>'
-        + '<span style="overflow:hidden;text-overflow:ellipsis">' + pAtu + '</span>'
-        + '</div>'
-      : '<span style="color:var(--muted)">—</span>';
+     // Pedido explícito: economizar altura — em vez de campo próprio
+     // "Alterado por" (rótulo + avatar + nome, ocupando uma célula/linha
+     // inteira do grid), só o avatar (iniciais) aparece agora, encostado
+     // no cabeçalho do card ao lado do título — nome completo ainda
+     // acessível via title="" (tooltip nativo do navegador).
+     var atuAvatar = pAtu
+      ? '<div title="Alterado por ' + pAtu.replace(/"/g,'&quot;') + '" style="width:20px;height:20px;border-radius:50%;background:var(--navy-dim);border:1px solid var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--navy);flex-shrink:0">' + initials + '</div>'
+      : '';
      // onclick no card inteiro, mesmo padrão de entregaCards/_spOpenEntityById.
      return '<div class="sp-item-card" onclick="_spOpenEntityById(\'projetos\',\'' + p.id + '\')">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
       + '<div class="sp-item-title" style="margin-bottom:0">' + (p.nome || '(sem nome)') + '</div>'
-      + (pCompl ? '<span class="badge ' + (complCls[pCompl]||'bm') + '" style="font-size:9px;flex-shrink:0">' + pCompl + '</span>' : '')
+      + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+      + (pCompl ? '<span class="badge ' + (complCls[pCompl]||'bm') + '" style="font-size:9px">' + pCompl + '</span>' : '')
+      + atuAvatar
       + '</div>'
-      // 3 colunas fixas (em vez de auto-fit) — com 6 campos sempre dá 2
-      // linhas parelhas, sem sobrar 1 campo sozinho numa linha extra
-      // (achado real: "Alterado por último" ficava órfão numa 3ª linha,
-      // e os rótulos mais longos quebravam em 2 linhas — combinado, isso
-      // deixava o card bem mais alto que o de Entregas). Rótulos
-      // encurtados + nowrap garantem 1 linha só em cada rótulo.
-      + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px 12px">'
+      + '</div>'
+      // 5 colunas fixas (só os campos de dados — "Alterado por" saiu do
+      // grid) cabem numa linha só, mesmo espírito de altura do card de
+      // Entregas (_entCampo/entregaCards, que também cabe tudo numa linha
+      // só). Rótulos encurtados + nowrap (_projCampo) evitam quebra.
+      + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px 10px">'
       + _projCampo('Etapa', etapaBadge)
       + _projCampo('Tipo de orçamento', tipoBadge)
       + _projCampo('Produto', prodBadge)
       + _projCampo('Valor total', '<span style="color:var(--green);font-weight:600">' + pValor + '</span>')
       + _projCampo('Quantidade', p.quantidade != null ? p.quantidade : '—')
-      + _projCampo('Alterado por', atuHtml)
       + '</div>'
       + '</div>';
     }).join('')
