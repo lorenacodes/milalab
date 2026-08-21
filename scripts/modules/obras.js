@@ -2156,7 +2156,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      + '</div>'
    : '')
 
-  + (tipo === 'Modular'
+  + (tipoArr.includes('Modular')
    ? '<div class="sp-stitle">Orçamento Modular</div><div id="mc-container"></div>'
    : '')
 
@@ -2379,7 +2379,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  _spCarregarRegistros(o.id, projetos);
  _sptInitScrollSpy();
 
- if (tipo === 'Modular') {
+ if (tipoArr.includes('Modular')) {
   // Usa o id real da obra (antes era um slug do nome — colidia entre obras
   // com nomes parecidos e perdia o memorial salvo se a obra fosse renomeada;
   // agora também é a FK real de memorial_calculo_obras.obra_id).
