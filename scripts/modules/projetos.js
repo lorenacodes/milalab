@@ -276,6 +276,26 @@ function _spProjetoRender(p, idx) {
  var etapa  = (p.etapa_projeto || '').trim();
  var compl  = p.complexidade || '';
 
+ // Auditoria: criado_por é NOVO (coluna + trigger trg_projetos_criado_por
+ // adicionados agora, pedido explícito) — só passa a ter valor real em
+ // projetos criados a partir de hoje; os já existentes mostram "—" porque
+ // esse dado nunca foi gravado antes (nunca existiu no Airtable/migração).
+ // atualizado_por/created_at/updated_at já existiam (trigger
+ // set_projetos_atualizado_por + set_updated_at), mesmo padrão de rodapé
+ // discreto já usado no painel de Empresa (_spEmpresas, empresas.js).
+ function _projAuditNome(email) {
+  if (!email) return '—';
+  var u = (_usuariosCache || []).find(function(x){ return x.email === email; });
+  return (u && u.nome_display) || email;
+ }
+ var auditHtml = '<div style="margin-top:24px;border-top:1px solid var(--border);padding-top:12px">'
+  + '<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;opacity:.85">Auditoria</div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">'+_projAuditNome(p.criado_por)+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de criação</span><span class="drw-audit-val">'+(p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">'+_projAuditNome(p.atualizado_por)+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de última alteração</span><span class="drw-audit-val">'+(p.updated_at ? new Date(p.updated_at).toLocaleString('pt-BR') : '—')+'</span></div>'
+  + '</div>';
+
  var html = `
   <div class="sp-g2">
    <div class="sp-field"><div class="sp-label">Código</div><input class="sp-inp" value="${cod}" readonly></div>
@@ -298,6 +318,7 @@ function _spProjetoRender(p, idx) {
     <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando empresa...</div>
    </div>
   </div>
+  ${auditHtml}
  `;
 
  _spSet('Projeto', (cod ? cod + ' — ' : '') + obraNome, html,
