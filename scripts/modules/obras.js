@@ -1377,71 +1377,58 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   'Aprovado':              'bg'
  };
  var complCls = {'Simples':'bg','Média':'by','Média - simples':'by','Complexa':'br','Alta':'br'};
+ // Cards em grid (mesmo padrão de _entCampo/entregaCards abaixo) em vez da
+ // tabela horizontal de antes — pedido explícito: a tabela precisava de
+ // scroll lateral pra ver todas as colunas (Etapa/Tipo/Produto/Valor/Qtd/
+ // Alterado por), o grid quebra linha sozinho e não precisa de scroll.
+ function _projCampo(label, valor) {
+  return '<div><div class="sp-label" style="margin-bottom:1px">' + label + '</div><div style="font-size:12px;color:var(--text)">' + valor + '</div></div>';
+ }
  var projCards = projetos.length
-  ? '<div style="overflow-x:auto;margin:0 -2px">'
-    + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
-    + '<thead><tr style="border-bottom:2px solid var(--border)">'
-    + '<th style="padding:7px 10px;text-align:left;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Projeto</th>'
-    + '<th style="padding:7px 10px;text-align:left;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Etapa do Projeto</th>'
-    + '<th style="padding:7px 10px;text-align:left;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Tipo de orçamento</th>'
-    + '<th style="padding:7px 10px;text-align:left;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Produto</th>'
-    + '<th style="padding:7px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Valor total</th>'
-    + '<th style="padding:7px 8px;text-align:right;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Quantidade</th>'
-    + '<th style="padding:7px 10px;text-align:left;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap">Alterado por último</th>'
-    + '</tr></thead><tbody>'
-    + projetos.map(function(p){
-       var pTipo  = p.tipo_orcamento || '';
-       var pEtapa = p.etapa_projeto  || '';
-       var pProd  = (p.produto || [])[0] || '—';
-       var pCompl = p.complexidade   || '';
-       var pValor = p.valor_unitario != null
-        ? (p.quantidade != null ? fmtMoeda(Number(p.valor_unitario) * Number(p.quantidade)) : fmtMoeda(p.valor_unitario))
-        : '—';
-       // "Alterado por último" é quem editou o REGISTRO por último
-       // (projetos.atualizado_por, e-mail setado pelo trigger
-       // trg_projetos_atualizado_por a cada INSERT/UPDATE — mesmo padrão de
-       // atividades.atualizado_por em tarefas.js), não o responsável pelo
-       // projeto — antes essa coluna mostrava p.responsavel, dando a entender
-       // (errado) que o responsável tinha sido quem fez a última alteração.
-       var pAtuU = (_usuariosCache || []).find(function(x){ return x.email === p.atualizado_por; });
-       var pAtu  = p.atualizado_por ? ((pAtuU && pAtuU.nome_display) || p.atualizado_por) : '';
-       var initials = pAtu
-        ? pAtu.trim().split(/\s+/).slice(0,2).map(function(w){ return w[0] || ''; }).join('').toUpperCase()
-        : '';
-       // Linha já vinha com cursor:pointer + hover, mas nunca teve onclick —
-       // parecia clicável e não fazia nada. _spOpenEntityById (side-panel.js)
-       // é o mesmo usado pelos chips de "vinculado(s)" em todo o resto do app.
-       return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;transition:background .12s"'
-        + ' onclick="_spOpenEntityById(\'projetos\',\'' + p.id + '\')"'
-        + ' onmouseover="this.style.background=\'var(--surface2)\'"'
-        + ' onmouseout="this.style.background=\'\'">'
-        + '<td style="padding:8px 10px">'
-        + '<div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px" title="'
-        + (p.nome||'').replace(/"/g,'&quot;') + '">' + (p.nome || '(sem nome)') + '</div>'
-        + (pCompl ? '<div style="margin-top:3px"><span class="badge ' + (complCls[pCompl]||'bm') + '" style="font-size:9px">' + pCompl + '</span></div>' : '')
-        + '</td>'
-        + '<td style="padding:8px 10px;white-space:nowrap">'
-        + (pEtapa ? '<span class="badge ' + (etapaCls[pEtapa]||'bm') + '" style="font-size:10px">' + pEtapa + '</span>' : '<span style="color:var(--muted)">—</span>')
-        + '</td>'
-        + '<td style="padding:8px 10px;white-space:nowrap">'
-        + (pTipo ? '<span class="badge ' + _tipoOrcamentoBadgeCls(pTipo) + '" style="font-size:10px">' + pTipo + '</span>' : '<span style="color:var(--muted)">—</span>')
-        + '</td>'
-        + '<td style="padding:8px 10px;white-space:nowrap">'
-        + (pProd !== '—' ? '<span class="badge bm" style="font-size:10px">' + pProd + '</span>' : '<span style="color:var(--muted)">—</span>')
-        + '</td>'
-        + '<td style="padding:8px 8px;text-align:right;font-size:12px;color:var(--green);font-weight:600;white-space:nowrap">' + pValor + '</td>'
-        + '<td style="padding:8px 8px;text-align:right;font-size:12px;color:var(--text);white-space:nowrap">' + (p.quantidade != null ? p.quantidade : '—') + '</td>'
-        + '<td style="padding:8px 10px">'
-        + (pAtu
-           ? '<div style="display:flex;align-items:center;gap:6px">'
-             + '<div style="width:22px;height:22px;border-radius:50%;background:var(--navy-dim);border:1px solid var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:var(--navy);flex-shrink:0">' + initials + '</div>'
-             + '<span style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">' + pAtu + '</span>'
-             + '</div>'
-           : '<span style="color:var(--muted)">—</span>')
-        + '</td>'
-        + '</tr>';
-      }).join('')
-    + '</tbody></table></div>'
+  ? projetos.map(function(p){
+     var pTipo  = p.tipo_orcamento || '';
+     var pEtapa = p.etapa_projeto  || '';
+     var pProd  = (p.produto || [])[0] || '—';
+     var pCompl = p.complexidade   || '';
+     var pValor = p.valor_unitario != null
+      ? (p.quantidade != null ? fmtMoeda(Number(p.valor_unitario) * Number(p.quantidade)) : fmtMoeda(p.valor_unitario))
+      : '—';
+     // "Alterado por último" é quem editou o REGISTRO por último
+     // (projetos.atualizado_por, e-mail setado pelo trigger
+     // trg_projetos_atualizado_por a cada INSERT/UPDATE — mesmo padrão de
+     // atividades.atualizado_por em tarefas.js), não o responsável pelo
+     // projeto — antes essa coluna mostrava p.responsavel, dando a entender
+     // (errado) que o responsável tinha sido quem fez a última alteração.
+     var pAtuU = (_usuariosCache || []).find(function(x){ return x.email === p.atualizado_por; });
+     var pAtu  = p.atualizado_por ? ((pAtuU && pAtuU.nome_display) || p.atualizado_por) : '';
+     var initials = pAtu
+      ? pAtu.trim().split(/\s+/).slice(0,2).map(function(w){ return w[0] || ''; }).join('').toUpperCase()
+      : '';
+     var etapaBadge = pEtapa ? '<span class="badge ' + (etapaCls[pEtapa]||'bm') + '" style="font-size:10px">' + pEtapa + '</span>' : '<span style="color:var(--muted)">—</span>';
+     var tipoBadge  = pTipo  ? '<span class="badge ' + _tipoOrcamentoBadgeCls(pTipo) + '" style="font-size:10px">' + pTipo + '</span>' : '<span style="color:var(--muted)">—</span>';
+     var prodBadge  = pProd !== '—' ? '<span class="badge bm" style="font-size:10px">' + pProd + '</span>' : '<span style="color:var(--muted)">—</span>';
+     var atuHtml = pAtu
+      ? '<div style="display:flex;align-items:center;gap:6px">'
+        + '<div style="width:20px;height:20px;border-radius:50%;background:var(--navy-dim);border:1px solid var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--navy);flex-shrink:0">' + initials + '</div>'
+        + '<span style="overflow:hidden;text-overflow:ellipsis">' + pAtu + '</span>'
+        + '</div>'
+      : '<span style="color:var(--muted)">—</span>';
+     // onclick no card inteiro, mesmo padrão de entregaCards/_spOpenEntityById.
+     return '<div class="sp-item-card" onclick="_spOpenEntityById(\'projetos\',\'' + p.id + '\')">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
+      + '<div class="sp-item-title" style="margin-bottom:0">' + (p.nome || '(sem nome)') + '</div>'
+      + (pCompl ? '<span class="badge ' + (complCls[pCompl]||'bm') + '" style="font-size:9px;flex-shrink:0">' + pCompl + '</span>' : '')
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px 12px">'
+      + _projCampo('Etapa do Projeto', etapaBadge)
+      + _projCampo('Tipo de orçamento', tipoBadge)
+      + _projCampo('Produto', prodBadge)
+      + _projCampo('Valor total (Projeto)', '<span style="color:var(--green);font-weight:600">' + pValor + '</span>')
+      + _projCampo('Quantidade', p.quantidade != null ? p.quantidade : '—')
+      + _projCampo('Alterado por último', atuHtml)
+      + '</div>'
+      + '</div>';
+    }).join('')
   : '<div class="sp-empty">Nenhum projeto vinculado a esta obra</div>';
 
  // ── Cards de entregas ────────────────────────────────────────────────────────
