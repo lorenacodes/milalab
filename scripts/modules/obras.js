@@ -917,12 +917,17 @@ function _spRegistrosDropzone() {
   + '<input type="file" id="sp-registros-file" accept="image/*" multiple style="display:none" onchange="_spRegistrosFileChange(this)">'
   + '</label>';
 }
-async function _spUploadRegistro(file, projetoId, obraId) {
+// tipo tem default 'fotos_obra' (comportamento original, usado pelos
+// Registros fotográficos da Obra) — parametrizado pra ser reaproveitado
+// também pelos slots de documento do detalhamento de Projeto
+// (_projDocUpload, projetos.js), que usam o mesmo bucket/tabela mas outros
+// valores de tipo ('pre_projeto'/'projeto_executivo').
+async function _spUploadRegistro(file, projetoId, obraId, tipo) {
  var path = 'projetos/' + projetoId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.\-]/g,'_');
  var up = await _sb.storage.from('documentos_projetos').upload(path, file, { upsert: false });
  if (up.error) { console.error('[Obras] erro ao enviar registro:', up.error); return false; }
  var ins = await _sb.from('documentos').insert({
-  projeto_id: projetoId, obra_id: obraId, nome_arquivo: file.name, tipo: 'fotos_obra',
+  projeto_id: projetoId, obra_id: obraId, nome_arquivo: file.name, tipo: tipo || 'fotos_obra',
   categoria: 'Técnico', caminho_storage: path, tamanho_bytes: file.size, mime_type: file.type,
   status: 'Ativo', versao: 1, origem: 'upload_manual',
  });

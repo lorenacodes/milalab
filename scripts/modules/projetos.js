@@ -262,9 +262,38 @@ function _spProjetoById(id) {
  });
 }
 
+// Cores de Tipo/Etapa — mesmos mapas literais já usados no Kanban de
+// Projetos (_renderProjetosKanban, acima) e no card de Projeto vinculado
+// no detalhamento de Obra (obras.js) — mantidos como cópia local (não são
+// globais em nenhum dos dois lugares) só pra não inventar uma paleta nova.
+var _projTipoCls = {'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by'};
+var _projEtapaCls = {
+ 'Orçamento':'bm','Análise Inicial':'bm','Aguardando Aprovação':'by',
+ 'Pré-projeto':'bm','Revisão Pré-Projeto':'by',
+ 'Projeto para Aprovação':'bb','Revisão Projeto':'by',
+ 'Projeto Executivo':'bb','Revisão Projeto Executivo':'by',
+ 'Ajustes de Piloto':'by','Projeto em Andamento':'by',
+ 'Aguardando Produção':'by','Projeto Finalizado':'bg',
+ 'Pós-vendas':'bg','Negócio perdido':'br'
+};
+
+// Auditoria: criado_por é NOVO (coluna + trigger trg_projetos_criado_por
+// adicionados agora, pedido explícito) — só passa a ter valor real em
+// projetos criados a partir de hoje; os já existentes mostram "—" porque
+// esse dado nunca foi gravado antes (nunca existiu no Airtable/migração).
+// atualizado_por/created_at/updated_at já existiam (trigger
+// set_projetos_atualizado_por + set_updated_at), mesmo padrão de rodapé
+// discreto já usado no painel de Empresa (_spEmpresas, empresas.js).
+function _projAuditNome(email) {
+ if (!email) return '—';
+ var u = (_usuariosCache || []).find(function(x){ return x.email === email; });
+ return (u && u.nome_display) || email;
+}
+
+var _spProjAtivo = null; // projeto atualmente aberto no painel (autosave/recalc lêem daqui)
+
 function _spProjetoRender(p, idx) {
- function pad3(n){ var s = String(n); while (s.length < 3) s = '0' + s; return s; }
- var cod    = idx != null && idx > -1 ? 'PRJ-' + pad3(idx + 1) : '';
+ _spProjAtivo = p;
  var obraInfo = p.obra_id ? (_obraIdMap[p.obra_id] || {}) : {};
  var obraNome = obraInfo.nome || '—';
  var tipo   = p.tipo_orcamento || '';
@@ -272,78 +301,321 @@ function _spProjetoRender(p, idx) {
  var qtd    = p.quantidade != null ? Number(p.quantidade) : null;
  var vU     = p.valor_unitario != null ? Number(p.valor_unitario) : null;
  var vT     = (vU != null && qtd != null) ? vU * qtd : vU;
- var fmtBRL = function(v){ return v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2}) : ''; };
- var etapa  = (p.etapa_projeto || '').trim();
- var compl  = p.complexidade || '';
+ var fmtBRL = function(v){ return v != null ? Number(v).toLocaleString('pt-BR', {style:'currency',currency:'BRL'}) : ''; };
+ var etapaAtual = (p.etapa_projeto || '').trim();
+ // Peso: peso_kg no banco SEMPRE foi o TOTAL (confirmado em submitNovoProjeto
+ // acima: `peso_kg: qtd*pesoUnitário`, nunca existiu coluna de peso unitário)
+ // — "Peso unitário" aqui é só um campo derivado (peso_kg/quantidade) pra
+ // edição; "Peso total" continua sendo o que persiste em peso_kg, calculado
+ // automaticamente a cada troca de unitário/quantidade (pedido explícito:
+ // usuário não deve digitar o total).
+ var pesoTotalAtual = p.peso_kg != null ? Number(p.peso_kg) : null;
+ var pesoUnitAtual  = (pesoTotalAtual != null && qtd) ? pesoTotalAtual / qtd : pesoTotalAtual;
 
- // Auditoria: criado_por é NOVO (coluna + trigger trg_projetos_criado_por
- // adicionados agora, pedido explícito) — só passa a ter valor real em
- // projetos criados a partir de hoje; os já existentes mostram "—" porque
- // esse dado nunca foi gravado antes (nunca existiu no Airtable/migração).
- // atualizado_por/created_at/updated_at já existiam (trigger
- // set_projetos_atualizado_por + set_updated_at), mesmo padrão de rodapé
- // discreto já usado no painel de Empresa (_spEmpresas, empresas.js).
- function _projAuditNome(email) {
-  if (!email) return '—';
-  var u = (_usuariosCache || []).find(function(x){ return x.email === email; });
-  return (u && u.nome_display) || email;
+ var tipoPill = tipo ? '<span class="badge ' + (_projTipoCls[tipo]||'bm') + '" style="font-size:11px">' + tipo + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>';
+ var prodPill = prod ? '<span class="badge bm" style="font-size:11px">' + prod + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>';
+
+ // Etapa do projeto — mesmo componente de busca+single-select já usado em
+ // Etapa do Negócio (obras.js, kind 'etapa') e em qualquer outro campo de
+ // seleção única do sistema (searchable-select.js) — pedido explícito de
+ // manter EXATAMENTE o padrão visual/comportamento já existente, não um
+ // <input> de texto livre nem componente novo.
+ _srchSelRegister('projEtapa', {
+  options: _projetosKanbanEtapaOrder, placeholder: 'Nenhuma etapa',
+  onSelect: function() { _projScheduleAutoSave(); },
+ });
+
+ var html = `
+  <input type="hidden" id="sp-proj-id" value="${p.id}">
+  <div class="sp-field"><div class="sp-label">Nome do projeto</div>
+   <input class="sp-inp" id="sp-proj-nome" style="text-transform:uppercase" value="${(p.nome||'').replace(/"/g,'&quot;')}" oninput="_upperCaseInput(this);_projScheduleAutoSave()"></div>
+  <div class="sp-g2">
+   <div class="sp-field"><div class="sp-label">Tipo</div><div style="margin-top:4px">${tipoPill}</div></div>
+   <div class="sp-field"><div class="sp-label">Produto</div><div style="margin-top:4px">${prodPill}</div></div>
+  </div>
+  <div class="sp-field"><div class="sp-label">Obra vinculada</div><div id="sp-proj-obra-chip" class="sp-rel-chips-wrap"></div></div>
+  <div class="sp-field"><div class="sp-label">Etapa do projeto</div>${_srchSelMarkup('projEtapa', 'sp-proj-etapa', etapaAtual)}</div>
+
+  <div class="sp-stitle">Informações técnicas</div>
+  <div class="sp-g3">
+   <div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-proj-qtd" type="number" min="0" value="${qtd != null ? qtd : ''}" oninput="_projRecalc();_projScheduleAutoSave()"></div>
+   <div class="sp-field"><div class="sp-label">Valor unitário</div><input class="sp-inp" id="sp-proj-vunit" value="${vU != null ? fmtBRL(vU) : ''}" onfocus="_spValorFocus(this)" onblur="_spValorBlur(this);_projRecalc();_projScheduleAutoSave()"></div>
+   <div class="sp-field"><div class="sp-label">Valor total</div><input class="sp-inp" id="sp-proj-vtotal" value="${vT != null ? fmtBRL(vT) : ''}" readonly></div>
+  </div>
+  <div class="sp-g3">
+   <div class="sp-field"><div class="sp-label">M² Estrutura</div><input class="sp-inp" id="sp-proj-m2estr" type="number" min="0" step="0.01" value="${p.m2_estrutura != null ? p.m2_estrutura : ''}" oninput="_projScheduleAutoSave()"></div>
+   <div class="sp-field"><div class="sp-label">M² Arquitetura</div><input class="sp-inp" id="sp-proj-m2arq" type="number" min="0" step="0.01" value="${p.m2_arquitetura != null ? p.m2_arquitetura : ''}" oninput="_projScheduleAutoSave()"></div>
+   <div class="sp-field"><div class="sp-label">Maior peça</div><input class="sp-inp" id="sp-proj-maiorpeca" value="${(p.maior_peca||'').replace(/"/g,'&quot;')}" oninput="_projScheduleAutoSave()"></div>
+  </div>
+  <div class="sp-g2">
+   <div class="sp-field"><div class="sp-label">Peso unitário (kg)</div><input class="sp-inp" id="sp-proj-pesouni" type="number" min="0" step="0.01" value="${pesoUnitAtual != null ? pesoUnitAtual : ''}" oninput="_projRecalc();_projScheduleAutoSave()"></div>
+   <div class="sp-field"><div class="sp-label">Peso total (kg)</div><input class="sp-inp" id="sp-proj-pesototal" value="${pesoTotalAtual != null ? Number(pesoTotalAtual).toLocaleString('pt-BR',{minimumFractionDigits:2}) : ''}" readonly></div>
+  </div>
+  <div class="sp-g2">
+   <div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-proj-cidade" value="Carregando..." readonly></div>
+   <div class="sp-field"><div class="sp-label">Estado</div><input class="sp-inp" id="sp-proj-estado" value="Carregando..." readonly></div>
+  </div>
+  <div class="sp-field"><div class="sp-label">Descritivo do projeto</div><textarea class="sp-inp" id="sp-proj-desc" rows="3" oninput="_projScheduleAutoSave()">${(p.descritivo||'')}</textarea></div>
+
+  <div class="sp-stitle">Melhorias vinculadas</div>
+  <div id="sp-proj-melhorias" class="sp-rel-chips-wrap">
+   <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando melhorias...</div>
+  </div>
+
+  <div class="sp-stitle">Empresa vinculada</div>
+  <div id="sp-proj-empresa" class="sp-rel-chips-wrap">
+   <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando empresa...</div>
+  </div>
+
+  <div class="sp-stitle">Documentos</div>
+  <div id="sp-proj-docs">
+   <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando documentos...</div>
+  </div>
+
+  <div class="sp-stitle">Tarefas</div>
+  <div id="sp-proj-tarefas">
+   <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando tarefas...</div>
+  </div>
+
+  ${_projAuditHTML(p)}
+ `;
+
+ // Excluir projeto disponível pra qualquer usuário (pedido explícito, sem
+ // checagem de isAdmin) — diferente de Obra/Entrega, que restringem a
+ // admin (obras.js, _spExcluirObra/_spExcluirEntrega); RLS de `projetos`
+ // já é aberta a qualquer autenticado (authenticated_all_projetos, cmd ALL),
+ // então não havia bloqueio de banco a ajustar aqui.
+ _spSet('Projeto', p.nome || '(sem nome)', html,
+  '<button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);margin-right:auto" onclick="_spExcluirProjeto(\'' + p.id + '\',\'' + (p.nome||'').replace(/'/g,"\\'") + '\')">Excluir projeto</button> '
+  + '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+
+ // Obra vinculada — chip clicável, mesmo padrão de Empresa/Contato
+ // vinculados usado em todo o app (_spRelChipHTML/_spOpenEntityById).
+ var obraChipEl = document.getElementById('sp-proj-obra-chip');
+ if (obraChipEl) {
+  obraChipEl.innerHTML = p.obra_id
+   ? _spRelChipHTML('obras', p.obra_id, obraNome)
+   : '<div class="sp-empty">Nenhuma obra vinculada.</div>';
  }
- var auditHtml = '<div style="margin-top:24px;border-top:1px solid var(--border);padding-top:12px">'
+
+ // Cidade/Estado — Projeto NÃO tem essas colunas (verificado no schema);
+ // no Airtable eram um rollup automático vindo da Obra. Decisão confirmada
+ // com a usuária (AskUserQuestion): mostrar só leitura, lidas da Obra
+ // vinculada, sem criar coluna nova em `projetos`.
+ (function() {
+  var cidEl = document.getElementById('sp-proj-cidade');
+  var estEl = document.getElementById('sp-proj-estado');
+  if (!cidEl || !estEl) return;
+  if (!p.obra_id || !_sb) { cidEl.value = '—'; estEl.value = '—'; return; }
+  _sb.from('obras').select('cidade,estado').eq('id', p.obra_id).single().then(function(res) {
+   cidEl.value = (res.data && res.data.cidade) || '—';
+   estEl.value = (res.data && res.data.estado) || '—';
+  });
+ })();
+
+ // Melhorias vinculadas — melhorias.projeto_id É a FK (o inverso de um
+ // select: a melhoria escolhe o projeto, não o contrário), então aqui é só
+ // uma lista de leitura, mesmo espírito de "Empresa vinculada" mas sem
+ // painel de detalhe próprio pra abrir (melhorias.js não tem um — módulo é
+ // só lista/kanban), por isso as tags não são clicáveis.
+ (function() {
+  var melEl = document.getElementById('sp-proj-melhorias');
+  if (!melEl || !_sb) return;
+  _sb.from('melhorias').select('id,nome,status').eq('projeto_id', p.id).then(function(res) {
+   var rows = (res.data || []);
+   if (!rows.length) { melEl.innerHTML = '<div class="sp-empty">Nenhuma melhoria vinculada a este projeto.</div>'; return; }
+   melEl.innerHTML = rows.map(function(m) {
+    return '<div class="sp-rel-chip" style="cursor:default" title="' + (m.nome||'').replace(/"/g,'&quot;') + '">'
+     + '<span class="sp-rel-chip-dot" style="background:#8B8B94"></span>'
+     + '<span class="sp-rel-chip-label">' + (m.nome||'(sem nome)').replace(/</g,'&lt;') + '</span>'
+     + (m.status ? '<span class="sp-rel-chip-sub">' + m.status + '</span>' : '')
+     + '</div>';
+   }).join('');
+  });
+ })();
+
+ // Empresa vinculada — Projeto→Empresa é FK direta (projetos.empresa_id),
+ // sem join necessário (ver notas do módulo). Mesmo padrão de chip clicável
+ // (_spRelChipHTML) e carregamento preguiçoso já usado em Obras vinculadas/
+ // Contatos vinculados no painel de Empresa (ver empresas.js).
+ (function() {
+  var container = document.getElementById('sp-proj-empresa');
+  if (!container) return;
+  if (!p.empresa_id) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
+  var empCache = (_empresasArr || []).find(function(e){ return String(e.id) === String(p.empresa_id); });
+  if (empCache) { container.innerHTML = _spRelChipHTML('empresas', empCache.id, empCache.nome || '—'); return; }
+  if (!_sb) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
+  _sb.from('empresas').select('id, nome').eq('id', p.empresa_id).single().then(function(res) {
+   if (res.error || !res.data) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
+   container.innerHTML = _spRelChipHTML('empresas', res.data.id, res.data.nome || '—');
+  });
+ })();
+
+ _projDocsCarregar(p.id, p.obra_id);
+ _projTarefasCarregar(p.id);
+}
+
+// ── Auditoria (rodapé) ────────────────────────────────────────────────────────
+function _projAuditHTML(p) {
+ return '<div style="margin-top:24px;border-top:1px solid var(--border);padding-top:12px">'
   + '<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;opacity:.85">Auditoria</div>'
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">'+_projAuditNome(p.criado_por)+'</span></div>'
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de criação</span><span class="drw-audit-val">'+(p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—')+'</span></div>'
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">'+_projAuditNome(p.atualizado_por)+'</span></div>'
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de última alteração</span><span class="drw-audit-val">'+(p.updated_at ? new Date(p.updated_at).toLocaleString('pt-BR') : '—')+'</span></div>'
   + '</div>';
+}
 
- var html = `
-  <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Código</div><input class="sp-inp" value="${cod}" readonly></div>
-   <div class="sp-field"><div class="sp-label">Tipo</div><input class="sp-inp" value="${tipo}" readonly></div>
-  </div>
-  <div class="sp-field"><div class="sp-label">Obra vinculada</div><input class="sp-inp" value="${(obraNome||'').replace(/"/g,'&quot;')}" readonly></div>
-  <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Produto</div><input class="sp-inp" value="${prod}"></div>
-   <div class="sp-field"><div class="sp-label">Etapa</div><input class="sp-inp" value="${etapa}"></div>
-  </div>
-  <div class="sp-g3">
-   <div class="sp-field"><div class="sp-label">Qtd.</div><input class="sp-inp" value="${qtd != null ? qtd : ''}"></div>
-   <div class="sp-field"><div class="sp-label">Valor unit.</div><input class="sp-inp" value="${fmtBRL(vU)}"></div>
-   <div class="sp-field"><div class="sp-label">Valor total</div><input class="sp-inp" value="${fmtBRL(vT)}" readonly></div>
-  </div>
-  <div class="sp-field"><div class="sp-label">Complexidade</div><input class="sp-inp" value="${compl}"></div>
-  <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
-   <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Empresa vinculada</div>
-   <div id="sp-proj-empresa" class="sp-rel-chips-wrap">
-    <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando empresa...</div>
-   </div>
-  </div>
-  ${auditHtml}
- `;
+// ── Recalcula Valor total / Peso total ao vivo (sem persistir ainda —
+// _spSaveProjetoFull faz isso no autosave debounced) ─────────────────────────
+function _projRecalc() {
+ var qtdEl = document.getElementById('sp-proj-qtd');
+ var vUnitEl = document.getElementById('sp-proj-vunit');
+ var vTotEl = document.getElementById('sp-proj-vtotal');
+ var pUnitEl = document.getElementById('sp-proj-pesouni');
+ var pTotEl = document.getElementById('sp-proj-pesototal');
+ var qtd = parseFloat(qtdEl?.value) || 0;
+ var vUnit = parseFloat((vUnitEl?.value||'').replace(/[^\d,-]/g,'').replace(',','.')) || 0;
+ var pUnit = parseFloat(pUnitEl?.value) || 0;
+ if (vTotEl) vTotEl.value = (qtd && vUnit) ? (qtd*vUnit).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '';
+ if (pTotEl) pTotEl.value = (qtd && pUnit) ? (qtd*pUnit).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
+}
 
- _spSet('Projeto', (cod ? cod + ' — ' : '') + obraNome, html,
-  '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+// ── Autosave (mesmo espírito de _obraScheduleAutoSave/_spSaveObraFull,
+// obras.js: debounce de 700ms, sem botão "Salvar") ────────────────────────────
+var _projAutoSaveTimer = null;
+function _projScheduleAutoSave() {
+ if (_projAutoSaveTimer) clearTimeout(_projAutoSaveTimer);
+ _projAutoSaveTimer = setTimeout(function(){ _spSaveProjetoFull(); }, 700);
+}
+async function _spSaveProjetoFull() {
+ if (_projAutoSaveTimer) { clearTimeout(_projAutoSaveTimer); _projAutoSaveTimer = null; }
+ var id = document.getElementById('sp-proj-id')?.value;
+ if (!id || !_sb) return;
+ var qtd = parseFloat(document.getElementById('sp-proj-qtd')?.value) || null;
+ var vUnitStr = (document.getElementById('sp-proj-vunit')?.value || '').replace(/[^\d,-]/g,'').replace(',','.');
+ var vUnit = vUnitStr ? parseFloat(vUnitStr) : null;
+ var pUnit = parseFloat(document.getElementById('sp-proj-pesouni')?.value) || null;
+ var payload = {
+  nome: (document.getElementById('sp-proj-nome')?.value || '').toUpperCase(),
+  etapa_projeto: document.getElementById('sp-proj-etapa')?.value || null,
+  quantidade: qtd,
+  valor_unitario: vUnit,
+  m2_estrutura: parseFloat(document.getElementById('sp-proj-m2estr')?.value) || null,
+  m2_arquitetura: parseFloat(document.getElementById('sp-proj-m2arq')?.value) || null,
+  maior_peca: (document.getElementById('sp-proj-maiorpeca')?.value || '').trim() || null,
+  // Peso total é o que persiste (peso_kg sempre foi "o total" no schema,
+  // ver comentário em _spProjetoRender) — calculado aqui, nunca digitado.
+  peso_kg: (qtd && pUnit) ? qtd * pUnit : null,
+  descritivo: (document.getElementById('sp-proj-desc')?.value || '').trim() || null,
+  updated_at: new Date().toISOString(),
+ };
+ var res = await _sb.from('projetos').update(payload).eq('id', id);
+ if (res.error) { console.error('[Projetos] erro ao salvar:', res.error); _showToast('Erro ao salvar: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ if (_spProjAtivo && String(_spProjAtivo.id) === String(id)) Object.assign(_spProjAtivo, payload);
+ var cacheIdx = (_projetosArr||[]).findIndex(function(x){ return String(x.id) === String(id); });
+ if (cacheIdx !== -1) Object.assign(_projetosArr[cacheIdx], payload);
+}
 
- // Empresa vinculada — Projeto→Empresa é FK direta (projetos.empresa_id),
- // sem join necessário (ver notas do módulo). Mesmo padrão de chip clicável
- // (_spRelChipHTML) e carregamento preguiçoso já usado em Obras vinculadas/
- // Contatos vinculados no painel de Empresa (ver empresas.js).
- var container = document.getElementById('sp-proj-empresa');
- if (!container) return;
- if (!p.empresa_id) {
-  container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>';
-  return;
- }
- var empCache = (_empresasArr || []).find(function(e){ return String(e.id) === String(p.empresa_id); });
- if (empCache) {
-  container.innerHTML = _spRelChipHTML('empresas', empCache.id, empCache.nome || '—');
-  return;
- }
- if (!_sb) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
- _sb.from('empresas').select('id, nome').eq('id', p.empresa_id).single().then(function(res) {
-  if (res.error || !res.data) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
-  container.innerHTML = _spRelChipHTML('empresas', res.data.id, res.data.nome || '—');
- });
+// ── Exclusão de Projeto — disponível pra qualquer usuário (pedido explícito).
+// Cascata real do schema (FKs de projetos): melhorias/projetos_responsaveis/
+// documentos/atividades_projetos/documentos_projetos/projetos_melhorias são
+// apagados junto (ON DELETE CASCADE); propostas fica com projeto_id nulo
+// (ON DELETE SET NULL) — aviso disso no confirm(), mesmo espírito de
+// _spExcluirObra (obras.js).
+async function _spExcluirProjeto(id, nome) {
+ if (!confirm('Excluir "' + (nome || 'este projeto') + '" PERMANENTEMENTE?\n\nMelhorias, documentos e tarefas vinculados a este projeto também serão excluídos. Esta ação não pode ser desfeita.')) return;
+ var res = await _sb.from('projetos').delete().eq('id', id);
+ if (res.error) { alert('Erro ao excluir: ' + (res.error?.message || '')); return; }
+ closePanel();
+ if (typeof _dbLoadProjetos === 'function') _dbLoadProjetos();
+}
+
+// ── Documentos do Projeto — Pré-Projeto/Projeto Executivo/Registro da Obra,
+// todos vivem em `documentos` (projeto_id) no mesmo bucket 'documentos_projetos'
+// (confirmado por SQL: os 155 'projeto_executivo' existentes já estão nesse
+// bucket, igual aos 'fotos_obra'). 'pre_projeto' é um tipo NOVO (não existe
+// nenhum documento com esse tipo ainda) — só passa a ter arquivos a partir de
+// agora, mesmo espírito do que já foi feito para criado_por/maior_peca.
+var _PROJ_DOC_TIPOS = [
+ { tipo: 'pre_projeto', label: 'Pré-Projeto' },
+ { tipo: 'projeto_executivo', label: 'Projeto Executivo' },
+ { tipo: 'fotos_obra', label: 'Registro da Obra' },
+];
+function _projDocItemHTML(d) {
+ var nome = d.nome_arquivo || 'Arquivo';
+ var pathSafe = String(d.caminho_storage||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+ var nomeSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+ return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--surface)">'
+  + '<span style="flex:1;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nome.replace(/</g,'&lt;') + '</span>'
+  + '<button type="button" class="btn btn-ghost" style="padding:3px 10px;font-size:11px" onclick="_spAbrirDocStorage(\''+pathSafe+'\',\''+nomeSafe+'\',\'documentos_projetos\')">Visualizar</button>'
+  + '</div>';
+}
+function _projDocSectionHTML(label, tipo, docs) {
+ var lista = docs.filter(function(d){ return d.tipo === tipo; });
+ return '<div class="sp-field">'
+  + '<div class="sp-label">' + label + '</div>'
+  + (lista.length ? lista.map(_projDocItemHTML).join('') : '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nenhum arquivo enviado.</div>')
+  + '<label style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--navy);cursor:pointer;font-weight:600">'
+  + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>'
+  + 'Anexar arquivo'
+  + '<input type="file" style="display:none" multiple onchange="_projDocUpload(this,\''+tipo+'\')">'
+  + '</label>'
+  + '</div>';
+}
+async function _projDocsCarregar(projetoId, obraId) {
+ var container = document.getElementById('sp-proj-docs');
+ if (!container || !_sb) return;
+ var res = await _sb.from('documentos').select('*').eq('projeto_id', projetoId)
+  .in('tipo', _PROJ_DOC_TIPOS.map(function(t){ return t.tipo; })).order('created_at', { ascending: false });
+ if (res.error) { container.innerHTML = '<div class="sp-empty" style="color:var(--red)">Erro ao carregar documentos.</div>'; return; }
+ var docs = res.data || [];
+ container.dataset.projetoId = projetoId;
+ container.dataset.obraId = obraId || '';
+ container.innerHTML = _PROJ_DOC_TIPOS.map(function(t){ return _projDocSectionHTML(t.label, t.tipo, docs); }).join('');
+}
+async function _projDocUpload(input, tipo) {
+ var files = Array.prototype.slice.call(input.files || []);
+ if (!files.length) return;
+ var container = document.getElementById('sp-proj-docs');
+ var projetoId = container && container.dataset.projetoId;
+ var obraId = (container && container.dataset.obraId) || null;
+ if (!projetoId) return;
+ var erros = 0;
+ for (var i = 0; i < files.length; i++) { if (!(await _spUploadRegistro(files[i], projetoId, obraId, tipo))) erros++; }
+ if (erros) _showToast(erros + ' arquivo(s) não enviado(s). Tente novamente.', 'erro');
+ _projDocsCarregar(projetoId, obraId);
+ input.value = '';
+}
+
+// ── Tarefas vinculadas ao Projeto — atividades_projetos é a junção real
+// (508 linhas, confirmado por SQL), mesmo padrão de "Tarefas" no
+// detalhamento de Obra (obras.js, atividades_obras). Clique abre a mesma
+// gaveta do Gestor de Tarefas (_taskDrawerOpen, dashboard.js).
+async function _projTarefasCarregar(projetoId) {
+ var container = document.getElementById('sp-proj-tarefas');
+ if (!container || !_sb) return;
+ var res = await _sb.from('atividades_projetos')
+  .select('atividade:atividade_id(id, titulo, status, prioridade, data_prazo, responsavel)').eq('projeto_id', projetoId);
+ if (res.error) { container.innerHTML = '<div class="sp-empty" style="color:var(--red)">Erro ao carregar tarefas.</div>'; return; }
+ var atividades = (res.data || []).map(function(link){ return link.atividade; }).filter(Boolean);
+ atividades.forEach(function(a){ if (Array.isArray(a.responsavel)) a.responsavel = _emailsToNomes(a.responsavel); });
+ var _taskStatusCor = { 'Concluída':'var(--green)', 'Concluido':'var(--green)', 'Em andamento':'var(--navy)', 'Em progresso':'var(--navy)', 'Bloqueado':'var(--red)', 'Impedida':'var(--red)', 'Atrasado':'var(--red)' };
+ function fmtData(d) { return d ? new Date(String(d).substring(0,10) + 'T00:00:00').toLocaleDateString('pt-BR') : '—'; }
+ container.innerHTML = atividades.length
+  ? atividades.map(function(a) {
+     var respTxt = Array.isArray(a.responsavel) ? a.responsavel.join(', ') : (a.responsavel || '');
+     return '<div class="sp-item-card" onclick="_taskDrawerOpen(\'' + a.id + '\')">'
+      + '<div class="sp-item-title">' + (a.titulo || '(sem título)') + '</div>'
+      + '<div class="sp-item-meta">'
+      + (a.status ? '<span style="color:' + (_taskStatusCor[a.status] || 'var(--muted)') + ';font-weight:600">' + a.status + '</span><span style="color:var(--border)">|</span>' : '')
+      + (a.prioridade ? '<span>Prioridade: <b>' + a.prioridade + '</b></span><span style="color:var(--border)">|</span>' : '')
+      + '<span>Prazo: <b>' + fmtData(a.data_prazo) + '</b></span>'
+      + '</div>'
+      + (respTxt ? '<div style="margin-top:4px;font-size:11px;color:var(--muted)">' + respTxt + '</div>' : '')
+      + '</div>';
+    }).join('')
+  : '<div class="sp-empty">Nenhuma tarefa vinculada a este projeto</div>';
 }
 
 // Filtro/Ordenação — mesmos componentes reutilizáveis do Gestor de Tarefas/
