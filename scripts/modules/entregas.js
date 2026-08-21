@@ -665,13 +665,6 @@ function _entProjFormHTML() {
  var p = _entNovoProj;
  if (!p) return '';
  var produtosDisponiveis = (typeof _noProdutosDisponiveis === 'function') ? _noProdutosDisponiveis(p.tipoObra) : (_produtosArr || []);
- // Padronizado com o dropdown buscável já usado em Etapa/Cidade/UF/Canal —
- // pedido explícito de consistência visual entre todos os selects do
- // sistema, com busca. Substitui as pills coloridas usadas antes aqui.
- _srchSelRegister('entProjTipo', {
-  options: p.tipoObraOpcoes || [], placeholder: 'Selecione o tipo...',
-  onSelect: function(v) { _entProjSet('tipoObra', v); },
- });
  var html = '<div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface2);display:flex;flex-direction:column;gap:12px">';
  html += '<div class="modal-grid col2" style="gap:12px">'
   + '<div class="mf" style="margin:0"><label style="font-size:11px">Nome do projeto <span class="req">*</span></label>'
@@ -682,10 +675,16 @@ function _entProjFormHTML() {
   + (_NO_PROJETO_ETAPA_OPCOES||[]).map(function(et){ return '<option' + (et===p.etapaProjeto?' selected':'') + '>' + et + '</option>'; }).join('')
   + '</select></div>'
   + '</div>';
- // Opções restritas aos tipos já marcados pra obra (pedido explícito,
- // mesma regra do wizard) — não usa _NO_TIPOS_OPCOES inteiro.
+ // Pills restritas aos tipos já marcados pra obra (pedido explícito, mesma
+ // regra do wizard) — não usa _NO_TIPOS_OPCOES inteiro.
  html += '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de obra do projeto <span class="req">*</span></label>'
-  + '<div style="margin-top:6px">' + _srchSelMarkup('entProjTipo', 'ent-proj-tipo', p.tipoObra) + '</div></div>';
+  + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'
+  + (p.tipoObraOpcoes||[]).map(function(t) {
+     var selT = t === p.tipoObra;
+     var corT = (_NO_TIPO_COR && _NO_TIPO_COR[t]) || 'var(--navy)';
+     return '<button type="button" onclick="_entProjSet(\'tipoObra\',\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + corT + ';background:' + (selT?corT:'transparent') + ';color:' + (selT?'#fff':corT) + '">' + t + '</button>';
+    }).join('')
+  + '</div></div>';
  html += '<div class="modal-grid col2" style="gap:12px">'
   + '<div class="mf" style="margin:0"><label style="font-size:11px">Produto <span class="req">*</span></label>'
   + '<div id="ent-proj-produto-dd" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('entProjProduto', produtosDisponiveis.map(function(pr){return pr.nome;}), p.produtoNomes, '_entProjMultiToggle', 'Selecione o(s) produto(s)...') + '</div></div>'
