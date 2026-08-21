@@ -1382,7 +1382,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  // scroll lateral pra ver todas as colunas (Etapa/Tipo/Produto/Valor/Qtd/
  // Alterado por), o grid quebra linha sozinho e não precisa de scroll.
  function _projCampo(label, valor) {
-  return '<div><div class="sp-label" style="margin-bottom:1px">' + label + '</div><div style="font-size:12px;color:var(--text)">' + valor + '</div></div>';
+  return '<div><div class="sp-label" style="margin-bottom:1px;white-space:nowrap">' + label + '</div><div style="font-size:12px;color:var(--text)">' + valor + '</div></div>';
  }
  var projCards = projetos.length
   ? projetos.map(function(p){
@@ -1419,13 +1419,19 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
       + '<div class="sp-item-title" style="margin-bottom:0">' + (p.nome || '(sem nome)') + '</div>'
       + (pCompl ? '<span class="badge ' + (complCls[pCompl]||'bm') + '" style="font-size:9px;flex-shrink:0">' + pCompl + '</span>' : '')
       + '</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px 12px">'
-      + _projCampo('Etapa do Projeto', etapaBadge)
+      // 3 colunas fixas (em vez de auto-fit) — com 6 campos sempre dá 2
+      // linhas parelhas, sem sobrar 1 campo sozinho numa linha extra
+      // (achado real: "Alterado por último" ficava órfão numa 3ª linha,
+      // e os rótulos mais longos quebravam em 2 linhas — combinado, isso
+      // deixava o card bem mais alto que o de Entregas). Rótulos
+      // encurtados + nowrap garantem 1 linha só em cada rótulo.
+      + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px 12px">'
+      + _projCampo('Etapa', etapaBadge)
       + _projCampo('Tipo de orçamento', tipoBadge)
       + _projCampo('Produto', prodBadge)
-      + _projCampo('Valor total (Projeto)', '<span style="color:var(--green);font-weight:600">' + pValor + '</span>')
+      + _projCampo('Valor total', '<span style="color:var(--green);font-weight:600">' + pValor + '</span>')
       + _projCampo('Quantidade', p.quantidade != null ? p.quantidade : '—')
-      + _projCampo('Alterado por último', atuHtml)
+      + _projCampo('Alterado por', atuHtml)
       + '</div>'
       + '</div>';
     }).join('')
