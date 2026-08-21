@@ -1418,7 +1418,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      // Responsável) mostra a FOTO real quando o usuário tem uma cadastrada
      // (avatar_url) e só cai pras iniciais/prata quando não tem — antes
      // essa distinção não existia aqui (era sempre iniciais).
-     var atuAvatar = pAtu && typeof _userAvatarByName === 'function' ? _userAvatarByName(pAtu, 34) : '';
+     var atuAvatar = pAtu && typeof _userAvatarByName === 'function' ? _userAvatarByName(pAtu, 30) : '';
      // onclick no card inteiro, mesmo padrão de entregaCards/_spOpenEntityById.
      return '<div class="sp-item-card" onclick="_spOpenEntityById(\'projetos\',\'' + p.id + '\')">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
