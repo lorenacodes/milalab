@@ -6,10 +6,14 @@ function _userAvatarHTML(u, size) {
  var fontSize = Math.round(size * 0.38);
  if (u && u.avatar) {
   // Foto real: nunca preenchida com prata — só um anel fino de prata em volta.
+  // Pedido explícito: a borda ficava "grossa" — o separador branco entre
+  // anel e foto era 2px fixo (não escalava com o tamanho, então em avatares
+  // pequenos ficava proporcionalmente pesado); 1px é fino o bastante pra
+  // separar sem competir visualmente com o anel de prata.
   var ringPad = Math.max(2, Math.round(size * 0.07));
   var imgSize = size - ringPad * 2;
   return '<span style="display:inline-flex;width:' + size + 'px;height:' + size + 'px;padding:' + ringPad + 'px;border-radius:50%;background:var(--silver-grad,#C9CDD8);flex-shrink:0;box-sizing:border-box" title="' + (u.nome||'') + '">'
-   + '<img src="' + u.avatar + '" style="width:' + imgSize + 'px;height:' + imgSize + 'px;border-radius:50%;object-fit:cover;display:block;border:2px solid var(--surface,#fff)">'
+   + '<img src="' + u.avatar + '" style="width:' + imgSize + 'px;height:' + imgSize + 'px;border-radius:50%;object-fit:cover;display:block;border:1px solid var(--surface,#fff)">'
    + '</span>';
  }
  // Sem foto: prata metálica é o padrão, não uma exceção.
