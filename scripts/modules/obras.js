@@ -635,7 +635,12 @@ async function _spObraById(id) {
    // "Tarefas": Atividades do Gestor de Tarefas vinculadas a esta obra —
    // pedido explícito. obra_id não é mais coluna direta de atividades (ver
    // scripts/lib/atividades-vinculos.js), vive na junção atividades_obras.
-   _sb.from('atividades_obras').select('atividade:atividade_id(id, titulo, status, prioridade, data_prazo, responsavel)').eq('obra_id', id)
+   _sb.from('atividades_obras').select('atividade:atividade_id(id, titulo, status, prioridade, data_prazo, responsavel)').eq('obra_id', id),
+   // Carrega o cache de avatar (avatar-helpers.js) em paralelo com o resto —
+   // o card de projeto vinculado (_spObrasRender) usa _userAvatarByName pra
+   // mostrar a FOTO de quem alterou por último; sem isso carregado antes do
+   // 1º render, sempre cairia no fallback de iniciais mesmo pra quem tem foto.
+   (typeof _loadAvatarCacheFast === 'function' ? _loadAvatarCacheFast() : Promise.resolve())
   ]);
 
   if (obraRes.error) {
@@ -1401,20 +1406,19 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      // (errado) que o responsável tinha sido quem fez a última alteração.
      var pAtuU = (_usuariosCache || []).find(function(x){ return x.email === p.atualizado_por; });
      var pAtu  = p.atualizado_por ? ((pAtuU && pAtuU.nome_display) || p.atualizado_por) : '';
-     var initials = pAtu
-      ? pAtu.trim().split(/\s+/).slice(0,2).map(function(w){ return w[0] || ''; }).join('').toUpperCase()
-      : '';
      var etapaBadge = pEtapa ? '<span class="badge ' + (etapaCls[pEtapa]||'bm') + '" style="font-size:10px">' + pEtapa + '</span>' : '<span style="color:var(--muted)">—</span>';
      var tipoBadge  = pTipo  ? '<span class="badge ' + _tipoOrcamentoBadgeCls(pTipo) + '" style="font-size:10px">' + pTipo + '</span>' : '<span style="color:var(--muted)">—</span>';
      var prodBadge  = pProd !== '—' ? '<span class="badge bm" style="font-size:10px">' + pProd + '</span>' : '<span style="color:var(--muted)">—</span>';
      // Pedido explícito: economizar altura — em vez de campo próprio
      // "Alterado por" (rótulo + avatar + nome, ocupando uma célula/linha
-     // inteira do grid), só o avatar (iniciais) aparece agora, encostado
-     // no cabeçalho do card ao lado do título — nome completo ainda
-     // acessível via title="" (tooltip nativo do navegador).
-     var atuAvatar = pAtu
-      ? '<div title="Alterado por ' + pAtu.replace(/"/g,'&quot;') + '" style="width:20px;height:20px;border-radius:50%;background:var(--navy-dim);border:1px solid var(--navy);display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:var(--navy);flex-shrink:0">' + initials + '</div>'
-      : '';
+     // inteira do grid), só o avatar aparece agora, encostado no cabeçalho
+     // do card ao lado do título — nome completo ainda acessível via
+     // title="" (tooltip nativo, já embutido em _userAvatarHTML).
+     // _userAvatarByName (avatar-helpers.js, mesmo helper do avatar de
+     // Responsável) mostra a FOTO real quando o usuário tem uma cadastrada
+     // (avatar_url) e só cai pras iniciais/prata quando não tem — antes
+     // essa distinção não existia aqui (era sempre iniciais).
+     var atuAvatar = pAtu && typeof _userAvatarByName === 'function' ? _userAvatarByName(pAtu, 20) : '';
      // onclick no card inteiro, mesmo padrão de entregaCards/_spOpenEntityById.
      return '<div class="sp-item-card" onclick="_spOpenEntityById(\'projetos\',\'' + p.id + '\')">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
