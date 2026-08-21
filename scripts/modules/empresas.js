@@ -104,10 +104,6 @@ document.addEventListener('click', function(e) {
  if (drop && box && !box.contains(e.target) && !drop.contains(e.target)) {
   _spEmpEstadoClose();
  }
- var addBox = document.getElementById('sp-emp-categoria-add');
- if (addBox && addBox.style.display !== 'none' && !addBox.contains(e.target) && !e.target.closest('#sp-emp-categoria-dropdown')) {
-  addBox.style.display = 'none'; addBox.innerHTML = '';
- }
  var cargoDrop = document.getElementById('sp-ctt-cargo-drop');
  var cargoBox  = document.getElementById('sp-ctt-cargo-box');
  if (cargoDrop && cargoBox && !cargoBox.contains(e.target) && !cargoDrop.contains(e.target)) {
@@ -187,52 +183,28 @@ function _spCttCargoKey(e) {
  if (e.key === 'Escape') _spCttCargoClose();
 }
 
-// Categoria (multipleSelects real no Airtable) — chips coloridos (mesma
-// paleta nt-tag-* já usada pra Fase/Estado em todo o app) em vez do dropdown
-// genérico "N selecionado(s)" de multiselect-ui.js (usado pra Setor/Cidade de
-// Fornecedores): aqui o valor escolhido precisa ficar visível de cara, não
-// escondido atrás de uma contagem — pedido explícito de design, replicando o
-// visual de multiselect colorido do Airtable original.
+// Categoria (multipleSelects real no Airtable) — pills coloridas, mesmo
+// padrão visual/interação do campo "Tipo(s) de obra" (_NO_TIPO_COR,
+// wizard-nova-obra.js): grade de botões clicáveis, sem dropdown/busca —
+// pedido explícito de manter as duas telas (cadastro e detalhamento de
+// Empresa) com a mesma estética. EMPRESA_CATEGORIA_OPCOES é o mesmo
+// vocabulário de _NO_TIPOS_OPCOES (menos "Misto"), então reaproveita o
+// mapa de cor direto em vez de duplicar.
 var _spEmpCategoriaSel = [];
 var EMPRESA_CATEGORIA_COR = { 'Modular':'nt-tag-blue', 'Solar':'nt-tag-yellow', 'Steel Frame':'nt-tag-purple', 'Telhados':'nt-tag-green' };
 function _empCategoriaTagCls(cat) { return EMPRESA_CATEGORIA_COR[cat] || 'nt-tag-gray'; }
 function _spEmpRenderCategoriaDropdown() {
  var wrap = document.getElementById('sp-emp-categoria-dropdown');
  if (!wrap) return;
- var chips = (_spEmpCategoriaSel || []).map(function(c) {
-  var esc = c.replace(/'/g,"\\'");
-  return '<span class="nt-tag ' + _empCategoriaTagCls(c) + '" style="display:inline-flex;align-items:center;gap:4px">'
-   + c.replace(/</g,'&lt;')
-   + '<button type="button" onclick="_spEmpCategoriaRemove(\''+esc+'\')" title="Remover" '
-   + 'style="background:none;border:none;cursor:pointer;padding:0;line-height:1;color:inherit;opacity:.65;font-size:12px">×</button></span>';
- }).join('');
- wrap.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;position:relative">'
-  + chips
-  + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_spEmpCategoriaOpenAdd()">+</button>'
-  + '<div id="sp-emp-categoria-add" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:20;min-width:170px"></div>'
-  + '</div>';
+ wrap.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:6px">' + EMPRESA_CATEGORIA_OPCOES.map(function(o) {
+  var sel = (_spEmpCategoriaSel || []).indexOf(o) >= 0;
+  var cor = (typeof _NO_TIPO_COR !== 'undefined' && _NO_TIPO_COR[o]) || 'var(--navy)';
+  var esc = o.replace(/'/g,"\\'");
+  return '<button type="button" onclick="_spEmpCategoriaToggle(\''+esc+'\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid '+cor+';background:'+(sel?cor:'transparent')+';color:'+(sel?'#fff':cor)+'">'+o+'</button>';
+ }).join('') + '</div>';
 }
-function _spEmpCategoriaOpenAdd() {
- var box = document.getElementById('sp-emp-categoria-add');
- if (!box) return;
- var abrir = box.style.display === 'none';
- box.style.display = abrir ? 'block' : 'none';
- if (!abrir) { box.innerHTML = ''; return; }
- var restantes = EMPRESA_CATEGORIA_OPCOES.filter(function(o){ return (_spEmpCategoriaSel||[]).indexOf(o) === -1; });
- box.innerHTML = '<div class="srch-sel-drop open" style="position:static">'
-  + '<div class="srch-sel-list">' + (restantes.length ? restantes.map(function(o) {
-     var esc = o.replace(/'/g,"\\'");
-     return '<div class="srch-sel-opt" onclick="_spEmpCategoriaAdd(\''+esc+'\')">'
-      + '<span class="nt-tag ' + _empCategoriaTagCls(o) + '" style="pointer-events:none">' + o + '</span></div>';
-    }).join('') : '<div class="srch-sel-empty">Todas já selecionadas.</div>') + '</div></div>';
-}
-function _spEmpCategoriaAdd(valor) {
- _spEmpCategoriaSel = _msToggle(_spEmpCategoriaSel, valor, true);
- _spEmpRenderCategoriaDropdown();
- if (typeof _empScheduleAutoSave === 'function') _empScheduleAutoSave();
-}
-function _spEmpCategoriaRemove(valor) {
- _spEmpCategoriaSel = _msToggle(_spEmpCategoriaSel, valor, false);
+function _spEmpCategoriaToggle(valor) {
+ _spEmpCategoriaSel = _msToggle(_spEmpCategoriaSel, valor, (_spEmpCategoriaSel||[]).indexOf(valor) === -1);
  _spEmpRenderCategoriaDropdown();
  if (typeof _empScheduleAutoSave === 'function') _empScheduleAutoSave();
 }
