@@ -2436,32 +2436,34 @@ function _spValorBlur(el) {
 // _empScheduleAutoSave (empresas.js)/_taskAutoSaveQueue (Gestor de Tarefas).
 // Debounce de 700ms (mesmo valor usado em Empresa) pra não bater no banco a
 // cada tecla digitada.
-// Pills multi-select de Tipo(s) de obra (painel de detalhamento) — mesmo
-// padrão de cor de _NO_TIPO_COR (wizard-nova-obra.js). O estado de verdade
-// vive em _obraAtiva.tipo_obra (array), mutado a cada clique — não tem
-// <select> nativo pra ler no autosave, então _spSaveObraFull lê direto
-// dali em vez de um elemento do DOM, diferente dos outros campos.
+// Dropdown de busca+checkbox de Tipo(s) de obra (painel de detalhamento) —
+// padronizado com o mesmo componente já usado em Produto/Tipologia
+// (multiselect-ui.js), pedido explícito de consistência visual entre todos
+// os selects do sistema. O estado de verdade vive em _obraAtiva.tipo_obra
+// (array), mutado a cada clique — não tem <select> nativo pra ler no
+// autosave, então _spSaveObraFull lê direto dali em vez de um elemento do DOM.
 function _spTipoPillsHTML(tiposAtuais) {
  var opcoes = (typeof _NO_TIPOS_OPCOES !== 'undefined' && _NO_TIPOS_OPCOES) || ['Telhados','Modular','Steel Frame','Solar','Misto (LSF + A36)'];
- return opcoes.map(function(t) {
-  var sel = (tiposAtuais||[]).indexOf(t) >= 0;
-  var cor = (typeof _NO_TIPO_COR !== 'undefined' && _NO_TIPO_COR[t]) || 'var(--navy)';
-  return '<button type="button" onclick="_spTipoObraToggle(\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + cor + ';background:' + (sel?cor:'transparent') + ';color:' + (sel?'#fff':cor) + '">' + t + '</button>';
- }).join('');
+ return _msRenderDropdown('spTipoObra', opcoes, tiposAtuais || [], '_spTipoMultiToggle', 'Selecione o(s) tipo(s) de obra...');
 }
-function _spTipoObraToggle(t) {
+function _spTipoMultiToggle(campo, t, checked) {
  if (!_obraAtiva) return;
  var arr = (_obraAtiva.tipo_obra || []).slice();
  var i = arr.indexOf(t);
- if (i >= 0) {
-  if (arr.length === 1) { _showToast('A obra precisa ter ao menos 1 tipo.', 'aviso'); return; }
-  arr.splice(i, 1);
- } else {
+ if (!checked) {
+  if (arr.length === 1) {
+   _showToast('A obra precisa ter ao menos 1 tipo.', 'aviso');
+   var wrapReset = document.getElementById('sp-tipo-pills');
+   if (wrapReset) wrapReset.innerHTML = _spTipoPillsHTML(arr);
+   return;
+  }
+  if (i >= 0) arr.splice(i, 1);
+ } else if (i === -1) {
   arr.push(t);
  }
  _obraAtiva.tipo_obra = arr;
  var wrap = document.getElementById('sp-tipo-pills');
- if (wrap) wrap.innerHTML = _spTipoPillsHTML(arr);
+ if (wrap) { wrap.innerHTML = _spTipoPillsHTML(arr); _noReabrirDropdown('sp-tipo-pills'); }
  _obraScheduleAutoSave();
 }
 
@@ -2878,6 +2880,13 @@ function _spProjFormHTML() {
  var p = _spNovoProj;
  if (!p) return '';
  var produtosDisponiveis = (typeof _noProdutosDisponiveis === 'function') ? _noProdutosDisponiveis(p.tipoObra) : (_produtosArr || []);
+ // Padronizado com o dropdown buscável já usado em Etapa/Cidade/UF/Canal —
+ // pedido explícito de consistência visual entre todos os selects do
+ // sistema, com busca. Substitui as pills coloridas usadas antes aqui.
+ _srchSelRegister('spProjTipo', {
+  options: p.tipoObraOpcoes || [], placeholder: 'Selecione o tipo...',
+  onSelect: function(v) { _spProjSet('tipoObra', v); },
+ });
  var html = '<div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--surface2);display:flex;flex-direction:column;gap:12px">';
  html += '<div class="modal-grid col2" style="gap:12px">'
   + '<div class="mf" style="margin:0"><label style="font-size:11px">Nome do projeto <span class="req">*</span></label>'
@@ -2889,13 +2898,7 @@ function _spProjFormHTML() {
   + '</select></div>'
   + '</div>';
  html += '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de obra do projeto <span class="req">*</span></label>'
-  + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'
-  + (p.tipoObraOpcoes||[]).map(function(t) {
-     var selT = t === p.tipoObra;
-     var corT = (_NO_TIPO_COR && _NO_TIPO_COR[t]) || 'var(--navy)';
-     return '<button type="button" onclick="_spProjSet(\'tipoObra\',\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + corT + ';background:' + (selT?corT:'transparent') + ';color:' + (selT?'#fff':corT) + '">' + t + '</button>';
-    }).join('')
-  + '</div></div>';
+  + '<div style="margin-top:6px">' + _srchSelMarkup('spProjTipo', 'sp-proj-tipo', p.tipoObra) + '</div></div>';
  html += '<div class="modal-grid col2" style="gap:12px">'
   + '<div class="mf" style="margin:0"><label style="font-size:11px">Produto <span class="req">*</span></label>'
   + '<div id="sp-proj-produto-dd" class="no-msel-wide" style="margin-top:4px">' + _msRenderDropdown('spProjProduto', produtosDisponiveis.map(function(pr){return pr.nome;}), p.produtoNomes, '_spProjMultiToggle', 'Selecione o(s) produto(s)...') + '</div></div>'

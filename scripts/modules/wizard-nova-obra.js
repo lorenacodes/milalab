@@ -232,19 +232,19 @@ var _NO_TIPO_COR = {
  'Telhados': 'var(--green)', 'Steel Frame': 'var(--purple)', 'Modular': 'var(--blue)',
  'Solar': 'var(--yellow)', 'Misto (LSF + A36)': 'var(--orange)',
 };
+// Padronizado com o dropdown de busca+checkbox já usado em Produto/
+// Tipologia (multiselect-ui.js) — pedido explícito de consistência visual
+// entre todos os selects do sistema, com busca. Substitui as pills
+// coloridas usadas antes aqui.
 function _noTipoGridRender() {
  var el = document.getElementById('no-tipo-grid');
  if (!el) return;
- el.innerHTML = _NO_TIPOS_OPCOES.map(function(t) {
-  var sel = _noTipos.indexOf(t) >= 0;
-  var cor = _NO_TIPO_COR[t] || 'var(--navy)';
-  return '<button type="button" onclick="_noTipoToggle(\'' + t.replace(/'/g, "\\'") + '\')" style="padding:8px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid ' + cor + ';background:' + (sel?cor:'transparent') + ';color:' + (sel?'#fff':cor) + '">' + t + '</button>';
- }).join('');
+ el.innerHTML = _msRenderDropdown('noTipo', _NO_TIPOS_OPCOES, _noTipos, '_noTipoMultiToggle', 'Selecione o(s) tipo(s) de obra...');
 }
-function _noTipoToggle(t) {
- var i = _noTipos.indexOf(t);
- if (i >= 0) _noTipos.splice(i, 1); else _noTipos.push(t);
+function _noTipoMultiToggle(campo, valor, checked) {
+ _noTipos = _msToggle(_noTipos, valor, checked);
  _noTipoGridRender();
+ _noReabrirDropdown('no-tipo-grid');
  _noProjRender();
 }
 
@@ -1060,6 +1060,15 @@ function _noProjRender() {
   var isSolar = p.tipoObra === _NO_SOLAR_TIPO;
   var produtosDisponiveis = _noProdutosDisponiveis(p.tipoObra);
   var propostaCheck = isSolar ? _noProjPodeProposta(idx) : null;
+  // Pedido explícito: padronizar com o dropdown buscável já usado em
+  // Etapa/Cidade/UF/Canal (searchable-select.js) em vez das pills coloridas
+  // — kind por índice (um card de projeto pode coexistir com outros na
+  // mesma tela), reregistrado a cada render deste card.
+  var tipoKind = 'noProjTipo' + idx;
+  _srchSelRegister(tipoKind, {
+   options: tipoOpts, placeholder: 'Selecione o tipo...',
+   onSelect: function(v) { _noProjSet(idx, 'tipoObra', v); },
+  });
 
   var html = '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface)">';
   html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border)">'
@@ -1080,20 +1089,12 @@ function _noProjRender() {
    + '</select></div>'
    + '</div>';
 
-  // Pills coloridas (mesmo padrão do grid de "Tipo(s) de obra" do Passo 1,
-  // _noTipoGridRender/_NO_TIPO_COR) em vez de <select> nativo sem cor —
-  // pedido explícito: essa identidade visual (verde/roxo/azul/amarelo/
-  // laranja por tipo) deveria valer aqui também. <option> de <select> não
-  // aceita cor de fundo/borda de forma confiável entre navegadores, então
-  // vira botões (seleção única: só 1 fica "preenchido" por vez).
+  // Padronizado com o dropdown buscável já usado em Etapa/Cidade/UF/Canal
+  // (searchable-select.js) — pedido explícito de consistência visual entre
+  // todos os "selects" do sistema, incluindo a opção de pesquisar entre as
+  // opções. Substituiu as pills coloridas usadas antes aqui.
   html += '<div class="mf" style="margin:0"><label style="font-size:11px">Tipo de obra do projeto <span class="req">*</span></label>'
-   + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'
-   + tipoOpts.map(function(t) {
-      var selT = t === p.tipoObra;
-      var corT = _NO_TIPO_COR[t] || 'var(--navy)';
-      return '<button type="button" onclick="_noProjSet(' + idx + ',\'tipoObra\',\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + corT + ';background:' + (selT?corT:'transparent') + ';color:' + (selT?'#fff':corT) + '">' + t + '</button>';
-     }).join('')
-   + '</div>'
+   + '<div style="margin-top:6px">' + _srchSelMarkup(tipoKind, 'no-proj-tipo-' + idx, p.tipoObra) + '</div>'
    + '</div>';
 
   html += '<div class="modal-grid col2" style="gap:12px">'
