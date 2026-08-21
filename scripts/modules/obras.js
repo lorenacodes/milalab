@@ -637,9 +637,9 @@ async function _spObraById(id) {
    // scripts/lib/atividades-vinculos.js), vive na junção atividades_obras.
    _sb.from('atividades_obras').select('atividade:atividade_id(id, titulo, status, prioridade, data_prazo, responsavel)').eq('obra_id', id),
    // Carrega o cache de avatar (avatar-helpers.js) em paralelo com o resto —
-   // o card de projeto vinculado (_spObrasRender) usa _userAvatarByName pra
-   // mostrar a FOTO de quem alterou por último; sem isso carregado antes do
-   // 1º render, sempre cairia no fallback de iniciais mesmo pra quem tem foto.
+   // o dropdown de Responsável do "+ Adicionar projeto" (_spProjRespDropdownMarkup)
+   // usa _userAvatarByName pra mostrar a FOTO real; sem isso carregado antes
+   // do 1º render, cairia no fallback de iniciais mesmo pra quem tem foto.
    (typeof _loadAvatarCacheFast === 'function' ? _loadAvatarCacheFast() : Promise.resolve())
   ]);
 
@@ -1398,35 +1398,18 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      var pValor = p.valor_unitario != null
       ? (p.quantidade != null ? fmtMoeda(Number(p.valor_unitario) * Number(p.quantidade)) : fmtMoeda(p.valor_unitario))
       : '—';
-     // "Alterado por último" é quem editou o REGISTRO por último
-     // (projetos.atualizado_por, e-mail setado pelo trigger
-     // trg_projetos_atualizado_por a cada INSERT/UPDATE — mesmo padrão de
-     // atividades.atualizado_por em tarefas.js), não o responsável pelo
-     // projeto — antes essa coluna mostrava p.responsavel, dando a entender
-     // (errado) que o responsável tinha sido quem fez a última alteração.
-     var pAtuU = (_usuariosCache || []).find(function(x){ return x.email === p.atualizado_por; });
-     var pAtu  = p.atualizado_por ? ((pAtuU && pAtuU.nome_display) || p.atualizado_por) : '';
      var etapaBadge = pEtapa ? '<span class="badge ' + (etapaCls[pEtapa]||'bm') + '" style="font-size:10px">' + pEtapa + '</span>' : '<span style="color:var(--muted)">—</span>';
      var tipoBadge  = pTipo  ? '<span class="badge ' + _tipoOrcamentoBadgeCls(pTipo) + '" style="font-size:10px">' + pTipo + '</span>' : '<span style="color:var(--muted)">—</span>';
      var prodBadge  = pProd !== '—' ? '<span class="badge bm" style="font-size:10px">' + pProd + '</span>' : '<span style="color:var(--muted)">—</span>';
-     // Pedido explícito: economizar altura — em vez de campo próprio
-     // "Alterado por" (rótulo + avatar + nome, ocupando uma célula/linha
-     // inteira do grid), só o avatar aparece agora, encostado no cabeçalho
-     // do card ao lado do título — nome completo ainda acessível via
-     // title="" (tooltip nativo, já embutido em _userAvatarHTML).
-     // _userAvatarByName (avatar-helpers.js, mesmo helper do avatar de
-     // Responsável) mostra a FOTO real quando o usuário tem uma cadastrada
-     // (avatar_url) e só cai pras iniciais/prata quando não tem — antes
-     // essa distinção não existia aqui (era sempre iniciais).
-     var atuAvatar = pAtu && typeof _userAvatarByName === 'function' ? _userAvatarByName(pAtu, 22) : '';
+     // Pedido explícito: tirar "Alterado por último" do card resumido
+     // (nome/avatar) daqui de dentro do detalhamento de Obra — essa
+     // informação passa a viver só no detalhamento do próprio Projeto
+     // (aberto ao clicar no card, _spOpenEntityById('projetos', p.id)).
      // onclick no card inteiro, mesmo padrão de entregaCards/_spOpenEntityById.
      return '<div class="sp-item-card" onclick="_spOpenEntityById(\'projetos\',\'' + p.id + '\')">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
       + '<div class="sp-item-title" style="margin-bottom:0">' + (p.nome || '(sem nome)') + '</div>'
-      + '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
-      + (pCompl ? '<span class="badge ' + (complCls[pCompl]||'bm') + '" style="font-size:9px">' + pCompl + '</span>' : '')
-      + atuAvatar
-      + '</div>'
+      + (pCompl ? '<span class="badge ' + (complCls[pCompl]||'bm') + '" style="font-size:9px;flex-shrink:0">' + pCompl + '</span>' : '')
       + '</div>'
       // 5 colunas fixas (só os campos de dados — "Alterado por" saiu do
       // grid) cabem numa linha só, mesmo espírito de altura do card de
