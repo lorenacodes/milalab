@@ -1647,7 +1647,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div class="sp-field"><div class="sp-label">Nome *</div><input class="sp-inp" id="sp-new-emp-nome" placeholder="Razão social"></div>'
   + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-new-emp-cnpj" value="' + _empCnpjMaskValue('') + '" oninput="_empCnpjMask(this)"></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
-  + '<div class="sp-field"><div class="sp-label">Estado *</div><select class="sp-inp" id="sp-new-emp-uf">' + _spEmpOptSelect(EMPRESA_ESTADO_OPCOES, '') + '</select></div>'
+  // Pedido explícito: Estado aqui era um <select> nativo sem busca — vira o
+  // mesmo componente de busca+single-select já usado em todo o resto do
+  // sistema (searchable-select.js), igual ao Estado do próprio painel de
+  // Empresa. Kind próprio ('spNeEstado') pra não colidir com outras
+  // instâncias abertas ao mesmo tempo.
+  + (function(){ _srchSelRegister('spNeEstado', { options: EMPRESA_ESTADO_OPCOES, placeholder: 'Selecione o estado...' }); return ''; })()
+  + '<div class="sp-field"><div class="sp-label">Estado *</div>' + _srchSelMarkup('spNeEstado', 'sp-new-emp-uf', '') + '</div>'
   + '<div class="sp-field"><div class="sp-label">Fase do Ciclo de Vida</div><select class="sp-inp" id="sp-new-emp-fase">' + _spEmpOptSelect(EMPRESA_FASE_OPCOES, '') + '</select></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   // Mesmo componente de chips coloridos já usado em openNovaEmpresa()
