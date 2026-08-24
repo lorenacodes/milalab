@@ -1966,7 +1966,32 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
         + '</div>')
      : '<div class="sp-empty" style="margin-bottom:14px">Vincule um projeto a esta obra para poder registrar fotos.</div>')
   + '<div id="sp-registros-lista"><div class="sp-empty"><div style="font-size:11px;color:var(--muted)">Carregando...</div></div></div>'
-  + '</div>'; // fim spt-panel registros
+  + '</div>' // fim spt-panel registros
+
+  // ── SEÇÃO: Auditoria — pedido explícito: Obra não tinha essa seção (só
+  // Empresa/Projeto tinham). criado_por/ultima_alteracao_por existiam como
+  // coluna mas NENHUM trigger os mantinha (nem a RPC de criação, nem
+  // _spSaveObraFull gravavam) — anexado agora o mesmo trigger
+  // set_audit_fields() já usado em Empresa (trg_obras_set_audit), então só
+  // fica confiável em obras criadas/editadas a partir de agora.
+  + '<div style="margin-top:24px;border-top:1px solid var(--border);padding-top:12px">'
+  + '<div style="font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;opacity:.85">Auditoria</div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">'+(o.criado_por||'—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de criação</span><span class="drw-audit-val">'+(o.created_at ? new Date(o.created_at).toLocaleDateString('pt-BR') : '—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">'+(o.ultima_alteracao_por||'—')+'</span></div>'
+  + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de última alteração</span><span class="drw-audit-val">'+(o.updated_at ? new Date(o.updated_at).toLocaleString('pt-BR') : '—')+'</span></div>'
+  + '</div>'
+
+  // ── SEÇÃO: Histórico de alterações — lê audit_log (tabela já existente,
+  // trg_obras_audit grava dados_anteriores/dados_novos em TODO INSERT/
+  // UPDATE/DELETE de `obras`, não precisou de nada novo no banco). Cada
+  // alteração mostra campo/valor anterior/valor novo, pedido explícito.
+  // audit_log só é legível por admin (policy admins_select_audit_log) —
+  // pra outros usuários a seção mostra um aviso em vez de aparentar que
+  // nunca houve alteração nenhuma.
+  + '<div class="sp-stitle">Histórico de alterações</div>'
+  + '<div id="sp-obra-historico"><div class="sp-empty"><div style="font-size:11px;color:var(--muted)">Carregando...</div></div></div>'
+  ; // fim do html
 
  // Sem botão "Salvar" — pedido explícito: qualquer alteração no formulário
  // já salva sozinha (ver _obraScheduleAutoSave/_spSaveObraFull), mesmo
@@ -1987,6 +2012,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  _spCarregarPropostaStatus(o.id);
  _spCarregarDocumentos(o.id);
  _spCarregarRegistros(o.id, projetos);
+ _spCarregarHistoricoObra(o.id);
  _sptInitScrollSpy();
 
  if (mostrarPropostaSolar) _spCheckSolarBtn();
@@ -1998,6 +2024,72 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
    '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
   );
  }
+}
+
+// ── Histórico de alterações (audit_log) ───────────────────────────────────────
+// audit_log já existia (trg_obras_audit grava dados_anteriores/dados_novos em
+// TODO INSERT/UPDATE/DELETE de `obras`) — só nunca tinha UI. Rótulos amigáveis
+// pra quem já é reconhecível; campos técnicos/de auditoria (null aqui) são
+// ignorados no diff pra não poluir com ruído tipo "updated_at mudou".
+var _OBRA_CAMPO_LABEL = {
+ nome: 'Nome', tipo_obra: 'Tipo(s) de obra', etapa_negocio: 'Etapa do Negócio',
+ cidade: 'Cidade', estado: 'Estado', canal_vendas: 'Canal de vendas',
+ quantidade: 'Quantidade', valor: 'Valor', endereco_entrega: 'Endereço de entrega',
+ data_criacao: 'Data do orçamento', data_envio_proposta: 'Data envio da proposta',
+ motivo_perdido: 'Motivo perdido', empresa_id: 'Empresa vinculada',
+ updated_at: null, ultima_alteracao_por: null, created_at: null, criado_por: null, id: null,
+};
+function _spHistFmtVal(v) {
+ if (v == null || v === '') return '—';
+ if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
+ if (typeof v === 'object') return JSON.stringify(v);
+ return String(v);
+}
+function _spHistoricoItemHTML(row) {
+ var dt = new Date(row.created_at);
+ var dtFmt = dt.toLocaleDateString('pt-BR') + ' às ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+ var opLabel = { INSERT: 'Criação', UPDATE: 'Alteração', DELETE: 'Exclusão' }[row.operacao] || row.operacao;
+ var diffsHtml = '';
+ if (row.operacao === 'UPDATE' && row.dados_anteriores && row.dados_novos) {
+  var before = row.dados_anteriores, after = row.dados_novos;
+  var changed = Object.keys(after).filter(function(k) {
+   if (_OBRA_CAMPO_LABEL[k] === null) return false;
+   return JSON.stringify(before[k]) !== JSON.stringify(after[k]);
+  });
+  if (changed.length) {
+   diffsHtml = '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">'
+    + changed.map(function(k) {
+       var label = _OBRA_CAMPO_LABEL[k] || k;
+       return '<div style="font-size:11px"><b>' + label + ':</b> '
+        + '<span style="color:var(--red);text-decoration:line-through">' + _spHistFmtVal(before[k]) + '</span>'
+        + ' → <span style="color:var(--green)">' + _spHistFmtVal(after[k]) + '</span></div>';
+      }).join('')
+    + '</div>';
+  }
+ }
+ return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface)">'
+  + '<div style="display:flex;align-items:center;justify-content:space-between">'
+  + '<span style="font-size:11px;font-weight:700;color:var(--text)">' + opLabel + '</span>'
+  + '<span style="font-size:10px;color:var(--muted)">' + dtFmt + '</span>'
+  + '</div>'
+  + '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + (row.usuario_email || '—') + '</div>'
+  + diffsHtml
+  + '</div>';
+}
+async function _spCarregarHistoricoObra(obraId) {
+ var container = document.getElementById('sp-obra-historico');
+ if (!container || !_sb) return;
+ var isAdmin = !!(_currentUser && _currentUser.isAdmin);
+ var res = await _sb.from('audit_log').select('*').eq('tabela', 'obras').eq('registro_id', obraId).order('created_at', { ascending: false }).limit(50);
+ if (res.error) { container.innerHTML = '<div class="sp-empty" style="color:var(--red)">Erro ao carregar histórico.</div>'; return; }
+ var rows = res.data || [];
+ if (!rows.length) {
+  container.innerHTML = isAdmin
+   ? '<div class="sp-empty">Nenhuma alteração registrada ainda.</div>'
+   : '<div class="sp-empty">Histórico de alterações visível apenas para administradores.</div>';
+  return;
+ }
+ container.innerHTML = rows.map(_spHistoricoItemHTML).join('');
 }
 
 // Resumo de "Proposta Comercial" na Visão Geral — mesma checagem de tipo

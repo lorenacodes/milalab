@@ -144,6 +144,10 @@ async function openNovaObra() {
  _noEmpresaIds = [];
  _noContatoIds = [];
  _noProjLista = [];
+ _noProjExistentesSel = [];
+ _noProjExistentesCache = null;
+ var neBox = document.getElementById('no-proj-existente-box'); if (neBox) neBox.style.display = 'none';
+ var neChips = document.getElementById('no-proj-existente-chips'); if (neChips) neChips.innerHTML = '';
 
  var nomeEl = document.getElementById('no-nome'); if (nomeEl) nomeEl.value = '';
  ['no-nc-nome','no-nc-email'].forEach(function(id){
@@ -690,7 +694,10 @@ function _noWizardValidate() {
   if (!(document.getElementById('no-canal')?.value || '').trim()) { _showToast('Informe o canal de vendas', 'aviso'); return false; }
  }
  if (_noStep === 4) {
-  if (!_noProjLista.length) { _showToast('Adicione ao menos um projeto — é obrigatório', 'aviso'); return false; }
+  // "Ao menos 1 projeto" conta tanto os criados aqui (_noProjLista) quanto
+  // os já existentes vinculados (_noProjExistentesSel) — pedido explícito
+  // de permitir vincular um projeto sem obra em vez de sempre criar um novo.
+  if (!_noProjLista.length && !_noProjExistentesSel.length) { _showToast('Adicione ou vincule ao menos um projeto — é obrigatório', 'aviso'); return false; }
   for (var i = 0; i < _noProjLista.length; i++) {
    var p = _noProjLista[i];
    var faltando = [];
@@ -751,6 +758,19 @@ async function submitNovaObra() {
   if (rpcRes.error) { _showToast('Erro ao criar obra: ' + _supaErrPt(rpcRes.error.message), 'erro'); return; }
   var obraId = rpcRes.data.obra_id;
   var projetoIds = rpcRes.data.projeto_ids || [];
+
+  // Vincula projetos EXISTENTES escolhidos no passo 4 (_noProjExistentesSel)
+  // — fora da RPC de propósito: criar_obra_completa só sabe INSERIR projetos
+  // novos, vincular é só um UPDATE simples de obra_id num projeto que já
+  // existe (sem obra, garantido pelo filtro `is('obra_id', null)` da busca).
+  if (_noProjExistentesSel.length) {
+   var linkRes = await _sb.from('projetos').update({ obra_id: obraId })
+    .in('id', _noProjExistentesSel.map(function(p){ return p.id; }));
+   if (linkRes.error) {
+    console.error('[Wizard] erro ao vincular projeto(s) existente(s):', linkRes.error);
+    _showToast('Obra criada, mas houve erro ao vincular projeto(s) existente(s): ' + _supaErrPt(linkRes.error.message), 'erro');
+   }
+  }
 
   // Documentos opcionais (passo 3)
   var docsMap = [
@@ -875,6 +895,70 @@ function _noProjAdd() {
 }
 function _noProjRemove(idx) { _noProjLista.splice(idx, 1); _noProjRender(); }
 function _noProjSet(idx, field, val) { _noProjLista[idx][field] = val; if (field === 'tipoObra') _noProjRender(); }
+
+// ── Vincular projeto EXISTENTE (sem obra) à obra sendo criada ────────────────
+// Pedido explícito: até agora só dava pra CRIAR projetos novos junto da obra
+// (_noProjLista/_noProjAdd) — não tinha jeito de pegar um projeto já
+// cadastrado e vinculá-lo à obra nova. `projetos.obra_id` é FK única (não é
+// N:N), então só projetos SEM obra (obra_id IS NULL — existem por causa do
+// ON DELETE SET NULL quando uma obra é excluída, ver _spExcluirObra) podem
+// ser vinculados aqui; um projeto que já pertence a outra obra não aparece
+// na busca (mudar isso teria que RETIRAR o projeto da obra atual dele, o
+// que não foi pedido). O vínculo de verdade só acontece em submitNovaObra,
+// depois que a obra é criada e o id existe.
+var _noProjExistentesSel = []; // [{id, nome}]
+var _noProjExistentesCache = null; // cache da lista de órfãos (recarrega só ao abrir a busca)
+function _noProjExistenteToggle() {
+ var box = document.getElementById('no-proj-existente-box');
+ if (!box) return;
+ var abrir = box.style.display === 'none';
+ box.style.display = abrir ? 'block' : 'none';
+ if (abrir) {
+  var busca = document.getElementById('no-proj-existente-busca');
+  if (busca) busca.value = '';
+  _noProjExistentesCache = null;
+  _noProjExistenteFiltrar('');
+ }
+}
+async function _noProjExistenteFiltrar(q) {
+ var resEl = document.getElementById('no-proj-existente-resultados');
+ if (!resEl) return;
+ if (!_noProjExistentesCache) {
+  resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Buscando...</div>';
+  var r = await _sb.from('projetos').select('id,nome,tipo_orcamento').is('obra_id', null).order('nome');
+  _noProjExistentesCache = r.data || [];
+ }
+ var jaSel = _noProjExistentesSel.map(function(p){ return p.id; });
+ var qn = (q || '').toLowerCase().trim();
+ var lista = _noProjExistentesCache.filter(function(p) {
+  return jaSel.indexOf(p.id) === -1 && (!qn || (p.nome||'').toLowerCase().indexOf(qn) !== -1);
+ });
+ if (!lista.length) { resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Nenhum projeto sem obra encontrado.</div>'; return; }
+ resEl.innerHTML = lista.slice(0, 30).map(function(p) {
+  var nomeSafe = (p.nome||'(sem nome)').replace(/'/g,"\\'");
+  return '<div onclick="_noProjExistenteAdd(\''+p.id+'\',\''+nomeSafe+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'var(--surface)\'" onmouseout="this.style.background=\'\'">'
+   + '<span>' + (p.nome||'(sem nome)').replace(/</g,'&lt;') + '</span>'
+   + (p.tipo_orcamento ? '<span style="font-size:10px;color:var(--muted)">' + p.tipo_orcamento + '</span>' : '')
+   + '</div>';
+ }).join('');
+}
+function _noProjExistenteAdd(id, nome) {
+ _noProjExistentesSel.push({ id: id, nome: nome });
+ _noProjExistenteChipsRender();
+ _noProjExistenteFiltrar(document.getElementById('no-proj-existente-busca')?.value || '');
+}
+function _noProjExistenteRemove(id) {
+ _noProjExistentesSel = _noProjExistentesSel.filter(function(p){ return p.id !== id; });
+ _noProjExistenteChipsRender();
+}
+function _noProjExistenteChipsRender() {
+ var wrap = document.getElementById('no-proj-existente-chips');
+ if (!wrap) return;
+ wrap.innerHTML = _noProjExistentesSel.map(function(p) {
+  return '<span class="badge bm" style="display:inline-flex;align-items:center;gap:5px;font-size:11px">' + (p.nome||'').replace(/</g,'&lt;')
+   + '<button type="button" onclick="_noProjExistenteRemove(\''+p.id+'\')" style="background:none;border:none;cursor:pointer;padding:0;line-height:1;color:inherit;opacity:.65;font-size:12px">×</button></span>';
+ }).join('');
+}
 // Valor unit.: mesmo padrão de Fornecedor (empresas.js, "Valor unitário" de
 // Produtos orçados) — máscara de digitação (_moedaMascarar) + valor
 // numérico real guardado à parte (_moedaParaNumero) pra não misturar o
@@ -1042,7 +1126,9 @@ function _noProjRender() {
  if (!container) return;
 
  if (!_noProjLista.length) {
-  container.innerHTML = '<div style="padding:16px;border:1px dashed var(--border);border-radius:8px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6">Nenhum projeto adicionado ainda.<br>É obrigatório ao menos 1 projeto para criar a obra.</div>';
+  container.innerHTML = _noProjExistentesSel.length
+   ? ''
+   : '<div style="padding:16px;border:1px dashed var(--border);border-radius:8px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6">Nenhum projeto adicionado ainda.<br>É obrigatório ao menos 1 projeto (novo ou vinculado) para criar a obra.</div>';
   return;
  }
 
