@@ -291,13 +291,72 @@ function _projAuditNome(email) {
 }
 
 var _spProjAtivo = null; // projeto atualmente aberto no painel (autosave/recalc lêem daqui)
+var _projTipoOpcoesAtuais = []; // tipo(s) de obra da Obra vinculada — restringe as opções do pill-select de Tipo
+
+// Tipo de obra do projeto — pills coloridas clicáveis (seleção única),
+// mesmo padrão/cor já usado em Tipo(s) de obra (_NO_TIPO_COR,
+// wizard-nova-obra.js) e nos sub-forms "+ Adicionar projeto" de Obra/
+// Entrega (obras.js/entregas.js) — pedido explícito: editável aqui
+// também, restrito aos tipos já marcados pra Obra vinculada.
+function _projTipoPillsHTML(opcoes, tipoAtual) {
+ if (!opcoes.length) return '<span style="color:var(--muted);font-size:12px">Vincule uma obra pra escolher o tipo.</span>';
+ return opcoes.map(function(t) {
+  var sel = t === tipoAtual;
+  var cor = (typeof _NO_TIPO_COR !== 'undefined' && _NO_TIPO_COR[t]) || 'var(--navy)';
+  return '<button type="button" onclick="_projTipoToggle(\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + cor + ';background:' + (sel?cor:'transparent') + ';color:' + (sel?'#fff':cor) + '">' + t + '</button>';
+ }).join('');
+}
+function _projTipoToggle(t) {
+ if (!_spProjAtivo) return;
+ _spProjAtivo.tipo_orcamento = t;
+ var pillsEl = document.getElementById('sp-proj-tipo-pills');
+ if (pillsEl) pillsEl.innerHTML = _projTipoPillsHTML(_projTipoOpcoesAtuais, t);
+ // Produto disponível depende do tipo (_noProdutosDisponiveis) — refaz o
+ // multiselect com as opções certas quando o tipo muda, mesmo espírito do
+ // wizard (_noProjRender re-renderiza produto ao trocar tipo do card).
+ var prodDd = document.getElementById('sp-proj-produto-dd');
+ if (prodDd && typeof _noProdutosDisponiveis === 'function') {
+  var produtoAtual = Array.isArray(_spProjAtivo.produto) ? _spProjAtivo.produto : [];
+  prodDd.innerHTML = _msRenderDropdown('projProduto', _noProdutosDisponiveis(t).map(function(pr){return pr.nome;}), produtoAtual, '_projProdutoToggle', 'Selecione o(s) produto(s)...');
+ }
+ _projScheduleAutoSave();
+}
+
+// Produto — multi-select com busca (_msRenderDropdown, mesmo componente já
+// usado no resto do sistema pra Produto/Tipologia), pedido explícito de
+// manter esse comportamento (não virar single-select).
+function _projProdutoToggle(campo, valor, checked) {
+ if (!_spProjAtivo) return;
+ var arr = Array.isArray(_spProjAtivo.produto) ? _spProjAtivo.produto.slice() : [];
+ _spProjAtivo.produto = _msToggle(arr, valor, checked);
+ var prodDd = document.getElementById('sp-proj-produto-dd');
+ if (prodDd) prodDd.innerHTML = _msRenderDropdown('projProduto', _noProdutosDisponiveis(_spProjAtivo.tipo_orcamento).map(function(pr){return pr.nome;}), _spProjAtivo.produto, '_projProdutoToggle', 'Selecione o(s) produto(s)...');
+ if (typeof _noReabrirDropdown === 'function') _noReabrirDropdown('sp-proj-produto-dd');
+ _projScheduleAutoSave();
+}
+
+// Desvincular obra — remove só o vínculo (obra_id = null), não apaga a
+// obra nem o projeto. Pedido explícito: projeto continua íntegro e
+// disponível pra vincular em outra obra depois (mesma mecânica de "sem
+// obra" já usada pelo buscador de projeto existente no wizard,
+// _noProjExistenteFiltrar — filtra por obra_id IS NULL).
+async function _projDesvincularObra() {
+ if (!_spProjAtivo || !_sb) return;
+ if (!confirm('Desvincular este projeto da obra atual?\n\nO projeto não será excluído — só deixa de estar associado a esta obra, podendo ser vinculado a outra depois.')) return;
+ var res = await _sb.from('projetos').update({ obra_id: null }).eq('id', _spProjAtivo.id);
+ if (res.error) { _showToast('Erro ao desvincular: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ _spProjAtivo.obra_id = null;
+ var cacheIdx = (_projetosArr||[]).findIndex(function(x){ return String(x.id) === String(_spProjAtivo.id); });
+ if (cacheIdx !== -1) _projetosArr[cacheIdx].obra_id = null;
+ _showToast('Projeto desvinculado da obra.', 'ok');
+ _spProjetoRender(_spProjAtivo, -1);
+}
 
 function _spProjetoRender(p, idx) {
  _spProjAtivo = p;
  var obraInfo = p.obra_id ? (_obraIdMap[p.obra_id] || {}) : {};
  var obraNome = obraInfo.nome || '—';
  var tipo   = p.tipo_orcamento || '';
- var prod   = Array.isArray(p.produto) ? (p.produto[0] || '') : (p.produto || '');
  var qtd    = p.quantidade != null ? Number(p.quantidade) : null;
  var vU     = p.valor_unitario != null ? Number(p.valor_unitario) : null;
  var vT     = (vU != null && qtd != null) ? vU * qtd : vU;
@@ -312,8 +371,7 @@ function _spProjetoRender(p, idx) {
  var pesoTotalAtual = p.peso_kg != null ? Number(p.peso_kg) : null;
  var pesoUnitAtual  = (pesoTotalAtual != null && qtd) ? pesoTotalAtual / qtd : pesoTotalAtual;
 
- var tipoPill = tipo ? '<span class="badge ' + (_projTipoCls[tipo]||'bm') + '" style="font-size:11px">' + tipo + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>';
- var prodPill = prod ? '<span class="badge bm" style="font-size:11px">' + prod + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>';
+ var produtoAtual = Array.isArray(p.produto) ? p.produto.slice() : (p.produto ? [p.produto] : []);
 
  // Etapa do projeto — mesmo componente de busca+single-select já usado em
  // Etapa do Negócio (obras.js, kind 'etapa') e em qualquer outro campo de
@@ -330,10 +388,15 @@ function _spProjetoRender(p, idx) {
   <div class="sp-field"><div class="sp-label">Nome do projeto</div>
    <input class="sp-inp" id="sp-proj-nome" style="text-transform:uppercase" value="${(p.nome||'').replace(/"/g,'&quot;')}" oninput="_upperCaseInput(this);_projScheduleAutoSave()"></div>
   <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Tipo</div><div style="margin-top:4px">${tipoPill}</div></div>
-   <div class="sp-field"><div class="sp-label">Produto</div><div style="margin-top:4px">${prodPill}</div></div>
+   <div class="sp-field"><div class="sp-label">Tipo</div><div id="sp-proj-tipo-pills" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${_projTipoPillsHTML([tipo].filter(Boolean), tipo)}</div></div>
+   <div class="sp-field"><div class="sp-label">Produto</div><div id="sp-proj-produto-dd" class="no-msel-wide" style="margin-top:4px">${_msRenderDropdown('projProduto', _noProdutosDisponiveis(tipo).map(function(pr){return pr.nome;}), produtoAtual, '_projProdutoToggle', 'Selecione o(s) produto(s)...')}</div></div>
   </div>
-  <div class="sp-field"><div class="sp-label">Obra vinculada</div><div id="sp-proj-obra-chip" class="sp-rel-chips-wrap"></div></div>
+  <div class="sp-field"><div class="sp-label">Obra vinculada</div>
+   <div style="display:flex;align-items:center;gap:8px">
+    <div id="sp-proj-obra-chip" class="sp-rel-chips-wrap" style="flex:1"></div>
+    ${p.obra_id ? '<button type=\"button\" class=\"btn btn-ghost\" style=\"padding:4px 10px;font-size:11px;flex-shrink:0\" onclick=\"_projDesvincularObra()\">Desvincular</button>' : ''}
+   </div>
+  </div>
   <div class="sp-field"><div class="sp-label">Etapa do projeto</div>${_srchSelMarkup('projEtapa', 'sp-proj-etapa', etapaAtual)}</div>
 
   <div class="sp-stitle">Informações técnicas</div>
@@ -402,14 +465,34 @@ function _spProjetoRender(p, idx) {
  // no Airtable eram um rollup automático vindo da Obra. Decisão confirmada
  // com a usuária (AskUserQuestion): mostrar só leitura, lidas da Obra
  // vinculada, sem criar coluna nova em `projetos`.
+ // Tipo(s) de obra da Obra vinculada também vem junto nessa mesma consulta
+ // — pedido explícito: o Tipo do projeto só pode ser um dos tipos já
+ // marcados pra obra (mesma regra já aplicada no wizard/"+Adicionar
+ // projeto" de Obra/Entrega), então as opções do pill-select dependem do
+ // que a Obra tem — só dá pra saber depois de buscar.
  (function() {
   var cidEl = document.getElementById('sp-proj-cidade');
   var estEl = document.getElementById('sp-proj-estado');
   if (!cidEl || !estEl) return;
-  if (!p.obra_id || !_sb) { cidEl.value = '—'; estEl.value = '—'; return; }
-  _sb.from('obras').select('cidade,estado').eq('id', p.obra_id).single().then(function(res) {
+  if (!p.obra_id || !_sb) {
+   cidEl.value = '—'; estEl.value = '—';
+   _projTipoOpcoesAtuais = [];
+   var pillsElVazio = document.getElementById('sp-proj-tipo-pills');
+   if (pillsElVazio) pillsElVazio.innerHTML = _projTipoPillsHTML(_NO_TIPOS_OPCOES || [], p.tipo_orcamento || '');
+   return;
+  }
+  _sb.from('obras').select('cidade,estado,tipo_obra').eq('id', p.obra_id).single().then(function(res) {
    cidEl.value = (res.data && res.data.cidade) || '—';
    estEl.value = (res.data && res.data.estado) || '—';
+   var opcoes = (res.data && res.data.tipo_obra) || [];
+   _projTipoOpcoesAtuais = opcoes;
+   // Se o tipo atual do projeto não é mais um dos tipos da obra (obra
+   // teve o(s) tipo(s) alterado(s) depois), reseta em vez de deixar o
+   // card preso num valor que não aparece mais nos botões — mesma regra
+   // do wizard (_noProjRender).
+   if (p.tipo_orcamento && opcoes.indexOf(p.tipo_orcamento) === -1) { p.tipo_orcamento = ''; _projScheduleAutoSave(); }
+   var pillsEl = document.getElementById('sp-proj-tipo-pills');
+   if (pillsEl) pillsEl.innerHTML = _projTipoPillsHTML(opcoes, p.tipo_orcamento || '');
   });
  })();
 
@@ -498,6 +581,12 @@ async function _spSaveProjetoFull() {
  var pUnit = parseFloat(document.getElementById('sp-proj-pesouni')?.value) || null;
  var payload = {
   nome: (document.getElementById('sp-proj-nome')?.value || '').toUpperCase(),
+  // Tipo/Produto mudam via clique nos pills/multiselect (_projTipoToggle/
+  // _projProdutoToggle), que já mutam _spProjAtivo direto — não tem
+  // <input>/<select> nativo pra ler aqui, mesmo espírito de Tipo(s) de
+  // obra no detalhamento de Obra (obras.js lê de _obraAtiva, não do DOM).
+  tipo_orcamento: (_spProjAtivo && _spProjAtivo.tipo_orcamento) || null,
+  produto: (_spProjAtivo && Array.isArray(_spProjAtivo.produto) && _spProjAtivo.produto.length) ? _spProjAtivo.produto : null,
   etapa_projeto: document.getElementById('sp-proj-etapa')?.value || null,
   quantidade: qtd,
   valor_unitario: vUnit,
