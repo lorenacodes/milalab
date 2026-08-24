@@ -297,20 +297,29 @@ document.addEventListener('keydown', e => {
 
 /* OBRAS FILTER — Airtable style */
 
-// "Sim"/"Não" — atalho pros vários campos de presença (ART, Cálculo
-// Estrutural, tem Projeto/Entrega/Instalação/Tarefa vinculado, etc.), todos
-// gravados como dataset 'sim'/'nao' (ver _obrasExtraDatasetAttrs em
-// obras.js).
-var _OBRAS_SIM_NAO = ['Sim', 'Não'];
-// Bug real encontrado: campos de presença (Sim/Não) sempre têm um valor
-// gravado (nunca uma string vazia de verdade — ver _obrasExtraDatasetAttrs,
-// obras.js), então "está vazio"/"não está vazio" (padrão de FB_OPS.select)
-// nunca fazem sentido aqui — "está vazio" nunca bate com nada, "não está
-// vazio" bate com tudo. A usuária tentou achar as 335 obras sem projeto
-// usando "Projeto" + "está vazio" (parecia a opção óbvia) e não achou
-// nenhuma — o jeito certo é "é" + "Não", que já funcionava. Restringe os
-// operadores desses campos a só é/não é, pra não repetir a confusão.
-var _OBRAS_SIM_NAO_OPS = [['eq','é'],['neq','não é']];
+// Campos de presença (ART, Cálculo Estrutural, tem Projeto/Entrega/
+// Instalação/Tarefa/Registro vinculado, Proposta comercial) — pedido
+// explícito: NENHUM filtro de sim/não deve usar valores "Sim"/"Não" pra
+// escolher, EXCETO campos que são checkbox de verdade (nenhum dos de baixo
+// é — todos são presença DERIVADA de outra tabela, não uma coluna booleana
+// marcável em `obras`). Esses viram só "está vazio" (não tem)/"não está
+// vazio" (tem), sem exigir escolher um valor — matchValue interpreta os
+// dois operadores direto em cima do dataset 'Sim'/'Não' já gravado por
+// _obrasExtraDatasetAttrs (obras.js), sem precisar mudar esse dataset.
+// Bug real encontrado antes desta rodada: com type:'select' + opts Sim/Não,
+// "está vazio"/"não está vazio" (padrão de FB_OPS.select) nunca faziam
+// sentido — o dataset sempre tem um valor ("Sim" ou "Não", nunca string
+// vazia de verdade), então "está vazio" nunca batia com nada. Trocado por
+// esses operadores dedicados, que têm o significado certo desde já.
+var _OBRAS_PRESENCA_OPS = [['empty','está vazio'],['nempty','não está vazio']];
+function _obrasPresencaMatchValue(datasetKey) {
+ return function(item, operator) {
+  var temValor = item[datasetKey] === 'Sim';
+  if (operator === 'empty')  return !temValor;
+  if (operator === 'nempty') return temValor;
+  return true;
+ };
+}
 
 // Campos disponíveis para filtro — pedido explícito: lista bem maior que a
 // original (só tipo/etapa/estado/empresa/cidade/dataEnvio), cobrindo campos
@@ -344,21 +353,21 @@ var _obrasCampos = {
  'criadoPor': { label: 'Criado por', type: 'text' },
  'updatedAt': { label: 'Horário da última alteração', type: 'date' },
  'contato': { label: 'Contato da Obra', type: 'text' },
- 'proposta': { label: 'Proposta comercial', type: 'select', opts: _OBRAS_SIM_NAO, ops: _OBRAS_SIM_NAO_OPS },
- 'art': { label: 'ART', type: 'select', opts: _OBRAS_SIM_NAO, ops: _OBRAS_SIM_NAO_OPS },
- 'calculo': { label: 'Cálculo Estrutural', type: 'select', opts: _OBRAS_SIM_NAO, ops: _OBRAS_SIM_NAO_OPS },
+ 'proposta': { label: 'Proposta comercial', type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('proposta') },
+ 'art': { label: 'ART', type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('art') },
+ 'calculo': { label: 'Cálculo Estrutural', type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('calculo') },
  // Presença (tem pelo menos 1 vinculado) — "Projeto"/"Entrega"/"Instalação"/
  // "Tarefa" da lista pedida; os detalhes de cada um continuam só dentro do
  // detalhamento da própria Obra (ver seções Projetos/Entregas/Instalação/
- // Tarefas no painel), aqui é só "tem ou não tem".
- 'temProjeto': { label: 'Projeto', type: 'select', opts: _OBRAS_SIM_NAO, ops: _OBRAS_SIM_NAO_OPS },
- 'temEntrega': { label: 'Entrega', type: 'select', opts: _OBRAS_SIM_NAO, ops: _OBRAS_SIM_NAO_OPS },
- 'temInstalacao': { label: 'Instalação', type: 'select', opts: _OBRAS_SIM_NAO, ops: _OBRAS_SIM_NAO_OPS },
- 'temTarefa': { label: 'Tarefa', type: 'select', opts: _OBRAS_SIM_NAO, ops: _OBRAS_SIM_NAO_OPS },
+ // Tarefas no painel), aqui é só "está vazio" (não tem)/"não está vazio" (tem).
+ 'temProjeto': { label: 'Projeto', type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('temProjeto') },
+ 'temEntrega': { label: 'Entrega', type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('temEntrega') },
+ 'temInstalacao': { label: 'Instalação', type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('temInstalacao') },
+ 'temTarefa': { label: 'Tarefa', type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('temTarefa') },
  // "Registro" = tem ao menos 1 foto (documentos.tipo='fotos_obra') em
  // algum Projeto vinculado à obra — ver aba "Registros" do painel de Obra
  // e _obrasCarregarRegistrosPresenca em obras.js.
- 'temRegistro': { label: 'Registro', type: 'select', opts: _OBRAS_SIM_NAO, ops: _OBRAS_SIM_NAO_OPS },
+ 'temRegistro': { label: 'Registro', type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('temRegistro') },
  // Agregados de Projetos (soma de todos os projetos vinculados à obra)
  'projQtd': { label: 'Quantidade Total (Projetos)', type: 'text' },
  'projValor': { label: 'Valor Total da Obra (Projetos)', type: 'text' },
