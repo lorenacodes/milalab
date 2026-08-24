@@ -1575,7 +1575,13 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // ── SEÇÃO: Visão Geral ───────────────────────────────────────────────────────
   + '<div class="spt-panel" id="spt-geral">'
 
-  + '<div class="sp-stitle" style="margin-top:0">Identificação</div>'
+  // Pedido explícito: "Identificação" ficava colado na barra de abas
+  // (.spt-bar já tem margin-bottom:18px próprio, mas via style inline
+  // margin-top:0 aqui zerava a folga extra que o .sp-stitle normal teria
+  // — 16px a mais só neste título específico, sem tocar no .sp-stitle
+  // global (usado em todas as outras seções do sistema, que não devem
+  // mudar de espaçamento).
+  + '<div class="sp-stitle" style="margin-top:16px">Identificação</div>'
   + '<div class="sp-field"><div class="sp-label">Nome da obra</div>'
   + '<input class="sp-inp" id="sp-nome" style="text-transform:uppercase" value="' + (o.nome||'').replace(/"/g,'&quot;') + '" placeholder="Nome da obra..." oninput="_upperCaseInput(this);_obraScheduleAutoSave()"></div>'
 
