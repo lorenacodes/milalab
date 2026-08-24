@@ -1632,7 +1632,12 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div class="sp-field"><div class="sp-label">Endereço de Entrega</div><input class="sp-inp" id="sp-end-entrega" value="' + (o.endereco_entrega||'') + '" placeholder="Rua, nº, cidade..." oninput="_obraScheduleAutoSave()"></div>'
 
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-obra-quantidade" type="number" min="0" placeholder="—" value="' + (o.quantidade != null ? o.quantidade : '') + '" oninput="_obraScheduleAutoSave()"></div>'
+  // Pedido explícito: "Quantidade" deixa de ser digitável — vira 100%
+  // automática, soma da Quantidade de todos os Projetos vinculados (mesmo
+  // totalQtd já calculado acima pro rodapé da aba Projetos), mesmo espírito
+  // do "Valor da obra" (também automático agora). Vale só aqui no MilaLab —
+  // não reflete de volta no Airtable, que continua com o valor histórico dele.
+  + '<div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-obra-quantidade" type="text" value="' + totalQtd + '" readonly title="Automático — soma da quantidade de todos os projetos vinculados"></div>'
   // Pedido explícito: "Valor da obra" deixa de ser digitável — vira 100%
   // automático, soma do Valor total (valor_unitario × quantidade) de
   // todos os Projetos vinculados (mesmo totalValor já calculado acima
@@ -2191,7 +2196,11 @@ async function _spSaveObraFull() {
   cidade:            document.getElementById('sp-cidade')?.value || '',
   estado:            document.getElementById('sp-uf')?.value?.toUpperCase() || '',
   canal_vendas:      document.getElementById('sp-canal')?.value || null,
-  quantidade:        document.getElementById('sp-obra-quantidade')?.value !== '' ? Number(document.getElementById('sp-obra-quantidade')?.value) : null,
+  // "Quantidade" não é mais lida do <input> (virou readonly, mesmo pedido
+  // de "Valor da obra") — sempre recalculada como a soma da quantidade de
+  // cada projeto vinculado, mesma fórmula do totalQtd exibido no rodapé
+  // da aba Projetos.
+  quantidade: (_obraAtiva.projetos || []).reduce(function(s, p){ return s + (Number(p.quantidade) || 0); }, 0),
   // "Valor da obra" não é mais lido do <input> (virou readonly, pedido
   // explícito) — sempre recalculado como a soma do valor total
   // (valor_unitario × quantidade) de cada projeto vinculado, mesma
