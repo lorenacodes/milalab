@@ -1087,7 +1087,17 @@ td{font-size:13px}
    ativa. A barra fica sticky no topo do .sp-body pra continuar
    funcionando como navegação enquanto o usuário rola (mesmo truque de
    margin negativa de antes, só que agora "grudada" em vez de estática). */
-.spt-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin:-18px -18px 18px;padding:0 18px;background:var(--surface);flex-shrink:0;overflow-x:auto;position:sticky;top:0;z-index:5}
+/* isolation+will-change: pedido explícito — durante o scroll real (mouse
+   wheel/trackpad, não replicável só lendo getBoundingClientRect), o
+   conteúdo logo abaixo (rótulo "Nome da obra") vazava por cima da barra
+   por uma fração de segundo antes dela se "recolocar". Causa: #sp-drawer
+   (ancestral) tem `transform` pro slide-in/out — o mesmo tipo de problema
+   já corrigido antes pros dropdowns position:fixed (_srchSelFixedContainingBlock),
+   só que aqui afeta o repaint de um position:sticky em vez do
+   posicionamento. isolation:isolate + will-change:transform força a
+   barra pra sua própria camada de composição, eliminando o lag de
+   repaint sem mudar layout/espaçamento nenhum. */
+.spt-bar{display:flex;gap:0;border-bottom:2px solid var(--border);margin:-18px -18px 18px;padding:0 18px;background:var(--surface);flex-shrink:0;overflow-x:auto;position:sticky;top:0;z-index:5;isolation:isolate;will-change:transform}
 /* padding/fonte reduzidos (eram 14px/12px) — com a 7ª aba (Registros)
    somada às 6 originais + badges de contagem, o total media ~709px de
    largura natural contra ~615px disponíveis no painel em sua largura
