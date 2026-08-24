@@ -1633,7 +1633,14 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
 
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-obra-quantidade" type="number" min="0" placeholder="—" value="' + (o.quantidade != null ? o.quantidade : '') + '" oninput="_obraScheduleAutoSave()"></div>'
-  + '<div class="sp-field"><div class="sp-label">Valor da obra</div><input class="sp-inp" id="sp-obra-valor" type="text" placeholder="R$ 0,00" value="' + (o.valor != null ? Number(o.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '') + '" onfocus="_spValorFocus(this)" onblur="_spValorBlur(this)" oninput="_obraScheduleAutoSave()"></div>'
+  // Pedido explícito: "Valor da obra" deixa de ser digitável — vira 100%
+  // automático, soma do Valor total (valor_unitario × quantidade) de
+  // todos os Projetos vinculados (mesmo totalValor já calculado acima
+  // pro rodapé da aba Projetos). Antes vinha só do Airtable (editável,
+  // podia ficar dessincronizado da soma real dos projetos); agora é
+  // sempre recalculado a cada render e persistido automaticamente em
+  // _spSaveObraFull, sem depender do usuário digitar nem do valor antigo.
+  + '<div class="sp-field"><div class="sp-label">Valor da obra</div><input class="sp-inp" id="sp-obra-valor" type="text" value="' + fmtMoeda(totalValor) + '" readonly title="Automático — soma do valor total de todos os projetos vinculados"></div>'
   + '</div>'
 
   + '<div class="sp-stitle">Empresa(s) & Contato</div>'
@@ -2185,7 +2192,11 @@ async function _spSaveObraFull() {
   estado:            document.getElementById('sp-uf')?.value?.toUpperCase() || '',
   canal_vendas:      document.getElementById('sp-canal')?.value || null,
   quantidade:        document.getElementById('sp-obra-quantidade')?.value !== '' ? Number(document.getElementById('sp-obra-quantidade')?.value) : null,
-  valor:             (function(){ var v=(document.getElementById('sp-obra-valor')?.value||'').trim(); if(!v)return null; var n=parseFloat(v.replace(/\./g,'').replace(',','.')); return isNaN(n)?null:n; })(),
+  // "Valor da obra" não é mais lido do <input> (virou readonly, pedido
+  // explícito) — sempre recalculado como a soma do valor total
+  // (valor_unitario × quantidade) de cada projeto vinculado, mesma
+  // fórmula do totalValor exibido no rodapé da aba Projetos.
+  valor: (_obraAtiva.projetos || []).reduce(function(s, p){ return s + (Number(p.valor_unitario) * Number(p.quantidade || 1) || 0); }, 0),
   endereco_entrega:  document.getElementById('sp-end-entrega')?.value?.trim() || null,
   updated_at:        new Date().toISOString(),
  };
