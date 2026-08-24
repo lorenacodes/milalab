@@ -146,6 +146,7 @@ async function openNovaObra() {
  _noProjLista = [];
  _noProjExistentesSel = [];
  _noProjExistentesCache = null;
+ _noContatoEmailPendentes = {};
  var neBox = document.getElementById('no-proj-existente-box'); if (neBox) neBox.style.display = 'none';
  var neChips = document.getElementById('no-proj-existente-chips'); if (neChips) neChips.innerHTML = '';
 
@@ -429,6 +430,16 @@ document.addEventListener('click', function(e) {
 // selecionadas (mesma regra de sempre: sem empresa, não tem a quem
 // associar o contato).
 var _noContatoDropdownOpen = false;
+// E-mail obrigatório em qualquer contato associado à obra (pedido explícito)
+// — contatos JÁ EXISTENTES sem e-mail cadastrado (_contatosArr, carregado de
+// `contatos` antes desta rodada não exigir e-mail) precisam de um campo
+// extra aqui no wizard antes de poderem seguir. _noContatoEmailPendentes
+// guarda o que foi digitado (por id) até ser persistido em `contatos.email`
+// (_noWizardValidate, passo 1) — mesmo e-mail passa a valer daqui pra
+// frente, não é só um valor usado nesta obra.
+var _EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+var _noContatoEmailPendentes = {};
+function _noContatoEmailPendenteSet(id, val) { _noContatoEmailPendentes[id] = (val || '').trim(); }
 function _noContatoDropdownToggle(forceOpen) {
  if (!_noEmpresaIds.length) { if (forceOpen !== false) _showToast('Selecione uma empresa primeiro', 'aviso'); return; }
  var open = typeof forceOpen === 'boolean' ? forceOpen : !_noContatoDropdownOpen;
@@ -470,11 +481,18 @@ function _noContatoFilterRender() {
  if (!lista.length) { el.innerHTML = '<div class="no-dd-empty">Nenhum contato encontrado' + (q ? ' para "' + q + '"' : '') + '.</div>'; return; }
  el.innerHTML = lista.map(function(c){
   var checked = _noContatoIds.indexOf(c.id) >= 0;
+  // Contato marcado, mas sem e-mail cadastrado — campo obrigatório inline
+  // (pedido explícito), preso ao próprio checkbox pra não passar
+  // despercebido. Some assim que o contato tem e-mail (novo ou já salvo).
+  var precisaEmail = checked && !c.email;
   return '<label class="no-check-row">'
    + '<input type="checkbox" ' + (checked?'checked':'') + ' onchange="_noContatoToggle(\'' + c.id + '\')">'
    + '<span class="no-check-row-main"><span class="no-check-row-title">' + c.nome_completo + '</span>'
    + (c.cargo ? '<span class="no-check-row-sub">' + c.cargo + '</span>' : '') + '</span>'
-   + '</label>';
+   + '</label>'
+   + (precisaEmail
+      ? '<input type="email" class="sp-inp" placeholder="E-mail obrigatório — este contato ainda não tem um cadastrado" style="margin:2px 0 6px 26px;width:calc(100% - 26px);font-size:11px;border-color:var(--red)" value="' + (_noContatoEmailPendentes[c.id] || '') + '" oninput="_noContatoEmailPendenteSet(\'' + c.id + '\',this.value)">'
+      : '');
  }).join('');
 }
 function _noContatoToggle(id) {
@@ -499,9 +517,13 @@ async function _noSalvarNovoContato() {
   _showToast('Telefone é obrigatório — informe DDD + número (10 ou 11 dígitos).', 'aviso');
   return;
  }
+ // E-mail obrigatório (pedido explícito) — mesma regra vale pra contato já
+ // existente sem e-mail (ver _noContatoFilterRender/_noWizardValidate).
+ var emailNovo = (document.getElementById('no-nc-email')?.value || '').trim();
+ if (!_EMAIL_RE.test(emailNovo)) { _showToast('E-mail é obrigatório — informe um e-mail válido.', 'aviso'); return; }
  var res = await _sb.from('contatos').insert({
   nome_completo: nome,
-  email: document.getElementById('no-nc-email')?.value?.trim() || null,
+  email: emailNovo,
   telefone: _cttTelMaskValue(telDigits),
   cargo: document.getElementById('no-nc-cargo')?.value || null,
  }).select('id,nome_completo,cargo').single();
@@ -667,8 +689,8 @@ function _noWizardGo(step) {
  if (step < _noStep) { _noStep = step; _noWizardRender(); }
 }
 
-function _noWizardNext() {
- if (!_noWizardValidate()) return;
+async function _noWizardNext() {
+ if (!(await _noWizardValidate())) return;
  if (_noStep < 4) { _noStep++; _noWizardRender(); }
 }
 
@@ -676,7 +698,7 @@ function _noWizardBack() {
  if (_noStep > 1) { _noStep--; _noWizardRender(); }
 }
 
-function _noWizardValidate() {
+async function _noWizardValidate() {
  if (_noStep === 1) {
   var nome = (document.getElementById('no-nome')?.value || '').trim();
   if (!nome) { _showToast('Informe o nome da obra', 'aviso'); return false; }
@@ -687,6 +709,31 @@ function _noWizardValidate() {
   // Empresa(s): sem contato nenhum, a obra fica sem ninguém pra falar do
   // orçamento.
   if (!_noContatoIds.length) { _showToast('Selecione ao menos um contato', 'aviso'); return false; }
+  // E-mail obrigatório pra qualquer contato associado à obra (pedido
+  // explícito) — cobre tanto o contato recém-criado (_noSalvarNovoContato
+  // já valida isso no insert) quanto um contato JÁ EXISTENTE que nunca
+  // teve e-mail cadastrado (_noContatoFilterRender mostra um campo inline
+  // "E-mail obrigatório" pra esses casos — ver _noContatoEmailPendentes).
+  for (var ceI = 0; ceI < _noContatoIds.length; ceI++) {
+   var cEmailChk = (_contatosArr || []).find(function(x){ return x.id === _noContatoIds[ceI]; });
+   if (cEmailChk && !cEmailChk.email && !_EMAIL_RE.test(_noContatoEmailPendentes[cEmailChk.id] || '')) {
+    _showToast('Informe um e-mail válido para "' + (cEmailChk.nome_completo||'o contato') + '" — é obrigatório', 'aviso');
+    _noContatoDropdownToggle(true);
+    return false;
+   }
+  }
+  // Persiste os e-mails digitados agora — passa a valer pro contato daqui
+  // pra frente (cadastro real em `contatos`), não só pra esta obra.
+  for (var ceS = 0; ceS < _noContatoIds.length; ceS++) {
+   var cEmailSave = (_contatosArr || []).find(function(x){ return x.id === _noContatoIds[ceS]; });
+   var pendente = cEmailSave && _noContatoEmailPendentes[cEmailSave.id];
+   if (cEmailSave && !cEmailSave.email && pendente) {
+    var upd = await _sb.from('contatos').update({ email: pendente }).eq('id', cEmailSave.id);
+    if (upd.error) { console.error('[Wizard] erro ao salvar e-mail do contato:', upd.error); continue; }
+    cEmailSave.email = pendente;
+    delete _noContatoEmailPendentes[cEmailSave.id];
+   }
+  }
  }
  if (_noStep === 2) {
   if (!document.getElementById('no-estado')?.value) { _showToast('Selecione o estado', 'aviso'); return false; }
@@ -715,7 +762,7 @@ function _noWizardValidate() {
 }
 
 async function submitNovaObra() {
- if (!_noWizardValidate()) return;
+ if (!(await _noWizardValidate())) return;
 
  // Nome sempre em CAIXA ALTA (pedido explícito) — o campo já força isso
  // enquanto digita (_upperCaseInput), .toUpperCase() aqui é só a garantia
