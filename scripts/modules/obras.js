@@ -2978,9 +2978,22 @@ function _obrasOptionsFromDom(datasetKey) {
  return Object.keys(set).sort(function(a, b){ return a.localeCompare(b, 'pt-BR'); });
 }
 
+// Bug real encontrado: esta função montava um objeto NOVO só com
+// {key,label,type,options} — qualquer propriedade extra adicionada depois
+// em _obrasCampos (app.js), como `ops` (operadores restritos) e
+// `matchValue` (hook de comparação customizada, usado pelos campos de
+// presença "está vazio"/"não está vazio"), era silenciosamente descartada
+// aqui. O filtro rodava com um field "incompleto" — sem matchValue nenhum,
+// _fbEvalCondition caía no fallback de texto puro (comparando "Não" com
+// string vazia), por isso "Projeto está vazio" sempre dava 0 resultados
+// mesmo com a lógica de _obrasPresencaMatchValue certa. Object.assign copia
+// TUDO de _obrasCampos[k] automaticamente — evita essa classe de bug se
+// mais propriedades forem adicionadas no futuro.
 var _obrasFbFields = Object.keys(_obrasCampos).map(function(k) {
  var c = _obrasCampos[k];
- return { key: k, label: c.label, type: c.type, options: c.opts || [] };
+ var f = Object.assign({}, c, { key: k, options: c.opts || [] });
+ delete f.opts;
+ return f;
 });
 _fbInit('obras', _obrasFbFields, _obrasApplyFilters);
 
