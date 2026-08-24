@@ -116,17 +116,23 @@ body.light .dash-panel{
  .avatar{width:30px;height:30px;background:var(--silver-grad);border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--silver-ink);overflow:hidden;position:relative;flex-shrink:0}
  .avatar img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:50%}
  /* MAIN */
- /* min-width:0 + overflow-x:hidden — pedido explícito: o Kanban de Obras
-    (.kanban-obras, já tem overflow-x:auto próprio) tinha colunas de sobra
-    largas o bastante pra estourar a viewport; sem isso aqui, um item flex
-    (.main, dentro do body flex) não encolhe abaixo do tamanho intrínseco
-    do conteúdo (min-width:auto é o padrão de flex item) — o overflow
-    escapava pra fora de .main e virava scroll HORIZONTAL DA PÁGINA
-    inteira, arrastando topbar/toolbar/seletor Kanban-Tabela junto (mesmo
-    sendo sticky verticalmente, sticky não trava a posição horizontal).
-    Com isso, o overflow fica contido dentro do Kanban, que já tem seu
-    próprio scroll — topbar/toolbar nunca mais saem da tela. */
- .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;overflow-x:hidden;transition:margin-left .22s cubic-bezier(.4,0,.2,1);background:transparent}
+ /* min-width:0 — pedido explícito: o Kanban de Obras (.kanban-obras, já
+    tem overflow-x:auto próprio) tinha colunas de sobra largas o bastante
+    pra estourar a viewport; sem isso aqui, um item flex (.main, dentro do
+    body flex) não encolhe abaixo do tamanho intrínseco do conteúdo
+    (min-width:auto é o padrão de flex item) — o overflow escapava pra
+    fora de .main e virava scroll HORIZONTAL DA PÁGINA inteira, arrastando
+    topbar/toolbar/seletor Kanban-Tabela junto.
+    NÃO usar overflow-x:hidden aqui (tentativa anterior, revertida) — bug
+    real encontrado: por spec, se overflow-x deixa de ser "visible",
+    overflow-y COMPUTA PRA "auto" sozinho, mesmo sem ser declarado. Isso
+    transformava .main num contêiner de scroll VERTICAL próprio, quebrando
+    o position:sticky da .topbar em qualquer página com rolagem vertical
+    (ex.: Obras em Tabela) — a topbar parava de acompanhar o scroll.
+    min-width:0 sozinho resolve as duas coisas: deixa o item flex encolher
+    (Kanban passa a rolar só dentro de si mesmo) sem tocar em overflow-y,
+    então o scroll vertical da página continua exatamente como era antes. */
+ .main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;transition:margin-left .22s cubic-bezier(.4,0,.2,1);background:transparent}
  /* Páginas .page-flex (ex: Gestor de Tarefas) precisam de um teto de altura real
     pra que só a grade role e a toolbar fique fixa (item 8 do pedido). Sem isso,
     .main só tem min-height:100vh — cresce com o conteúdo, o documento inteiro
