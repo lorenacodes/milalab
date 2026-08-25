@@ -2626,7 +2626,7 @@ async function _instExistenteFiltrar(q) {
   // todos os instalacao_id já vinculados e filtra fora em memória.
   var linkedRes = await _sb.from('obras_instalacoes').select('instalacao_id');
   var linkedIds = new Set((linkedRes.data || []).map(function(l){ return l.instalacao_id; }));
-  var r = await _sb.from('instalacoes').select('id,tipo_servico,funil,data_inicio').order('created_at', { ascending: false });
+  var r = await _sb.from('instalacoes').select('id,numero,tipo_servico,funil,data_inicio').order('created_at', { ascending: false });
   _instExistentesCache = (r.data || []).filter(function(i){ return !linkedIds.has(i.id); });
  }
  var qn = (q || '').toLowerCase().trim();
@@ -2635,8 +2635,12 @@ async function _instExistenteFiltrar(q) {
  });
  if (!lista.length) { resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Nenhuma instalação sem obra encontrada.</div>'; return; }
  resEl.innerHTML = lista.slice(0, 30).map(function(i) {
+  // Mesma fórmula de nomenclatura usada em todo o resto do sistema
+  // (numero - tipo_servico - obra); aqui a instalação ainda não tem
+  // obra vinculada, então essa parte fica "(sem obra)".
+  var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - (sem obra)';
   return '<div onclick="_instExistenteVincular(\''+i.id+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'var(--surface)\'" onmouseout="this.style.background=\'\'">'
-   + '<span>' + (i.tipo_servico || '(sem tipo)') + '</span>'
+   + '<span>' + instNome + '</span>'
    + (i.funil ? '<span style="font-size:10px;color:var(--muted)">' + i.funil + '</span>' : '')
    + '</div>';
  }).join('');
