@@ -2703,7 +2703,12 @@ async function _instExistenteFiltrar(q) {
   }).join('');
  } catch (err) {
   console.error('[Obras] erro ao buscar instalações:', err);
-  resEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:6px 0">Erro ao buscar instalações: ' + _supaErrPt((err && err.message) || 'tente novamente') + '</div>';
+  // Mostra o detalhe técnico cru (em vez do texto genérico de _supaErrPt)
+  // só nesta busca específica — ainda em diagnóstico de um bug real que
+  // já travou essa tela sem dar nenhuma pista; assim que resolvido, isso
+  // pode voltar a usar _supaErrPt como todo o resto do sistema.
+  var detalhe = (err && (err.message || err.details || err.hint)) || 'erro desconhecido';
+  resEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:6px 0">Erro ao buscar instalações: ' + detalhe.replace(/</g,'&lt;') + '</div>';
  }
 }
 async function _instExistenteVincular(id) {
