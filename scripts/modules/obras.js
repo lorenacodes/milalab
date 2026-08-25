@@ -1240,11 +1240,14 @@ async function _spDownloadProposta(propostaId) {
  setTimeout(function(){ var m = document.getElementById('proposta-modal'); if (m) { var b = m.querySelector('button[onclick*="print"]'); if (b) b.click(); } }, 800);
 }
 
-async function _spAbrirDocStorage(path, nomeArquivo, bucket) {
+async function _spAbrirDocStorage(path, nomeArquivo, bucket, docId, obraId, classificacaoAtual) {
  if (!_dbOk) { _showToast('Banco de dados offline', 'erro'); return; }
  if (!path) { _showToast('Caminho do arquivo não encontrado', 'erro'); return; }
- // Mostrar modal com loading
- _spDocPdfModal(null, nomeArquivo || 'Documento');
+ // Mostrar modal com loading — docId/obraId opcionais (só as chamadas vindas
+ // de _spCarregarPropostaStatus passam) ligam o controle de classificação
+ // oficial/complemento dentro do próprio modal; chamadas de documento
+ // genérico (entregas.js/projetos.js/aba Documentos) continuam sem isso.
+ _spDocPdfModal(null, nomeArquivo || 'Documento', docId, obraId, classificacaoAtual);
  try {
   var res = await _sb.storage.from(bucket || 'documentos_obras').createSignedUrl(path, 3600);
   if (res.error) {
@@ -1261,12 +1264,23 @@ async function _spAbrirDocStorage(path, nomeArquivo, bucket) {
  }
 }
 
-function _spDocPdfModal(url, nome) {
+function _spDocPdfModal(url, nome, docId, obraId, classificacaoAtual) {
  var existing = document.getElementById('doc-pdf-modal');
  if (existing) existing.remove();
  var modal = document.createElement('div');
  modal.id = 'doc-pdf-modal';
  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:4000;display:flex;flex-direction:column;align-items:center;justify-content:center';
+ // Controle de classificação (oficial/complemento) — só aparece quando o
+ // modal foi aberto a partir da lista de Propostas Comerciais
+ // (_spCarregarPropostaStatus passa docId/obraId; qualquer outro chamador
+ // de _spAbrirDocStorage, ex. documento genérico, deixa em branco).
+ var classRow = docId
+  ? '<div id="doc-pdf-class-row" style="display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--border);flex-shrink:0;font-size:11px;flex-wrap:wrap">'
+    + '<span style="color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0">Classificação</span>'
+    + _spDocPdfClassBtnHTML('oficial', docId, obraId, classificacaoAtual)
+    + _spDocPdfClassBtnHTML('complemento', docId, obraId, classificacaoAtual)
+    + '</div>'
+  : '';
  modal.innerHTML =
   '<div style="background:var(--surface);border-radius:12px;width:min(860px,96vw);height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.4);overflow:hidden">'
   + '<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0">'
@@ -1274,12 +1288,41 @@ function _spDocPdfModal(url, nome) {
   + '<a id="doc-pdf-dl-btn" style="display:none;font-size:11px;font-weight:600;padding:6px 14px;border:none;border-radius:6px;background:var(--navy);color:#fff;cursor:pointer;text-decoration:none;white-space:nowrap;align-items:center;gap:5px" download><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M8 2v9M4 8l4 4 4-4"/><path d="M2 14h12"/></svg>Baixar</a>'
   + '<button onclick="document.getElementById(\'doc-pdf-modal\').remove()" style="background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--muted);padding:0 4px;flex-shrink:0">×</button>'
   + '</div>'
+  + classRow
   + '<div id="doc-pdf-modal-body" style="flex:1;display:flex;align-items:center;justify-content:center;background:#f0f0f0">'
   + '<div style="text-align:center;color:#888"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="1.5" style="margin-bottom:8px;animation:spin 1s linear infinite"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg><div style="font-size:12px">Carregando...</div></div>'
   + '</div>'
   + '</div>';
  document.body.appendChild(modal);
  modal.addEventListener('click', function(e){ if (e.target === modal) modal.remove(); });
+}
+
+// Botão de classificação (oficial/complemento) dentro do modal de PDF —
+// estilo "toggle": destacado (cor cheia) quando é a classificação atual,
+// contorno neutro quando não é.
+function _spDocPdfClassBtnHTML(valor, docId, obraId, classificacaoAtual) {
+ var ativo = classificacaoAtual === valor;
+ var rotulo = valor === 'oficial' ? 'Versão mais recente/oficial' : 'Complemento';
+ var cor = valor === 'oficial' ? 'var(--green)' : 'var(--muted)';
+ var style = ativo
+  ? 'background:' + cor + ';color:#fff;border:1px solid ' + cor
+  : 'background:transparent;color:' + cor + ';border:1px solid var(--border)';
+ return '<button type="button" data-classval="' + valor + '" onclick="event.stopPropagation();_spSetClassificacaoProposta(\'' + docId + '\',\'' + obraId + '\',\'' + valor + '\')" style="' + style + ';padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer">' + rotulo + '</button>';
+}
+
+// Depois de reclassificar, atualiza os 2 botões do modal já aberto sem
+// precisar recarregar o PDF (o iframe re-renderizaria do zero à toa).
+function _spDocPdfModalSetClassificacao(classificacao) {
+ var row = document.getElementById('doc-pdf-class-row');
+ if (!row) return;
+ row.querySelectorAll('button[data-classval]').forEach(function(btn){
+  var valor = btn.getAttribute('data-classval');
+  var ativo = valor === classificacao;
+  var cor = valor === 'oficial' ? 'var(--green)' : 'var(--muted)';
+  btn.style.cssText += ativo
+   ? ';background:' + cor + ';color:#fff;border:1px solid ' + cor
+   : ';background:transparent;color:' + cor + ';border:1px solid var(--border)';
+ });
 }
 
 function _spDocPdfModalUrl(url, nome) {
@@ -1665,13 +1708,16 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<input class="sp-inp" id="sp-data-proposta" type="date" value="' + (o.data_envio_proposta ? String(o.data_envio_proposta).substring(0,10) : '') + '" onchange="_obraScheduleAutoSave()"></div>'
   + '</div>'
 
-  // Proposta Comercial não é um campo de texto (é um documento anexado, ver
-  // aba Documentos/_spCarregarDocumentos) — aqui é só um resumo de status +
-  // atalho, populado depois via _spCarregarPropostaStatus (a busca real fica
-  // fora do render síncrono do painel, mesmo esquema do "Verificando..."
-  // de #sp-propostas-lista acima).
+  // Proposta Comercial não é um campo de texto (é documento anexado, ver
+  // aba Documentos/_spCarregarDocumentos) — pedido explícito: uma obra pode
+  // ter mais de 1 proposta (versão oficial + complementos), então em vez de
+  // só um resumo "N anexada(s)" + atalho pra outra aba, mostra a lista real
+  // aqui mesmo, com classificação e clique-pra-pré-visualizar. Populado
+  // depois via _spCarregarPropostaStatus (fora do render síncrono do
+  // painel, mesmo esquema do "Verificando..." de #sp-propostas-lista, que é
+  // a lista da aba Documentos — id diferente aqui pra não colidir).
   + '<div class="sp-field"><div class="sp-label">Proposta Comercial</div>'
-  + '<div id="sp-proposta-status" style="display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13px;color:var(--muted)">Verificando...</div></div>'
+  + '<div id="sp-vg-propostas-lista" style="padding:4px 0;font-size:12px;color:var(--muted)">Verificando...</div></div>'
 
   + '<div class="sp-g3">'
   + '<div class="sp-field"><div class="sp-label">Cidade</div>' + _srchSelMarkup('cidade', 'sp-cidade', o.cidade || '') + '</div>'
@@ -2211,24 +2257,62 @@ async function _spCarregarHistoricoObra(obraId) {
  container.innerHTML = rows.map(_spHistoricoItemHTML).join('');
 }
 
-// Resumo de "Proposta Comercial" na Visão Geral — mesma checagem de tipo
+// Lista de "Proposta Comercial" na Visão Geral — pedido explícito: uma obra
+// pode ter mais de 1 proposta (versão oficial + complementos), então em vez
+// do resumo antigo ("N anexada(s)" + atalho pra aba Documentos), mostra
+// cada proposta aqui mesmo — nome, classificação, clique abre
+// pré-visualização (mesmo modal de PDF já usado no resto do sistema,
+// _spAbrirDocStorage/_spDocPdfModal). Mesma checagem de tipo
 // (case-insensitive, cobre "Proposta Comercial" do Airtable e
 // "proposta_comercial" do upload manual) usada em _obrasCarregarPropostaMap
-// pra grid, só que aqui é 1 obra só. "Ver em Documentos" pula pra aba real
-// (_sptSwitch já dispara _spCarregarDocumentos sozinho).
+// pra grid, só que aqui é 1 obra só. "Pendente Upload" (sem arquivo real)
+// fica fora — não tem o que pré-visualizar.
 async function _spCarregarPropostaStatus(obraId) {
- var el = document.getElementById('sp-proposta-status');
+ var el = document.getElementById('sp-vg-propostas-lista');
  if (!el || !obraId) return;
- var res = await _sb.from('documentos').select('id', { count: 'exact', head: true }).eq('obra_id', obraId).ilike('tipo', '%proposta%comercial%');
+ var res = await _sb.from('documentos')
+  .select('id,nome_arquivo,caminho_storage,status,classificacao_proposta,created_at')
+  .eq('obra_id', obraId).ilike('tipo', '%proposta%comercial%')
+  .order('created_at', { ascending: false });
  if (res.error) { el.textContent = 'Erro ao verificar.'; return; }
- var n = res.count || 0;
- if (!n) {
-  el.innerHTML = '<span>Nenhuma proposta anexada.</span>'
-   + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_sptSwitch(\'documentos\', document.querySelector(&quot;.spt-btn[onclick*=documentos]&quot;))">Anexar em Documentos</button>';
- } else {
-  el.innerHTML = '<span class="nt-tag nt-tag-green">' + n + ' anexada' + (n !== 1 ? 's' : '') + '</span>'
-   + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_sptSwitch(\'documentos\', document.querySelector(&quot;.spt-btn[onclick*=documentos]&quot;))">Ver em Documentos</button>';
+ var docs = (res.data || []).filter(function(d){ return d.caminho_storage && d.status !== 'Pendente Upload'; });
+ if (!docs.length) {
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:4px 0;font-size:13px">'
+   + '<span>Nenhuma proposta anexada.</span>'
+   + '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_sptSwitch(\'documentos\', document.querySelector(&quot;.spt-btn[onclick*=documentos]&quot;))">Anexar em Documentos</button>'
+   + '</div>';
+  return;
  }
+ el.innerHTML = docs.map(function(d){
+  var classe = d.classificacao_proposta === 'oficial' ? 'bg' : (d.classificacao_proposta === 'complemento' ? 'bm' : 'bo');
+  var rotulo = d.classificacao_proposta === 'oficial' ? 'Oficial' : (d.classificacao_proposta === 'complemento' ? 'Complemento' : 'Sem classificação');
+  var pathSafe = (d.caminho_storage||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var nomeSafe = (d.nome_arquivo||'Proposta').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return '<div onclick="_spAbrirDocStorage(\''+pathSafe+'\',\''+nomeSafe+'\',\'documentos_obras\',\''+d.id+'\',\''+obraId+'\',\''+(d.classificacao_proposta||'')+'\')" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:5px;cursor:pointer" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">'
+   + '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--muted)" stroke-width="1.6" style="flex-shrink:0"><path d="M4 1.5h6l3 3v9a1 1 0 01-1 1H4a1 1 0 01-1-1v-11a1 1 0 011-1z"/><path d="M9.5 1.5V5h3.5"/></svg>'
+   + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text)">' + (d.nome_arquivo || 'Proposta') + '</span>'
+   + '<span class="badge ' + classe + '" style="font-size:9px;flex-shrink:0">' + rotulo + '</span>'
+   + '</div>';
+ }).join('');
+}
+
+// Classificação de Proposta Comercial (oficial/complemento) — pedido
+// explícito. Só 1 "oficial" por obra faz sentido de negócio (é a versão que
+// vale), então marcar uma como oficial rebaixa automaticamente qualquer
+// outra que já fosse oficial nessa mesma obra pra complemento — nenhuma
+// proposta é apagada ou escondida, só muda de rótulo.
+async function _spSetClassificacaoProposta(docId, obraId, classificacao) {
+ if (!docId || !classificacao) return;
+ if (classificacao === 'oficial') {
+  var demoteRes = await _sb.from('documentos').update({ classificacao_proposta: 'complemento' })
+   .eq('obra_id', obraId).eq('classificacao_proposta', 'oficial').neq('id', docId);
+  if (demoteRes.error) console.error('[Obras] erro ao rebaixar proposta oficial anterior:', demoteRes.error);
+ }
+ var res = await _sb.from('documentos').update({ classificacao_proposta: classificacao }).eq('id', docId);
+ if (res.error) { _showToast('Erro ao classificar: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ _showToast('Proposta classificada como ' + (classificacao === 'oficial' ? 'oficial' : 'complemento') + '.', 'ok');
+ _spDocPdfModalSetClassificacao(classificacao);
+ _spCarregarPropostaStatus(obraId);
 }
 
 function _spValorFocus(el) {
