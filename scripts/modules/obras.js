@@ -2786,8 +2786,19 @@ async function _spCriarInstalacao() {
  // Vincula a esta Obra — obras_instalacoes é N:N de verdade (decisão
  // confirmada com a usuária: Instalação pode ter várias Obras, igual ao
  // Airtable) — instalacoes.obra_id não é mais usado pra novos registros.
+ // Achado real: com esse erro só logado no console (sem desfazer nada), uma
+ // falha aqui (rede/RLS) deixava a instalação já criada mas SEM NENHUMA
+ // obra vinculada — órfã, mesmo tendo sido criada de dentro do
+ // detalhamento de uma obra específica (achado: 19 instalações órfãs no
+ // banco vinham exatamente desse tipo de falha silenciosa). Agora desfaz a
+ // criação (apaga a instalação) e avisa a usuária em vez de deixar órfã.
  const obraLinkRes = await _sb.from('obras_instalacoes').insert({ obra_id: _obraAtiva.id, instalacao_id: instRow.id });
- if (obraLinkRes.error) console.error('[Obras] erro ao vincular instalação à obra:', obraLinkRes.error);
+ if (obraLinkRes.error) {
+  console.error('[Obras] erro ao vincular instalação à obra:', obraLinkRes.error);
+  await _sb.from('instalacoes').delete().eq('id', instRow.id);
+  alert('Erro ao vincular a instalação à obra — a instalação não foi criada. Tente novamente: ' + _supaErrPt(obraLinkRes.error.message));
+  return;
+ }
  // Vincula a(s) equipe(s) selecionada(s) — junção instalacoes_equipe, sem
  // colunas extras (só instalacao_id/equipe_id).
  if (_instEquipeSel.length && instRow && instRow.id) {
