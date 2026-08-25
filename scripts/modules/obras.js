@@ -1924,11 +1924,11 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      })()
   + '<div id="sp-nova-instalacao-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">'
   + '<div class="sp-g2" style="gap:8px">'
-  + '<div class="sp-field"><div class="sp-label">Tipo de serviço</div>' + _srchSelMarkup('instTipoServico', 'sp-new-inst-tipo', '') + '</div>'
-  + '<div class="sp-field"><div class="sp-label">Status</div>' + _srchSelMarkup('instStatus', 'sp-new-inst-funil', 'A programar') + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Tipo de serviço <span class="req">*</span></div>' + _srchSelMarkup('instTipoServico', 'sp-new-inst-tipo', '') + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Status <span class="req">*</span></div>' + _srchSelMarkup('instStatus', 'sp-new-inst-funil', 'A programar') + '</div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
-  + '<div class="sp-field"><div class="sp-label">Data início</div><input class="sp-inp" id="sp-new-inst-inicio" type="date"></div>'
-  + '<div class="sp-field"><div class="sp-label">Data fim</div><input class="sp-inp" id="sp-new-inst-fim" type="date"></div>'
+  + '<div class="sp-field"><div class="sp-label">Data início <span class="req">*</span></div><input class="sp-inp" id="sp-new-inst-inicio" type="date"></div>'
+  + '<div class="sp-field"><div class="sp-label">Data fim <span class="req">*</span></div><input class="sp-inp" id="sp-new-inst-fim" type="date"></div>'
   // "Valor total gasto" removido (pedido explícito) — campo não usado na
   // criação de instalação por aqui.
   // Equipe de Instalação — pedido explícito: campo que faltava. N:N de
@@ -1937,7 +1937,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // (_msRenderDropdown, mesmo componente do resto do sistema) em vez de
   // single-select. Lista vem de `equipe_instalacao` (carregada uma vez,
   // cache simples — mesmo espírito de _cidadeCache).
-  + '<div class="sp-field" style="margin-top:8px"><div class="sp-label">Equipe de Instalação</div><div id="sp-new-inst-equipe-dd" class="no-msel-wide">' + _instEquipeDropdownHTML([]) + '</div></div>'
+  + '<div class="sp-field" style="margin-top:8px"><div class="sp-label">Equipe de Instalação <span class="req">*</span></div><div id="sp-new-inst-equipe-dd" class="no-msel-wide">' + _instEquipeDropdownHTML([]) + '</div></div>'
   + '<div class="sp-field" style="margin-top:8px"><div class="sp-label">Detalhes</div>'
   // Textarea expansível (pedido explícito) — cresce sozinha conforme
   // digita (reset de height antes de reler scrollHeight, senão só cresce
@@ -2604,12 +2604,27 @@ function _spToggleNovaInstalacao() {
 }
 async function _spCriarInstalacao() {
  if (!_obraAtiva || !_obraAtiva.id) return;
+ // Obrigatórios (pedido explícito): Tipo de serviço, Status, Data início,
+ // Data fim e Equipe de Instalação — antes só Tipo/Status/datas existiam
+ // e nenhum era exigido; Equipe é o campo novo desta rodada, já nasce
+ // obrigatório junto.
+ const tipoServico = document.getElementById('sp-new-inst-tipo')?.value || '';
+ const status = document.getElementById('sp-new-inst-funil')?.value || '';
+ const dataInicio = document.getElementById('sp-new-inst-inicio')?.value || '';
+ const dataFim = document.getElementById('sp-new-inst-fim')?.value || '';
+ var faltando = [];
+ if (!tipoServico) faltando.push('Tipo de serviço');
+ if (!status) faltando.push('Status');
+ if (!dataInicio) faltando.push('Data início');
+ if (!dataFim) faltando.push('Data fim');
+ if (!_instEquipeSel.length) faltando.push('Equipe de Instalação');
+ if (faltando.length) { _showToast('Preencha: ' + faltando.join(', '), 'aviso'); return; }
  const payload = {
   obra_id: _obraAtiva.id,
-  tipo_servico: document.getElementById('sp-new-inst-tipo')?.value || null,
-  funil: document.getElementById('sp-new-inst-funil')?.value || null,
-  data_inicio: document.getElementById('sp-new-inst-inicio')?.value || null,
-  data_fim: document.getElementById('sp-new-inst-fim')?.value || null,
+  tipo_servico: tipoServico,
+  funil: status,
+  data_inicio: dataInicio,
+  data_fim: dataFim,
   detalhes: document.getElementById('sp-new-inst-detalhes')?.value?.trim() || null,
  };
  const { data: instRow, error } = await _sb.from('instalacoes').insert(payload).select('id').single();
