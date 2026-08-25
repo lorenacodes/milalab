@@ -1929,16 +1929,15 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">Data início</div><input class="sp-inp" id="sp-new-inst-inicio" type="date"></div>'
   + '<div class="sp-field"><div class="sp-label">Data fim</div><input class="sp-inp" id="sp-new-inst-fim" type="date"></div>'
-  + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
-  + '<div class="sp-field"><div class="sp-label">Valor total gasto</div><input class="sp-inp" id="sp-new-inst-valor" type="number" min="0" placeholder="0"></div>'
+  // "Valor total gasto" removido (pedido explícito) — campo não usado na
+  // criação de instalação por aqui.
   // Equipe de Instalação — pedido explícito: campo que faltava. N:N de
   // verdade no banco (instalacoes_equipe, sem colunas extras — uma
   // instalação pode ter mais de uma equipe), por isso multi-select
   // (_msRenderDropdown, mesmo componente do resto do sistema) em vez de
   // single-select. Lista vem de `equipe_instalacao` (carregada uma vez,
   // cache simples — mesmo espírito de _cidadeCache).
-  + '<div class="sp-field"><div class="sp-label">Equipe de Instalação</div><div id="sp-new-inst-equipe-dd" class="no-msel-wide">' + _instEquipeDropdownHTML([]) + '</div></div>'
-  + '</div>'
+  + '<div class="sp-field" style="margin-top:8px"><div class="sp-label">Equipe de Instalação</div><div id="sp-new-inst-equipe-dd" class="no-msel-wide">' + _instEquipeDropdownHTML([]) + '</div></div>'
   + '<div class="sp-field" style="margin-top:8px"><div class="sp-label">Detalhes</div>'
   // Textarea expansível (pedido explícito) — cresce sozinha conforme
   // digita (reset de height antes de reler scrollHeight, senão só cresce
@@ -2611,7 +2610,6 @@ async function _spCriarInstalacao() {
   funil: document.getElementById('sp-new-inst-funil')?.value || null,
   data_inicio: document.getElementById('sp-new-inst-inicio')?.value || null,
   data_fim: document.getElementById('sp-new-inst-fim')?.value || null,
-  valor_total_gasto: document.getElementById('sp-new-inst-valor')?.value !== '' ? Number(document.getElementById('sp-new-inst-valor')?.value) : null,
   detalhes: document.getElementById('sp-new-inst-detalhes')?.value?.trim() || null,
  };
  const { data: instRow, error } = await _sb.from('instalacoes').insert(payload).select('id').single();
