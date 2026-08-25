@@ -2663,9 +2663,12 @@ async function _instExistenteFiltrar(q) {
  try {
   if (!_instExistentesCache) {
    resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Buscando...</div>';
+   // Pedido explícito: ordenar pelo prefixo do número (numero, o "ID" que
+   // aparece no início da fórmula de nomenclatura), não mais por data de
+   // criação.
    var r = await _sb.from('instalacoes')
     .select('id,numero,tipo_servico,funil,data_inicio,data_fim,instalacoes_equipe(equipe:equipe_id(nome)),obras_instalacoes(obra:obra_id(id,nome))')
-    .order('created_at', { ascending: false });
+    .order('numero', { ascending: true });
    if (r.error) throw r.error;
    _instExistentesCache = r.data || [];
   }
