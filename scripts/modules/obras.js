@@ -2649,60 +2649,62 @@ function _instExistenteToggle() {
 async function _instExistenteFiltrar(q) {
  var resEl = document.getElementById('sp-inst-existente-resultados');
  if (!resEl) return;
- if (!_instExistentesCache) {
-  resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Buscando...</div>';
-  // Achado real (2ª correção): Instalação↔Obra é N:N de verdade (decisão
-  // confirmada com a usuária — "usar a junção em tudo") — uma instalação
-  // já vinculada a OUTRAS obras ainda pode (e deve) aparecer aqui pra ser
-  // vinculada também à obra atual. A 1ª versão desta busca filtrava fora
-  // QUALQUER instalação com algum vínculo em obras_instalacoes (tratando
-  // como se fosse FK única), escondendo errado as que só não estavam
-  // vinculadas a ESTA obra especificamente. O filtro certo (abaixo, depois
-  // de buscar) exclui só quem já está vinculado à obra atual.
-  try {
+ // Achado real (2ª correção): Instalação↔Obra é N:N de verdade (decisão
+ // confirmada com a usuária — "usar a junção em tudo") — uma instalação já
+ // vinculada a OUTRAS obras ainda pode (e deve) aparecer aqui pra ser
+ // vinculada também à obra atual. A 1ª versão desta busca filtrava fora
+ // QUALQUER instalação com algum vínculo em obras_instalacoes (tratando
+ // como se fosse FK única), escondendo errado as que só não estavam
+ // vinculadas a ESTA obra especificamente.
+ // Todo o corpo da função (busca + filtro + render) fica dentro de um
+ // try/catch único — achado real: um erro em QUALQUER etapa depois da
+ // busca (não só na query em si) deixava a Promise rejeitar sem handler
+ // nenhum, travando a tela em "Buscando..." pra sempre.
+ try {
+  if (!_instExistentesCache) {
+   resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Buscando...</div>';
    var r = await _sb.from('instalacoes')
-    .select('id,numero,tipo_servico,funil,data_inicio,data_fim,instalacoes_equipe(equipe:equipe_id(nome)),obras_instalacoes(obra_id,obra:obra_id(nome))')
+    .select('id,numero,tipo_servico,funil,data_inicio,data_fim,instalacoes_equipe(equipe:equipe_id(nome)),obras_instalacoes(obra:obra_id(id,nome))')
     .order('created_at', { ascending: false });
    if (r.error) throw r.error;
    _instExistentesCache = r.data || [];
-  } catch (err) {
-   console.error('[Obras] erro ao buscar instalações:', err);
-   resEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:6px 0">Erro ao buscar instalações: ' + _supaErrPt((err && err.message) || 'tente novamente') + '</div>';
-   return;
   }
+  var obraAtualId = _obraAtiva && _obraAtiva.id;
+  var qn = (q || '').toLowerCase().trim();
+  var lista = _instExistentesCache.filter(function(i) {
+   var jaNestaObra = (i.obras_instalacoes || []).some(function(x){ return x.obra && String(x.obra.id) === String(obraAtualId); });
+   if (jaNestaObra) return false;
+   return !qn || (i.tipo_servico||'').toLowerCase().indexOf(qn) !== -1;
+  });
+  if (!lista.length) { resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Nenhuma instalação encontrada.</div>'; return; }
+  // Mesma estética de mini-card usada no card de instalações vinculadas
+  // (instCards acima) — nome com a fórmula + badge de status no topo,
+  // badges de Categoria/Equipe e datas embaixo — só que compacto, pra
+  // caber vários resultados de busca numa lista rolável.
+  resEl.innerHTML = lista.slice(0, 30).map(function(i) {
+   var outrasObras = (i.obras_instalacoes || []).map(function(x){ return x.obra && x.obra.nome; }).filter(Boolean);
+   var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - ' + (outrasObras.length ? outrasObras.join(', ') : '(sem obra)');
+   var statusBadge = i.funil ? '<span class="badge ' + (_instStatusClsObra[i.funil]||'bm') + '" style="font-size:9px;flex-shrink:0">' + i.funil + '</span>' : '';
+   var categoriaBadge = i.tipo_servico ? '<span class="badge bo" style="font-size:9px">' + i.tipo_servico + '</span>' : '';
+   var equipeNomes = (i.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean);
+   var equipeBadge = equipeNomes.length ? equipeNomes.map(function(n){ return '<span class="badge bm" style="font-size:9px">' + n + '</span>'; }).join(' ') : '';
+   return '<div onclick="_instExistenteVincular(\''+i.id+'\')" style="padding:8px;border-radius:6px;cursor:pointer;border:1px solid var(--border);margin-bottom:6px" onmouseover="this.style.background=\'var(--surface)\'" onmouseout="this.style.background=\'\'">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px">'
+    + '<span style="font-size:12px;font-weight:600">' + instNome + '</span>'
+    + statusBadge
+    + '</div>'
+    + '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:10px;color:var(--muted)">'
+    + categoriaBadge
+    + '<span>Início: ' + fmtData(i.data_inicio) + '</span>'
+    + '<span>Fim: ' + fmtData(i.data_fim) + '</span>'
+    + equipeBadge
+    + '</div>'
+    + '</div>';
+  }).join('');
+ } catch (err) {
+  console.error('[Obras] erro ao buscar instalações:', err);
+  resEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:6px 0">Erro ao buscar instalações: ' + _supaErrPt((err && err.message) || 'tente novamente') + '</div>';
  }
- var obraAtualId = _obraAtiva && _obraAtiva.id;
- var qn = (q || '').toLowerCase().trim();
- var lista = _instExistentesCache.filter(function(i) {
-  var jaNestaObra = (i.obras_instalacoes || []).some(function(x){ return String(x.obra_id) === String(obraAtualId); });
-  if (jaNestaObra) return false;
-  return !qn || (i.tipo_servico||'').toLowerCase().indexOf(qn) !== -1;
- });
- if (!lista.length) { resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Nenhuma instalação encontrada.</div>'; return; }
- // Mesma estética de mini-card usada no card de instalações vinculadas
- // (instCards acima) — nome com a fórmula + badge de status no topo,
- // badges de Categoria/Equipe e datas embaixo — só que compacto, pra
- // caber vários resultados de busca numa lista rolável.
- resEl.innerHTML = lista.slice(0, 30).map(function(i) {
-  var outrasObras = (i.obras_instalacoes || []).map(function(x){ return x.obra && x.obra.nome; }).filter(Boolean);
-  var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - ' + (outrasObras.length ? outrasObras.join(', ') : '(sem obra)');
-  var statusBadge = i.funil ? '<span class="badge ' + (_instStatusClsObra[i.funil]||'bm') + '" style="font-size:9px;flex-shrink:0">' + i.funil + '</span>' : '';
-  var categoriaBadge = i.tipo_servico ? '<span class="badge bo" style="font-size:9px">' + i.tipo_servico + '</span>' : '';
-  var equipeNomes = (i.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean);
-  var equipeBadge = equipeNomes.length ? equipeNomes.map(function(n){ return '<span class="badge bm" style="font-size:9px">' + n + '</span>'; }).join(' ') : '';
-  return '<div onclick="_instExistenteVincular(\''+i.id+'\')" style="padding:8px;border-radius:6px;cursor:pointer;border:1px solid var(--border);margin-bottom:6px" onmouseover="this.style.background=\'var(--surface)\'" onmouseout="this.style.background=\'\'">'
-   + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px">'
-   + '<span style="font-size:12px;font-weight:600">' + instNome + '</span>'
-   + statusBadge
-   + '</div>'
-   + '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:10px;color:var(--muted)">'
-   + categoriaBadge
-   + '<span>Início: ' + fmtData(i.data_inicio) + '</span>'
-   + '<span>Fim: ' + fmtData(i.data_fim) + '</span>'
-   + equipeBadge
-   + '</div>'
-   + '</div>';
- }).join('');
 }
 async function _instExistenteVincular(id) {
  if (!_obraAtiva || !_obraAtiva.id) return;
