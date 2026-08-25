@@ -36,6 +36,10 @@ function _spAutoTagHTML(tooltip) {
 // parte, laranja já cobre "outro" corretamente).
 var _tipoOrcamentoCls = { 'Telhados':'bg', 'Steel Frame':'bp', 'Modular':'bb', 'Solar':'by' };
 function _tipoOrcamentoBadgeCls(tipo) { return _tipoOrcamentoCls[tipo] || 'bo'; }
+// Cores de Status de Instalação (mesmo mapa de _instStatusCls em
+// instalacoes.js, cópia local — usado tanto no card de instalações
+// vinculadas quanto na busca de "vincular existente" abaixo).
+var _instStatusClsObra = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
 var _etapaClsBd = {
  'Orçamento':'bb','Atualização de orçamento':'bb','Follow-up':'by','Negociação':'bp',
  'Aprovação de projeto':'by','Piloto':'bn','Projeto aprovado':'bn','Em Andamento':'bn',
@@ -650,7 +654,7 @@ async function _spObraById(id) {
    // com a usuária: usar a junção em tudo, não mais instalacoes.obra_id,
    // que só guardava 1). Mapeado abaixo pra manter o mesmo formato de
    // array de instalações que o resto do código já espera.
-   _sb.from('obras_instalacoes').select('instalacao:instalacao_id(*)').eq('obra_id', id),
+   _sb.from('obras_instalacoes').select('instalacao:instalacao_id(*, instalacoes_equipe(equipe:equipe_id(nome)))').eq('obra_id', id),
    // "Tarefas": Atividades do Gestor de Tarefas vinculadas a esta obra —
    // pedido explícito. obra_id não é mais coluna direta de atividades (ver
    // scripts/lib/atividades-vinculos.js), vive na junção atividades_obras.
@@ -1497,6 +1501,14 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   : '<div class="sp-empty">Nenhuma entrega registrada para esta obra</div>';
 
  // ── Cards de instalacoes ─────────────────────────────────────────────────────
+ // Referência explícita da usuária: estética do card do Airtable (nome com a
+ // fórmula, badge colorido de Categoria do Serviço, grid com Data início/
+ // Data fim/Equipe) — em harmonia com o padrão de card já usado no resto do
+ // sistema (grid + _xCampo + badge no topo à direita, mesmo espírito de
+ // projetoCards/entregaCards logo acima).
+ function _instCampo(label, valor) {
+  return '<div><div class="sp-label" style="margin-bottom:1px;white-space:nowrap">' + label + '</div><div style="font-size:12px;color:var(--text)">' + valor + '</div></div>';
+ }
  var instCards = instalacoes.length
   ? instalacoes.map(function(i){
      // Nome segue a fórmula pedida explicitamente (igual ao Airtable):
@@ -1507,17 +1519,24 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      // instalação tenha outras obras vinculadas (ver detalhamento
      // completo da Instalação pra ver todas).
      var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - ' + (o.nome || '(sem obra)');
+     var statusBadge = i.funil ? '<span class="badge ' + (_instStatusClsObra[i.funil]||'bm') + '" style="font-size:9px;flex-shrink:0">' + i.funil + '</span>' : '';
+     var categoriaBadge = i.tipo_servico ? '<span class="badge bo" style="font-size:10px">' + i.tipo_servico + '</span>' : '<span style="color:var(--muted)">—</span>';
+     var equipeNomes = (i.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean);
+     var equipeBadge = equipeNomes.length
+      ? equipeNomes.map(function(n){ return '<span class="badge bm" style="font-size:10px">' + n + '</span>'; }).join(' ')
+      : '<span style="color:var(--muted)">—</span>';
      return '<div class="sp-item-card" onclick="_spOpenEntityById(\'instalacoes\',\'' + i.id + '\')">'
-      + '<div class="sp-item-title">' + instNome + '</div>'
-      + '<div class="sp-item-meta">'
-      + (i.funil ? '<span>Funil: <b>' + i.funil + '</b></span><span style="color:var(--border)">|</span>' : '')
-      + '<span>Inicio: <b>' + fmtData(i.data_inicio) + '</b></span>'
-      + '<span style="color:var(--border)">|</span>'
-      + '<span>Fim: <b>' + fmtData(i.data_fim) + '</b></span>'
-      + '<span style="color:var(--border)">|</span>'
-      + '<span>Duração: <b>' + fmtDias(i.dias_executados) + '</b></span>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
+      + '<div class="sp-item-title" style="margin-bottom:0">' + instNome + '</div>'
+      + statusBadge
       + '</div>'
-      + (i.valor_total_gasto ? '<div style="margin-top:6px;font-size:12px;font-weight:600;color:var(--green)">' + fmtMoeda(i.valor_total_gasto) + '</div>' : '')
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px 10px">'
+      + _instCampo('Categoria de Serviço', categoriaBadge)
+      + _instCampo('Data início', fmtData(i.data_inicio))
+      + _instCampo('Data fim', fmtData(i.data_fim))
+      + _instCampo('Equipe de Instalação', equipeBadge)
+      + '</div>'
+      + (i.valor_total_gasto ? '<div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--green)">' + fmtMoeda(i.valor_total_gasto) + '</div>' : '')
       + (i.detalhes ? '<div style="margin-top:4px;font-size:11px;color:var(--muted)">' + i.detalhes + '</div>' : '')
       + '</div>';
     }).join('')
@@ -2626,7 +2645,7 @@ async function _instExistenteFiltrar(q) {
   // todos os instalacao_id já vinculados e filtra fora em memória.
   var linkedRes = await _sb.from('obras_instalacoes').select('instalacao_id');
   var linkedIds = new Set((linkedRes.data || []).map(function(l){ return l.instalacao_id; }));
-  var r = await _sb.from('instalacoes').select('id,numero,tipo_servico,funil,data_inicio').order('created_at', { ascending: false });
+  var r = await _sb.from('instalacoes').select('id,numero,tipo_servico,funil,data_inicio,data_fim,instalacoes_equipe(equipe:equipe_id(nome))').order('created_at', { ascending: false });
   _instExistentesCache = (r.data || []).filter(function(i){ return !linkedIds.has(i.id); });
  }
  var qn = (q || '').toLowerCase().trim();
@@ -2634,14 +2653,27 @@ async function _instExistenteFiltrar(q) {
   return !qn || (i.tipo_servico||'').toLowerCase().indexOf(qn) !== -1;
  });
  if (!lista.length) { resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Nenhuma instalação sem obra encontrada.</div>'; return; }
+ // Mesma estética de mini-card usada no card de instalações vinculadas
+ // (instCards acima) — nome com a fórmula + badge de status no topo,
+ // badges de Categoria/Equipe e datas embaixo — só que compacto, pra
+ // caber vários resultados de busca numa lista rolável.
  resEl.innerHTML = lista.slice(0, 30).map(function(i) {
-  // Mesma fórmula de nomenclatura usada em todo o resto do sistema
-  // (numero - tipo_servico - obra); aqui a instalação ainda não tem
-  // obra vinculada, então essa parte fica "(sem obra)".
   var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - (sem obra)';
-  return '<div onclick="_instExistenteVincular(\''+i.id+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'var(--surface)\'" onmouseout="this.style.background=\'\'">'
-   + '<span>' + instNome + '</span>'
-   + (i.funil ? '<span style="font-size:10px;color:var(--muted)">' + i.funil + '</span>' : '')
+  var statusBadge = i.funil ? '<span class="badge ' + (_instStatusClsObra[i.funil]||'bm') + '" style="font-size:9px;flex-shrink:0">' + i.funil + '</span>' : '';
+  var categoriaBadge = i.tipo_servico ? '<span class="badge bo" style="font-size:9px">' + i.tipo_servico + '</span>' : '';
+  var equipeNomes = (i.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean);
+  var equipeBadge = equipeNomes.length ? equipeNomes.map(function(n){ return '<span class="badge bm" style="font-size:9px">' + n + '</span>'; }).join(' ') : '';
+  return '<div onclick="_instExistenteVincular(\''+i.id+'\')" style="padding:8px;border-radius:6px;cursor:pointer;border:1px solid var(--border);margin-bottom:6px" onmouseover="this.style.background=\'var(--surface)\'" onmouseout="this.style.background=\'\'">'
+   + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px">'
+   + '<span style="font-size:12px;font-weight:600">' + instNome + '</span>'
+   + statusBadge
+   + '</div>'
+   + '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:10px;color:var(--muted)">'
+   + categoriaBadge
+   + '<span>Início: ' + fmtData(i.data_inicio) + '</span>'
+   + '<span>Fim: ' + fmtData(i.data_fim) + '</span>'
+   + equipeBadge
+   + '</div>'
    + '</div>';
  }).join('');
 }
