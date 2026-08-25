@@ -1951,7 +1951,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '</div>'
   + '</div>'
   + '<div id="sp-inst-existente-box" style="display:none;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--surface2)">'
-  + '<input type="text" id="sp-inst-existente-busca" class="sp-inp" placeholder="Buscar instalação sem obra vinculada, pelo tipo de serviço..." style="font-size:12px;margin-bottom:8px" oninput="_instExistenteFiltrar(this.value)">'
+  + '<input type="text" id="sp-inst-existente-busca" class="sp-inp" placeholder="Buscar instalação já cadastrada, pelo tipo de serviço..." style="font-size:12px;margin-bottom:8px" oninput="_instExistenteFiltrar(this.value)">'
   + '<div id="sp-inst-existente-resultados" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>'
   + '</div>'
   + (function() {
@@ -2627,11 +2627,12 @@ async function _spCriarEmpresaObra() {
  _dbLoadEmpresas(); // atualiza tabela de empresas em segundo plano
 }
 
-// ── Vincular Instalação EXISTENTE (sem obra) à obra atual ─────────────────────
-// Pedido explícito: só dava pra criar instalação nova por aqui. instalacoes.
-// obra_id é FK única (não N:N), então só instalações SEM obra (obra_id IS
-// NULL) aparecem na busca — mesmo modelo/mesma limitação de
-// _noProjExistenteFiltrar (wizard-nova-obra.js).
+// ── Vincular Instalação EXISTENTE à obra atual ────────────────────────────────
+// Pedido explícito: só dava pra criar instalação nova por aqui. Instalação↔
+// Obra é N:N de verdade (obras_instalacoes, decisão confirmada com a
+// usuária), então a busca lista QUALQUER instalação — inclusive as já
+// vinculadas a OUTRAS obras — só excluindo quem já está vinculado à obra
+// ATUAL (senão apareceria duplicada/redundante no resultado).
 var _instExistentesCache = null;
 function _instExistenteToggle() {
  var box = document.getElementById('sp-inst-existente-box');
@@ -2650,37 +2651,41 @@ async function _instExistenteFiltrar(q) {
  if (!resEl) return;
  if (!_instExistentesCache) {
   resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Buscando...</div>';
-  // Achado real: a busca antiga fazia 2 consultas separadas (uma só pra
-  // saber quais instalacao_id já têm obra, outra pra listar as instalações)
-  // sem NENHUM tratamento de erro — se qualquer uma delas falhasse
-  // (RLS, rede, embed inválido), a Promise rejeitava sem cair em catch
-  // nenhum e a tela ficava travada em "Buscando..." pra sempre. Agora é
-  // uma consulta só (embed de obras_instalacoes direto em instalacoes,
-  // filtrado em memória por "sem nenhum vínculo") com try/catch garantindo
-  // que a UI sempre sai do estado de carregamento, com erro ou sem erro.
+  // Achado real (2ª correção): Instalação↔Obra é N:N de verdade (decisão
+  // confirmada com a usuária — "usar a junção em tudo") — uma instalação
+  // já vinculada a OUTRAS obras ainda pode (e deve) aparecer aqui pra ser
+  // vinculada também à obra atual. A 1ª versão desta busca filtrava fora
+  // QUALQUER instalação com algum vínculo em obras_instalacoes (tratando
+  // como se fosse FK única), escondendo errado as que só não estavam
+  // vinculadas a ESTA obra especificamente. O filtro certo (abaixo, depois
+  // de buscar) exclui só quem já está vinculado à obra atual.
   try {
    var r = await _sb.from('instalacoes')
-    .select('id,numero,tipo_servico,funil,data_inicio,data_fim,instalacoes_equipe(equipe:equipe_id(nome)),obras_instalacoes(obra_id)')
+    .select('id,numero,tipo_servico,funil,data_inicio,data_fim,instalacoes_equipe(equipe:equipe_id(nome)),obras_instalacoes(obra_id,obra:obra_id(nome))')
     .order('created_at', { ascending: false });
    if (r.error) throw r.error;
-   _instExistentesCache = (r.data || []).filter(function(i){ return !(i.obras_instalacoes && i.obras_instalacoes.length); });
+   _instExistentesCache = r.data || [];
   } catch (err) {
-   console.error('[Obras] erro ao buscar instalações sem obra:', err);
+   console.error('[Obras] erro ao buscar instalações:', err);
    resEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:6px 0">Erro ao buscar instalações: ' + _supaErrPt((err && err.message) || 'tente novamente') + '</div>';
    return;
   }
  }
+ var obraAtualId = _obraAtiva && _obraAtiva.id;
  var qn = (q || '').toLowerCase().trim();
  var lista = _instExistentesCache.filter(function(i) {
+  var jaNestaObra = (i.obras_instalacoes || []).some(function(x){ return String(x.obra_id) === String(obraAtualId); });
+  if (jaNestaObra) return false;
   return !qn || (i.tipo_servico||'').toLowerCase().indexOf(qn) !== -1;
  });
- if (!lista.length) { resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Nenhuma instalação sem obra encontrada.</div>'; return; }
+ if (!lista.length) { resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Nenhuma instalação encontrada.</div>'; return; }
  // Mesma estética de mini-card usada no card de instalações vinculadas
  // (instCards acima) — nome com a fórmula + badge de status no topo,
  // badges de Categoria/Equipe e datas embaixo — só que compacto, pra
  // caber vários resultados de busca numa lista rolável.
  resEl.innerHTML = lista.slice(0, 30).map(function(i) {
-  var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - (sem obra)';
+  var outrasObras = (i.obras_instalacoes || []).map(function(x){ return x.obra && x.obra.nome; }).filter(Boolean);
+  var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - ' + (outrasObras.length ? outrasObras.join(', ') : '(sem obra)');
   var statusBadge = i.funil ? '<span class="badge ' + (_instStatusClsObra[i.funil]||'bm') + '" style="font-size:9px;flex-shrink:0">' + i.funil + '</span>' : '';
   var categoriaBadge = i.tipo_servico ? '<span class="badge bo" style="font-size:9px">' + i.tipo_servico + '</span>' : '';
   var equipeNomes = (i.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean);
