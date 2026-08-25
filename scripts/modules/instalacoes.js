@@ -161,11 +161,14 @@ function _spInstalacaoRender(inst) {
  var diasProgramados = (inst.data_inicio && inst.data_fim)
   ? Math.round((new Date(inst.data_fim) - new Date(inst.data_inicio)) / 86400000)
   : null;
- // Sem "nome" na tabela nem número sequencial migrado do Airtable (o "121"
- // do print é o autonumber interno do Airtable, nunca existiu no Supabase)
- // — pedido de "congruência com os dados que temos": título construído só
- // do que é real (Tipo de serviço + Obra(s)), sem inventar um número.
- var titulo = (inst.tipo_servico || 'Instalação') + (obras.length ? ' — ' + obras.map(function(o){ return o.nome; }).join(', ') : '');
+ // Fórmula pedida explicitamente (igual ao campo fórmula do Airtable):
+ // "{ID sequencial} - {Categoria do Serviço} - {Obra}". `numero` é a
+ // coluna nova (SERIAL, migração add_instalacoes_numero_sequencial) —
+ // preenchida por ordem de created_at pras 125 instalações já existentes,
+ // automática (nextval) pra qualquer instalação nova. Nome montado aqui
+ // no client, não fica armazenado — evita ficar desatualizado se
+ // tipo_servico ou a(s) obra(s) vinculada(s) mudar(em) depois.
+ var titulo = (inst.numero != null ? inst.numero : '?') + ' - ' + (inst.tipo_servico || 'Instalação') + ' - ' + (obras.length ? obras.map(function(o){ return o.nome; }).join(', ') : '(sem obra)');
 
  _srchSelRegister('instDetTipo', {
   options: ['Instalação','Montagem fábrica','Treinamento piloto','Assistência técnica'],
@@ -329,7 +332,7 @@ async function _dbLoadInstalacoes() {
    // dado; "Obra"/"Cliente" liam só de instalacoes.obra_id, que só guarda
    // 1 obra — ver _spInstalacaoById abaixo pro detalhamento completo.
    var res = await _sb.from('instalacoes')
-    .select('id, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, obras_instalacoes(obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))), instalacoes_equipe(equipe:equipe_id(nome))')
+    .select('id, numero, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, obras_instalacoes(obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))), instalacoes_equipe(equipe:equipe_id(nome))')
     .order('data_inicio', { ascending: false })
     .range(from, from + 999);
    if (res.error) throw new Error(res.error.message);
@@ -363,10 +366,13 @@ async function _dbLoadInstalacoes() {
     var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2);
    };
    var dias = inst.dias_executados != null ? inst.dias_executados : (inst.data_inicio && inst.data_fim ? Math.round((new Date(inst.data_fim)-new Date(inst.data_inicio))/86400000) : '—');
+   // Nome/"Instalação" segue a fórmula pedida explicitamente (igual ao
+   // Airtable): "{ID sequencial} - {Categoria do Serviço} - {Obra}".
+   var nomeInst = (inst.numero != null ? inst.numero : '?') + ' - ' + (tipo !== '—' ? tipo : 'Instalação') + ' - ' + (obraNome !== '—' ? obraNome : '(sem obra)');
    return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'instalacoes\',this)" data-id="'+inst.id+'" data-funil="'+funil+'"'
     +' data-tipo="'+(tipo!=='—'?tipo:'')+'" data-obra="'+(obraNome!=='—'?obraNome.replace(/"/g,'&quot;'):'')+'" data-cliente="'+(clienteNome!=='—'?clienteNome.replace(/"/g,'&quot;'):'')+'"'
     +' data-inicio="'+(inst.data_inicio||'')+'" data-fim="'+(inst.data_fim||'')+'" data-dias="'+(typeof dias==='number'?dias:0)+'">'
-    + '<td style="font-weight:500">' + obraNome + '</td>'
+    + '<td style="font-weight:500">' + nomeInst + '</td>'
     + '<td style="color:var(--muted);font-size:12px">' + clienteNome + '</td>'
     + '<td>' + (tipo !== '—' ? '<span class="badge bg">'+tipo+'</span>' : '<span style="color:var(--border)">—</span>') + '</td>'
     + '<td style="font-size:12px;color:var(--muted)">' + equipeNomes + '</td>'

@@ -1499,8 +1499,16 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
  // ── Cards de instalacoes ─────────────────────────────────────────────────────
  var instCards = instalacoes.length
   ? instalacoes.map(function(i){
+     // Nome segue a fórmula pedida explicitamente (igual ao Airtable):
+     // "{ID sequencial} - {Categoria do Serviço} - {Obra}". `numero` é a
+     // coluna nova (SERIAL, migração add_instalacoes_numero_sequencial).
+     // "Obra" aqui é a obra ATUAL (o.nome, já em escopo) — o card já está
+     // dentro do detalhamento desta obra especificamente, mesmo que a
+     // instalação tenha outras obras vinculadas (ver detalhamento
+     // completo da Instalação pra ver todas).
+     var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - ' + (o.nome || '(sem obra)');
      return '<div class="sp-item-card" onclick="_spOpenEntityById(\'instalacoes\',\'' + i.id + '\')">'
-      + '<div class="sp-item-title">' + (i.tipo_servico || '(sem tipo)') + '</div>'
+      + '<div class="sp-item-title">' + instNome + '</div>'
       + '<div class="sp-item-meta">'
       + (i.funil ? '<span>Funil: <b>' + i.funil + '</b></span><span style="color:var(--border)">|</span>' : '')
       + '<span>Inicio: <b>' + fmtData(i.data_inicio) + '</b></span>'
