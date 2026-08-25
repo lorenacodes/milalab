@@ -1522,27 +1522,29 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      var statusBadge = i.funil ? '<span class="badge ' + (_instStatusClsObra[i.funil]||'bm') + '" style="font-size:9px;flex-shrink:0">' + i.funil + '</span>' : '';
      var categoriaBadge = i.tipo_servico ? '<span class="badge bo" style="font-size:10px">' + i.tipo_servico + '</span>' : '<span style="color:var(--muted)">—</span>';
      var equipeNomes = (i.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean);
+     // Pedido explícito: com mais de 2 equipes, mostra só as 2 primeiras +
+     // "+N" pro resto — evita que o card cresça sem limite de largura/altura
+     // quando tem muita gente vinculada (ver detalhamento da própria
+     // Instalação pra lista completa).
      var equipeBadges = equipeNomes.length
-      ? equipeNomes.map(function(n){ return '<span class="badge bm" style="font-size:10px">' + n + '</span>'; }).join(' ')
+      ? equipeNomes.slice(0, 2).map(function(n){ return '<span class="badge bm" style="font-size:10px">' + n + '</span>'; }).join(' ')
+        + (equipeNomes.length > 2 ? ' <span class="badge bm" style="font-size:10px" title="' + equipeNomes.slice(2).join(', ').replace(/"/g,'&quot;') + '">+' + (equipeNomes.length - 2) + '</span>' : '')
       : '<span style="color:var(--muted)">—</span>';
+     // Card compactado (pedido explícito) — Categoria/Datas/Equipe numa
+     // única linha em vez de grid + linha extra: Data início/fim ficam bem
+     // próximas uma da outra (par com gap pequeno) e Equipe fica logo ao
+     // lado de Data fim, tudo dentro do mesmo grid de 3 colunas.
      return '<div class="sp-item-card" onclick="_spOpenEntityById(\'instalacoes\',\'' + i.id + '\')">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'
       + '<div class="sp-item-title" style="margin-bottom:0">' + instNome + '</div>'
       + statusBadge
       + '</div>'
-      // Categoria/Data início/Data fim: 3 campos de valor único e curto,
-      // grid de largura fixa. Equipe de Instalação fica FORA do grid, numa
-      // linha própria com badges que quebram livremente (flex-wrap) — indo
-      // pro grid ela distorcia a altura/alinhamento das outras colunas
-      // sempre que tinha mais de 1 pessoa (relatado pela usuária: "muito
-      // mal formatado... não segue os princípios de escalabilidade").
-      + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px">'
+      + '<div style="display:grid;grid-template-columns:auto auto 1fr;gap:4px 18px;align-items:start">'
       + _instCampo('Categoria de Serviço', categoriaBadge)
-      + _instCampo('Data início', fmtData(i.data_inicio))
-      + _instCampo('Data fim', fmtData(i.data_fim))
+      + '<div style="display:flex;gap:12px">' + _instCampo('Data início', fmtData(i.data_inicio)) + _instCampo('Data fim', fmtData(i.data_fim)) + '</div>'
+      + _instCampo('Equipe de Instalação', '<div style="display:flex;flex-wrap:wrap;gap:4px">' + equipeBadges + '</div>')
       + '</div>'
-      + '<div style="margin-top:8px"><div class="sp-label" style="margin-bottom:3px">Equipe de Instalação</div><div style="display:flex;flex-wrap:wrap;gap:4px">' + equipeBadges + '</div></div>'
-      + (i.valor_total_gasto ? '<div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--green)">' + fmtMoeda(i.valor_total_gasto) + '</div>' : '')
+      + (i.valor_total_gasto ? '<div style="margin-top:6px;font-size:12px;font-weight:600;color:var(--green)">' + fmtMoeda(i.valor_total_gasto) + '</div>' : '')
       + (i.detalhes ? '<div style="margin-top:4px;font-size:11px;color:var(--muted)">' + i.detalhes + '</div>' : '')
       + '</div>';
     }).join('')
@@ -2648,14 +2650,25 @@ async function _instExistenteFiltrar(q) {
  if (!resEl) return;
  if (!_instExistentesCache) {
   resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Buscando...</div>';
-  // "Sem obra" agora significa "não aparece em obras_instalacoes nenhuma"
-  // (N:N de verdade — decisão confirmada com a usuária) — não dá pra
-  // filtrar isso com um .is('obra_id', null) simples feito antes; busca
-  // todos os instalacao_id já vinculados e filtra fora em memória.
-  var linkedRes = await _sb.from('obras_instalacoes').select('instalacao_id');
-  var linkedIds = new Set((linkedRes.data || []).map(function(l){ return l.instalacao_id; }));
-  var r = await _sb.from('instalacoes').select('id,numero,tipo_servico,funil,data_inicio,data_fim,instalacoes_equipe(equipe:equipe_id(nome))').order('created_at', { ascending: false });
-  _instExistentesCache = (r.data || []).filter(function(i){ return !linkedIds.has(i.id); });
+  // Achado real: a busca antiga fazia 2 consultas separadas (uma só pra
+  // saber quais instalacao_id já têm obra, outra pra listar as instalações)
+  // sem NENHUM tratamento de erro — se qualquer uma delas falhasse
+  // (RLS, rede, embed inválido), a Promise rejeitava sem cair em catch
+  // nenhum e a tela ficava travada em "Buscando..." pra sempre. Agora é
+  // uma consulta só (embed de obras_instalacoes direto em instalacoes,
+  // filtrado em memória por "sem nenhum vínculo") com try/catch garantindo
+  // que a UI sempre sai do estado de carregamento, com erro ou sem erro.
+  try {
+   var r = await _sb.from('instalacoes')
+    .select('id,numero,tipo_servico,funil,data_inicio,data_fim,instalacoes_equipe(equipe:equipe_id(nome)),obras_instalacoes(obra_id)')
+    .order('created_at', { ascending: false });
+   if (r.error) throw r.error;
+   _instExistentesCache = (r.data || []).filter(function(i){ return !(i.obras_instalacoes && i.obras_instalacoes.length); });
+  } catch (err) {
+   console.error('[Obras] erro ao buscar instalações sem obra:', err);
+   resEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:6px 0">Erro ao buscar instalações: ' + _supaErrPt((err && err.message) || 'tente novamente') + '</div>';
+   return;
+  }
  }
  var qn = (q || '').toLowerCase().trim();
  var lista = _instExistentesCache.filter(function(i) {
