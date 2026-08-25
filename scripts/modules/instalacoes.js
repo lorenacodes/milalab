@@ -9,7 +9,11 @@ function openNovaInstalacao() { alert('Modal "Nova Instalação" será implement
 // Filtro de condições de verdade. _fbEvaluate/_sbCompare recebem tr.dataset
 // direto — ver data-* adicionados no template de _dbLoadInstalacoes.
 var _instFbFields = [
- { key: 'funil',   label: 'Status',  type: 'select', options: ['Programado','Planejado','Em andamento','Finalizado','Cancelado'] },
+ // Vocabulário real (mesmo campo do Airtable original, confirmado por
+ // print da usuária) — a lista antiga (Programado/Planejado/Em andamento/
+ // Finalizado/Cancelado) tinha 3 valores que nunca existiram nos dados
+ // reais e faltava "Emitir boleto de medição", que existe.
+ { key: 'funil',   label: 'Status',  type: 'select', options: ['A programar','Programado','Emitir boleto de medição','Em execução','Finalizado'] },
  { key: 'tipo',    label: 'Tipo',    type: 'text' },
  { key: 'obra',    label: 'Obra',    type: 'text' },
  { key: 'cliente', label: 'Cliente', type: 'text' },
@@ -141,8 +145,11 @@ async function _dbLoadInstalacoes() {
  try {
   var allData = []; var from = 0;
   while (true) {
+   // instalacoes_equipe(equipe:...) — junção N:N (pedido explícito: coluna
+   // "Equipe" da tabela era hardcoded "—", nunca tinha sido ligada de
+   // verdade a nenhum dado; ver _spInstalacoes abaixo pro detalhamento).
    var res = await _sb.from('instalacoes')
-    .select('id, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, obra_id, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
+    .select('id, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, obra_id, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome))), instalacoes_equipe(equipe:equipe_id(nome))')
     .order('data_inicio', { ascending: false })
     .range(from, from + 999);
    if (res.error) throw new Error(res.error.message);
@@ -161,12 +168,13 @@ async function _dbLoadInstalacoes() {
    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Nenhuma instalação encontrada.</td></tr>';
    return;
   }
-  var funilCls = { 'Finalizado':'bg', 'Programado':'by', 'Em andamento':'bm', 'Planejado':'bp', 'Cancelado':'br' };
+  var funilCls = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
   tbody.innerHTML = allData.map(function(inst) {
    var obraNome = (inst.obra && inst.obra.nome) || '—';
    var clienteNome = '—';
    try { clienteNome = inst.obra.empresas_obras[0].empresa.nome || '—'; } catch(e) {}
    var tipo = inst.tipo_servico || '—';
+   var equipeNomes = (inst.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean).join(', ') || '—';
    var funil = inst.funil || '—';
    var cls = funilCls[funil] || 'bm';
    var fmtDate = function(d) {
@@ -180,7 +188,7 @@ async function _dbLoadInstalacoes() {
     + '<td style="font-weight:500">' + obraNome + '</td>'
     + '<td style="color:var(--muted);font-size:12px">' + clienteNome + '</td>'
     + '<td>' + (tipo !== '—' ? '<span class="badge bg">'+tipo+'</span>' : '<span style="color:var(--border)">—</span>') + '</td>'
-    + '<td style="font-size:12px;color:var(--muted)">—</td>'
+    + '<td style="font-size:12px;color:var(--muted)">' + equipeNomes + '</td>'
     + '<td style="font-size:12px;color:var(--muted)">' + fmtDate(inst.data_inicio) + '</td>'
     + '<td style="font-size:12px;color:var(--muted)">' + fmtDate(inst.data_fim) + '</td>'
     + '<td style="text-align:center;font-size:12px">' + dias + '</td>'

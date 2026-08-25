@@ -1903,22 +1903,50 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div class="sp-stitle" style="margin:0;padding:0;border:none">Instalações (' + instalacoes.length + ')</div>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaInstalacao()">+ Nova Instalação</button>'
   + '</div>'
+  + (function() {
+      // Tipo de serviço/Status — mesmo componente de busca+single-select
+      // já usado em todo o resto do sistema (searchable-select.js), pedido
+      // explícito. "Funil" renomeado pra "Status" (mesmo pedido) — coluna
+      // no banco continua `funil` (não é o rótulo exibido). Opções do
+      // Status seguem EXATAMENTE o campo original do Airtable (print
+      // enviado pela usuária), incluindo "Emitir boleto de medição" que
+      // não existia em nenhuma das duas listas antigas (nem aqui, nem no
+      // filtro da página cheia de Instalações, que também estava errado).
+      _srchSelRegister('instTipoServico', {
+       options: ['Instalação','Montagem fábrica','Treinamento piloto','Assistência técnica'],
+       placeholder: 'Selecione...',
+      });
+      _srchSelRegister('instStatus', {
+       options: ['A programar','Programado','Emitir boleto de medição','Em execução','Finalizado'],
+       placeholder: 'Selecione...',
+      });
+      return '';
+     })()
   + '<div id="sp-nova-instalacao-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px">'
   + '<div class="sp-g2" style="gap:8px">'
-  + '<div class="sp-field"><div class="sp-label">Tipo de serviço</div><select class="sp-inp" id="sp-new-inst-tipo">'
-  + '<option value="">Selecione...</option>'
-  + ['Instalação','Montagem fábrica','Treinamento piloto','Assistência técnica'].map(function(t){ return '<option>' + t + '</option>'; }).join('')
-  + '</select></div>'
-  + '<div class="sp-field"><div class="sp-label">Funil</div><select class="sp-inp" id="sp-new-inst-funil">'
-  + ['A programar','Programado','Em execução','Finalizado'].map(function(f,i){ return '<option' + (i===0?' selected':'') + '>' + f + '</option>'; }).join('')
-  + '</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Tipo de serviço</div>' + _srchSelMarkup('instTipoServico', 'sp-new-inst-tipo', '') + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Status</div>' + _srchSelMarkup('instStatus', 'sp-new-inst-funil', 'A programar') + '</div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">Data início</div><input class="sp-inp" id="sp-new-inst-inicio" type="date"></div>'
   + '<div class="sp-field"><div class="sp-label">Data fim</div><input class="sp-inp" id="sp-new-inst-fim" type="date"></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">Valor total gasto</div><input class="sp-inp" id="sp-new-inst-valor" type="number" min="0" placeholder="0"></div>'
-  + '<div class="sp-field"><div class="sp-label">Detalhes</div><input class="sp-inp" id="sp-new-inst-detalhes" placeholder="Observações..."></div>'
-  + '</div><div style="display:flex;gap:6px;margin-top:10px">'
+  // Equipe de Instalação — pedido explícito: campo que faltava. N:N de
+  // verdade no banco (instalacoes_equipe, sem colunas extras — uma
+  // instalação pode ter mais de uma equipe), por isso multi-select
+  // (_msRenderDropdown, mesmo componente do resto do sistema) em vez de
+  // single-select. Lista vem de `equipe_instalacao` (carregada uma vez,
+  // cache simples — mesmo espírito de _cidadeCache).
+  + '<div class="sp-field"><div class="sp-label">Equipe de Instalação</div><div id="sp-new-inst-equipe-dd" class="no-msel-wide">' + _instEquipeDropdownHTML([]) + '</div></div>'
+  + '</div>'
+  + '<div class="sp-field" style="margin-top:8px"><div class="sp-label">Detalhes</div>'
+  // Textarea expansível (pedido explícito) — cresce sozinha conforme
+  // digita (reset de height antes de reler scrollHeight, senão só cresce
+  // e nunca encolhe ao apagar texto). Sem helper genérico anterior no
+  // código pra isso — inline mesmo, é só essas 2 linhas.
+  + '<textarea class="sp-inp" id="sp-new-inst-detalhes" placeholder="Observações..." rows="1" style="resize:none;overflow:hidden;min-height:34px" oninput="this.style.height=\'auto\';this.style.height=(this.scrollHeight)+\'px\'"></textarea>'
+  + '</div>'
+  + '<div style="display:flex;gap:6px;margin-top:10px">'
   + '<button class="btn btn-primary btn-sm" onclick="_spCriarInstalacao()" style="flex:1;justify-content:center">Criar instalação</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaInstalacao()">Cancelar</button>'
   + '</div></div>'
@@ -2541,9 +2569,39 @@ async function _spCriarEmpresaObra() {
 
 // ── Quick-create Contato ──────────────────────────────────────────────────────
 // ── Quick-create Instalação ────────────────────────────────────────────────────
+// Equipe de Instalação — pedido explícito, campo que faltava. Relação N:N
+// de verdade (instalacoes_equipe, sem colunas extras), então multi-select
+// (_msRenderDropdown). Cache simples da lista de equipes (equipe_instalacao),
+// carregada uma vez só, mesmo espírito de _cidadeCache (wizard-nova-obra.js).
+var _instEquipesCache = null;
+var _instEquipeSel = [];
+function _instEquipeDropdownHTML(sel) {
+ var opcoes = (_instEquipesCache || []).map(function(e){ return e.nome; });
+ return _msRenderDropdown('instEquipe', opcoes, sel || [], '_instEquipeToggle', 'Selecione a(s) equipe(s)...');
+}
+function _instEquipeToggle(campo, valor, checked) {
+ _instEquipeSel = _msToggle(_instEquipeSel, valor, checked);
+ var dd = document.getElementById('sp-new-inst-equipe-dd');
+ if (dd) dd.innerHTML = _instEquipeDropdownHTML(_instEquipeSel);
+ if (typeof _noReabrirDropdown === 'function') _noReabrirDropdown('sp-new-inst-equipe-dd');
+}
+async function _instCarregarEquipesCache() {
+ if (_instEquipesCache) return;
+ var res = await _sb.from('equipe_instalacao').select('id,nome').order('nome');
+ _instEquipesCache = res.data || [];
+}
 function _spToggleNovaInstalacao() {
  const f = document.getElementById('sp-nova-instalacao-form');
- if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+ if (!f) return;
+ var abrir = f.style.display === 'none';
+ f.style.display = abrir ? 'block' : 'none';
+ if (abrir) {
+  _instEquipeSel = [];
+  _instCarregarEquipesCache().then(function(){
+   var dd = document.getElementById('sp-new-inst-equipe-dd');
+   if (dd) dd.innerHTML = _instEquipeDropdownHTML(_instEquipeSel);
+  });
+ }
 }
 async function _spCriarInstalacao() {
  if (!_obraAtiva || !_obraAtiva.id) return;
@@ -2556,8 +2614,18 @@ async function _spCriarInstalacao() {
   valor_total_gasto: document.getElementById('sp-new-inst-valor')?.value !== '' ? Number(document.getElementById('sp-new-inst-valor')?.value) : null,
   detalhes: document.getElementById('sp-new-inst-detalhes')?.value?.trim() || null,
  };
- const { error } = await _sb.from('instalacoes').insert(payload);
+ const { data: instRow, error } = await _sb.from('instalacoes').insert(payload).select('id').single();
  if (error) { alert('Erro ao criar instalação: ' + (error?.message || '')); return; }
+ // Vincula a(s) equipe(s) selecionada(s) — junção instalacoes_equipe, sem
+ // colunas extras (só instalacao_id/equipe_id).
+ if (_instEquipeSel.length && instRow && instRow.id) {
+  var equipeIds = (_instEquipesCache || []).filter(function(e){ return _instEquipeSel.indexOf(e.nome) !== -1; }).map(function(e){ return e.id; });
+  var linkRows = equipeIds.map(function(eid){ return { instalacao_id: instRow.id, equipe_id: eid }; });
+  if (linkRows.length) {
+   var linkRes = await _sb.from('instalacoes_equipe').insert(linkRows);
+   if (linkRes.error) console.error('[Obras] erro ao vincular equipe(s) à instalação:', linkRes.error);
+  }
+ }
  // Instalação nova muda a contagem/lista mostrada nesta mesma seção — mais
  // simples e seguro recarregar o painel inteiro (_spObraById já faz um
  // Promise.all rápido) do que tentar remontar só o pedaço de instalações.
