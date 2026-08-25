@@ -1716,7 +1716,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div id="sp-nova-empresa-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">'
   + '<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Nova Empresa</div>'
   + '<div class="sp-g2" style="gap:8px">'
-  + '<div class="sp-field"><div class="sp-label">Nome *</div><input class="sp-inp" id="sp-new-emp-nome" placeholder="Razão social"></div>'
+  + '<div class="sp-field"><div class="sp-label">Nome <span class="req">*</span></div><input class="sp-inp" id="sp-new-emp-nome" placeholder="Razão social"></div>'
   + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-new-emp-cnpj" value="' + _empCnpjMaskValue('') + '" oninput="_empCnpjMask(this)"></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   // Pedido explícito: Estado aqui era um <select> nativo sem busca — vira o
@@ -1725,7 +1725,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // Empresa. Kind próprio ('spNeEstado') pra não colidir com outras
   // instâncias abertas ao mesmo tempo.
   + (function(){ _srchSelRegister('spNeEstado', { options: EMPRESA_ESTADO_OPCOES, placeholder: 'Selecione o estado...' }); return ''; })()
-  + '<div class="sp-field"><div class="sp-label">Estado *</div>' + _srchSelMarkup('spNeEstado', 'sp-new-emp-uf', '') + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Estado <span class="req">*</span></div>' + _srchSelMarkup('spNeEstado', 'sp-new-emp-uf', '') + '</div>'
   + '<div class="sp-field"><div class="sp-label">Fase do Ciclo de Vida</div><select class="sp-inp" id="sp-new-emp-fase">' + _spEmpOptSelect(EMPRESA_FASE_OPCOES, '') + '</select></div>'
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   // Mesmo componente de chips coloridos já usado em openNovaEmpresa()
@@ -1751,7 +1751,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '</div></div>'
   + '<div id="sp-novo-contato-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">'
   + '<div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Novo Contato</div>'
-  + '<div class="sp-field"><div class="sp-label">Nome completo *</div><input class="sp-inp" id="sp-new-cont-nome" placeholder="Nome"></div>'
+  + '<div class="sp-field"><div class="sp-label">Nome completo <span class="req">*</span></div><input class="sp-inp" id="sp-new-cont-nome" placeholder="Nome"></div>'
   + '<div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">E-mail</div><input class="sp-inp" id="sp-new-cont-email" type="email" placeholder="nome@empresa.com" oninput="_cttEmailMask(this)"></div>'
   + '<div class="sp-field"><div class="sp-label">Telefone</div><input class="sp-inp" id="sp-new-cont-tel" value="' + _cttTelMaskValue('') + '" oninput="_cttTelMask(this)"></div>'
@@ -2579,9 +2579,12 @@ async function _spCriarEmpresaObra() {
  // formulário equivalente do wizard de Nova Obra (_noSalvarNovaEmpresa).
  const estado = document.getElementById('sp-new-emp-uf')?.value || '';
  if (!estado) { alert('Estado da empresa é obrigatório.'); return; }
- // Mesma regra de _spCriarEmpresa/_spCriarContato (empresas.js): CNPJ vazio
- // é permitido, incompleto bloqueia — o molde preenche posições vazias com
- // "_", então quem decide é a contagem de dígitos reais, não um if(!cnpj).
+ // Mesma regra do formulário equivalente do wizard de Nova Obra
+ // (_noSalvarNovaEmpresa) — quick-create embutido num fluxo maior, CNPJ
+ // opcional na hora (bloqueia só incompleto); diferente da criação
+ // dedicada (_spCriarEmpresa, empresas.js), que sempre exige os 14
+ // dígitos — decisão deliberada, não um descuido (ambos os quick-creates
+ // se referenciam mutuamente nos comentários originais).
  const cnpjEl = document.getElementById('sp-new-emp-cnpj');
  const cnpjDigits = ((cnpjEl || {}).value || '').replace(/\D/g, '');
  if (cnpjDigits.length > 0 && cnpjDigits.length < 14) {

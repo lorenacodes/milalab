@@ -934,10 +934,39 @@ function _taskAutoSaveQueue(patch, immediate) {
  _taskAutoSaveTimer = setTimeout(_taskAutoSaveFlush, immediate ? 120 : 700);
 }
 
+// Campos obrigatórios (mesmo asterisco do formulário de criação,
+// _submitNewTask/camposObrig) — levantamento de campos obrigatórios achou
+// que aqui no autosave de EDIÇÃO dava pra limpar qualquer um deles (ex.:
+// voltar o <select> pra opção em branco, apagar a data) e salvar null sem
+// nenhum aviso, mesmo com o asterisco no rótulo prometendo o contrário.
+// Mapa campo→{label, elId} pra poder reverter a UI pro valor anterior
+// (window._drwCurrentTask, setado em _taskDrawerOpen) quando barra o save.
+var _TASK_CAMPOS_OBRIG = {
+ titulo:          { label: 'Nome da atividade', elId: 'nt-titulo' },
+ tipo_atividade:  { label: 'Tipo de atividade', elId: 'nt-tipo-atividade' },
+ area:            { label: 'Área',              elId: 'nt-area' },
+ data_inicio:     { label: 'Data de início',    elId: 'nt-dt-inicio' },
+ data_prazo:      { label: 'Data de fim',       elId: 'nt-dt-fim' },
+};
 function _taskAutoSaveFlush() {
  if (!_taskEditId || !_taskAutoSavePending) return;
  var id = _taskEditId, patch = _taskAutoSavePending;
  _taskAutoSavePending = null;
+ var bloqueados = [];
+ Object.keys(_TASK_CAMPOS_OBRIG).forEach(function(campo) {
+  if (!(campo in patch)) return;
+  var v = patch[campo];
+  if (v != null && String(v).trim() !== '') return;
+  bloqueados.push(_TASK_CAMPOS_OBRIG[campo].label);
+  delete patch[campo];
+  var el = document.getElementById(_TASK_CAMPOS_OBRIG[campo].elId);
+  var valorAnterior = window._drwCurrentTask ? window._drwCurrentTask[campo] : null;
+  if (el) el.value = valorAnterior || '';
+ });
+ if (bloqueados.length) {
+  _showToast('Campo obrigatório: ' + bloqueados.join(', ') + '. Alteração não foi salva.', 'erro');
+ }
+ if (!Object.keys(patch).length) { _taskAutoSaveStatus(); return; }
  patch.updated_at = new Date().toISOString();
  _sb.from('atividades').update(patch).eq('id', id).then(function(res) {
   // Só pula a atualização de UI se o usuário JÁ ABRIU OUTRA atividade
@@ -1305,6 +1334,9 @@ function _respAutoSaveResponsaveis() {
 function _respToggleUser(email, nome, iniciais) {
  var idx = _respSelecionados.findIndex(function(s){ return s.email === email; });
  if (idx >= 0) {
+  // Responsáveis é obrigatório (asterisco no rótulo, nt-responsavel) —
+  // não deixa remover o último restante.
+  if (_respSelecionados.length <= 1) { _showToast('Responsáveis é obrigatório — mantenha ao menos 1 pessoa.', 'erro'); return; }
   _respSelecionados.splice(idx, 1);
  } else {
   _respSelecionados.push({ email: email, nome: nome, iniciais: iniciais });
@@ -1317,6 +1349,7 @@ function _respToggleUser(email, nome, iniciais) {
 function _respRemoveUser(email) {
  var idx = _respSelecionados.findIndex(function(s){ return s.email === email; });
  if (idx === -1) return;
+ if (_respSelecionados.length <= 1) { _showToast('Responsáveis é obrigatório — mantenha ao menos 1 pessoa.', 'erro'); return; }
  _respSelecionados.splice(idx, 1);
  _respUpdateBox();
  var search = document.getElementById('nt-resp-search');

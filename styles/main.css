@@ -382,6 +382,13 @@ body.light .dash-panel{
  .mf.span2{grid-column:span 2}
  .mf label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;display:flex;align-items:center;gap:3px}
  .mf label .req{color:var(--red);font-size:13px;line-height:1}
+ /* Achado no levantamento de campos obrigatórios: a regra acima só valia
+    dentro de ".mf label" — o mesmo `<span class="req">*</span>` usado dentro
+    de ".sp-label" (formulários de Nova Instalação/Nova Projeto nos painéis
+    de detalhamento) herdava a cor cinza-muted do rótulo em vez de vermelho,
+    então o asterisco de "obrigatório" ficava visualmente indistinguível.
+    Regra base sem escopo garante vermelho em qualquer contexto. */
+ .req{color:var(--red)}
  /* :not([type=checkbox]):not([type=radio]) — sem essa exclusão, width:100%
     vazava pra dentro de QUALQUER checkbox/radio aninhado num .mf (ex.: os
     checkboxes do multiselect de Produto/Responsável/Tipologia no wizard de

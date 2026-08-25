@@ -382,7 +382,12 @@ async function _spEmpresas(row, tds) {
   '<div class="sp-field"><div class="sp-label">Razão Social <span style="color:var(--red)">*</span></div>'
   + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/"/g,'&quot;')+'" oninput="_empScheduleAutoSave()"></div>'
   + '<div class="sp-g2">'
-  + '<div class="sp-field"><div class="sp-label">CNPJ <span style="color:var(--red)">*</span></div><input class="sp-inp" id="sp-emp-cnpj" value="'+_empCnpjMaskValue(cnpj).replace(/"/g,'&quot;')+'" oninput="_empCnpjMask(this);_empScheduleAutoSave()"></div>'
+  // Sem asterisco aqui de propósito: diferente da criação (onde CNPJ é
+  // obrigatório), editar uma empresa já existente permite deixar o CNPJ em
+  // branco (registros antigos migrados do Airtable podem não ter — ver
+  // regra completa em _spSaveEmpresa). Asterisco aqui seria enganoso, já
+  // que o autosave nunca bloqueia o campo vazio.
+  + '<div class="sp-field"><div class="sp-label">CNPJ</div><input class="sp-inp" id="sp-emp-cnpj" value="'+_empCnpjMaskValue(cnpj).replace(/"/g,'&quot;')+'" oninput="_empCnpjMask(this);_empScheduleAutoSave()"></div>'
   + '<div class="sp-field"><div class="sp-label">Estado</div>'+_spEmpEstadoMarkup(estado)+'</div>'
   + '</div>'
   + '<div class="sp-g2">'

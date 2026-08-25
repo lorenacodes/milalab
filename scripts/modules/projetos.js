@@ -385,11 +385,11 @@ function _spProjetoRender(p, idx) {
 
  var html = `
   <input type="hidden" id="sp-proj-id" value="${p.id}">
-  <div class="sp-field"><div class="sp-label">Nome do projeto</div>
+  <div class="sp-field"><div class="sp-label">Nome do projeto <span class="req">*</span></div>
    <input class="sp-inp" id="sp-proj-nome" style="text-transform:uppercase" value="${(p.nome||'').replace(/"/g,'&quot;')}" oninput="_upperCaseInput(this);_projScheduleAutoSave()"></div>
   <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Tipo</div><div id="sp-proj-tipo-pills" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${_projTipoPillsHTML([tipo].filter(Boolean), tipo)}</div></div>
-   <div class="sp-field"><div class="sp-label">Produto</div><div id="sp-proj-produto-dd" class="no-msel-wide" style="margin-top:4px">${_msRenderDropdown('projProduto', _noProdutosDisponiveis(tipo).map(function(pr){return pr.nome;}), produtoAtual, '_projProdutoToggle', 'Selecione o(s) produto(s)...')}</div></div>
+   <div class="sp-field"><div class="sp-label">Tipo <span class="req">*</span></div><div id="sp-proj-tipo-pills" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${_projTipoPillsHTML([tipo].filter(Boolean), tipo)}</div></div>
+   <div class="sp-field"><div class="sp-label">Produto <span class="req">*</span></div><div id="sp-proj-produto-dd" class="no-msel-wide" style="margin-top:4px">${_msRenderDropdown('projProduto', _noProdutosDisponiveis(tipo).map(function(pr){return pr.nome;}), produtoAtual, '_projProdutoToggle', 'Selecione o(s) produto(s)...')}</div></div>
   </div>
   <div class="sp-field"><div class="sp-label">Obra vinculada</div>
    <div style="display:flex;align-items:center;gap:8px">
@@ -397,7 +397,7 @@ function _spProjetoRender(p, idx) {
     ${p.obra_id ? '<button type=\"button\" class=\"btn btn-ghost\" style=\"padding:4px 10px;font-size:11px;flex-shrink:0\" onclick=\"_projDesvincularObra()\">Desvincular</button>' : ''}
    </div>
   </div>
-  <div class="sp-field"><div class="sp-label">Etapa do projeto</div>${_srchSelMarkup('projEtapa', 'sp-proj-etapa', etapaAtual)}</div>
+  <div class="sp-field"><div class="sp-label">Etapa do projeto <span class="req">*</span></div>${_srchSelMarkup('projEtapa', 'sp-proj-etapa', etapaAtual)}</div>
 
   <div class="sp-stitle">Informações técnicas</div>
   <div class="sp-g3">
@@ -599,6 +599,26 @@ async function _spSaveProjetoFull() {
   descritivo: (document.getElementById('sp-proj-desc')?.value || '').trim() || null,
   updated_at: new Date().toISOString(),
  };
+ // Nome/Tipo/Produto/Etapa são obrigatórios (mesma regra do formulário de
+ // criação — Novo Projeto, wizard/obras.js) — levantamento de campos
+ // obrigatórios achou que aqui no autosave do detalhamento dava pra limpar
+ // qualquer um deles e salvar vazio sem aviso, mesmo com o asterisco.
+ // Ignora só o(s) campo(s) esvaziado(s) (devolve o valor anterior) em vez
+ // de recusar a alteração inteira.
+ var faltando = [];
+ if (!payload.nome) {
+  faltando.push('Nome do projeto'); delete payload.nome;
+  var elNome = document.getElementById('sp-proj-nome'); if (elNome && _spProjAtivo) elNome.value = _spProjAtivo.nome || '';
+ }
+ if (!payload.tipo_orcamento) { faltando.push('Tipo'); delete payload.tipo_orcamento; }
+ if (!payload.produto) { faltando.push('Produto'); delete payload.produto; }
+ if (!payload.etapa_projeto) {
+  faltando.push('Etapa do projeto'); delete payload.etapa_projeto;
+  if (_spProjAtivo && typeof _srchSelSelectItem === 'function') _srchSelSelectItem('projEtapa', _spProjAtivo.etapa_projeto || '');
+ }
+ if (faltando.length) _showToast('Campo obrigatório: ' + faltando.join(', ') + '. Alteração não foi salva.', 'erro');
+ var camposReais = Object.keys(payload).filter(function(k){ return k !== 'updated_at'; });
+ if (!camposReais.length) return;
  var res = await _sb.from('projetos').update(payload).eq('id', id);
  if (res.error) { console.error('[Projetos] erro ao salvar:', res.error); _showToast('Erro ao salvar: ' + _supaErrPt(res.error.message), 'erro'); return; }
  if (_spProjAtivo && String(_spProjAtivo.id) === String(id)) Object.assign(_spProjAtivo, payload);

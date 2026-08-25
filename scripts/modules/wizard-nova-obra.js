@@ -491,7 +491,8 @@ function _noContatoFilterRender() {
    + (c.cargo ? '<span class="no-check-row-sub">' + c.cargo + '</span>' : '') + '</span>'
    + '</label>'
    + (precisaEmail
-      ? '<input type="email" class="sp-inp" placeholder="E-mail obrigatório — este contato ainda não tem um cadastrado" style="margin:2px 0 6px 26px;width:calc(100% - 26px);font-size:11px;border-color:var(--red)" value="' + (_noContatoEmailPendentes[c.id] || '') + '" oninput="_noContatoEmailPendenteSet(\'' + c.id + '\',this.value)">'
+      ? '<div style="margin:2px 0 2px 26px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)">E-mail <span class="req">*</span></div>'
+        + '<input type="email" class="sp-inp" placeholder="Este contato ainda não tem um e-mail cadastrado" style="margin:0 0 6px 26px;width:calc(100% - 26px);font-size:11px;border-color:var(--red)" value="' + (_noContatoEmailPendentes[c.id] || '') + '" oninput="_noContatoEmailPendenteSet(\'' + c.id + '\',this.value)">'
       : '');
  }).join('');
 }

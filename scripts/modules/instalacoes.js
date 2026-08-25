@@ -192,11 +192,11 @@ function _spInstalacaoRender(inst) {
 
  var html = `
   <input type="hidden" id="sp-inst-id" value="${inst.id}">
-  <div class="sp-field"><div class="sp-label">Tipo de Serviço</div>${_srchSelMarkup('instDetTipo', 'sp-inst-tipo', inst.tipo_servico || '')}</div>
-  <div class="sp-field"><div class="sp-label">Status</div>${_srchSelMarkup('instDetStatus', 'sp-inst-status', inst.funil || '')}</div>
+  <div class="sp-field"><div class="sp-label">Tipo de Serviço <span class="req">*</span></div>${_srchSelMarkup('instDetTipo', 'sp-inst-tipo', inst.tipo_servico || '')}</div>
+  <div class="sp-field"><div class="sp-label">Status <span class="req">*</span></div>${_srchSelMarkup('instDetStatus', 'sp-inst-status', inst.funil || '')}</div>
   <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Data início</div><input class="sp-inp" id="sp-inst-inicio" type="date" value="${inst.data_inicio || ''}" onchange="_instScheduleAutoSave()"></div>
-   <div class="sp-field"><div class="sp-label">Data fim</div><input class="sp-inp" id="sp-inst-fim" type="date" value="${inst.data_fim || ''}" onchange="_instScheduleAutoSave()"></div>
+   <div class="sp-field"><div class="sp-label">Data início <span class="req">*</span></div><input class="sp-inp" id="sp-inst-inicio" type="date" value="${inst.data_inicio || ''}" onchange="_instScheduleAutoSave()"></div>
+   <div class="sp-field"><div class="sp-label">Data fim <span class="req">*</span></div><input class="sp-inp" id="sp-inst-fim" type="date" value="${inst.data_fim || ''}" onchange="_instScheduleAutoSave()"></div>
   </div>
   <div class="sp-g2">
    <div class="sp-field"><div class="sp-label">Nº dias programados</div><input class="sp-inp" value="${diasProgramados != null ? diasProgramados : '—'}" readonly title="Automático — diferença entre Data início e Data fim"></div>
@@ -208,7 +208,7 @@ function _spInstalacaoRender(inst) {
   </div>
   <div class="sp-field"><div class="sp-label">Detalhes</div><textarea class="sp-inp" id="sp-inst-detalhes" rows="1" style="resize:none;overflow:hidden;min-height:34px" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';_instScheduleAutoSave()">${inst.detalhes || ''}</textarea></div>
 
-  <div class="sp-stitle">Equipe de Instalação</div>
+  <div class="sp-stitle">Equipe de Instalação <span class="req">*</span></div>
   <div id="sp-inst-equipe-dd" class="no-msel-wide"><div style="font-size:12px;color:var(--muted);padding:8px 0">Carregando...</div></div>
 
   <div class="sp-stitle" style="display:flex;align-items:center;justify-content:space-between">
@@ -255,6 +255,12 @@ async function _instDetEquipeToggle(campo, valor, checked) {
  if (!_instAtiva) return;
  var equipe = (_instEquipesCacheDet || []).find(function(e){ return e.nome === valor; });
  if (!equipe) return;
+ // Equipe de Instalação é obrigatória (mesma regra do formulário de
+ // criação, obras.js) — não deixa desmarcar a última pessoa restante.
+ if (!checked && _instDetEquipeSel.length <= 1) {
+  _showToast('Equipe de Instalação é obrigatória — mantenha ao menos 1 pessoa.', 'erro');
+  return;
+ }
  _instDetEquipeSel = _msToggle(_instDetEquipeSel, valor, checked);
  var dd = document.getElementById('sp-inst-equipe-dd');
  if (dd) dd.innerHTML = _instDetEquipeDropdownHTML();
@@ -297,15 +303,34 @@ async function _spSalvarInstalacaoFull() {
  if (_instAutoSaveTimer) { clearTimeout(_instAutoSaveTimer); _instAutoSaveTimer = null; }
  var id = document.getElementById('sp-inst-id')?.value;
  if (!id || !_sb) return;
+ var elTipo = document.getElementById('sp-inst-tipo');
+ var elStatus = document.getElementById('sp-inst-status');
+ var elInicio = document.getElementById('sp-inst-inicio');
+ var elFim = document.getElementById('sp-inst-fim');
+ // Mesmos 4 campos obrigatórios do formulário de CRIAÇÃO (Nova Instalação,
+ // obras.js) — levantamento de campos obrigatórios encontrou que aqui, no
+ // autosave do detalhamento, dava pra limpar qualquer um deles e salvar
+ // null sem aviso nenhum, mesmo com o asterisco de obrigatório no rótulo.
+ // Ignora só o(s) campo(s) esvaziado(s) (devolve o valor anterior) em vez
+ // de recusar a alteração inteira — permite salvar o resto normalmente
+ // mesmo se um dado legado já estiver sem um desses valores.
  var payload = {
-  tipo_servico: document.getElementById('sp-inst-tipo')?.value || null,
-  funil: document.getElementById('sp-inst-status')?.value || null,
-  data_inicio: document.getElementById('sp-inst-inicio')?.value || null,
-  data_fim: document.getElementById('sp-inst-fim')?.value || null,
+  tipo_servico: elTipo?.value || null,
+  funil: elStatus?.value || null,
+  data_inicio: elInicio?.value || null,
+  data_fim: elFim?.value || null,
   dias_executados: document.getElementById('sp-inst-dias-exec')?.value !== '' ? Number(document.getElementById('sp-inst-dias-exec')?.value) : null,
   detalhes: document.getElementById('sp-inst-detalhes')?.value?.trim() || null,
   updated_at: new Date().toISOString(),
  };
+ var faltando = [];
+ if (!payload.tipo_servico) { faltando.push('Tipo de Serviço'); delete payload.tipo_servico; if (_instAtiva && typeof _srchSelSelectItem === 'function') _srchSelSelectItem('instDetTipo', _instAtiva.tipo_servico || ''); }
+ if (!payload.funil) { faltando.push('Status'); delete payload.funil; if (_instAtiva && typeof _srchSelSelectItem === 'function') _srchSelSelectItem('instDetStatus', _instAtiva.funil || ''); }
+ if (!payload.data_inicio) { faltando.push('Data início'); delete payload.data_inicio; if (elInicio && _instAtiva) elInicio.value = _instAtiva.data_inicio || ''; }
+ if (!payload.data_fim) { faltando.push('Data fim'); delete payload.data_fim; if (elFim && _instAtiva) elFim.value = _instAtiva.data_fim || ''; }
+ if (faltando.length) _showToast('Campo obrigatório: ' + faltando.join(', ') + '. Alteração não foi salva.', 'erro');
+ var camposReais = Object.keys(payload).filter(function(k){ return k !== 'updated_at'; });
+ if (!camposReais.length) return;
  var res = await _sb.from('instalacoes').update(payload).eq('id', id);
  if (res.error) { console.error('[Instalações] erro ao salvar:', res.error); _showToast('Erro ao salvar: ' + _supaErrPt(res.error.message), 'erro'); return; }
  if (_instAtiva && String(_instAtiva.id) === String(id)) Object.assign(_instAtiva, payload);
