@@ -1092,6 +1092,14 @@ td{font-size:13px}
 .sp-inp{font-size:13px;color:var(--text);padding:6px 10px;border:1px solid transparent;border-radius:var(--r-sm);background:transparent;width:100%;box-sizing:border-box;outline:none;font-family:inherit;transition:border-color .12s,background .12s}
 .sp-inp:hover,.sp-inp:focus{border-color:var(--border);background:var(--surface2)}
 .sp-inp:focus{border-color:var(--navy)}
+/* Pedido explícito: campo readonly (ex.: Quantidade/Valor da obra,
+   calculados automaticamente a partir dos Projetos) tinha exatamente a
+   mesma aparência de um campo editável — até reagia a hover/focus como se
+   fosse. Fundo diferente (var(--surface2) sempre, não só no hover),
+   cursor "não permitido" e SEM reação a hover/focus deixam claro, sem
+   precisar de texto extra, que ali não dá pra digitar. */
+.sp-inp[readonly]{background:var(--surface2);color:var(--muted);cursor:not-allowed}
+.sp-inp[readonly]:hover,.sp-inp[readonly]:focus{border-color:transparent;background:var(--surface2)}
 .sp-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .sp-g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .sp-stitle{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--navy);margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)}

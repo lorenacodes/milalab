@@ -14,6 +14,20 @@ function _spObras(row, tds) {
 var _tipoClsBd = {
  'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by','Misto (LSF+A36)':'bn'
 };
+
+// Tag "Automático" — pedido explícito: campo readonly calculado (Quantidade/
+// Valor da obra, somados dos Projetos vinculados) precisava deixar claro,
+// de forma discreta e no mesmo padrão visual do resto do sistema, que
+// aquele valor não é digitável e de onde ele vem — não só a cor de fundo
+// diferente do <input> (ver .sp-inp[readonly] em main.css), que sozinha
+// não explicava o "porquê". Reaproveita a base de .badge (mesmo componente
+// de tag usado em todo o app), cor neutra (var(--muted)) — não é um
+// status/categoria, é só uma nota informativa.
+function _spAutoTagHTML(tooltip) {
+ return '<span class="badge" style="background:var(--surface2);color:var(--muted);font-size:9px;font-weight:600;text-transform:none;letter-spacing:0;gap:3px;margin-left:6px;vertical-align:middle" title="' + (tooltip||'').replace(/"/g,'&quot;') + '">'
+  + '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="flex-shrink:0"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>'
+  + 'Automático</span>';
+}
 // Cor do badge "Tipo de orçamento" na tabela de Projetos (dentro do
 // detalhamento de Obra) — pedido explícito: seguir o mesmo padrão de cores
 // de categoria (verde/roxo/azul/amarelo), com laranja pra qualquer valor
@@ -1637,7 +1651,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // totalQtd já calculado acima pro rodapé da aba Projetos), mesmo espírito
   // do "Valor da obra" (também automático agora). Vale só aqui no MilaLab —
   // não reflete de volta no Airtable, que continua com o valor histórico dele.
-  + '<div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-obra-quantidade" type="text" value="' + totalQtd + '" readonly title="Automático — soma da quantidade de todos os projetos vinculados"></div>'
+  + '<div class="sp-field"><div class="sp-label">Quantidade' + _spAutoTagHTML('Somado automaticamente a partir dos projetos vinculados') + '</div><input class="sp-inp" id="sp-obra-quantidade" type="text" value="' + totalQtd + '" readonly></div>'
   // Pedido explícito: "Valor da obra" deixa de ser digitável — vira 100%
   // automático, soma do Valor total (valor_unitario × quantidade) de
   // todos os Projetos vinculados (mesmo totalValor já calculado acima
@@ -1645,7 +1659,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // podia ficar dessincronizado da soma real dos projetos); agora é
   // sempre recalculado a cada render e persistido automaticamente em
   // _spSaveObraFull, sem depender do usuário digitar nem do valor antigo.
-  + '<div class="sp-field"><div class="sp-label">Valor da obra</div><input class="sp-inp" id="sp-obra-valor" type="text" value="' + fmtMoeda(totalValor) + '" readonly title="Automático — soma do valor total de todos os projetos vinculados"></div>'
+  + '<div class="sp-field"><div class="sp-label">Valor da obra' + _spAutoTagHTML('Somado automaticamente a partir do valor total dos projetos vinculados') + '</div><input class="sp-inp" id="sp-obra-valor" type="text" value="' + fmtMoeda(totalValor) + '" readonly></div>'
   + '</div>'
 
   + '<div class="sp-stitle">Empresa(s) & Contato</div>'
