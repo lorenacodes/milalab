@@ -110,33 +110,210 @@ function _instApplyFilters() {
  }
 }
 
+// Reescrito (pedido explícito, congruente com o Airtable) — a versão
+// antiga lia os campos de tds[N].innerText (texto já formatado da linha
+// da TABELA cheia de Instalações). Bug real: qualquer entrada que não
+// viesse de um <tr> de verdade (ex.: o card de Instalação dentro do
+// detalhamento de Obra, que abre via _spOpenEntityById → uma <tr> FAKE
+// sem nenhuma célula) tinha tds vazio — o painel abria sem nenhuma
+// informação. Agora busca por id, com todos os relacionamentos reais
+// (mesmo padrão de _spObraById/_spProjetoRender).
 function _spInstalacoes(row, tds) {
- const nome   = tds[0]?.innerText?.trim() || '';
- const cli    = tds[1]?.innerText?.trim() || '';
- const tipo   = tds[2]?.innerText?.trim() || '';
- const equipe = tds[3]?.innerText?.trim() || '';
- const ini    = tds[4]?.innerText?.trim() || '';
- const fim    = tds[5]?.innerText?.trim() || '';
- const dias   = tds[6]?.innerText?.trim() || '';
- const status = tds[7]?.innerText?.trim() || '';
- const html = `
-  <div class="sp-field"><div class="sp-label">Instalação</div><input class="sp-inp" value="${nome}"></div>
+ _spInstalacaoById(row.dataset.id);
+}
+
+// Cores de identidade — mesmo mapa de _dbLoadInstalacoes acima, cópia
+// local (não é global em nenhum dos dois lugares).
+var _instStatusCls = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
+var _instAtiva = null; // instalação atualmente aberta no painel (autosave lê daqui)
+var _instDetEquipeSel = [];
+var _instEquipesCacheDet = null;
+
+async function _spInstalacaoById(id) {
+ if (!id) return;
+ _spSet('Instalação', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
+ document.getElementById('sp-overlay').classList.add('sp-open');
+ document.getElementById('sp-drawer').classList.add('sp-open');
+ if (typeof _spTrackDirectOpen === 'function') _spTrackDirectOpen('instalacoes', id);
+ if (!_sb) return;
+ // obras_instalacoes/instalacoes_equipe — as duas relações N:N de verdade
+ // (Instalação pode ter várias Obras, igual ao Airtable — decisão
+ // confirmada com a usuária; e várias Equipes, já existente).
+ var res = await _sb.from('instalacoes')
+  .select('*, obras_instalacoes(obra:obra_id(id,nome,cidade,estado)), instalacoes_equipe(equipe:equipe_id(id,nome))')
+  .eq('id', id).single();
+ if (res.error || !res.data) {
+  _spSet('Instalação', 'Erro', '<div style="color:var(--red);padding:20px">Instalação não encontrada.</div>', '');
+  return;
+ }
+ _spInstalacaoRender(res.data);
+}
+
+function _spInstalacaoRender(inst) {
+ _instAtiva = inst;
+ var obras = (inst.obras_instalacoes || []).map(function(x){ return x.obra; }).filter(Boolean);
+ var equipes = (inst.instalacoes_equipe || []).map(function(x){ return x.equipe; }).filter(Boolean);
+ // Cidade/Estado — rollup das Obras vinculadas (mesmo espírito do rollup
+ // de Cidade/Estado no detalhamento de Projeto) — com várias obras
+ // possíveis aqui, mostra a lista única de valores, não só o 1º.
+ var cidades = Array.from(new Set(obras.map(function(o){ return o.cidade; }).filter(Boolean)));
+ var estados = Array.from(new Set(obras.map(function(o){ return o.estado; }).filter(Boolean)));
+ var diasProgramados = (inst.data_inicio && inst.data_fim)
+  ? Math.round((new Date(inst.data_fim) - new Date(inst.data_inicio)) / 86400000)
+  : null;
+ // Sem "nome" na tabela nem número sequencial migrado do Airtable (o "121"
+ // do print é o autonumber interno do Airtable, nunca existiu no Supabase)
+ // — pedido de "congruência com os dados que temos": título construído só
+ // do que é real (Tipo de serviço + Obra(s)), sem inventar um número.
+ var titulo = (inst.tipo_servico || 'Instalação') + (obras.length ? ' — ' + obras.map(function(o){ return o.nome; }).join(', ') : '');
+
+ _srchSelRegister('instDetTipo', {
+  options: ['Instalação','Montagem fábrica','Treinamento piloto','Assistência técnica'],
+  placeholder: 'Selecione...', onSelect: function(){ _instScheduleAutoSave(); },
+ });
+ _srchSelRegister('instDetStatus', {
+  options: ['A programar','Programado','Emitir boleto de medição','Em execução','Finalizado'],
+  placeholder: 'Selecione...', onSelect: function(){ _instScheduleAutoSave(); },
+ });
+ _srchSelRegister('instDetObraAdd', {
+  options: function(){ return (_obraIdMap ? Object.keys(_obraIdMap).map(function(oid){ return { id: oid, label: _obraIdMap[oid].nome }; }) : []).map(function(o){ return o.label; }); },
+  placeholder: 'Buscar obra pra vincular...',
+  onSelect: function(nomeEscolhido) {
+   var oid = null;
+   if (typeof _obraIdMap !== 'undefined') {
+    oid = Object.keys(_obraIdMap).find(function(k){ return _obraIdMap[k].nome === nomeEscolhido; });
+   }
+   if (oid) _instObraVincular(oid);
+  },
+ });
+
+ var html = `
+  <input type="hidden" id="sp-inst-id" value="${inst.id}">
+  <div class="sp-field"><div class="sp-label">Tipo de Serviço</div>${_srchSelMarkup('instDetTipo', 'sp-inst-tipo', inst.tipo_servico || '')}</div>
+  <div class="sp-field"><div class="sp-label">Status</div>${_srchSelMarkup('instDetStatus', 'sp-inst-status', inst.funil || '')}</div>
   <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Cliente</div><input class="sp-inp" value="${cli}"></div>
-   <div class="sp-field"><div class="sp-label">Tipo</div><input class="sp-inp" value="${tipo}"></div>
+   <div class="sp-field"><div class="sp-label">Data início</div><input class="sp-inp" id="sp-inst-inicio" type="date" value="${inst.data_inicio || ''}" onchange="_instScheduleAutoSave()"></div>
+   <div class="sp-field"><div class="sp-label">Data fim</div><input class="sp-inp" id="sp-inst-fim" type="date" value="${inst.data_fim || ''}" onchange="_instScheduleAutoSave()"></div>
   </div>
   <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Equipe</div><input class="sp-inp" value="${equipe}"></div>
-   <div class="sp-field"><div class="sp-label">Dias previstos</div><input class="sp-inp" value="${dias}"></div>
+   <div class="sp-field"><div class="sp-label">Nº dias programados</div><input class="sp-inp" value="${diasProgramados != null ? diasProgramados : '—'}" readonly title="Automático — diferença entre Data início e Data fim"></div>
+   <div class="sp-field"><div class="sp-label">Nº dias executados</div><input class="sp-inp" id="sp-inst-dias-exec" type="number" min="0" value="${inst.dias_executados != null ? inst.dias_executados : ''}" onchange="_instScheduleAutoSave()"></div>
   </div>
   <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Início</div><input class="sp-inp" value="${ini}"></div>
-   <div class="sp-field"><div class="sp-label">Fim</div><input class="sp-inp" value="${fim}"></div>
+   <div class="sp-field"><div class="sp-label">Cidade (das Obras)</div><input class="sp-inp" value="${cidades.length ? cidades.join(', ') : '—'}" readonly></div>
+   <div class="sp-field"><div class="sp-label">Estado (das Obras)</div><input class="sp-inp" value="${estados.length ? estados.join(', ') : '—'}" readonly></div>
   </div>
-  <div class="sp-field"><div class="sp-label">Status</div><input class="sp-inp" value="${status}"></div>
+  <div class="sp-field"><div class="sp-label">Detalhes</div><textarea class="sp-inp" id="sp-inst-detalhes" rows="1" style="resize:none;overflow:hidden;min-height:34px" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';_instScheduleAutoSave()">${inst.detalhes || ''}</textarea></div>
+
+  <div class="sp-stitle">Equipe de Instalação</div>
+  <div id="sp-inst-equipe-dd" class="no-msel-wide"><div style="font-size:12px;color:var(--muted);padding:8px 0">Carregando...</div></div>
+
+  <div class="sp-stitle" style="display:flex;align-items:center;justify-content:space-between">
+   <span>Obras vinculadas</span>
+   <button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_instObraAddToggle()">+ Vincular</button>
+  </div>
+  <div id="sp-inst-obra-add" style="display:none;margin-bottom:8px">${_srchSelMarkup('instDetObraAdd', 'sp-inst-obra-add-hidden', '')}</div>
+  <div id="sp-inst-obras-chips" class="sp-rel-chips-wrap">${
+   obras.length
+    ? obras.map(function(o){ return _spRelChipHTML('obras', o.id, o.nome || '—', null, '_instObraDesvincular(\'' + inst.id + '\',\'' + o.id + '\')'); }).join('')
+    : '<div class="sp-empty">Nenhuma obra vinculada.</div>'
+  }</div>
  `;
- _spSet('Instalação', nome, html,
-  '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+
+ // Exclusão disponível pra qualquer usuário (RLS de `instalacoes` já é
+ // aberta a qualquer autenticado, sem restrição adicional pedida) —
+ // mesmo padrão de Projeto. CASCADE no banco já limpa obras_instalacoes/
+ // instalacoes_equipe/documentos_instalacoes sozinho.
+ _spSet('Instalação', titulo, html,
+  '<button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);margin-right:auto" onclick="_spExcluirInstalacao(\'' + inst.id + '\',\'' + titulo.replace(/'/g,"\\'") + '\')">Excluir instalação</button> '
+  + '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+
+ _instDetEquipeSel = equipes.map(function(e){ return e.nome; });
+ _instCarregarEquipesCacheDet().then(function(){
+  var dd = document.getElementById('sp-inst-equipe-dd');
+  if (dd) dd.innerHTML = _instDetEquipeDropdownHTML();
+ });
+}
+
+async function _instCarregarEquipesCacheDet() {
+ if (_instEquipesCacheDet) return;
+ var res = await _sb.from('equipe_instalacao').select('id,nome').order('nome');
+ _instEquipesCacheDet = res.data || [];
+}
+function _instDetEquipeDropdownHTML() {
+ var opcoes = (_instEquipesCacheDet || []).map(function(e){ return e.nome; });
+ return _msRenderDropdown('instDetEquipe', opcoes, _instDetEquipeSel, '_instDetEquipeToggle', 'Selecione a(s) equipe(s)...');
+}
+// Toggle persiste na hora (insert/delete direto em instalacoes_equipe) —
+// diferente do formulário de CRIAÇÃO (obras.js), que só grava tudo junto
+// no fim; aqui a instalação já existe, então cada clique já é uma
+// alteração de verdade, mesmo espírito do autosave do resto do sistema.
+async function _instDetEquipeToggle(campo, valor, checked) {
+ if (!_instAtiva) return;
+ var equipe = (_instEquipesCacheDet || []).find(function(e){ return e.nome === valor; });
+ if (!equipe) return;
+ _instDetEquipeSel = _msToggle(_instDetEquipeSel, valor, checked);
+ var dd = document.getElementById('sp-inst-equipe-dd');
+ if (dd) dd.innerHTML = _instDetEquipeDropdownHTML();
+ if (typeof _noReabrirDropdown === 'function') _noReabrirDropdown('sp-inst-equipe-dd');
+ if (checked) {
+  var insRes = await _sb.from('instalacoes_equipe').insert({ instalacao_id: _instAtiva.id, equipe_id: equipe.id });
+  if (insRes.error) console.error('[Instalações] erro ao vincular equipe:', insRes.error);
+ } else {
+  var delRes = await _sb.from('instalacoes_equipe').delete().eq('instalacao_id', _instAtiva.id).eq('equipe_id', equipe.id);
+  if (delRes.error) console.error('[Instalações] erro ao desvincular equipe:', delRes.error);
+ }
+}
+
+function _instObraAddToggle() {
+ var box = document.getElementById('sp-inst-obra-add');
+ if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+}
+async function _instObraVincular(obraId) {
+ if (!_instAtiva) return;
+ var res = await _sb.from('obras_instalacoes').insert({ obra_id: obraId, instalacao_id: _instAtiva.id });
+ if (res.error) { _showToast('Erro ao vincular obra: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ _showToast('Obra vinculada.', 'ok');
+ _spInstalacaoById(_instAtiva.id);
+}
+async function _instObraDesvincular(instalacaoId, obraId) {
+ if (!confirm('Desvincular esta obra da instalação?\n\nNão apaga a obra nem a instalação, só remove o vínculo entre as duas.')) return;
+ var res = await _sb.from('obras_instalacoes').delete().eq('instalacao_id', instalacaoId).eq('obra_id', obraId);
+ if (res.error) { _showToast('Erro ao desvincular: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ _spInstalacaoById(instalacaoId);
+}
+
+// Autosave (mesmo espírito de _obraScheduleAutoSave/_spSaveObraFull,
+// obras.js: debounce de 700ms, sem botão "Salvar").
+var _instAutoSaveTimer = null;
+function _instScheduleAutoSave() {
+ if (_instAutoSaveTimer) clearTimeout(_instAutoSaveTimer);
+ _instAutoSaveTimer = setTimeout(function(){ _spSalvarInstalacaoFull(); }, 700);
+}
+async function _spSalvarInstalacaoFull() {
+ if (_instAutoSaveTimer) { clearTimeout(_instAutoSaveTimer); _instAutoSaveTimer = null; }
+ var id = document.getElementById('sp-inst-id')?.value;
+ if (!id || !_sb) return;
+ var payload = {
+  tipo_servico: document.getElementById('sp-inst-tipo')?.value || null,
+  funil: document.getElementById('sp-inst-status')?.value || null,
+  data_inicio: document.getElementById('sp-inst-inicio')?.value || null,
+  data_fim: document.getElementById('sp-inst-fim')?.value || null,
+  dias_executados: document.getElementById('sp-inst-dias-exec')?.value !== '' ? Number(document.getElementById('sp-inst-dias-exec')?.value) : null,
+  detalhes: document.getElementById('sp-inst-detalhes')?.value?.trim() || null,
+  updated_at: new Date().toISOString(),
+ };
+ var res = await _sb.from('instalacoes').update(payload).eq('id', id);
+ if (res.error) { console.error('[Instalações] erro ao salvar:', res.error); _showToast('Erro ao salvar: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ if (_instAtiva && String(_instAtiva.id) === String(id)) Object.assign(_instAtiva, payload);
+}
+
+async function _spExcluirInstalacao(id, nome) {
+ if (!confirm('Excluir "' + (nome || 'esta instalação') + '" PERMANENTEMENTE?\n\nVínculos com obras/equipes/documentos desta instalação também serão excluídos. Esta ação não pode ser desfeita.')) return;
+ var res = await _sb.from('instalacoes').delete().eq('id', id);
+ if (res.error) { alert('Erro ao excluir: ' + (res.error?.message || '')); return; }
+ closePanel();
+ if (typeof _dbLoadInstalacoes === 'function') _dbLoadInstalacoes();
 }
 
 async function _dbLoadInstalacoes() {
@@ -145,11 +322,14 @@ async function _dbLoadInstalacoes() {
  try {
   var allData = []; var from = 0;
   while (true) {
-   // instalacoes_equipe(equipe:...) — junção N:N (pedido explícito: coluna
-   // "Equipe" da tabela era hardcoded "—", nunca tinha sido ligada de
-   // verdade a nenhum dado; ver _spInstalacoes abaixo pro detalhamento).
+   // obras_instalacoes/instalacoes_equipe — as duas relações N:N de
+   // verdade (Instalação pode ter várias Obras, igual ao Airtable —
+   // decisão confirmada com a usuária; e várias Equipes). Coluna "Equipe"
+   // era hardcoded "—" antes, nunca tinha sido ligada de verdade a nenhum
+   // dado; "Obra"/"Cliente" liam só de instalacoes.obra_id, que só guarda
+   // 1 obra — ver _spInstalacaoById abaixo pro detalhamento completo.
    var res = await _sb.from('instalacoes')
-    .select('id, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, obra_id, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome))), instalacoes_equipe(equipe:equipe_id(nome))')
+    .select('id, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, obras_instalacoes(obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))), instalacoes_equipe(equipe:equipe_id(nome))')
     .order('data_inicio', { ascending: false })
     .range(from, from + 999);
    if (res.error) throw new Error(res.error.message);
@@ -170,9 +350,10 @@ async function _dbLoadInstalacoes() {
   }
   var funilCls = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
   tbody.innerHTML = allData.map(function(inst) {
-   var obraNome = (inst.obra && inst.obra.nome) || '—';
+   var obrasLigadas = (inst.obras_instalacoes || []).map(function(x){ return x.obra; }).filter(Boolean);
+   var obraNome = obrasLigadas.length ? obrasLigadas.map(function(o){ return o.nome; }).join(', ') : '—';
    var clienteNome = '—';
-   try { clienteNome = inst.obra.empresas_obras[0].empresa.nome || '—'; } catch(e) {}
+   try { clienteNome = obrasLigadas[0].empresas_obras[0].empresa.nome || '—'; } catch(e) {}
    var tipo = inst.tipo_servico || '—';
    var equipeNomes = (inst.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean).join(', ') || '—';
    var funil = inst.funil || '—';

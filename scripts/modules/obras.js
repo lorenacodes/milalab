@@ -645,7 +645,12 @@ async function _spObraById(id) {
    _sb.from('obras').select('*, empresas_obras(empresa_id,empresa:empresa_id(id,nome,cnpj)), contatos_obras(contato_id,contato:contato_id(id,nome_completo))').eq('id', id).single(),
    _sb.from('projetos').select('*').eq('obra_id', id).order('created_at'),
    _sb.from('entregas').select('*').eq('obra_id', id).order('data_faturamento', { ascending: false, nullsFirst: false }),
-   _sb.from('instalacoes').select('*').eq('obra_id', id).order('data_inicio'),
+   // Instalação↔Obra é N:N de verdade (obras_instalacoes, confirmado que
+   // o Airtable permite várias Obras por Instalação — decisão confirmada
+   // com a usuária: usar a junção em tudo, não mais instalacoes.obra_id,
+   // que só guardava 1). Mapeado abaixo pra manter o mesmo formato de
+   // array de instalações que o resto do código já espera.
+   _sb.from('obras_instalacoes').select('instalacao:instalacao_id(*)').eq('obra_id', id),
    // "Tarefas": Atividades do Gestor de Tarefas vinculadas a esta obra —
    // pedido explícito. obra_id não é mais coluna direta de atividades (ver
    // scripts/lib/atividades-vinculos.js), vive na junção atividades_obras.
@@ -668,7 +673,7 @@ async function _spObraById(id) {
   const projetos  = projRes.data || [];
   projetos.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
   const entregas  = entregasRes.data || [];
-  const instalacoes = instRes.data || [];
+  const instalacoes = (instRes.data || []).map(function(link){ return link.instalacao; }).filter(Boolean);
   const atividades = (atividadesRes.data || []).map(function(link){ return link.atividade; }).filter(Boolean);
   atividades.forEach(function(a){ if (Array.isArray(a.responsavel)) a.responsavel = _emailsToNomes(a.responsavel); });
 
@@ -2607,8 +2612,14 @@ async function _instExistenteFiltrar(q) {
  if (!resEl) return;
  if (!_instExistentesCache) {
   resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Buscando...</div>';
-  var r = await _sb.from('instalacoes').select('id,tipo_servico,funil,data_inicio').is('obra_id', null).order('created_at', { ascending: false });
-  _instExistentesCache = r.data || [];
+  // "Sem obra" agora significa "não aparece em obras_instalacoes nenhuma"
+  // (N:N de verdade — decisão confirmada com a usuária) — não dá pra
+  // filtrar isso com um .is('obra_id', null) simples feito antes; busca
+  // todos os instalacao_id já vinculados e filtra fora em memória.
+  var linkedRes = await _sb.from('obras_instalacoes').select('instalacao_id');
+  var linkedIds = new Set((linkedRes.data || []).map(function(l){ return l.instalacao_id; }));
+  var r = await _sb.from('instalacoes').select('id,tipo_servico,funil,data_inicio').order('created_at', { ascending: false });
+  _instExistentesCache = (r.data || []).filter(function(i){ return !linkedIds.has(i.id); });
  }
  var qn = (q || '').toLowerCase().trim();
  var lista = _instExistentesCache.filter(function(i) {
@@ -2624,7 +2635,7 @@ async function _instExistenteFiltrar(q) {
 }
 async function _instExistenteVincular(id) {
  if (!_obraAtiva || !_obraAtiva.id) return;
- var res = await _sb.from('instalacoes').update({ obra_id: _obraAtiva.id }).eq('id', id);
+ var res = await _sb.from('obras_instalacoes').insert({ obra_id: _obraAtiva.id, instalacao_id: id });
  if (res.error) { _showToast('Erro ao vincular: ' + _supaErrPt(res.error.message), 'erro'); return; }
  _showToast('Instalação vinculada.', 'ok');
  _instExistenteToggle();
@@ -2686,7 +2697,6 @@ async function _spCriarInstalacao() {
  if (!_instEquipeSel.length) faltando.push('Equipe de Instalação');
  if (faltando.length) { _showToast('Preencha: ' + faltando.join(', '), 'aviso'); return; }
  const payload = {
-  obra_id: _obraAtiva.id,
   tipo_servico: tipoServico,
   funil: status,
   data_inicio: dataInicio,
@@ -2695,6 +2705,11 @@ async function _spCriarInstalacao() {
  };
  const { data: instRow, error } = await _sb.from('instalacoes').insert(payload).select('id').single();
  if (error) { alert('Erro ao criar instalação: ' + (error?.message || '')); return; }
+ // Vincula a esta Obra — obras_instalacoes é N:N de verdade (decisão
+ // confirmada com a usuária: Instalação pode ter várias Obras, igual ao
+ // Airtable) — instalacoes.obra_id não é mais usado pra novos registros.
+ const obraLinkRes = await _sb.from('obras_instalacoes').insert({ obra_id: _obraAtiva.id, instalacao_id: instRow.id });
+ if (obraLinkRes.error) console.error('[Obras] erro ao vincular instalação à obra:', obraLinkRes.error);
  // Vincula a(s) equipe(s) selecionada(s) — junção instalacoes_equipe, sem
  // colunas extras (só instalacao_id/equipe_id).
  if (_instEquipeSel.length && instRow && instRow.id) {
