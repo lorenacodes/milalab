@@ -2686,7 +2686,12 @@ async function _instExistenteFiltrar(q) {
   // daquele escopo, não enxerga esse helper. Cópia local aqui (mesma lógica,
   // mesmo truque de 'T00:00:00' pra não perder 1 dia por fuso horário).
   var fmtDataLocal = function(d) { return d ? new Date(String(d).substring(0,10) + 'T00:00:00').toLocaleDateString('pt-BR') : '—'; };
-  resEl.innerHTML = lista.slice(0, 30).map(function(i) {
+  // Achado real: cortar em 30 escondia a maioria das instalações sem filtro
+  // nenhum digitado (agora que a busca lista TODAS, não só as sem obra —
+  // são ~130 no total). A caixa de resultados já rola (max-height:180px,
+  // overflow-y:auto — ver markup), então não precisa desse limite artificial;
+  // a busca por tipo de serviço é quem estreita a lista quando necessário.
+  resEl.innerHTML = lista.map(function(i) {
    var outrasObras = (i.obras_instalacoes || []).map(function(x){ return x.obra && x.obra.nome; }).filter(Boolean);
    var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - ' + (outrasObras.length ? outrasObras.join(', ') : '(sem obra)');
    var statusBadge = i.funil ? '<span class="badge ' + (_instStatusClsObra[i.funil]||'bm') + '" style="font-size:9px;flex-shrink:0">' + i.funil + '</span>' : '';
