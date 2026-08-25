@@ -2681,6 +2681,11 @@ async function _instExistenteFiltrar(q) {
   // (instCards acima) — nome com a fórmula + badge de status no topo,
   // badges de Categoria/Equipe e datas embaixo — só que compacto, pra
   // caber vários resultados de busca numa lista rolável.
+  // fmtData é uma função LOCAL de _spObraById (linha ~1386) — causa raiz do
+  // "fmtData is not defined": _instExistenteFiltrar é uma função irmã, fora
+  // daquele escopo, não enxerga esse helper. Cópia local aqui (mesma lógica,
+  // mesmo truque de 'T00:00:00' pra não perder 1 dia por fuso horário).
+  var fmtDataLocal = function(d) { return d ? new Date(String(d).substring(0,10) + 'T00:00:00').toLocaleDateString('pt-BR') : '—'; };
   resEl.innerHTML = lista.slice(0, 30).map(function(i) {
    var outrasObras = (i.obras_instalacoes || []).map(function(x){ return x.obra && x.obra.nome; }).filter(Boolean);
    var instNome = (i.numero != null ? i.numero : '?') + ' - ' + (i.tipo_servico || 'Instalação') + ' - ' + (outrasObras.length ? outrasObras.join(', ') : '(sem obra)');
@@ -2695,20 +2700,15 @@ async function _instExistenteFiltrar(q) {
     + '</div>'
     + '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:10px;color:var(--muted)">'
     + categoriaBadge
-    + '<span>Início: ' + fmtData(i.data_inicio) + '</span>'
-    + '<span>Fim: ' + fmtData(i.data_fim) + '</span>'
+    + '<span>Início: ' + fmtDataLocal(i.data_inicio) + '</span>'
+    + '<span>Fim: ' + fmtDataLocal(i.data_fim) + '</span>'
     + equipeBadge
     + '</div>'
     + '</div>';
   }).join('');
  } catch (err) {
   console.error('[Obras] erro ao buscar instalações:', err);
-  // Mostra o detalhe técnico cru (em vez do texto genérico de _supaErrPt)
-  // só nesta busca específica — ainda em diagnóstico de um bug real que
-  // já travou essa tela sem dar nenhuma pista; assim que resolvido, isso
-  // pode voltar a usar _supaErrPt como todo o resto do sistema.
-  var detalhe = (err && (err.message || err.details || err.hint)) || 'erro desconhecido';
-  resEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:6px 0">Erro ao buscar instalações: ' + detalhe.replace(/</g,'&lt;') + '</div>';
+  resEl.innerHTML = '<div style="font-size:11px;color:var(--red);padding:6px 0">Erro ao buscar instalações: ' + _supaErrPt((err && err.message) || 'tente novamente') + '</div>';
  }
 }
 async function _instExistenteVincular(id) {
