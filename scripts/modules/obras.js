@@ -1522,7 +1522,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
      var statusBadge = i.funil ? '<span class="badge ' + (_instStatusClsObra[i.funil]||'bm') + '" style="font-size:9px;flex-shrink:0">' + i.funil + '</span>' : '';
      var categoriaBadge = i.tipo_servico ? '<span class="badge bo" style="font-size:10px">' + i.tipo_servico + '</span>' : '<span style="color:var(--muted)">—</span>';
      var equipeNomes = (i.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean);
-     var equipeBadge = equipeNomes.length
+     var equipeBadges = equipeNomes.length
       ? equipeNomes.map(function(n){ return '<span class="badge bm" style="font-size:10px">' + n + '</span>'; }).join(' ')
       : '<span style="color:var(--muted)">—</span>';
      return '<div class="sp-item-card" onclick="_spOpenEntityById(\'instalacoes\',\'' + i.id + '\')">'
@@ -1530,12 +1530,18 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
       + '<div class="sp-item-title" style="margin-bottom:0">' + instNome + '</div>'
       + statusBadge
       + '</div>'
-      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px 10px">'
+      // Categoria/Data início/Data fim: 3 campos de valor único e curto,
+      // grid de largura fixa. Equipe de Instalação fica FORA do grid, numa
+      // linha própria com badges que quebram livremente (flex-wrap) — indo
+      // pro grid ela distorcia a altura/alinhamento das outras colunas
+      // sempre que tinha mais de 1 pessoa (relatado pela usuária: "muito
+      // mal formatado... não segue os princípios de escalabilidade").
+      + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px">'
       + _instCampo('Categoria de Serviço', categoriaBadge)
       + _instCampo('Data início', fmtData(i.data_inicio))
       + _instCampo('Data fim', fmtData(i.data_fim))
-      + _instCampo('Equipe de Instalação', equipeBadge)
       + '</div>'
+      + '<div style="margin-top:8px"><div class="sp-label" style="margin-bottom:3px">Equipe de Instalação</div><div style="display:flex;flex-wrap:wrap;gap:4px">' + equipeBadges + '</div></div>'
       + (i.valor_total_gasto ? '<div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--green)">' + fmtMoeda(i.valor_total_gasto) + '</div>' : '')
       + (i.detalhes ? '<div style="margin-top:4px;font-size:11px;color:var(--muted)">' + i.detalhes + '</div>' : '')
       + '</div>';
