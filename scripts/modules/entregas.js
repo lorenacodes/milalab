@@ -494,7 +494,6 @@ function _spEntregaById(id) {
 }
 
 function _spEntregaRender(e) {
- var bucket    = _entBucketFor(e.etapa);
  var atrasado  = _entIsLate(e);
  var titulo    = e.nome_entrega || 'Entrega';
  var obraNome  = (e.obra && e.obra.nome) || '';
@@ -546,15 +545,15 @@ function _spEntregaRender(e) {
     ${_srchSelMarkup('entDetTransporte', 'sp-entdet-transporte', transp)}
    </div>
    <div class="sp-field"><div class="sp-label">Peso (kg)</div>
-    <input class="sp-inp" type="number" value="${peso}">
+    <input class="sp-inp" type="number" value="${peso}" onchange="_spEntDetSalvarCampo('${e.id}', { peso_kg: this.value !== '' ? Number(this.value) : null })">
    </div>
   </div>
   <div class="sp-g2">
    <div class="sp-field"><div class="sp-label">Qtd. (peças)</div>
-    <input class="sp-inp" type="number" value="${qtd}">
+    <input class="sp-inp" type="number" value="${qtd}" onchange="_spEntDetSalvarCampo('${e.id}', { quantidade: this.value !== '' ? Number(this.value) : null })">
    </div>
    <div class="sp-field"><div class="sp-label">Maior peça (mm)</div>
-    <input class="sp-inp" type="number" value="${maiorPeca}">
+    <input class="sp-inp" type="number" value="${maiorPeca}" onchange="_spEntDetSalvarCampo('${e.id}', { maior_peca_mm: this.value !== '' ? Number(this.value) : null })">
    </div>
   </div>
   <div class="sp-g2">
@@ -572,11 +571,9 @@ function _spEntregaRender(e) {
    </label>
   </div>
   <div class="sp-field"><div class="sp-label">Status</div>
-   <select class="sp-inp">
-    <option ${bucket==='aguardando'?'selected':''}>${e.etapa && bucket==='aguardando' ? e.etapa : 'Aguardando produção'}</option>
-    <option ${bucket==='producao'?'selected':''}>${e.etapa && bucket==='producao' ? e.etapa : 'Em produção'}</option>
-    <option ${bucket==='transporte'?'selected':''}>Em transporte</option>
-    <option ${bucket==='entregue'?'selected':''}>Entrega realizada</option>
+   <select class="sp-inp" onchange="_spEntDetSalvarCampo('${e.id}', { etapa: this.value || null })">
+    <option value="">Selecione...</option>
+    ${Object.keys(_entEtapaBucket).map(function(et){ return '<option value="' + et.replace(/"/g,'&quot;') + '" ' + (e.etapa === et ? 'selected' : '') + '>' + et + '</option>'; }).join('')}
    </select>
    ${atrasado ? '<div style="margin-top:6px;font-size:11px;font-weight:600;color:var(--red)">⚠ Faturamento vencido (atrasado)</div>' : ''}
   </div>
