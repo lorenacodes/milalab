@@ -1901,7 +1901,18 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   // Contato.
   + '<div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--border)">'
   + '<div class="sp-stitle" style="margin:0;padding:0;border:none">Instalações (' + instalacoes.length + ')</div>'
+  + '<div style="display:flex;gap:6px">'
+  // "Vincular existente" — pedido explícito: só dava pra CRIAR instalação
+  // nova por aqui, não pra pegar uma já cadastrada (sem obra, obra_id IS
+  // NULL) e associar a esta obra. Mesmo modelo de busca já usado pro
+  // "projeto existente" do wizard (_noProjExistenteToggle/Filtrar).
+  + '<button class="btn btn-ghost btn-sm" onclick="_instExistenteToggle()">+ Vincular existente</button>'
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovaInstalacao()">+ Nova Instalação</button>'
+  + '</div>'
+  + '</div>'
+  + '<div id="sp-inst-existente-box" style="display:none;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--surface2)">'
+  + '<input type="text" id="sp-inst-existente-busca" class="sp-inp" placeholder="Buscar instalação sem obra vinculada, pelo tipo de serviço..." style="font-size:12px;margin-bottom:8px" oninput="_instExistenteFiltrar(this.value)">'
+  + '<div id="sp-inst-existente-resultados" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px"></div>'
   + '</div>'
   + (function() {
       // Tipo de serviço/Status — mesmo componente de busca+single-select
@@ -1929,8 +1940,15 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '</div><div class="sp-g2" style="gap:8px;margin-top:8px">'
   + '<div class="sp-field"><div class="sp-label">Data início <span class="req">*</span></div><input class="sp-inp" id="sp-new-inst-inicio" type="date"></div>'
   + '<div class="sp-field"><div class="sp-label">Data fim <span class="req">*</span></div><input class="sp-inp" id="sp-new-inst-fim" type="date"></div>'
-  // "Valor total gasto" removido (pedido explícito) — campo não usado na
-  // criação de instalação por aqui.
+  + '</div>'
+  // Bug real encontrado (testando ao vivo): faltava fechar o <div
+  // class="sp-g2"> das datas acima — sem esse '</div>', o card da
+  // instalação recém-criada nunca aparecia (a tag desbalanceada fazia
+  // #spt-instalacao engolir TODAS as seções seguintes — Tarefas/
+  // Documentos/Registros/Auditoria — como filhas suas em vez de irmãs,
+  // quebrando o layout inteiro silenciosamente, sem erro nenhum no
+  // console). "Valor total gasto" removido (pedido explícito) — campo
+  // não usado na criação de instalação por aqui.
   // Equipe de Instalação — pedido explícito: campo que faltava. N:N de
   // verdade no banco (instalacoes_equipe, sem colunas extras — uma
   // instalação pode ter mais de uma equipe), por isso multi-select
@@ -2564,6 +2582,54 @@ async function _spCriarEmpresaObra() {
  _spToggleNovaEmpresa();
  _dbLoadObras(); _dbLoadObrasKanban();
  _dbLoadEmpresas(); // atualiza tabela de empresas em segundo plano
+}
+
+// ── Vincular Instalação EXISTENTE (sem obra) à obra atual ─────────────────────
+// Pedido explícito: só dava pra criar instalação nova por aqui. instalacoes.
+// obra_id é FK única (não N:N), então só instalações SEM obra (obra_id IS
+// NULL) aparecem na busca — mesmo modelo/mesma limitação de
+// _noProjExistenteFiltrar (wizard-nova-obra.js).
+var _instExistentesCache = null;
+function _instExistenteToggle() {
+ var box = document.getElementById('sp-inst-existente-box');
+ if (!box) return;
+ var abrir = box.style.display === 'none';
+ box.style.display = abrir ? 'block' : 'none';
+ if (abrir) {
+  var busca = document.getElementById('sp-inst-existente-busca');
+  if (busca) busca.value = '';
+  _instExistentesCache = null;
+  _instExistenteFiltrar('');
+ }
+}
+async function _instExistenteFiltrar(q) {
+ var resEl = document.getElementById('sp-inst-existente-resultados');
+ if (!resEl) return;
+ if (!_instExistentesCache) {
+  resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Buscando...</div>';
+  var r = await _sb.from('instalacoes').select('id,tipo_servico,funil,data_inicio').is('obra_id', null).order('created_at', { ascending: false });
+  _instExistentesCache = r.data || [];
+ }
+ var qn = (q || '').toLowerCase().trim();
+ var lista = _instExistentesCache.filter(function(i) {
+  return !qn || (i.tipo_servico||'').toLowerCase().indexOf(qn) !== -1;
+ });
+ if (!lista.length) { resEl.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:6px 0">Nenhuma instalação sem obra encontrada.</div>'; return; }
+ resEl.innerHTML = lista.slice(0, 30).map(function(i) {
+  return '<div onclick="_instExistenteVincular(\''+i.id+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'var(--surface)\'" onmouseout="this.style.background=\'\'">'
+   + '<span>' + (i.tipo_servico || '(sem tipo)') + '</span>'
+   + (i.funil ? '<span style="font-size:10px;color:var(--muted)">' + i.funil + '</span>' : '')
+   + '</div>';
+ }).join('');
+}
+async function _instExistenteVincular(id) {
+ if (!_obraAtiva || !_obraAtiva.id) return;
+ var res = await _sb.from('instalacoes').update({ obra_id: _obraAtiva.id }).eq('id', id);
+ if (res.error) { _showToast('Erro ao vincular: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ _showToast('Instalação vinculada.', 'ok');
+ _instExistenteToggle();
+ _spObraById(_obraAtiva.id);
+ if (typeof _dbLoadInstalacoes === 'function') _dbLoadInstalacoes();
 }
 
 // ── Quick-create Contato ──────────────────────────────────────────────────────
