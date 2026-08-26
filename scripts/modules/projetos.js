@@ -392,8 +392,12 @@ function _spProjetos(row, tds) {
 // _dbLoadProjetos); se o painel for aberto por um chip de OUTRA entidade antes
 // da página Projetos ter sido visitada (cache ainda vazio), cai para uma busca
 // direta no Supabase por id — mesma estratégia de fallback do _spObraById.
-function _spProjetoById(id) {
+async function _spProjetoById(id) {
  if (!id) return;
+ // Garante o mapa de nomes de Obra mesmo quando o painel é aberto sem a
+ // Tabela de Projetos ter carregado antes (ex.: chip vindo de outra
+ // entidade) — mesmo motivo/fix de _garantirObraIdMap em _dbLoadProjetos.
+ await _garantirObraIdMap();
  var idx = (_projetosArr || []).findIndex(function(x){ return String(x.id) === String(id); });
  var p = idx !== -1 ? _projetosArr[idx] : null;
  if (p) { _spProjetoRender(p, idx); return; }
@@ -1081,10 +1085,30 @@ function _projApplyFilters() {
 var _projetosArr    = [];
 var _obraIdMap      = {}; // id → {nome, empresa} preenchido por _dbLoadObras
 
+// _obraIdMap normalmente é preenchido por _dbLoadObras (obras.js) — mas só
+// roda quando a aba Obras é visitada. Entrando direto em Projetos (sem
+// passar por Obras antes) o cache ficava vazio pra sempre e a coluna
+// "Obra vinculada" nunca preenchia (bug relatado: fica tudo "—"). Busca
+// avulsa e leve (só id+nome, sem os agregados pesados que _dbLoadObras
+// carrega) só quando o cache ainda está vazio — não duplica trabalho se
+// Obras já rodou antes nesta sessão.
+async function _garantirObraIdMap() {
+ if (Object.keys(_obraIdMap).length || !_sb) return;
+ var allObras = []; var from = 0; var more = true;
+ while (more) {
+  var res = await _sb.from('obras').select('id, nome').range(from, from + 999);
+  if (res.error || !res.data) break;
+  allObras = allObras.concat(res.data);
+  more = res.data.length === 1000; from += 1000;
+ }
+ allObras.forEach(function(o) { _obraIdMap[o.id] = { nome: o.nome || '' }; });
+}
+
 async function _dbLoadProjetos() {
  var tbody=document.getElementById('proj-tbody');
  if(tbody) tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando projetos...</td></tr>';
  var allData=[]; var from=0; var more=true;
+ await _garantirObraIdMap();
  while(more){
   var res=await _sb.from('projetos').select('*').order('created_at',{ascending:false}).range(from,from+999);
   if(res.error){
