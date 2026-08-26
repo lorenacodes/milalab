@@ -740,6 +740,7 @@ function _spProjetoRender(p, idx) {
   </div>
   <div class="sp-field"><div class="sp-label">Etapa do projeto <span class="req">*</span></div>${_srchSelMarkup('projEtapa', 'sp-proj-etapa', etapaAtual)}</div>
 
+  ${!p.obra_id ? '' : `
   <div class="sp-stitle">Informações técnicas</div>
   <div class="sp-g3">
    <div class="sp-field"><div class="sp-label">Quantidade</div><input class="sp-inp" id="sp-proj-qtd" type="number" min="0" value="${qtd != null ? qtd : ''}" oninput="_projRecalc();_projScheduleAutoSave()"></div>
@@ -759,6 +760,7 @@ function _spProjetoRender(p, idx) {
    <div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-proj-cidade" value="Carregando..." readonly></div>
    <div class="sp-field"><div class="sp-label">Estado</div><input class="sp-inp" id="sp-proj-estado" value="Carregando..." readonly></div>
   </div>
+  `}
   <div class="sp-field"><div class="sp-label">Responsável</div><div id="sp-proj-responsavel-dd" class="no-msel-wide">${_msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _respNomesAtuais, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...')}</div></div>
   <div class="sp-field"><div class="sp-label">Descritivo do projeto</div><textarea class="sp-inp" id="sp-proj-desc" rows="3" oninput="_projScheduleAutoSave()">${(p.descritivo||'')}</textarea></div>
 
