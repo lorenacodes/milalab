@@ -290,36 +290,46 @@ async function _renderProjetosKanban() {
 // Clique vs. arraste: assim que 'dragstart' dispara de verdade (mesmo por
 // 1px de tremor do mouse), o Chrome passa a capturar o ponteiro pro loop
 // nativo de drag-and-drop e PARA DE DISPARAR 'mouseup' no elemento de
-// origem — dispara 'dragend' no lugar (tentativa anterior, baseada em
-// mousedown/mouseup, partia desse pressuposto errado e por isso não
-// funcionava em cliques reais, só em clique sintético via .click()/
-// dispatchEvent, que não passa pelo loop nativo de drag do navegador).
-// Solução: guarda a posição do dragstart; no dragend, se o deslocamento
-// final foi pequeno, trata como clique (abre o detalhamento) — sem mexer
-// no fluxo de 'drop', que continua responsável por persistir a etapa
-// quando o arraste é de verdade (deslocamento grande, solto em outra
-// coluna). Cliques que NUNCA chegam a dispar dragstart (deslocamento
-// realmente zero) continuam funcionando pelo 'click' nativo normal.
+// origem — dispara 'dragend' no lugar. MAS o próprio 'dragend' tem outra
+// pegadinha: clientX/clientY dele frequentemente vêm ZERADOS quando o
+// arraste nem chegou a sair de perto da origem (bug/quirk conhecido do
+// Chrome) — comparar essa posição contra a do dragstart então calculava um
+// deslocamento gigante (posição real vs. 0,0) e tratava todo clique como
+// arraste de verdade, mesmo parado no lugar (2ª tentativa, também errada).
+// Solução: em vez de confiar nas coordenadas do dragend, escuta o evento
+// 'drag' (dispara repetidamente ENQUANTO o arraste está em andamento, com
+// coordenadas confiáveis a cada disparo) e só marca "houve arraste de
+// verdade" se ele reportar deslocamento real em algum momento — ignora
+// disparos de 'drag' com 0,0 (mesma pegadinha, acontece nos primeiros/
+// últimos disparos às vezes). Se nenhum 'drag' com deslocamento real
+// aconteceu até o dragend, foi clique — abre o detalhamento. 'drop' segue
+// responsável por persistir a etapa nos arrastes de verdade.
 var _projCardDragStartXY = null;
+var _projCardDidMove = false;
 function _onProjCardDragStart(e) {
  e.dataTransfer.setData('text/plain', this.dataset.id);
  e.dataTransfer.effectAllowed = 'move';
  this.classList.add('dragging');
  _projCardDragStartXY = { x: e.clientX, y: e.clientY };
+ _projCardDidMove = false;
 }
-function _onProjCardDragEnd(e) {
+function _onProjCardDrag(e) {
+ if (!_projCardDragStartXY || (e.clientX === 0 && e.clientY === 0)) return;
+ var dx = Math.abs(e.clientX - _projCardDragStartXY.x);
+ var dy = Math.abs(e.clientY - _projCardDragStartXY.y);
+ if (dx > 5 || dy > 5) _projCardDidMove = true;
+}
+function _onProjCardDragEnd() {
  this.classList.remove('dragging');
- if (_projCardDragStartXY) {
-  var dx = Math.abs(e.clientX - _projCardDragStartXY.x);
-  var dy = Math.abs(e.clientY - _projCardDragStartXY.y);
-  if (dx <= 5 && dy <= 5) _spProjetoById(this.dataset.id);
- }
+ if (_projCardDragStartXY && !_projCardDidMove) _spProjetoById(this.dataset.id);
  _projCardDragStartXY = null;
+ _projCardDidMove = false;
 }
 function _onProjCardClick() { _spProjetoById(this.dataset.id); }
 function _setupProjetosKanbanDnD() {
  document.querySelectorAll('#proj-kanban .proj-kn-card').forEach(function(card) {
   card.addEventListener('dragstart', _onProjCardDragStart);
+  card.addEventListener('drag', _onProjCardDrag);
   card.addEventListener('dragend', _onProjCardDragEnd);
   card.addEventListener('click', _onProjCardClick);
  });
