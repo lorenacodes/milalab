@@ -1181,16 +1181,24 @@ tbody[data-sp] tr:hover td{background:var(--navy-dim)!important}
 .proj-view-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border:none;border-radius:var(--r-sm);font-size:12px;font-weight:500;cursor:pointer;color:var(--muted);background:transparent;font-family:inherit;transition:all .15s;white-space:nowrap}
 .proj-view-btn:hover{color:var(--text)}
 .proj-view-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.15);font-weight:600}
+/* Mesmo padrão visual do Kanban de Obras (.kanban-col/.kc-*/.obra-card,
+   acima) — min-width+max-width (não só flex-basis) pra travar a largura de
+   verdade mesmo com texto longo dentro (Obra vinculada sem quebra de linha
+   forçava a coluna a alargar além do previsto quando só havia flex-basis,
+   sem min/max-width, pra segurar o tamanho). */
 #proj-kanban{display:none;gap:14px;overflow-x:auto;padding-bottom:16px;align-items:flex-start}
-.proj-kn-col{flex:0 0 240px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-lg);display:flex;flex-direction:column;max-height:calc(100vh - 280px)}
-.proj-kn-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:2px solid transparent;border-image:var(--silver-line) 1;flex-shrink:0}
-.proj-kn-count{font-size:11px;font-weight:700;color:var(--muted);background:var(--border);border-radius:var(--r-lg);padding:1px 7px}
-.proj-kn-body{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;flex:1}
-.proj-kn-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
-.proj-kn-card:hover{border-color:var(--navy);box-shadow:0 2px 8px rgba(91,91,214,.12)}
-.proj-kn-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px;line-height:1.35;word-break:break-word}
-.proj-kn-obra{font-size:10px;color:var(--muted);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.proj-kn-footer{display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
+.proj-kn-col{min-width:232px;max-width:232px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 10px;flex-shrink:0;display:flex;flex-direction:column}
+.proj-kn-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 2px 10px;border-bottom:1px solid var(--border)}
+.proj-kn-count{font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1px 7px}
+.proj-kn-body{overflow-y:auto;max-height:calc(100vh - 320px);margin:0 -2px;padding:0 2px;border-radius:var(--r-sm);transition:background .12s,outline .12s}
+.proj-kn-body.kc-dragover{background:var(--surface);outline:2px dashed var(--green);outline-offset:-2px}
+.proj-kn-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow-1);cursor:pointer;transition:box-shadow .15s,border-color .15s;position:relative}
+.proj-kn-card:hover{border-color:var(--green);box-shadow:var(--shadow-2)}
+.proj-kn-card:last-child{margin-bottom:0}
+.proj-kn-card.dragging{opacity:.4}
+.proj-kn-title{font-size:13px;font-weight:600;line-height:1.4;color:var(--text)}
+.proj-kn-obra{font-size:11px;color:var(--muted);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proj-kn-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
  /* ── Date inputs: color-scheme para respeitar o tema ──────────────────────
     Motivo: input[type="date"] usa chrome nativo que ignora CSS variables —
     sem color-scheme o ícone de calendário fica com cores do sistema (branco/

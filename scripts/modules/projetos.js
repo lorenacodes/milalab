@@ -198,14 +198,17 @@ async function _renderProjetosKanban() {
  data.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
  var tipoCls  = {'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by'};
  var complCls = {'Simples':'bg','Média':'by','Média - simples':'by','Complexa':'br','Alta':'br'};
- var etapaCls = {
-  'Orçamento':'bm','Análise Inicial':'bm','Aguardando Aprovação':'by',
-  'Pré-projeto':'bm','Revisão Pré-Projeto':'by',
-  'Projeto para Aprovação':'bb','Revisão Projeto':'by',
-  'Projeto Executivo':'bb','Revisão Projeto Executivo':'by',
-  'Ajustes de Piloto':'by','Projeto em Andamento':'by',
-  'Aguardando Produção':'by','Projeto Finalizado':'bg',
-  'Pós-vendas':'bg','Negócio perdido':'br'
+ // Cor do ponto no cabeçalho da coluna — mesmo espírito de _etapaDot em
+ // obras.js (cor sólida, não mais um badge colorido no cabeçalho, pra
+ // seguir o padrão visual exato do Kanban de Obras: .kc-dot + .kc-label).
+ var etapaDot = {
+  'Orçamento':'var(--blue)','Análise Inicial':'var(--blue)','Aguardando Aprovação':'var(--yellow)',
+  'Pré-projeto':'var(--blue)','Revisão Pré-Projeto':'var(--yellow)',
+  'Projeto para Aprovação':'var(--navy)','Revisão Projeto':'var(--yellow)',
+  'Projeto Executivo':'var(--navy)','Revisão Projeto Executivo':'var(--yellow)',
+  'Ajustes de Piloto':'var(--yellow)','Projeto em Andamento':'var(--yellow)',
+  'Aguardando Produção':'var(--yellow)','Projeto Finalizado':'var(--green)',
+  'Pós-vendas':'var(--green)','Negócio perdido':'var(--red)'
  };
 
  // Agrupa por etapa — trim para ignorar espaços extras vindos do Airtable
@@ -228,22 +231,26 @@ async function _renderProjetosKanban() {
   return;
  }
 
+ // Mesmo padrão visual/estrutural do Kanban de Obras: cabeçalho com ponto
+ // colorido + label (kc-dot/kc-label, não mais um badge cheio), card
+ // minimalista (título, tags, uma linha discreta de contexto) — nada de
+ // rodapé com valor/responsável, que era um padrão só desta página.
  container.innerHTML = ordered.map(function(etapa) {
   var cards  = groups[etapa] || [];
-  var cls    = etapaCls[etapa] || 'bm';
+  var dot    = etapaDot[etapa] || 'var(--muted)';
   var cardsHtml = cards.map(function(p) {
    var tipo     = p.tipo_orcamento || '';
    var tipCls   = tipoCls[tipo]   || 'bm';
    var compl    = p.complexidade  || '';
    var cmpCls   = complCls[compl] || 'bm';
-   var obraNome = (p.obra && p.obra.nome)   ? p.obra.nome   : '—';
+   var obraNome = (p.obra && p.obra.nome)   ? p.obra.nome   : '';
    var empNome  = (p.obra && p.obra.empresas_obras && p.obra.empresas_obras[0]?.empresa?.nome) ? p.obra.empresas_obras[0].empresa.nome : '';
-   var valor    = (p.valor_unitario != null)
-    ? 'R$ ' + (Number(p.valor_unitario) * Number(p.quantidade || 1)).toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})
-    : null;
    var valorNum = (p.valor_unitario != null) ? Number(p.valor_unitario) * Number(p.quantidade || 1) : 0;
    var pesoNum  = (p.peso_kg != null) ? Number(p.peso_kg) * Number(p.quantidade || 1) : 0;
-   var clienteStr = ((empNome ? empNome + ' — ' : '') + obraNome).replace(/"/g,'&quot;');
+   var clienteStr = ((empNome ? empNome + ' — ' : '') + (obraNome||'—')).replace(/"/g,'&quot;');
+   var subtitulo = ((empNome ? empNome + ' — ' : '') + obraNome) || 'Sem obra vinculada';
+   var tagsHtml = (tipo ? '<span class="badge ' + tipCls + '" style="font-size:10px">' + tipo + '</span>' : '')
+    + (compl ? '<span class="badge ' + cmpCls + '" style="font-size:10px">' + compl + '</span>' : '');
    // Clique abre o próprio projeto (_spProjetoById), não mais a Obra vinculada
    // — abrir a Obra era o comportamento antigo e escondia o detalhamento do
    // Projeto atrás de um passo a mais. Arrastável (draggable) pra permitir
@@ -252,24 +259,13 @@ async function _renderProjetosKanban() {
     + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-compl="' + compl + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '"'
     + ' data-nome="' + (p.nome||'').replace(/"/g,'&quot;') + '" data-resp="' + (p.responsavel||'').replace(/"/g,'&quot;') + '" data-finalizado="' + (p.finalizado?'Sim':'Não') + '" data-funcional="' + (p.funcional?'Sim':'Não') + '">'
     + '<div class="proj-kn-title">' + (p.nome || '(sem nome)') + '</div>'
-    + '<div class="proj-kn-obra" title="' + obraNome + '">'
-    + (empNome ? empNome + ' — ' : '') + obraNome
-    + '</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">'
-    + (tipo  ? '<span class="badge ' + tipCls + '" style="font-size:9px">' + tipo  + '</span>' : '')
-    + (compl ? '<span class="badge ' + cmpCls + '" style="font-size:9px">' + compl + '</span>' : '')
-    + '</div>'
-    + '<div class="proj-kn-footer">'
-    + '<span style="font-size:11px;font-weight:700;color:var(--green)">' + (valor || '—') + '</span>'
-    + (p.responsavel
-       ? '<span style="font-size:10px;color:var(--muted)">' + p.responsavel.split(' ')[0] + '</span>'
-       : '')
-    + '</div>'
+    + (tagsHtml ? '<div class="proj-kn-tags">' + tagsHtml + '</div>' : '')
+    + '<div class="proj-kn-obra" title="' + subtitulo.replace(/"/g,'&quot;') + '">' + subtitulo + '</div>'
     + '</div>';
   }).join('');
   return '<div class="proj-kn-col" data-etapa="' + etapa + '">'
    + '<div class="proj-kn-head">'
-   + '<span class="badge ' + cls + '" style="font-size:10px">' + etapa + '</span>'
+   + '<span class="kc-label"><span class="kc-dot" style="background:' + dot + '"></span>' + etapa + '</span>'
    + '<span class="proj-kn-count">' + cards.length + '</span>'
    + '</div>'
    + '<div class="proj-kn-body">' + cardsHtml + '</div>'
