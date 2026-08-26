@@ -467,8 +467,14 @@ var _projTipoOpcoesAtuais = []; // tipo(s) de obra da Obra vinculada — restrin
 // Entrega (obras.js/entregas.js) — pedido explícito: editável aqui
 // também, restrito aos tipos já marcados pra Obra vinculada.
 function _projTipoPillsHTML(opcoes, tipoAtual) {
- if (!opcoes.length) return '<span style="color:var(--muted);font-size:12px">Vincule uma obra pra escolher o tipo.</span>';
- return opcoes.map(function(t) {
+ // Pedido explícito: sem obra vinculada (ou obra sem nenhum Tipo de obra
+ // marcado), o Tipo do projeto ficava travado — nada renderizado, sem
+ // jeito de escolher, mesmo sendo campo obrigatório. Cai pra lista
+ // completa de tipos (_NO_TIPOS_OPCOES, wizard-nova-obra.js) nesse caso,
+ // em vez de bloquear.
+ var opcoesReais = (opcoes && opcoes.length) ? opcoes : (_NO_TIPOS_OPCOES || []);
+ if (!opcoesReais.length) return '<span style="color:var(--muted);font-size:12px">Nenhum tipo disponível.</span>';
+ return opcoesReais.map(function(t) {
   var sel = t === tipoAtual;
   var cor = (typeof _NO_TIPO_COR !== 'undefined' && _NO_TIPO_COR[t]) || 'var(--navy)';
   return '<button type="button" onclick="_projTipoToggle(\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + cor + ';background:' + (sel?cor:'transparent') + ';color:' + (sel?'#fff':cor) + '">' + t + '</button>';

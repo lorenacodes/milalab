@@ -596,7 +596,12 @@ function _spEntregaRender(e) {
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 
  _spCarregarDocumentosEntrega(e.id, obraId);
- if (obraId) _spCarregarProjetosEntrega(obraId, (e.obra && e.obra.tipo_obra) || []);
+ // Pedido explícito: obra sem nenhum Tipo de obra marcado não pode travar
+ // o Tipo do projeto (campo obrigatório sem nenhuma opção pra escolher) —
+ // cai pra lista completa (_NO_TIPOS_OPCOES) nesse caso, mesma regra do
+ // formulário equivalente dentro do painel de Obra (obras.js).
+ var tipoObraObra = (e.obra && e.obra.tipo_obra && e.obra.tipo_obra.length) ? e.obra.tipo_obra : (_NO_TIPOS_OPCOES || []);
+ if (obraId) _spCarregarProjetosEntrega(obraId, tipoObraObra);
 }
 
 // ── Projeto(s) da obra, vistos de dentro do painel de Entrega — pedido

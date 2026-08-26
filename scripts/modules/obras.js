@@ -2924,7 +2924,11 @@ function _spToggleNovoProjeto() {
  if (!box || !_obraAtiva) return;
  var abrir = box.style.display === 'none' || !box.style.display;
  if (abrir) {
-  var tipoObraOpcoes = (_obraAtiva.tipo_obra || []).slice();
+  // Pedido explícito: quando a obra não tem nenhum Tipo de obra marcado
+  // (tipo_obra vazio), o Tipo do projeto ficava travado — nenhuma opção
+  // renderizada, mesmo o campo sendo obrigatório, sem jeito de criar o
+  // projeto. Cai pra lista completa de tipos (_NO_TIPOS_OPCOES) nesse caso.
+  var tipoObraOpcoes = (_obraAtiva.tipo_obra && _obraAtiva.tipo_obra.length) ? _obraAtiva.tipo_obra.slice() : (_NO_TIPOS_OPCOES || []).slice();
   _spNovoProj = {
    obraId: _obraAtiva.id, nome: '', etapaProjeto: '', tipoObra: tipoObraOpcoes.length === 1 ? tipoObraOpcoes[0] : '',
    produtoNomes: [], responsavelEmails: [], qtd: '', vuni: '', m2Arquitetura: '', m2Estrutura: '',
