@@ -3,28 +3,58 @@
 // existente; para criar Obra+Projetos juntos, use o wizard Nova Obra), kanban por
 // etapa, renderer do painel lateral, filtro de tipo, cache/loader de projetos.
 // ═══════════════════════════════════════════════════════════════════════════════
+// Obra — vira busca+single-select (srch-sel, mesmo componente já usado em
+// Etapa/Cidade/Tipo do sistema) em vez do <select> nativo: lista de Obras
+// cresce sem limite e escolher digitando é o padrão em todo o resto do app.
 async function _npPopularObras() {
- var sel = document.getElementById('np-obra');
- if (!sel) return;
+ var wrap = document.getElementById('np-obra-wrap');
+ if (!wrap) return;
  var lista = Object.keys(_obraIdMap || {}).map(function(id){ return { id: id, nome: _obraIdMap[id].nome }; });
  if (!lista.length && _sb) {
   var res = await _sb.from('obras').select('id, nome').order('nome');
   if (!res.error && res.data) lista = res.data;
  }
  lista.sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
- sel.innerHTML = '<option value="">Selecione a obra...</option>'
-  + lista.map(function(o){ return '<option value="' + o.id + '">' + (o.nome||'(sem nome)').replace(/</g,'&lt;') + '</option>'; }).join('');
+ _srchSelRegister('npObra', {
+  options: lista.map(function(o){ return o.nome || '(sem nome)'; }),
+  placeholder: 'Selecione a obra...',
+  onSelect: function(nome) {
+   var obra = lista.find(function(o){ return (o.nome||'(sem nome)') === nome; });
+   var idEl = document.getElementById('np-obra-id');
+   if (idEl) idEl.value = obra ? obra.id : '';
+  }
+ });
+ wrap.innerHTML = _srchSelMarkup('npObra', 'np-obra-id', '');
 }
 
-function openNovoProjeto() {
+// Responsável — multi-select com busca (_msRenderDropdown), ligado a
+// usuários reais (_usuariosCache), mesmo padrão já usado pra Produto aqui
+// e pro dropdown de Responsável do wizard de Nova Obra — deixa de ser
+// texto livre.
+var _npResponsavelSel = [];
+function _npResponsavelToggle(campo, valor, checked) {
+ _npResponsavelSel = _msToggle(_npResponsavelSel, valor, checked);
+ var wrap = document.getElementById('np-responsavel-wrap');
+ if (wrap) wrap.innerHTML = _msRenderDropdown('npResp', (_usuariosCache||[]).map(function(u){ return u.nome_display || u.email; }), _npResponsavelSel, '_npResponsavelToggle', 'Selecione o(s) responsável(is)...');
+}
+
+async function openNovoProjeto() {
  // Resetar campos
  ['np-tipo','np-produto','np-etapa'].forEach(id => {
  const el = document.getElementById(id); if(el) el.selectedIndex = 0;
  });
- ['np-qtd','np-val-uni','np-peso-uni','np-m2arq','np-m2estr','np-desc','np-responsavel'].forEach(id => {
+ ['np-nome','np-qtd','np-val-uni','np-peso-uni','np-m2arq','np-m2estr','np-desc'].forEach(id => {
  const el = document.getElementById(id); if(el) el.value = '';
  });
- _npPopularObras();
+ var idEl = document.getElementById('np-obra-id'); if (idEl) idEl.value = '';
+ var finEl = document.getElementById('np-finalizado'); if (finEl) finEl.checked = false;
+ var funEl = document.getElementById('np-funcional'); if (funEl) funEl.checked = false;
+ _npResponsavelSel = [];
+
+ await Promise.all([_npPopularObras(), _loadUsuariosCache()]);
+ var respWrap = document.getElementById('np-responsavel-wrap');
+ if (respWrap) respWrap.innerHTML = _msRenderDropdown('npResp', (_usuariosCache||[]).map(function(u){ return u.nome_display || u.email; }), [], '_npResponsavelToggle', 'Selecione o(s) responsável(is)...');
+
  calcProjetoTotais();
  document.getElementById('modal-novo-projeto').classList.add('open');
  document.body.style.overflow = 'hidden';
@@ -68,9 +98,9 @@ function calcProjetoTotais() {
 }
 
 async function submitNovoProjeto() {
- const obraId = document.getElementById('np-obra').value;
+ const obraId = document.getElementById('np-obra-id').value;
  const tipo   = document.getElementById('np-tipo').value;
- if (!obraId) { document.getElementById('np-obra').style.borderColor = 'var(--red)'; return; }
+ if (!obraId) { _showToast('Selecione a obra.', 'aviso'); return; }
  if (!tipo)   { document.getElementById('np-tipo').style.borderColor = 'var(--red)'; return; }
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
@@ -82,12 +112,18 @@ async function submitNovoProjeto() {
  const etapa  = document.getElementById('np-etapa').value;
  const comp   = document.getElementById('np-complexidade').value;
  const prod   = document.getElementById('np-produto').value || null;
- const resp   = (document.getElementById('np-responsavel').value || '').trim();
  const desc   = (document.getElementById('np-desc').value || '').trim();
- const obraNome = (document.getElementById('np-obra').selectedOptions[0] || {}).textContent || '';
+ const nomeDigitado = (document.getElementById('np-nome').value || '').trim();
+ const obraNome = _srchSelState.npObra ? _srchSelState.npObra.selected : '';
+ const finalizado = !!document.getElementById('np-finalizado').checked;
+ const funcional  = !!document.getElementById('np-funcional').checked;
+
+ var respEmails = (_usuariosCache || [])
+  .filter(function(u){ return _npResponsavelSel.indexOf(u.nome_display || u.email) !== -1; })
+  .map(function(u){ return u.email; });
 
  const payload = {
-  nome: (obraNome + ' — ' + tipo).toUpperCase(),
+  nome: (nomeDigitado || (obraNome + ' — ' + tipo)).toUpperCase(),
   obra_id: obraId,
   tipo_orcamento: tipo,
   etapa_projeto: etapa || null,
@@ -98,8 +134,10 @@ async function submitNovoProjeto() {
   peso_kg: (qtd && pUnit) ? qtd * pUnit : null,
   quantidade: qtd,
   valor_unitario: vUnit,
-  responsavel: resp ? [resp] : null,
+  responsavel: respEmails.length ? respEmails : null,
   descritivo: desc || null,
+  finalizado: finalizado,
+  funcional: funcional,
  };
 
  const btn = document.querySelector('#modal-novo-projeto .btn-primary');
@@ -111,6 +149,7 @@ async function submitNovoProjeto() {
  _showToast('Projeto criado com sucesso!', 'ok');
  closeNovoProjeto();
  _dbLoadProjetos();
+ if (document.getElementById('proj-kanban') && document.getElementById('proj-kanban').style.display !== 'none') _renderProjetosKanban();
 }
 
 var _projetosKanbanEtapaOrder = [
@@ -147,7 +186,7 @@ async function _renderProjetosKanban() {
  container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">Carregando projetos do banco...</div>';
 
  var res = await _sb.from('projetos')
-  .select('id, nome, etapa_projeto, tipo_orcamento, produto, complexidade, responsavel, valor_unitario, quantidade, peso_kg, obra_id, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
+  .select('id, nome, etapa_projeto, tipo_orcamento, produto, complexidade, responsavel, valor_unitario, quantidade, peso_kg, obra_id, finalizado, funcional, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
   .order('created_at', { ascending: false });
 
  if (res.error || !res.data) {
@@ -178,16 +217,19 @@ async function _renderProjetosKanban() {
  });
 
  // Ordena colunas: etapas com dados na ordem definida, depois qualquer outra
- var ordered = _projetosKanbanEtapaOrder.filter(function(e){ return groups[e] && groups[e].length; });
+ // Todas as etapas conhecidas viram coluna, mesmo sem nenhum card agora —
+ // senão não existe alvo (.proj-kn-col) pra soltar um card arrastado numa
+ // etapa vazia, e o drag-and-drop só serviria pra etapas que já têm dados.
+ var ordered = _projetosKanbanEtapaOrder.slice();
  Object.keys(groups).forEach(function(e){ if (!ordered.includes(e)) ordered.push(e); });
 
- if (ordered.length === 0) {
+ if (!data.length) {
   container.innerHTML = '<div class="sp-empty" style="width:100%">Nenhum projeto encontrado no banco.</div>';
   return;
  }
 
  container.innerHTML = ordered.map(function(etapa) {
-  var cards  = groups[etapa];
+  var cards  = groups[etapa] || [];
   var cls    = etapaCls[etapa] || 'bm';
   var cardsHtml = cards.map(function(p) {
    var tipo     = p.tipo_orcamento || '';
@@ -199,12 +241,16 @@ async function _renderProjetosKanban() {
    var valor    = (p.valor_unitario != null)
     ? 'R$ ' + (Number(p.valor_unitario) * Number(p.quantidade || 1)).toLocaleString('pt-BR', {minimumFractionDigits:2,maximumFractionDigits:2})
     : null;
-   var obraId   = p.obra_id || '';
    var valorNum = (p.valor_unitario != null) ? Number(p.valor_unitario) * Number(p.quantidade || 1) : 0;
    var pesoNum  = (p.peso_kg != null) ? Number(p.peso_kg) * Number(p.quantidade || 1) : 0;
    var clienteStr = ((empNome ? empNome + ' — ' : '') + obraNome).replace(/"/g,'&quot;');
-   return '<div class="proj-kn-card" onclick="if(obraId){_spObraById(\'' + obraId + '\')}" title="Abrir obra vinculada"'
-    + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-compl="' + compl + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '">'
+   // Clique abre o próprio projeto (_spProjetoById), não mais a Obra vinculada
+   // — abrir a Obra era o comportamento antigo e escondia o detalhamento do
+   // Projeto atrás de um passo a mais. Arrastável (draggable) pra permitir
+   // mudar a etapa direto pelo Kanban (ver _setupProjetosKanbanDnD abaixo).
+   return '<div class="proj-kn-card" draggable="true" data-id="' + p.id + '" onclick="_spProjetoById(\'' + p.id + '\')" title="Abrir projeto"'
+    + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-compl="' + compl + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '"'
+    + ' data-nome="' + (p.nome||'').replace(/"/g,'&quot;') + '" data-resp="' + (p.responsavel||'').replace(/"/g,'&quot;') + '" data-finalizado="' + (p.finalizado?'Sim':'Não') + '" data-funcional="' + (p.funcional?'Sim':'Não') + '">'
     + '<div class="proj-kn-title">' + (p.nome || '(sem nome)') + '</div>'
     + '<div class="proj-kn-obra" title="' + obraNome + '">'
     + (empNome ? empNome + ' — ' : '') + obraNome
@@ -221,7 +267,7 @@ async function _renderProjetosKanban() {
     + '</div>'
     + '</div>';
   }).join('');
-  return '<div class="proj-kn-col">'
+  return '<div class="proj-kn-col" data-etapa="' + etapa + '">'
    + '<div class="proj-kn-head">'
    + '<span class="badge ' + cls + '" style="font-size:10px">' + etapa + '</span>'
    + '<span class="proj-kn-count">' + cards.length + '</span>'
@@ -229,6 +275,77 @@ async function _renderProjetosKanban() {
    + '<div class="proj-kn-body">' + cardsHtml + '</div>'
    + '</div>';
  }).join('');
+
+ _setupProjetosKanbanDnD();
+}
+
+// ── Drag-and-drop do Kanban de Projetos (move card → atualiza etapa_projeto)
+// Colunas aqui são geradas dinamicamente a partir dos dados (não são IDs
+// fixos no HTML como em Obras), então os listeners são reanexados a cada
+// render — .proj-kn-body é recriado do zero em _renderProjetosKanban, então
+// não há risco de acumular listeners duplicados.
+function _onProjCardDragStart(e) {
+ e.dataTransfer.setData('text/plain', this.dataset.id);
+ e.dataTransfer.effectAllowed = 'move';
+ this.classList.add('dragging');
+}
+function _onProjCardDragEnd() { this.classList.remove('dragging'); }
+function _setupProjetosKanbanDnD() {
+ document.querySelectorAll('#proj-kanban .proj-kn-card').forEach(function(card) {
+  card.addEventListener('dragstart', _onProjCardDragStart);
+  card.addEventListener('dragend', _onProjCardDragEnd);
+ });
+ document.querySelectorAll('#proj-kanban .proj-kn-body').forEach(function(body) {
+  body.addEventListener('dragover', function(e) { e.preventDefault(); body.classList.add('kc-dragover'); });
+  body.addEventListener('dragleave', function() { body.classList.remove('kc-dragover'); });
+  body.addEventListener('drop', function(e) {
+   e.preventDefault();
+   body.classList.remove('kc-dragover');
+   var id = e.dataTransfer.getData('text/plain');
+   var col = body.closest('.proj-kn-col');
+   var novaEtapa = col && col.dataset.etapa;
+   if (id && novaEtapa) updateProjetoEtapa(id, novaEtapa);
+  });
+ });
+}
+
+// ── Persiste a nova etapa no Supabase, com UI otimista + rollback em erro
+// (mesmo padrão de updateObraEtapa, obras.js) — move o card pra coluna
+// certa antes mesmo da resposta do banco, desfaz se der erro.
+async function updateProjetoEtapa(id, novaEtapa) {
+ if (!id || !novaEtapa || !_sb) return;
+ var card = document.querySelector('.proj-kn-card[data-id="' + id + '"]');
+ var etapaAnterior = card && card.dataset.etapa;
+ if (etapaAnterior === novaEtapa) return;
+ _moverCardProjetoParaColuna(id, novaEtapa);
+
+ var res = await _sb.from('projetos').update({ etapa_projeto: novaEtapa, updated_at: new Date().toISOString() }).eq('id', id);
+ if (res.error) {
+  _showToast('Erro ao atualizar etapa: ' + _supaErrPt(res.error.message), 'erro');
+  if (etapaAnterior) _moverCardProjetoParaColuna(id, etapaAnterior);
+  return;
+ }
+ if (_spProjAtivo && String(_spProjAtivo.id) === String(id)) {
+  _spProjAtivo.etapa_projeto = novaEtapa;
+  if (typeof _srchSelSelectItem === 'function') _srchSelSelectItem('projEtapa', novaEtapa);
+ }
+ var cacheIdx = (_projetosArr || []).findIndex(function(x) { return String(x.id) === String(id); });
+ if (cacheIdx !== -1) _projetosArr[cacheIdx].etapa_projeto = novaEtapa;
+ var row = document.querySelector('#proj-tbody tr[data-id="' + id + '"]');
+ if (row) row.dataset.etapa = novaEtapa;
+ _showToast('Etapa atualizada para "' + novaEtapa + '"', 'ok');
+}
+function _moverCardProjetoParaColuna(id, etapa) {
+ var card = document.querySelector('.proj-kn-card[data-id="' + id + '"]');
+ var destCol = document.querySelector('#proj-kanban .proj-kn-col[data-etapa="' + etapa.replace(/"/g,'\\"') + '"]');
+ if (!card || !destCol) return;
+ var destBody = destCol.querySelector('.proj-kn-body');
+ if (destBody && card.parentElement !== destBody) destBody.insertBefore(card, destBody.firstChild);
+ card.dataset.etapa = etapa;
+ document.querySelectorAll('#proj-kanban .proj-kn-col').forEach(function(col) {
+  var badge = col.querySelector('.proj-kn-count');
+  if (badge) badge.textContent = col.querySelectorAll('.proj-kn-card').length;
+ });
 }
 
 function _spProjetos(row, tds) {
@@ -322,6 +439,22 @@ function _projTipoToggle(t) {
  _projScheduleAutoSave();
 }
 
+// Responsável — multi-select com busca ligado a usuários reais
+// (_usuariosCache), mesmo padrão do Produto acima e do dropdown de
+// Responsável do wizard de Nova Obra. Estado local separado de
+// _spProjAtivo.responsavel porque esse campo já chega convertido pra string
+// de nomes (_emailsToNomes, usado só pra exibição) — aqui guardamos os
+// nomes selecionados e convertemos de volta pra e-mails só na hora de
+// salvar (_spSaveProjetoFull).
+var _spProjRespSel = [];
+function _projResponsavelToggle(campo, valor, checked) {
+ _spProjRespSel = _msToggle(_spProjRespSel, valor, checked);
+ var wrap = document.getElementById('sp-proj-responsavel-dd');
+ if (wrap) wrap.innerHTML = _msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _spProjRespSel, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...');
+ if (typeof _noReabrirDropdown === 'function') _noReabrirDropdown('sp-proj-responsavel-dd');
+ _projScheduleAutoSave();
+}
+
 // Produto — multi-select com busca (_msRenderDropdown, mesmo componente já
 // usado no resto do sistema pra Produto/Tipologia), pedido explícito de
 // manter esse comportamento (não virar single-select).
@@ -382,6 +515,18 @@ function _spProjetoRender(p, idx) {
   options: _projetosKanbanEtapaOrder, placeholder: 'Nenhuma etapa',
   onSelect: function() { _projScheduleAutoSave(); },
  });
+ // Complexidade — mesmo padrão de single-select buscável do resto do
+ // formulário (estava só no modal de criação, sem forma de editar depois).
+ _srchSelRegister('projComplexidade', {
+  options: ['Simples', 'Média', 'Média - simples', 'Complexa', 'Alta'], placeholder: 'Nenhuma',
+  onSelect: function() { _projScheduleAutoSave(); },
+ });
+ // p.responsavel já chega aqui convertido de array-de-e-mails pra string
+ // "Nome1, Nome2" (ver _emailsToNomes, chamado antes de _spProjetoRender
+ // tanto no caminho de cache quanto no fetch direto por id) — desfaz pra
+ // popular o multiselect com os nomes já marcados.
+ var _respNomesAtuais = p.responsavel ? String(p.responsavel).split(', ').filter(Boolean) : [];
+ _spProjRespSel = _respNomesAtuais.slice();
 
  var html = `
   <input type="hidden" id="sp-proj-id" value="${p.id}">
@@ -417,6 +562,14 @@ function _spProjetoRender(p, idx) {
   <div class="sp-g2">
    <div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-proj-cidade" value="Carregando..." readonly></div>
    <div class="sp-field"><div class="sp-label">Estado</div><input class="sp-inp" id="sp-proj-estado" value="Carregando..." readonly></div>
+  </div>
+  <div class="sp-g2">
+   <div class="sp-field"><div class="sp-label">Complexidade</div>${_srchSelMarkup('projComplexidade', 'sp-proj-complexidade', p.complexidade || '')}</div>
+   <div class="sp-field"><div class="sp-label">Responsável</div><div id="sp-proj-responsavel-dd" class="no-msel-wide">${_msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _respNomesAtuais, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...')}</div></div>
+  </div>
+  <div class="sp-g2" style="align-items:center">
+   <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="sp-proj-finalizado"${p.finalizado?' checked':''} onchange="_projScheduleAutoSave()"> Finalizado</label>
+   <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="sp-proj-funcional"${p.funcional?' checked':''} onchange="_projScheduleAutoSave()"> Funcional</label>
   </div>
   <div class="sp-field"><div class="sp-label">Descritivo do projeto</div><textarea class="sp-inp" id="sp-proj-desc" rows="3" oninput="_projScheduleAutoSave()">${(p.descritivo||'')}</textarea></div>
 
@@ -536,6 +689,17 @@ function _spProjetoRender(p, idx) {
 
  _projDocsCarregar(p.id, p.obra_id);
  _projTarefasCarregar(p.id);
+
+ // Responsável: se _usuariosCache ainda não tinha carregado quando o dropdown
+ // foi montado acima (raro — carrega em segundo plano desde o boot do app,
+ // ver app.js), refaz com a lista real assim que chegar. Mesmo padrão
+ // defensivo já usado em obras.js/entregas.js pro form de Responsável.
+ if (!(_usuariosCache || []).length && typeof _loadUsuariosCache === 'function') {
+  _loadUsuariosCache().then(function() {
+   var wrap = document.getElementById('sp-proj-responsavel-dd');
+   if (wrap) wrap.innerHTML = _msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _spProjRespSel, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...');
+  });
+ }
 }
 
 // ── Auditoria (rodapé) ────────────────────────────────────────────────────────
@@ -597,8 +761,18 @@ async function _spSaveProjetoFull() {
   // ver comentário em _spProjetoRender) — calculado aqui, nunca digitado.
   peso_kg: (qtd && pUnit) ? qtd * pUnit : null,
   descritivo: (document.getElementById('sp-proj-desc')?.value || '').trim() || null,
+  complexidade: document.getElementById('sp-proj-complexidade')?.value || null,
+  finalizado: !!document.getElementById('sp-proj-finalizado')?.checked,
+  funcional: !!document.getElementById('sp-proj-funcional')?.checked,
   updated_at: new Date().toISOString(),
  };
+ // Responsável: _spProjRespSel guarda nomes selecionados (multiselect não
+ // tem <select> nativo pra ler) — converte pra e-mails contra _usuariosCache
+ // na hora de salvar, mesmo padrão do modal de criação (_npResponsavelSel).
+ var respEmails = (_usuariosCache || [])
+  .filter(function(u){ return _spProjRespSel.indexOf(u.nome_display || u.email) !== -1; })
+  .map(function(u){ return u.email; });
+ payload.responsavel = respEmails.length ? respEmails : null;
  // Nome/Tipo/Produto/Etapa são obrigatórios (mesma regra do formulário de
  // criação — Novo Projeto, wizard/obras.js) — levantamento de campos
  // obrigatórios achou que aqui no autosave do detalhamento dava pra limpar
@@ -621,9 +795,16 @@ async function _spSaveProjetoFull() {
  if (!camposReais.length) return;
  var res = await _sb.from('projetos').update(payload).eq('id', id);
  if (res.error) { console.error('[Projetos] erro ao salvar:', res.error); _showToast('Erro ao salvar: ' + _supaErrPt(res.error.message), 'erro'); return; }
- if (_spProjAtivo && String(_spProjAtivo.id) === String(id)) Object.assign(_spProjAtivo, payload);
+ // _spProjAtivo/_projetosArr guardam responsavel como STRING de nomes
+ // (convenção do resto do arquivo — ver _emailsToNomes em _dbLoadProjetos/
+ // _spProjetoById), não o array de e-mails que acabou de ir pro banco;
+ // sem essa conversão, reabrir este projeto sem recarregar a página
+ // quebraria o split(', ') que popula o multiselect de Responsável.
+ var payloadCache = Object.assign({}, payload);
+ if ('responsavel' in payloadCache) payloadCache.responsavel = _emailsToNomes(payloadCache.responsavel);
+ if (_spProjAtivo && String(_spProjAtivo.id) === String(id)) Object.assign(_spProjAtivo, payloadCache);
  var cacheIdx = (_projetosArr||[]).findIndex(function(x){ return String(x.id) === String(id); });
- if (cacheIdx !== -1) Object.assign(_projetosArr[cacheIdx], payload);
+ if (cacheIdx !== -1) Object.assign(_projetosArr[cacheIdx], payloadCache);
 }
 
 // ── Exclusão de Projeto — disponível pra qualquer usuário (pedido explícito).
@@ -733,15 +914,25 @@ async function _projTarefasCarregar(projetoId) {
 // _fbEvaluate/_sbCompare recebem o .dataset de cada <tr>/.proj-kn-card
 // direto (ver data-* adicionados nos templates de _dbLoadProjetos/
 // _renderProjetosKanban).
+// Etapa/Complexidade/Cliente(Obra) viram 'select' — antes 'text' exigia
+// digitar exatamente o valor, o que o pedido original aponta como bug
+// específico ("filtros de Etapa e Obra... deveriam seguir o padrão de
+// single-select"). filtro-builder.js já mostra 'select' como lista
+// clicável com busca automática acima de 8 opções — sem digitação livre.
 var _projFbFields = [
- { key: 'tipo',    label: 'Tipo de orçamento', type: 'select', options: ['Telhados','Steel Frame','Modular','Solar'] },
- { key: 'etapa',   label: 'Etapa',             type: 'text' },
- { key: 'compl',   label: 'Complexidade',      type: 'text' },
+ { key: 'nome',    label: 'Nome do Projeto',   type: 'text' },
+ { key: 'tipo',    label: 'Tipo de orçamento', type: 'select', options: ['Telhados','Steel Frame','Modular','Solar','Misto (LSF + A36)'] },
+ { key: 'etapa',   label: 'Etapa',             type: 'select', options: _projetosKanbanEtapaOrder },
+ { key: 'compl',   label: 'Complexidade',      type: 'select', options: ['Simples','Média','Média - simples','Complexa','Alta'] },
  { key: 'cliente', label: 'Cliente/Obra',      type: 'text' },
+ { key: 'resp',    label: 'Responsável',       type: 'multitext', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
+ { key: 'finalizado', label: 'Finalizado', type: 'select', options: ['Sim','Não'] },
+ { key: 'funcional',  label: 'Funcional',  type: 'select', options: ['Sim','Não'] },
 ];
 _fbInit('projetos', _projFbFields, _projApplyFilters);
 
 var _projSbFields = [
+ { key: 'nome',    label: 'Nome do Projeto', type: 'text' },
  { key: 'cliente', label: 'Cliente/Obra', type: 'text' },
  { key: 'etapa',   label: 'Etapa',        type: 'text' },
  { key: 'valor',   label: 'Valor total',  type: 'number', getValue: function(ds) { return parseFloat(ds.valor) || 0; } },
@@ -753,6 +944,7 @@ _sbInit('projetos', _projSbFields, _projApplyFilters);
 // não reconstrói a tbody a partir de um array em memória; ver comentário
 // completo em _obrasRenderGroupNode, obras.js).
 var _projGbFields = [
+ { key: 'nome',    label: 'Nome do Projeto' },
  { key: 'tipo',    label: 'Tipo de orçamento' },
  { key: 'etapa',   label: 'Etapa' },
  { key: 'compl',   label: 'Complexidade' },
@@ -907,7 +1099,8 @@ async function _dbLoadProjetos() {
   var cliente=empNome||obraNome;
   if(vT)totV+=vT;if(pT)totP+=pT;if(_emAnd.indexOf(etapa)!==-1)cAnd++;
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-tipo="'+tipo+'" data-id="'+(p.id||'')+'"'
-   +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+(cliente||'').replace(/"/g,'&quot;')+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'">'
+   +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+(cliente||'').replace(/"/g,'&quot;')+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
+   +' data-nome="'+(p.nome||'').replace(/"/g,'&quot;')+'" data-resp="'+(p.responsavel||'').replace(/"/g,'&quot;')+'" data-finalizado="'+(p.finalizado?'Sim':'Não')+'" data-funcional="'+(p.funcional?'Sim':'Não')+'">'
    +'<td style="font-weight:600;color:var(--navy)">'+cod+'</td>'
    +'<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+obraNome+'">'+cliente+'</td>'
    +'<td>'+(tipo?'<span class="badge '+(_tCls[tipo]||'bm')+'">'+tipo+'</span>':'—')+'</td>'

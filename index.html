@@ -1861,14 +1861,21 @@
  </div>
  <div class="modal-body">
 
+ <!-- Identificação -->
+ <div class="form-section-title">Identificação</div>
+ <div class="form-grid">
+ <div class="fg s2">
+ <label>Nome do Projeto</label>
+ <input type="text" id="np-nome" placeholder="Deixe em branco para gerar a partir da Obra + Tipo">
+ </div>
+ </div>
+
  <!-- Vinculação -->
  <div class="form-section-title">Vinculação</div>
  <div class="form-grid">
  <div class="fg s2">
  <label>Obra <span style="color:var(--red)">*</span></label>
- <select id="np-obra">
- <option value="">Selecione a obra...</option>
- </select>
+ <div id="np-obra-wrap"></div>
  </div>
  </div>
  <div class="form-grid">
@@ -1984,7 +1991,13 @@
  <div class="form-grid" style="margin-top:4px">
  <div class="fg s2">
  <label>Responsável pelo projeto</label>
- <input type="text" id="np-responsavel" placeholder="Nome do responsável...">
+ <div id="np-responsavel-wrap"></div>
+ </div>
+ </div>
+ <div class="form-grid" style="margin-top:4px">
+ <div class="fg" style="display:flex;align-items:center;gap:16px">
+ <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400"><input type="checkbox" id="np-finalizado"> Finalizado</label>
+ <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:400"><input type="checkbox" id="np-funcional"> Funcional</label>
  </div>
  </div>
 
