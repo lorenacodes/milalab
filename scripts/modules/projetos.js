@@ -253,18 +253,23 @@ async function _renderProjetosKanban() {
     + (compl ? '<span class="badge ' + cmpCls + '" style="font-size:10px">' + compl + '</span>' : '');
    // Clique abre o próprio projeto (_spProjetoById), não mais a Obra vinculada
    // — abrir a Obra era o comportamento antigo e escondia o detalhamento do
-   // Projeto atrás de um passo a mais. Arrastável (draggable) pra permitir
-   // mudar a etapa direto pelo Kanban (ver _setupProjetosKanbanDnD abaixo).
-   // SEM onclick aqui de propósito — card inteiro sendo draggable=true faz
-   // o navegador tratar qualquer tremor mínimo do mouse durante um clique
-   // real como início de arraste (limiar nativo de poucos pixels), o que
-   // SUPRIME o evento click nativo por definição — o card ficava "não
-   // clicável" na prática, mesmo com o onclick corretamente amarrado (bug
-   // relatado). _setupProjetosKanbanDnD registra mousedown/mouseup com
-   // checagem de deslocamento em vez de confiar no evento click.
-   return '<div class="proj-kn-card" draggable="true" data-id="' + p.id + '" title="Abrir projeto"'
+   // Projeto atrás de um passo a mais.
+   // O card em SI não é mais draggable — três tentativas de distinguir
+   // "isso foi clique ou arraste" por heurística (mousedown/mouseup,
+   // dragend com checagem de deslocamento, depois com o evento 'drag'
+   // contínuo) falharam na prática: testes sintéticos via dispatchEvent não
+   // reproduzem o loop nativo real de drag-and-drop do Chrome, então cada
+   // "confirmação" só validava contra a própria suposição, não contra o
+   // navegador de verdade. Card inteiro sendo draggable=true deixa
+   // fundamentalmente ambíguo se um clique real vai ou não disparar
+   // dragstart (limiar nativo varia). Solução definitiva: separar
+   // fisicamente as duas áreas — só a alcinha ".proj-kn-handle" é
+   // draggable, o resto do card é clique puro, sem ambiguidade nenhuma
+   // possível (ver _setupProjetosKanbanDnD abaixo).
+   return '<div class="proj-kn-card" data-id="' + p.id + '" title="Abrir projeto"'
     + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-compl="' + compl + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '"'
     + ' data-nome="' + (p.nome||'').replace(/"/g,'&quot;') + '" data-resp="' + (p.responsavel||'').replace(/"/g,'&quot;') + '" data-finalizado="' + (p.finalizado?'Sim':'Não') + '" data-funcional="' + (p.funcional?'Sim':'Não') + '">'
+    + '<div class="proj-kn-handle" draggable="true" title="Arrastar para outra etapa"><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.5"/><circle cx="7.5" cy="2.5" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="13.5" r="1.5"/><circle cx="7.5" cy="13.5" r="1.5"/></svg></div>'
     + '<div class="proj-kn-title">' + (p.nome || '(sem nome)') + '</div>'
     + (tagsHtml ? '<div class="proj-kn-tags">' + tagsHtml + '</div>' : '')
     + '<div class="proj-kn-obra" title="' + subtitulo.replace(/"/g,'&quot;') + '">' + subtitulo + '</div>'
@@ -287,51 +292,41 @@ async function _renderProjetosKanban() {
 // fixos no HTML como em Obras), então os listeners são reanexados a cada
 // render — .proj-kn-body é recriado do zero em _renderProjetosKanban, então
 // não há risco de acumular listeners duplicados.
-// Clique vs. arraste: assim que 'dragstart' dispara de verdade (mesmo por
-// 1px de tremor do mouse), o Chrome passa a capturar o ponteiro pro loop
-// nativo de drag-and-drop e PARA DE DISPARAR 'mouseup' no elemento de
-// origem — dispara 'dragend' no lugar. MAS o próprio 'dragend' tem outra
-// pegadinha: clientX/clientY dele frequentemente vêm ZERADOS quando o
-// arraste nem chegou a sair de perto da origem (bug/quirk conhecido do
-// Chrome) — comparar essa posição contra a do dragstart então calculava um
-// deslocamento gigante (posição real vs. 0,0) e tratava todo clique como
-// arraste de verdade, mesmo parado no lugar (2ª tentativa, também errada).
-// Solução: em vez de confiar nas coordenadas do dragend, escuta o evento
-// 'drag' (dispara repetidamente ENQUANTO o arraste está em andamento, com
-// coordenadas confiáveis a cada disparo) e só marca "houve arraste de
-// verdade" se ele reportar deslocamento real em algum momento — ignora
-// disparos de 'drag' com 0,0 (mesma pegadinha, acontece nos primeiros/
-// últimos disparos às vezes). Se nenhum 'drag' com deslocamento real
-// aconteceu até o dragend, foi clique — abre o detalhamento. 'drop' segue
-// responsável por persistir a etapa nos arrastes de verdade.
-var _projCardDragStartXY = null;
-var _projCardDidMove = false;
-function _onProjCardDragStart(e) {
- e.dataTransfer.setData('text/plain', this.dataset.id);
+// Clique vs. arraste: três tentativas de resolver isso por HEURÍSTICA
+// (mousedown/mouseup; dragend com checagem de deslocamento; depois com o
+// evento 'drag' contínuo pra contornar coordenadas zeradas do dragend)
+// falharam na prática — cada uma "passava" nos testes porque eventos
+// sintéticos via dispatchEvent nunca entram no loop nativo real de
+// drag-and-drop do Chrome, então só validavam contra a própria suposição.
+// Card inteiro sendo draggable=true deixa fundamentalmente ambíguo se um
+// clique real vai ou não disparar dragstart (limiar nativo varia,
+// imprevisível). Solução definitiva: elimina a ambiguidade fisicamente —
+// só a alcinha ".proj-kn-handle" é draggable; o resto do card nunca
+// dispara dragstart, então 'click' nele é sempre um clique de verdade, sem
+// heurística nenhuma.
+function _onProjHandleDragStart(e) {
+ e.stopPropagation();
+ var card = this.closest('.proj-kn-card');
+ e.dataTransfer.setData('text/plain', card.dataset.id);
  e.dataTransfer.effectAllowed = 'move';
- this.classList.add('dragging');
- _projCardDragStartXY = { x: e.clientX, y: e.clientY };
- _projCardDidMove = false;
+ card.classList.add('dragging');
 }
-function _onProjCardDrag(e) {
- if (!_projCardDragStartXY || (e.clientX === 0 && e.clientY === 0)) return;
- var dx = Math.abs(e.clientX - _projCardDragStartXY.x);
- var dy = Math.abs(e.clientY - _projCardDragStartXY.y);
- if (dx > 5 || dy > 5) _projCardDidMove = true;
-}
-function _onProjCardDragEnd() {
- this.classList.remove('dragging');
- if (_projCardDragStartXY && !_projCardDidMove) _spProjetoById(this.dataset.id);
- _projCardDragStartXY = null;
- _projCardDidMove = false;
+function _onProjHandleDragEnd(e) {
+ e.stopPropagation();
+ this.closest('.proj-kn-card').classList.remove('dragging');
 }
 function _onProjCardClick() { _spProjetoById(this.dataset.id); }
 function _setupProjetosKanbanDnD() {
  document.querySelectorAll('#proj-kanban .proj-kn-card').forEach(function(card) {
-  card.addEventListener('dragstart', _onProjCardDragStart);
-  card.addEventListener('drag', _onProjCardDrag);
-  card.addEventListener('dragend', _onProjCardDragEnd);
   card.addEventListener('click', _onProjCardClick);
+ });
+ document.querySelectorAll('#proj-kanban .proj-kn-handle').forEach(function(handle) {
+  handle.addEventListener('dragstart', _onProjHandleDragStart);
+  handle.addEventListener('dragend', _onProjHandleDragEnd);
+  // A alça não deve abrir o detalhamento se for só clicada sem arrastar —
+  // o clique nela não tem por que fazer nada, então nem deixa borbulhar
+  // pro card (que abriria o painel sem essa checagem).
+  handle.addEventListener('click', function(e) { e.stopPropagation(); });
  });
  document.querySelectorAll('#proj-kanban .proj-kn-body').forEach(function(body) {
   body.addEventListener('dragover', function(e) { e.preventDefault(); body.classList.add('kc-dragover'); });

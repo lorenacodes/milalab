@@ -1201,9 +1201,15 @@ tbody[data-sp] tr:hover td{background:var(--navy-dim)!important}
 .proj-kn-card:hover{border-color:var(--green);box-shadow:var(--shadow-2)}
 .proj-kn-card:last-child{margin-bottom:0}
 .proj-kn-card.dragging{opacity:.4}
-.proj-kn-title{font-size:13px;font-weight:600;line-height:1.4;color:var(--text)}
+.proj-kn-title{font-size:13px;font-weight:600;line-height:1.4;color:var(--text);padding-right:16px}
 .proj-kn-obra{font-size:11px;color:var(--muted);margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .proj-kn-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+/* Alça de arraste isolada do resto do card (ver comentário em
+   _setupProjetosKanbanDnD, projetos.js) — só ela é draggable, o resto do
+   card é clique puro sem nenhuma ambiguidade com o loop nativo de drag. */
+.proj-kn-handle{position:absolute;top:12px;right:10px;width:14px;height:16px;display:flex;align-items:center;justify-content:center;color:var(--border);cursor:grab;flex-shrink:0}
+.proj-kn-handle:hover{color:var(--muted)}
+.proj-kn-handle:active{cursor:grabbing}
  /* ── Date inputs: color-scheme para respeitar o tema ──────────────────────
     Motivo: input[type="date"] usa chrome nativo que ignora CSS variables —
     sem color-scheme o ícone de calendário fica com cores do sistema (branco/
