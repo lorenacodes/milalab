@@ -752,11 +752,6 @@ function _spProjetoRender(p, idx) {
    <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando melhorias...</div>
   </div>
 
-  <div class="sp-stitle">Empresa vinculada</div>
-  <div id="sp-proj-empresa" class="sp-rel-chips-wrap">
-   <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando empresa...</div>
-  </div>
-
   <div class="sp-stitle">Documentos</div>
   <div id="sp-proj-docs">
    <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando documentos...</div>
@@ -841,23 +836,6 @@ function _spProjetoRender(p, idx) {
      + (m.status ? '<span class="sp-rel-chip-sub">' + m.status + '</span>' : '')
      + '</div>';
    }).join('');
-  });
- })();
-
- // Empresa vinculada — Projeto→Empresa é FK direta (projetos.empresa_id),
- // sem join necessário (ver notas do módulo). Mesmo padrão de chip clicável
- // (_spRelChipHTML) e carregamento preguiçoso já usado em Obras vinculadas/
- // Contatos vinculados no painel de Empresa (ver empresas.js).
- (function() {
-  var container = document.getElementById('sp-proj-empresa');
-  if (!container) return;
-  if (!p.empresa_id) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
-  var empCache = (_empresasArr || []).find(function(e){ return String(e.id) === String(p.empresa_id); });
-  if (empCache) { container.innerHTML = _spRelChipHTML('empresas', empCache.id, empCache.nome || '—'); return; }
-  if (!_sb) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
-  _sb.from('empresas').select('id, nome').eq('id', p.empresa_id).single().then(function(res) {
-   if (res.error || !res.data) { container.innerHTML = '<div class="sp-empty">Nenhuma empresa vinculada a este projeto.</div>'; return; }
-   container.innerHTML = _spRelChipHTML('empresas', res.data.id, res.data.nome || '—');
   });
  })();
 
