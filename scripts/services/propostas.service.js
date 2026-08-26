@@ -318,7 +318,7 @@ function fecharPropostaComercial() {
  document.body.style.overflow = '';
 }
 
-function imprimirProposta() {
+async function imprimirProposta() {
  var el = document.getElementById('proposta-comercial-content');
  if (!el || !el.innerHTML) return;
  var content = el.innerHTML;
@@ -337,15 +337,28 @@ function imprimirProposta() {
  titulo = titulo || 'Proposta MilaTec';
 
  // Extrai apenas CSS das props — evita regra @media print da página principal
- // que oculta body>*:not(#modal-proposta-comercial) e deixaria a janela em branco
+ // que oculta body>*:not(#modal-proposta-comercial) e deixaria a janela em branco.
+ // As regras .prop-* vivem em styles/main.css (um <link>, não um <style>
+ // inline) — document.querySelectorAll('style') NUNCA encontrava nada (bug
+ // real: a janela impressa saía sem NENHUM CSS de proposta, só o reset
+ // genérico abaixo + estilo padrão do navegador — logo sem limite de
+ // altura, grids de estatística viravam texto solto, cabeçalho não ficava
+ // lado a lado, endereço sem alinhamento à direita — exatamente o "sai
+ // todo mal formatado" relatado). Busca o CSS de verdade direto do arquivo
+ // via fetch, usando a URL real do <link> já carregado (respeita o
+ // cache-buster ?v=... vigente, sem hardcodar o caminho).
  var propCss = '';
- document.querySelectorAll('style').forEach(function(s){
-  var t = s.textContent;
-  var a = t.indexOf('/* Proposta Comercial');
-  if (a === -1) return;
-  var b = t.indexOf('@media print{', a);
-  propCss += (b !== -1) ? t.slice(a, b) : t.slice(a);
- });
+ try {
+  var mainCssLink = document.querySelector('link[href*="main.css"]');
+  if (mainCssLink) {
+   var cssText = await fetch(mainCssLink.href).then(function(r){ return r.text(); });
+   var a = cssText.indexOf('/* Proposta Comercial');
+   if (a !== -1) {
+    var b = cssText.indexOf('@media print{', a);
+    propCss = (b !== -1) ? cssText.slice(a, b) : cssText.slice(a);
+   }
+  }
+ } catch (e) { console.error('[Proposta] erro ao buscar CSS pra impressão:', e); }
 
  var win = window.open('', '_blank');
  if (!win) { _showToast('Permita pop-ups para imprimir.', 'erro'); return; }
