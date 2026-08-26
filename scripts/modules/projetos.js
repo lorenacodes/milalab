@@ -394,6 +394,22 @@ function _spProjetos(row, tds) {
 // direta no Supabase por id — mesma estratégia de fallback do _spObraById.
 async function _spProjetoById(id) {
  if (!id) return;
+ // Achado real (não era mais heurística de arraste): quando o card do
+ // Kanban chama isto direto (_onProjCardClick), sem passar por _spOpen
+ // (side-panel.js — que é quem normalmente adiciona a classe .sp-open ao
+ // clicar numa <tr> da Tabela), o overlay/drawer só abriam no branch de
+ // "projeto não estava em cache" (linhas abaixo). Só que _projetosArr já
+ // vem preenchido de qualquer visita à aba Projetos (_dbLoadProjetos roda
+ // sempre que a página é navegada — ver app.js), então o card do Kanban
+ // SEMPRE caía no branch de cache-hit acima, que renderizava o conteúdo do
+ // painel só que sem nunca abrir o drawer (transform:translateX(100%) e
+ // opacity:0 continuavam valendo) — o clique "não fazia nada" na tela,
+ // mesmo com o listener disparando certinho e o conteúdo sendo montado
+ // por trás. Corrigido abrindo o overlay/drawer incondicionalmente, antes
+ // de checar o cache.
+ document.getElementById('sp-overlay').classList.add('sp-open');
+ document.getElementById('sp-drawer').classList.add('sp-open');
+ if (typeof _spTrackDirectOpen === 'function') _spTrackDirectOpen('projetos', id);
  // Garante o mapa de nomes de Obra mesmo quando o painel é aberto sem a
  // Tabela de Projetos ter carregado antes (ex.: chip vindo de outra
  // entidade) — mesmo motivo/fix de _garantirObraIdMap em _dbLoadProjetos.
@@ -403,8 +419,6 @@ async function _spProjetoById(id) {
  if (p) { _spProjetoRender(p, idx); return; }
 
  _spSet('Projeto', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
- document.getElementById('sp-overlay').classList.add('sp-open');
- document.getElementById('sp-drawer').classList.add('sp-open');
  if (!_sb) return;
  _sb.from('projetos').select('*').eq('id', id).single().then(function(res) {
   if (res.error || !res.data) {
