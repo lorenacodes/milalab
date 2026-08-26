@@ -27,6 +27,19 @@ async function _npPopularObras() {
  wrap.innerHTML = _srchSelMarkup('npObra', 'np-obra-id', '');
 }
 
+// Tipo de orçamento — pedido explícito: mesmo estilo de busca+single-select
+// (srch-sel) já usado no campo Obra, em vez do <select> nativo.
+function _npPopularTipo() {
+ var wrap = document.getElementById('np-tipo-wrap');
+ if (!wrap) return;
+ _srchSelRegister('npTipo', {
+  options: (typeof _NO_TIPOS_OPCOES !== 'undefined' && _NO_TIPOS_OPCOES) || ['Telhados','Steel Frame','Modular','Misto (LSF + A36)','Solar'],
+  placeholder: 'Selecione o tipo...',
+  onSelect: function() { if (typeof updateNpProdutoOptions === 'function') updateNpProdutoOptions(); }
+ });
+ wrap.innerHTML = _srchSelMarkup('npTipo', 'np-tipo', '');
+}
+
 // Responsável — multi-select com busca, ligado a usuários reais
 // (_respUsuarios, dashboard.js). Pedido explícito: mostrar a FOTO de cada
 // usuário na seleção — _msRenderDropdown genérico (usado pra Produto/
@@ -109,9 +122,10 @@ function _npTelhaToggle(campo, valor, checked) {
 
 async function openNovoProjeto() {
  // Resetar campos
- ['np-tipo','np-produto','np-etapa'].forEach(id => {
+ ['np-produto','np-etapa'].forEach(id => {
  const el = document.getElementById(id); if(el) el.selectedIndex = 0;
  });
+ _npPopularTipo();
  ['np-nome','np-qtd','np-val-uni','np-peso-uni','np-m2arq','np-m2estr','np-desc'].forEach(id => {
  const el = document.getElementById(id); if(el) el.value = '';
  });
@@ -198,7 +212,7 @@ async function submitNovoProjeto() {
  // obrigatório (projeto sem orçamento/obra associada precisa ficar
  // vinculado a alguma Melhoria em vez).
  if (!obraId && !_npMelhoriaSel.length) { _showToast('Vincule uma Obra ou uma Melhoria.', 'aviso'); return; }
- if (!tipo)   { document.getElementById('np-tipo').style.borderColor = 'var(--red)'; return; }
+ if (!tipo)   { var tipoBox = document.getElementById('sp-srch-npTipo-box'); if (tipoBox) tipoBox.style.borderColor = 'var(--red)'; _showToast('Selecione o tipo de orçamento.', 'aviso'); return; }
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
  const qtd    = parseFloat(document.getElementById('np-qtd').value) || null;
