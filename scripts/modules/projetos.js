@@ -47,8 +47,6 @@ async function openNovoProjeto() {
  const el = document.getElementById(id); if(el) el.value = '';
  });
  var idEl = document.getElementById('np-obra-id'); if (idEl) idEl.value = '';
- var finEl = document.getElementById('np-finalizado'); if (finEl) finEl.checked = false;
- var funEl = document.getElementById('np-funcional'); if (funEl) funEl.checked = false;
  _npResponsavelSel = [];
 
  await Promise.all([_npPopularObras(), _loadUsuariosCache()]);
@@ -115,8 +113,6 @@ async function submitNovoProjeto() {
  const desc   = (document.getElementById('np-desc').value || '').trim();
  const nomeDigitado = (document.getElementById('np-nome').value || '').trim();
  const obraNome = _srchSelState.npObra ? _srchSelState.npObra.selected : '';
- const finalizado = !!document.getElementById('np-finalizado').checked;
- const funcional  = !!document.getElementById('np-funcional').checked;
 
  var respEmails = (_usuariosCache || [])
   .filter(function(u){ return _npResponsavelSel.indexOf(u.nome_display || u.email) !== -1; })
@@ -136,8 +132,6 @@ async function submitNovoProjeto() {
   valor_unitario: vUnit,
   responsavel: respEmails.length ? respEmails : null,
   descritivo: desc || null,
-  finalizado: finalizado,
-  funcional: funcional,
  };
 
  const btn = document.querySelector('#modal-novo-projeto .btn-primary');
@@ -186,7 +180,7 @@ async function _renderProjetosKanban() {
  container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">Carregando projetos do banco...</div>';
 
  var res = await _sb.from('projetos')
-  .select('id, nome, etapa_projeto, tipo_orcamento, produto, complexidade, responsavel, valor_unitario, quantidade, peso_kg, obra_id, finalizado, funcional, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
+  .select('id, nome, etapa_projeto, tipo_orcamento, produto, complexidade, responsavel, valor_unitario, quantidade, peso_kg, obra_id, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
   .order('created_at', { ascending: false });
 
  if (res.error || !res.data) {
@@ -268,7 +262,7 @@ async function _renderProjetosKanban() {
    // possível (ver _setupProjetosKanbanDnD abaixo).
    return '<div class="proj-kn-card" data-id="' + p.id + '" title="Abrir projeto"'
     + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-compl="' + compl + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '"'
-    + ' data-nome="' + (p.nome||'').replace(/"/g,'&quot;') + '" data-resp="' + (p.responsavel||'').replace(/"/g,'&quot;') + '" data-finalizado="' + (p.finalizado?'Sim':'Não') + '" data-funcional="' + (p.funcional?'Sim':'Não') + '">'
+    + ' data-nome="' + (p.nome||'').replace(/"/g,'&quot;') + '" data-resp="' + (p.responsavel||'').replace(/"/g,'&quot;') + '">'
     + '<div class="proj-kn-handle" draggable="true" title="Arrastar para outra etapa"><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.5"/><circle cx="7.5" cy="2.5" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="13.5" r="1.5"/><circle cx="7.5" cy="13.5" r="1.5"/></svg></div>'
     + '<div class="proj-kn-title">' + (p.nome || '(sem nome)') + '</div>'
     + (tagsHtml ? '<div class="proj-kn-tags">' + tagsHtml + '</div>' : '')
@@ -624,10 +618,6 @@ function _spProjetoRender(p, idx) {
    <div class="sp-field"><div class="sp-label">Complexidade</div>${_srchSelMarkup('projComplexidade', 'sp-proj-complexidade', p.complexidade || '')}</div>
    <div class="sp-field"><div class="sp-label">Responsável</div><div id="sp-proj-responsavel-dd" class="no-msel-wide">${_msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _respNomesAtuais, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...')}</div></div>
   </div>
-  <div class="sp-g2" style="align-items:center">
-   <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="sp-proj-finalizado"${p.finalizado?' checked':''} onchange="_projScheduleAutoSave()"> Finalizado</label>
-   <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="sp-proj-funcional"${p.funcional?' checked':''} onchange="_projScheduleAutoSave()"> Funcional</label>
-  </div>
   <div class="sp-field"><div class="sp-label">Descritivo do projeto</div><textarea class="sp-inp" id="sp-proj-desc" rows="3" oninput="_projScheduleAutoSave()">${(p.descritivo||'')}</textarea></div>
 
   <div class="sp-stitle">Melhorias vinculadas</div>
@@ -819,8 +809,6 @@ async function _spSaveProjetoFull() {
   peso_kg: (qtd && pUnit) ? qtd * pUnit : null,
   descritivo: (document.getElementById('sp-proj-desc')?.value || '').trim() || null,
   complexidade: document.getElementById('sp-proj-complexidade')?.value || null,
-  finalizado: !!document.getElementById('sp-proj-finalizado')?.checked,
-  funcional: !!document.getElementById('sp-proj-funcional')?.checked,
   updated_at: new Date().toISOString(),
  };
  // Responsável: _spProjRespSel guarda nomes selecionados (multiselect não
@@ -983,8 +971,6 @@ var _projFbFields = [
  { key: 'compl',   label: 'Complexidade',      type: 'select', options: ['Simples','Média','Média - simples','Complexa','Alta'] },
  { key: 'cliente', label: 'Cliente/Obra',      type: 'text' },
  { key: 'resp',    label: 'Responsável',       type: 'multitext', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
- { key: 'finalizado', label: 'Finalizado', type: 'select', options: ['Sim','Não'] },
- { key: 'funcional',  label: 'Funcional',  type: 'select', options: ['Sim','Não'] },
 ];
 _fbInit('projetos', _projFbFields, _projApplyFilters);
 
@@ -1203,7 +1189,7 @@ async function _dbLoadProjetos() {
   if(vT)totV+=vT;if(pT)totP+=pT;if(_emAnd.indexOf(etapa)!==-1)cAnd++;
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-tipo="'+tipo+'" data-id="'+(p.id||'')+'"'
    +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+(clienteBusca||'').replace(/"/g,'&quot;')+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
-   +' data-nome="'+(p.nome||'').replace(/"/g,'&quot;')+'" data-resp="'+(p.responsavel||'').replace(/"/g,'&quot;')+'" data-finalizado="'+(p.finalizado?'Sim':'Não')+'" data-funcional="'+(p.funcional?'Sim':'Não')+'">'
+   +' data-nome="'+(p.nome||'').replace(/"/g,'&quot;')+'" data-resp="'+(p.responsavel||'').replace(/"/g,'&quot;')+'">'
    +'<td style="font-size:12px;white-space:normal;word-break:break-word" title="'+(obraOuMelhoria||'').replace(/"/g,'&quot;')+'">'+obraOuMelhoria+'</td>'
    +'<td>'+(tipo?'<span class="badge '+(_tCls[tipo]||'bm')+'">'+tipo+'</span>':'—')+'</td>'
    +'<td style="font-size:12px">'+prod+'</td>'
