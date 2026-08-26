@@ -124,6 +124,10 @@ async function openNovoProjeto() {
  var telhadoWrap = document.getElementById('np-telhado-wrap');
  if (telhadoWrap) telhadoWrap.style.display = 'none';
 
+ if (!_produtosArr.length) {
+  var prRes = await _sb.from('produtos').select('id,nome,categoria').order('nome');
+  _produtosArr = prRes.data || [];
+ }
  await Promise.all([_npPopularObras(), _respLoadUsers(), _npCarregarMelhorias()]);
  var respWrap = document.getElementById('np-responsavel-wrap');
  if (respWrap) respWrap.innerHTML = _npResponsavelDropdownHTML();
@@ -133,6 +137,7 @@ async function openNovoProjeto() {
  if (tdWrap) tdWrap.innerHTML = _msRenderDropdown('npTelhado', _NO_TIPOLOGIA_TELHADO_OPCOES||[], _npTelhadoSel, '_npTelhadoToggle', 'Selecione a(s) tipologia(s)...');
  var thWrap = document.getElementById('np-telha-dd');
  if (thWrap) thWrap.innerHTML = _msRenderDropdown('npTelha', _NO_TIPO_TELHA_OPCOES||[], _npTelhaSel, '_npTelhaToggle', 'Selecione o(s) tipo(s)...');
+ if (typeof updateNpProdutoOptions === 'function') updateNpProdutoOptions();
 
  calcProjetoTotais();
  document.getElementById('modal-novo-projeto').classList.add('open');
