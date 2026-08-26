@@ -27,6 +27,19 @@ async function _npPopularObras() {
  wrap.innerHTML = _srchSelMarkup('npObra', 'np-obra-id', '');
 }
 
+// Etapa do projeto — pedido explícito: mesmo estilo de busca+single-select
+// já usado no campo Etapa do detalhamento de Projeto (_srchSelRegister
+// 'projEtapa', mais abaixo neste arquivo), em vez do <select> nativo sem
+// busca que o modal de criação tinha.
+function _npPopularEtapa() {
+ var wrap = document.getElementById('np-etapa-wrap');
+ if (!wrap) return;
+ _srchSelRegister('npEtapa', {
+  options: _projetosKanbanEtapaOrder, placeholder: 'Selecione a etapa...',
+ });
+ wrap.innerHTML = _srchSelMarkup('npEtapa', 'np-etapa', 'Análise Inicial');
+}
+
 // Catálogo real de produtos (_produtosArr, populado também pelo wizard Nova
 // Obra) — achado real: o detalhamento de Projeto (_spProjetoById) montava o
 // dropdown de Produto a partir de _noProdutosDisponiveis(tipo) sem nunca
@@ -149,10 +162,11 @@ function _npTelhaToggle(campo, valor, checked) {
 
 async function openNovoProjeto() {
  // Resetar campos
- ['np-produto','np-etapa'].forEach(id => {
+ ['np-produto'].forEach(id => {
  const el = document.getElementById(id); if(el) el.selectedIndex = 0;
  });
  _npPopularTipo();
+ _npPopularEtapa();
  ['np-nome','np-qtd','np-val-uni','np-peso-uni','np-m2arq','np-m2estr','np-desc'].forEach(id => {
  const el = document.getElementById(id); if(el) el.value = '';
  });
@@ -232,12 +246,12 @@ async function submitNovoProjeto() {
  var respWrap = document.getElementById('np-responsavel-wrap');
  nomeEl.style.borderColor = '';
  prodEl.style.borderColor = '';
- etapaEl.style.borderColor = '';
+ var etapaBox = document.getElementById('sp-srch-npEtapa-box'); if (etapaBox) etapaBox.style.borderColor = '';
  if (respWrap) respWrap.style.outline = '';
 
  if (!nomeDigitado) { nomeEl.style.borderColor = 'var(--red)'; nomeEl.focus(); _showToast('Informe o nome do projeto.', 'aviso'); return; }
  if (!prod) { prodEl.style.borderColor = 'var(--red)'; _showToast('Selecione o produto.', 'aviso'); return; }
- if (!etapa) { etapaEl.style.borderColor = 'var(--red)'; _showToast('Selecione a etapa do projeto.', 'aviso'); return; }
+ if (!etapa) { if (etapaBox) etapaBox.style.borderColor = 'var(--red)'; _showToast('Selecione a etapa do projeto.', 'aviso'); return; }
  // Pedido explícito: Obra OU Melhoria — pelo menos um dos dois vínculos é
  // obrigatório (projeto sem orçamento/obra associada precisa ficar
  // vinculado a alguma Melhoria em vez).
