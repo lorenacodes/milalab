@@ -1114,7 +1114,11 @@ var _projFbFields = [
  // comentário completo em _dbLoadProjetos (data-* de cada um, e por que
  // Fotos da Obra/Pré-Projeto/Projeto executivo/Tarefa ficaram de fora).
  { key: 'melhoria',   label: 'Melhoria',                  type: 'multitext', options: function(){ return _projMelhoriaOpcoesCache; } },
- { key: 'cidade',     label: 'Cidade (Obra)',             type: 'select', options: function(){ return _projCidadeOpcoesCache; } },
+ // Pedido explícito: Cidade não dava pra digitar (select só deixa clicar
+ // numa opção já existente na lista) — texto livre com "contém" é o que
+ // faz sentido pra um campo com centenas de valores diferentes (mesmo
+ // padrão de Nome do Projeto/Cliente-Obra, que também são type:'text').
+ { key: 'cidade',     label: 'Cidade (Obra)',             type: 'text' },
  { key: 'estado',     label: 'Estado (Obra)',             type: 'select', options: function(){ return _projEstadoOpcoesCache; } },
  { key: 'produto',    label: 'Produto',                   type: 'multitext', options: function(){ return _projProdutoOpcoesCache; } },
  { key: 'descritivo', label: 'Descritivo do projeto',     type: 'text' },
@@ -1257,7 +1261,6 @@ var _projetosArr    = [];
 var _obraIdMap      = {}; // id → {nome, empresa} preenchido por _dbLoadObras
 var _projMelhoriaOpcoesCache = []; // opções (nomes distintos) pro filtro "Melhoria"
 var _projProdutoOpcoesCache = [];  // opções (nomes distintos) pro filtro "Produto"
-var _projCidadeOpcoesCache = [];   // opções (nomes distintos) pro filtro "Cidade (Obra)"
 var _projEstadoOpcoesCache = [];   // opções (nomes distintos) pro filtro "Estado (Obra)"
 var _projMelhoriaMap = {}; // projeto_id → [nome, ...] das melhorias vinculadas — pedido explícito:
 // projeto sem obra deve mostrar a(s) melhoria(s) vinculada(s) em vez de "—".
@@ -1426,23 +1429,22 @@ async function _dbLoadProjetos() {
    +'<td style="text-align:right">'+_fmtN(pT,1)+'</td>'
    +'<td>'+(etapa?'<span class="badge '+(_eCls[etapa]||'bm')+'">'+etapa+'</span>':'—')+'</td></tr>';
  }).join('');
- // Opções dos novos filtros (Melhoria/Produto/Cidade/Estado) — computadas
- // aqui a partir dos dados já carregados, em vez de mais uma query: mesmo
- // espírito de _npCarregarMelhorias, só que pro filtro em vez do formulário
- // de criação.
+ // Opções dos novos filtros (Melhoria/Produto/Estado) — computadas aqui a
+ // partir dos dados já carregados, em vez de mais uma query: mesmo espírito
+ // de _npCarregarMelhorias, só que pro filtro em vez do formulário de
+ // criação. Cidade não entra aqui — virou texto livre (ver _projFbFields),
+ // não precisa de lista de opções pré-computada.
  (function() {
-  var melSet = {}, prodSet = {}, cidSet = {}, estSet = {};
+  var melSet = {}, prodSet = {}, estSet = {};
   allData.forEach(function(p) {
    (_projMelhoriaMap[p.id] || []).forEach(function(m) { melSet[m] = true; });
    (Array.isArray(p.produto) ? p.produto : (p.produto ? [p.produto] : [])).forEach(function(pr) { prodSet[pr] = true; });
    var oi = p.obra_id ? (_obraIdMap[p.obra_id] || {}) : {};
-   if (oi.cidade) cidSet[oi.cidade] = true;
    if (oi.estado) estSet[oi.estado] = true;
   });
   var toSortedArr = function(obj) { return Object.keys(obj).sort(function(a,b){ return a.localeCompare(b); }); };
   _projMelhoriaOpcoesCache = toSortedArr(melSet);
   _projProdutoOpcoesCache = toSortedArr(prodSet);
-  _projCidadeOpcoesCache = toSortedArr(cidSet);
   _projEstadoOpcoesCache = toSortedArr(estSet);
  })();
  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
