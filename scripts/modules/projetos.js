@@ -1171,12 +1171,18 @@ async function _dbLoadProjetos() {
   var obraInfo=p.obra_id?(_obraIdMap[p.obra_id]||{}):{};
   var obraNome=obraInfo.nome||'—';
   var empNome=obraInfo.empresa||'';
-  var cliente=empNome||obraNome;
+  // Achado real: a coluna "Obra vinculada" (título da própria tabela)
+  // mostrava a EMPRESA em vez da obra sempre que a empresa existia —
+  // detalhamento do projeto mostrava a obra certa, a tabela mostrava outro
+  // nome pro mesmo projeto. Cliente/Obra (busca/filtro) continua
+  // combinando os dois pra achar por qualquer um; a célula visível agora
+  // mostra só a obra, como o cabeçalho promete.
+  var clienteBusca=((empNome?empNome+' — ':'')+(obraNome!=='—'?obraNome:'')).trim()||obraNome;
   if(vT)totV+=vT;if(pT)totP+=pT;if(_emAnd.indexOf(etapa)!==-1)cAnd++;
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-tipo="'+tipo+'" data-id="'+(p.id||'')+'"'
-   +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+(cliente||'').replace(/"/g,'&quot;')+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
+   +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+(clienteBusca||'').replace(/"/g,'&quot;')+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
    +' data-nome="'+(p.nome||'').replace(/"/g,'&quot;')+'" data-resp="'+(p.responsavel||'').replace(/"/g,'&quot;')+'" data-finalizado="'+(p.finalizado?'Sim':'Não')+'" data-funcional="'+(p.funcional?'Sim':'Não')+'">'
-   +'<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+obraNome+'">'+cliente+'</td>'
+   +'<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+obraNome+'">'+obraNome+'</td>'
    +'<td>'+(tipo?'<span class="badge '+(_tCls[tipo]||'bm')+'">'+tipo+'</span>':'—')+'</td>'
    +'<td style="font-size:12px">'+prod+'</td>'
    +'<td style="text-align:right">'+(qtd!=null?qtd:'—')+'</td>'
