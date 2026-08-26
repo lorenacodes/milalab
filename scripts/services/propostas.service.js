@@ -101,6 +101,22 @@ function updateNpProdutoOptions() {
   opt.style.display = (tipo === 'Solar') ? (g === 'solar' ? '' : 'none') : (g === 'padrao' ? '' : 'none');
  });
  document.getElementById('np-produto-info').style.display = 'none';
+
+ // Pedido explícito: Tipologia do Telhado/Tipo de Telha aparecem
+ // automaticamente só quando Tipo de orçamento = Telhados.
+ var telhadoWrap = document.getElementById('np-telhado-wrap');
+ if (telhadoWrap) {
+  var mostrar = tipo === 'Telhados';
+  telhadoWrap.style.display = mostrar ? '' : 'none';
+  if (!mostrar && typeof _npTelhadoSel !== 'undefined') {
+   _npTelhadoSel = [];
+   _npTelhaSel = [];
+   var tdWrap = document.getElementById('np-telhado-dd');
+   if (tdWrap) tdWrap.innerHTML = _msRenderDropdown('npTelhado', _NO_TIPOLOGIA_TELHADO_OPCOES||[], _npTelhadoSel, '_npTelhadoToggle', 'Selecione a(s) tipologia(s)...');
+   var thWrap = document.getElementById('np-telha-dd');
+   if (thWrap) thWrap.innerHTML = _msRenderDropdown('npTelha', _NO_TIPO_TELHA_OPCOES||[], _npTelhaSel, '_npTelhaToggle', 'Selecione o(s) tipo(s)...');
+  }
+ }
 }
 
 function updateNpProdutoInfo() {

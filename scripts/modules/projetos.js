@@ -63,6 +63,50 @@ function _npResponsavelToggle(campo, valor, checked) {
  if (wrap) wrap.innerHTML = _npResponsavelDropdownHTML();
 }
 
+// Melhoria vinculada — pedido explícito: um Projeto pode nascer sem Obra
+// (orçamento) desde que fique vinculado a alguma Melhoria em vez (mesmo
+// conceito da coluna "Obra/Melhoria" na Tabela de Projetos). Só lista
+// melhorias AINDA SEM projeto (melhorias.projeto_id is null) — mesmo
+// modelo de "vincular existente" já usado em Instalação/Projeto noutras
+// telas: melhoria só pertence a 1 projeto por vez (FK única,
+// melhorias.projeto_id), então uma já vinculada não pode aparecer aqui de
+// novo (escolher ela roubaria o vínculo do projeto atual dela).
+var _npMelhoriaSel = [];
+var _npMelhoriasCache = null;
+async function _npCarregarMelhorias() {
+ if (_npMelhoriasCache || !_sb) return;
+ var res = await _sb.from('melhorias').select('id,nome').is('projeto_id', null).order('nome');
+ _npMelhoriasCache = res.data || [];
+}
+function _npMelhoriaDropdownHTML() {
+ var opcoes = (_npMelhoriasCache || []).map(function(m){ return m.nome || '(sem nome)'; });
+ return _msRenderDropdown('npMelhoria', opcoes, _npMelhoriaSel, '_npMelhoriaToggle', 'Selecione a(s) melhoria(s)...');
+}
+function _npMelhoriaToggle(campo, valor, checked) {
+ _npMelhoriaSel = _msToggle(_npMelhoriaSel, valor, checked);
+ var wrap = document.getElementById('np-melhoria-wrap');
+ if (wrap) wrap.innerHTML = _npMelhoriaDropdownHTML();
+}
+
+// Tipologia do Telhado / Tipo de Telha — pedido explícito: aparecem
+// automaticamente só quando Tipo de orçamento = Telhados (ver
+// updateNpProdutoOptions, propostas.service.js, que alterna o
+// #np-telhado-wrap). Mesmo vocabulário/padrão já usado no wizard de Nova
+// Obra (_NO_TIPOLOGIA_TELHADO_OPCOES/_NO_TIPO_TELHA_OPCOES,
+// wizard-nova-obra.js).
+var _npTelhadoSel = [];
+var _npTelhaSel = [];
+function _npTelhadoToggle(campo, valor, checked) {
+ _npTelhadoSel = _msToggle(_npTelhadoSel, valor, checked);
+ var wrap = document.getElementById('np-telhado-dd');
+ if (wrap) wrap.innerHTML = _msRenderDropdown('npTelhado', _NO_TIPOLOGIA_TELHADO_OPCOES, _npTelhadoSel, '_npTelhadoToggle', 'Selecione a(s) tipologia(s)...');
+}
+function _npTelhaToggle(campo, valor, checked) {
+ _npTelhaSel = _msToggle(_npTelhaSel, valor, checked);
+ var wrap = document.getElementById('np-telha-dd');
+ if (wrap) wrap.innerHTML = _msRenderDropdown('npTelha', _NO_TIPO_TELHA_OPCOES, _npTelhaSel, '_npTelhaToggle', 'Selecione o(s) tipo(s)...');
+}
+
 async function openNovoProjeto() {
  // Resetar campos
  ['np-tipo','np-produto','np-etapa'].forEach(id => {
@@ -73,10 +117,22 @@ async function openNovoProjeto() {
  });
  var idEl = document.getElementById('np-obra-id'); if (idEl) idEl.value = '';
  _npResponsavelSel = [];
+ _npMelhoriaSel = [];
+ _npMelhoriasCache = null;
+ _npTelhadoSel = [];
+ _npTelhaSel = [];
+ var telhadoWrap = document.getElementById('np-telhado-wrap');
+ if (telhadoWrap) telhadoWrap.style.display = 'none';
 
- await Promise.all([_npPopularObras(), _respLoadUsers()]);
+ await Promise.all([_npPopularObras(), _respLoadUsers(), _npCarregarMelhorias()]);
  var respWrap = document.getElementById('np-responsavel-wrap');
  if (respWrap) respWrap.innerHTML = _npResponsavelDropdownHTML();
+ var melWrap = document.getElementById('np-melhoria-wrap');
+ if (melWrap) melWrap.innerHTML = _npMelhoriaDropdownHTML();
+ var tdWrap = document.getElementById('np-telhado-dd');
+ if (tdWrap) tdWrap.innerHTML = _msRenderDropdown('npTelhado', _NO_TIPOLOGIA_TELHADO_OPCOES||[], _npTelhadoSel, '_npTelhadoToggle', 'Selecione a(s) tipologia(s)...');
+ var thWrap = document.getElementById('np-telha-dd');
+ if (thWrap) thWrap.innerHTML = _msRenderDropdown('npTelha', _NO_TIPO_TELHA_OPCOES||[], _npTelhaSel, '_npTelhaToggle', 'Selecione o(s) tipo(s)...');
 
  calcProjetoTotais();
  document.getElementById('modal-novo-projeto').classList.add('open');
@@ -123,7 +179,20 @@ function calcProjetoTotais() {
 async function submitNovoProjeto() {
  const obraId = document.getElementById('np-obra-id').value;
  const tipo   = document.getElementById('np-tipo').value;
- if (!obraId) { _showToast('Selecione a obra.', 'aviso'); return; }
+ const prod   = document.getElementById('np-produto').value || null;
+ const nomeDigitado = (document.getElementById('np-nome').value || '').trim();
+
+ var nomeEl = document.getElementById('np-nome');
+ var prodEl = document.getElementById('np-produto');
+ nomeEl.style.borderColor = '';
+ prodEl.style.borderColor = '';
+
+ if (!nomeDigitado) { nomeEl.style.borderColor = 'var(--red)'; nomeEl.focus(); _showToast('Informe o nome do projeto.', 'aviso'); return; }
+ if (!prod) { prodEl.style.borderColor = 'var(--red)'; _showToast('Selecione o produto.', 'aviso'); return; }
+ // Pedido explícito: Obra OU Melhoria — pelo menos um dos dois vínculos é
+ // obrigatório (projeto sem orçamento/obra associada precisa ficar
+ // vinculado a alguma Melhoria em vez).
+ if (!obraId && !_npMelhoriaSel.length) { _showToast('Vincule uma Obra ou uma Melhoria.', 'aviso'); return; }
  if (!tipo)   { document.getElementById('np-tipo').style.borderColor = 'var(--red)'; return; }
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
@@ -134,9 +203,7 @@ async function submitNovoProjeto() {
  const m2estr = parseFloat(document.getElementById('np-m2estr').value) || null;
  const etapa  = document.getElementById('np-etapa').value;
  const comp   = document.getElementById('np-complexidade').value;
- const prod   = document.getElementById('np-produto').value || null;
  const desc   = (document.getElementById('np-desc').value || '').trim();
- const nomeDigitado = (document.getElementById('np-nome').value || '').trim();
  const obraNome = _srchSelState.npObra ? _srchSelState.npObra.selected : '';
 
  var respEmails = (_respUsuarios || [])
@@ -145,7 +212,7 @@ async function submitNovoProjeto() {
 
  const payload = {
   nome: (nomeDigitado || (obraNome + ' — ' + tipo)).toUpperCase(),
-  obra_id: obraId,
+  obra_id: obraId || null,
   tipo_orcamento: tipo,
   etapa_projeto: etapa || null,
   produto: prod ? [prod] : null,
@@ -157,14 +224,24 @@ async function submitNovoProjeto() {
   valor_unitario: vUnit,
   responsavel: respEmails.length ? respEmails : null,
   descritivo: desc || null,
+  tipologia_telhado: _npTelhadoSel.length ? _npTelhadoSel : null,
+  tipologia_telha: _npTelhaSel.length ? _npTelhaSel : null,
  };
 
  const btn = document.querySelector('#modal-novo-projeto .btn-primary');
- const { error } = await _sb.from('projetos').insert(payload);
+ const { data: novoProjeto, error } = await _sb.from('projetos').insert(payload).select('id').single();
  if (error) {
   _showToast('Erro ao criar projeto: ' + _supaErrPt(error.message), 'erro');
   return;
  }
+
+ if (_npMelhoriaSel.length && novoProjeto) {
+  var melIds = (_npMelhoriasCache || [])
+   .filter(function(m){ return _npMelhoriaSel.indexOf(m.nome || '(sem nome)') !== -1; })
+   .map(function(m){ return m.id; });
+  if (melIds.length) await _sb.from('melhorias').update({ projeto_id: novoProjeto.id }).in('id', melIds);
+ }
+
  _showToast('Projeto criado com sucesso!', 'ok');
  closeNovoProjeto();
  _dbLoadProjetos();
