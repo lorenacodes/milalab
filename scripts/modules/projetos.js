@@ -27,6 +27,19 @@ async function _npPopularObras() {
  wrap.innerHTML = _srchSelMarkup('npObra', 'np-obra-id', '');
 }
 
+// Catálogo real de produtos (_produtosArr, populado também pelo wizard Nova
+// Obra) — achado real: o detalhamento de Projeto (_spProjetoById) montava o
+// dropdown de Produto a partir de _noProdutosDisponiveis(tipo) sem nunca
+// garantir que _produtosArr estivesse carregado antes (só o modal de
+// criação fazia essa garantia) — abrindo o detalhamento sem ter passado
+// antes pela Nova Obra/Novo Projeto, o catálogo vinha vazio e a lista de
+// opções de Produto ficava sem nenhum item pra escolher.
+async function _garantirProdutosArr() {
+ if (_produtosArr.length || !_sb) return;
+ var prRes = await _sb.from('produtos').select('id,nome,categoria').order('nome');
+ _produtosArr = prRes.data || [];
+}
+
 // Tipo de orçamento — pedido explícito: mesmo estilo de pills coloridas
 // clicáveis já usado em Tipo(s) de Obra (_NO_TIPO_COR, wizard-nova-obra.js)
 // e no detalhamento do próprio Projeto (_projTipoPillsHTML/_projTipoToggle,
@@ -152,10 +165,7 @@ async function openNovoProjeto() {
  var telhadoWrap = document.getElementById('np-telhado-wrap');
  if (telhadoWrap) telhadoWrap.style.display = 'none';
 
- if (!_produtosArr.length) {
-  var prRes = await _sb.from('produtos').select('id,nome,categoria').order('nome');
-  _produtosArr = prRes.data || [];
- }
+ await _garantirProdutosArr();
  await Promise.all([_npPopularObras(), _respLoadUsers(), _npCarregarMelhorias()]);
  var respWrap = document.getElementById('np-responsavel-wrap');
  if (respWrap) respWrap.innerHTML = _npResponsavelDropdownHTML();
@@ -546,7 +556,9 @@ async function _spProjetoById(id) {
  // Garante o mapa de nomes de Obra mesmo quando o painel é aberto sem a
  // Tabela de Projetos ter carregado antes (ex.: chip vindo de outra
  // entidade) — mesmo motivo/fix de _garantirObraIdMap em _dbLoadProjetos.
- await _garantirObraIdMap();
+ // _garantirProdutosArr: mesmo motivo — sem isso o dropdown de Produto
+ // abria sem nenhuma opção pra escolher (achado real).
+ await Promise.all([_garantirObraIdMap(), _garantirProdutosArr()]);
  var idx = (_projetosArr || []).findIndex(function(x){ return String(x.id) === String(id); });
  var p = idx !== -1 ? _projetosArr[idx] : null;
  if (p) { _spProjetoRender(p, idx); return; }
