@@ -255,7 +255,14 @@ async function _renderProjetosKanban() {
    // — abrir a Obra era o comportamento antigo e escondia o detalhamento do
    // Projeto atrás de um passo a mais. Arrastável (draggable) pra permitir
    // mudar a etapa direto pelo Kanban (ver _setupProjetosKanbanDnD abaixo).
-   return '<div class="proj-kn-card" draggable="true" data-id="' + p.id + '" onclick="_spProjetoById(\'' + p.id + '\')" title="Abrir projeto"'
+   // SEM onclick aqui de propósito — card inteiro sendo draggable=true faz
+   // o navegador tratar qualquer tremor mínimo do mouse durante um clique
+   // real como início de arraste (limiar nativo de poucos pixels), o que
+   // SUPRIME o evento click nativo por definição — o card ficava "não
+   // clicável" na prática, mesmo com o onclick corretamente amarrado (bug
+   // relatado). _setupProjetosKanbanDnD registra mousedown/mouseup com
+   // checagem de deslocamento em vez de confiar no evento click.
+   return '<div class="proj-kn-card" draggable="true" data-id="' + p.id + '" title="Abrir projeto"'
     + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-compl="' + compl + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '"'
     + ' data-nome="' + (p.nome||'').replace(/"/g,'&quot;') + '" data-resp="' + (p.responsavel||'').replace(/"/g,'&quot;') + '" data-finalizado="' + (p.finalizado?'Sim':'Não') + '" data-funcional="' + (p.funcional?'Sim':'Não') + '">'
     + '<div class="proj-kn-title">' + (p.nome || '(sem nome)') + '</div>'
@@ -286,10 +293,25 @@ function _onProjCardDragStart(e) {
  this.classList.add('dragging');
 }
 function _onProjCardDragEnd() { this.classList.remove('dragging'); }
+// Clique vs. arraste: mede o deslocamento entre mousedown e mouseup — só
+// abre o detalhamento se o mouse ficou praticamente parado (limiar de 5px).
+// Não depende do evento 'click' nativo porque esse é suprimido pelo
+// navegador sempre que um dragstart chegou a disparar nesse mesmo gesto.
+var _projCardDownXY = null;
+function _onProjCardMouseDown(e) { _projCardDownXY = { x: e.clientX, y: e.clientY }; }
+function _onProjCardMouseUp(e) {
+ if (!_projCardDownXY) return;
+ var dx = Math.abs(e.clientX - _projCardDownXY.x);
+ var dy = Math.abs(e.clientY - _projCardDownXY.y);
+ _projCardDownXY = null;
+ if (dx <= 5 && dy <= 5) _spProjetoById(this.dataset.id);
+}
 function _setupProjetosKanbanDnD() {
  document.querySelectorAll('#proj-kanban .proj-kn-card').forEach(function(card) {
   card.addEventListener('dragstart', _onProjCardDragStart);
   card.addEventListener('dragend', _onProjCardDragEnd);
+  card.addEventListener('mousedown', _onProjCardMouseDown);
+  card.addEventListener('mouseup', _onProjCardMouseUp);
  });
  document.querySelectorAll('#proj-kanban .proj-kn-body').forEach(function(body) {
   body.addEventListener('dragover', function(e) { e.preventDefault(); body.classList.add('kc-dragover'); });
