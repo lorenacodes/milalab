@@ -213,6 +213,8 @@ async function submitNovoProjeto() {
  const obraId = document.getElementById('np-obra-id').value;
  const tipo   = document.getElementById('np-tipo').value;
  const prod   = document.getElementById('np-produto').value || null;
+ const etapaEl = document.getElementById('np-etapa');
+ const etapa  = etapaEl.value;
  const nomeDigitado = (document.getElementById('np-nome').value || '').trim();
 
  var nomeEl = document.getElementById('np-nome');
@@ -220,10 +222,12 @@ async function submitNovoProjeto() {
  var respWrap = document.getElementById('np-responsavel-wrap');
  nomeEl.style.borderColor = '';
  prodEl.style.borderColor = '';
+ etapaEl.style.borderColor = '';
  if (respWrap) respWrap.style.outline = '';
 
  if (!nomeDigitado) { nomeEl.style.borderColor = 'var(--red)'; nomeEl.focus(); _showToast('Informe o nome do projeto.', 'aviso'); return; }
  if (!prod) { prodEl.style.borderColor = 'var(--red)'; _showToast('Selecione o produto.', 'aviso'); return; }
+ if (!etapa) { etapaEl.style.borderColor = 'var(--red)'; _showToast('Selecione a etapa do projeto.', 'aviso'); return; }
  // Pedido explícito: Obra OU Melhoria — pelo menos um dos dois vínculos é
  // obrigatório (projeto sem orçamento/obra associada precisa ficar
  // vinculado a alguma Melhoria em vez).
@@ -237,7 +241,6 @@ async function submitNovoProjeto() {
  const pUnit  = parseFloat(document.getElementById('np-peso-uni').value) || null;
  const m2arq  = parseFloat(document.getElementById('np-m2arq').value) || null;
  const m2estr = parseFloat(document.getElementById('np-m2estr').value) || null;
- const etapa  = document.getElementById('np-etapa').value;
  const desc   = (document.getElementById('np-desc').value || '').trim();
  const obraNome = _srchSelState.npObra ? _srchSelState.npObra.selected : '';
 
