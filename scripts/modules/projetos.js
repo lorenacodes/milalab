@@ -783,6 +783,28 @@ function _spProjetoRender(p, idx) {
    <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando melhorias...</div>
   </div>
 
+  <div class="sp-stitle">Fotos do Projeto</div>
+  <!-- Achado real: só existia a lista genérica de arquivo (nome + botão
+       Visualizar, ver _PROJ_DOC_TIPOS/_projDocSectionHTML) — nenhuma prévia
+       de imagem de verdade, diferente da galeria "Registros fotográficos"
+       que já existe no detalhamento de Obra (_spCarregarRegistros/
+       _spRegistrosDropzone, obras.js). Mesma galeria com miniaturas +
+       upload por clique/arraste, só que escopada a ESTE projeto (a de Obra
+       agrega de todos os projetos vinculados). Mesmo tipo='fotos_obra' e
+       mesmo bucket/tabela — reaproveita _spUploadRegistro sem duplicar. -->
+  <div id="sp-proj-fotos-info" style="font-size:11px;color:var(--muted);margin-bottom:6px"></div>
+  <div id="sp-proj-fotos-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;margin-bottom:8px"></div>
+  <label id="sp-proj-fotos-dz" style="display:flex;align-items:center;justify-content:center;gap:6px;border:2px dashed var(--border);border-radius:8px;padding:12px 8px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center;font-size:11px;color:var(--muted);margin-bottom:20px"
+   onmouseover="this.style.borderColor='var(--navy)';this.style.background='rgba(59,130,246,.04)'"
+   onmouseout="this.style.borderColor='var(--border)';this.style.background=''"
+   ondragover="event.preventDefault();this.style.borderColor='var(--navy)';this.style.background='rgba(59,130,246,.07)'"
+   ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
+   ondrop="_projFotosDrop(event)">
+   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.7"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>
+   <span id="sp-proj-fotos-dz-lbl">Clique ou arraste fotos para adicionar</span>
+   <input type="file" id="sp-proj-fotos-file" accept="image/*" multiple style="display:none" onchange="_projFotosFileChange(this)">
+  </label>
+
   <div class="sp-stitle">Documentos</div>
   <div id="sp-proj-docs">
    <div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando documentos...</div>
@@ -870,6 +892,7 @@ function _spProjetoRender(p, idx) {
   });
  })();
 
+ _projFotosCarregar(p.id, p.obra_id);
  _projDocsCarregar(p.id, p.obra_id);
  _projTarefasCarregar(p.id);
 
@@ -1001,16 +1024,18 @@ async function _spExcluirProjeto(id, nome) {
  if (typeof _dbLoadProjetos === 'function') _dbLoadProjetos();
 }
 
-// ── Documentos do Projeto — Pré-Projeto/Projeto Executivo/Registro da Obra,
-// todos vivem em `documentos` (projeto_id) no mesmo bucket 'documentos_projetos'
+// ── Documentos do Projeto — Pré-Projeto/Projeto Executivo, ambos vivem em
+// `documentos` (projeto_id) no mesmo bucket 'documentos_projetos'
 // (confirmado por SQL: os 155 'projeto_executivo' existentes já estão nesse
 // bucket, igual aos 'fotos_obra'). 'pre_projeto' é um tipo NOVO (não existe
 // nenhum documento com esse tipo ainda) — só passa a ter arquivos a partir de
 // agora, mesmo espírito do que já foi feito para criado_por/maior_peca.
+// 'fotos_obra' NÃO entra mais aqui — ganhou galeria própria com miniaturas
+// (_projFotosCarregar, logo abaixo), em vez da lista genérica de arquivo
+// (nome + botão) que os outros dois tipos continuam usando.
 var _PROJ_DOC_TIPOS = [
  { tipo: 'pre_projeto', label: 'Pré-Projeto' },
  { tipo: 'projeto_executivo', label: 'Projeto Executivo' },
- { tipo: 'fotos_obra', label: 'Registro da Obra' },
 ];
 function _projDocItemHTML(d) {
  var nome = d.nome_arquivo || 'Arquivo';
@@ -1056,6 +1081,69 @@ async function _projDocUpload(input, tipo) {
  if (erros) _showToast(erros + ' arquivo(s) não enviado(s). Tente novamente.', 'erro');
  _projDocsCarregar(projetoId, obraId);
  input.value = '';
+}
+
+// ── Fotos do Projeto — galeria com miniaturas (documentos.tipo='fotos_obra'
+// deste projeto), mesmo bucket/tabela e mesmo _spUploadRegistro já usados
+// pelos Registros fotográficos da Obra (obras.js), só que sem agrupar por
+// projeto (aqui só existe UM projeto — o aberto) e sem depender de um
+// seletor de projeto (o id já é conhecido, ver dz.dataset.projetoId).
+async function _projFotosCarregar(projetoId, obraId) {
+ var container = document.getElementById('sp-proj-fotos-grid');
+ var infoEl = document.getElementById('sp-proj-fotos-info');
+ var dz = document.getElementById('sp-proj-fotos-dz');
+ if (!container || !_sb) return;
+ if (dz) { dz.dataset.projetoId = projetoId; dz.dataset.obraId = obraId || ''; }
+ var res = await _sb.from('documentos').select('*').eq('tipo', 'fotos_obra').eq('projeto_id', projetoId).order('created_at', { ascending: false });
+ if (res.error) { container.innerHTML = '<div class="sp-empty" style="color:var(--red)">Erro ao carregar fotos.</div>'; return; }
+ var fotos = res.data || [];
+ if (infoEl) infoEl.textContent = fotos.length ? (fotos.length + (fotos.length === 1 ? ' foto' : ' fotos')) : 'Nenhuma foto enviada ainda.';
+ if (!fotos.length) { container.innerHTML = ''; return; }
+ // Assinatura em lote — mesma otimização de _spCarregarRegistros (obras.js):
+ // 1 chamada resolve as URLs de todas as fotos em vez de 1 por foto.
+ var paths = fotos.map(function(f){ return f.caminho_storage; }).filter(Boolean);
+ var signedMap = {};
+ if (paths.length) {
+  var sig = await _sb.storage.from('documentos_projetos').createSignedUrls(paths, 3600);
+  if (!sig.error) (sig.data || []).forEach(function(s){ if (s.signedUrl && s.path) signedMap[s.path] = s.signedUrl; });
+ }
+ container.innerHTML = fotos.map(function(f) {
+  var url = signedMap[f.caminho_storage];
+  var nome = (f.nome_arquivo || 'Foto').toString();
+  var pathSafe = String(f.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var nomeSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var onclickAttr = url ? " onclick=\"_spAbrirDocStorage('" + pathSafe + "','" + nomeSafe + "','documentos_projetos')\"" : '';
+  return '<div' + onclickAttr + ' title="' + nome.replace(/"/g,'&quot;') + '" style="cursor:' + (url ? 'pointer' : 'default') + ';border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1;background:var(--surface2)">'
+   + (url
+      ? '<img src="' + url + '" alt="' + nome.replace(/"/g,'&quot;') + '" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block">'
+      : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:10px;text-align:center;padding:4px">Sem prévia</div>')
+   + '</div>';
+ }).join('');
+}
+async function _projFotosUploadFiles(files) {
+ if (!files || !files.length) return;
+ var dz = document.getElementById('sp-proj-fotos-dz');
+ var projetoId = dz && dz.dataset.projetoId;
+ var obraId = (dz && dz.dataset.obraId) || null;
+ if (!projetoId) return;
+ var lbl = document.getElementById('sp-proj-fotos-dz-lbl');
+ if (lbl) lbl.textContent = 'Enviando...';
+ var erros = 0;
+ for (var i = 0; i < files.length; i++) { if (!(await _spUploadRegistro(files[i], projetoId, obraId, 'fotos_obra'))) erros++; }
+ if (lbl) lbl.textContent = 'Clique ou arraste fotos para adicionar';
+ if (erros) _showToast(erros + ' foto(s) não enviada(s). Tente novamente.', 'erro');
+ _projFotosCarregar(projetoId, obraId);
+}
+function _projFotosFileChange(input) {
+ _projFotosUploadFiles(Array.prototype.slice.call(input.files || []));
+ input.value = '';
+}
+function _projFotosDrop(event) {
+ event.preventDefault();
+ var dz = document.getElementById('sp-proj-fotos-dz');
+ if (dz) { dz.style.borderColor = 'var(--border)'; dz.style.background = ''; }
+ var files = event.dataTransfer && event.dataTransfer.files;
+ _projFotosUploadFiles(Array.prototype.slice.call(files || []));
 }
 
 // ── Tarefas vinculadas ao Projeto — atividades_projetos é a junção real
@@ -1115,10 +1203,12 @@ var _projFbFields = [
  // Fotos da Obra/Pré-Projeto/Projeto executivo/Tarefa ficaram de fora).
  { key: 'melhoria',   label: 'Melhoria',                  type: 'multitext', options: function(){ return _projMelhoriaOpcoesCache; } },
  // Pedido explícito: Cidade não dava pra digitar (select só deixa clicar
- // numa opção já existente na lista) — texto livre com "contém" é o que
- // faz sentido pra um campo com centenas de valores diferentes (mesmo
- // padrão de Nome do Projeto/Cliente-Obra, que também são type:'text').
- { key: 'cidade',     label: 'Cidade (Obra)',             type: 'text' },
+ // Pedido explícito: Cidade tem que ser select+multi com busca, igual a
+ // Obras (app.js: 'cidade' também é type:'select'). O problema real não
+ // era o tipo — era a lista de opções vir sempre vazia (bug de
+ // _obraGeoMap corrigido acima), o que dava a impressão de "não dá pra
+ // inserir valor".
+ { key: 'cidade',     label: 'Cidade (Obra)',             type: 'select', options: function(){ return _projCidadeOpcoesCache; } },
  { key: 'estado',     label: 'Estado (Obra)',             type: 'select', options: function(){ return _projEstadoOpcoesCache; } },
  { key: 'produto',    label: 'Produto',                   type: 'multitext', options: function(){ return _projProdutoOpcoesCache; } },
  { key: 'descritivo', label: 'Descritivo do projeto',     type: 'text' },
@@ -1261,6 +1351,7 @@ var _projetosArr    = [];
 var _obraIdMap      = {}; // id → {nome, empresa} preenchido por _dbLoadObras
 var _projMelhoriaOpcoesCache = []; // opções (nomes distintos) pro filtro "Melhoria"
 var _projProdutoOpcoesCache = [];  // opções (nomes distintos) pro filtro "Produto"
+var _projCidadeOpcoesCache = [];   // opções (nomes distintos) pro filtro "Cidade (Obra)"
 var _projEstadoOpcoesCache = [];   // opções (nomes distintos) pro filtro "Estado (Obra)"
 var _projMelhoriaMap = {}; // projeto_id → [nome, ...] das melhorias vinculadas — pedido explícito:
 // projeto sem obra deve mostrar a(s) melhoria(s) vinculada(s) em vez de "—".
@@ -1453,22 +1544,23 @@ async function _dbLoadProjetos() {
    +'<td style="text-align:right">'+_fmtN(pT,1)+'</td>'
    +'<td>'+(etapa?'<span class="badge '+(_eCls[etapa]||'bm')+'">'+etapa+'</span>':'—')+'</td></tr>';
  }).join('');
- // Opções dos novos filtros (Melhoria/Produto/Estado) — computadas aqui a
- // partir dos dados já carregados, em vez de mais uma query: mesmo espírito
- // de _npCarregarMelhorias, só que pro filtro em vez do formulário de
- // criação. Cidade não entra aqui — virou texto livre (ver _projFbFields),
- // não precisa de lista de opções pré-computada.
+ // Opções dos novos filtros (Melhoria/Produto/Cidade/Estado) — computadas
+ // aqui a partir dos dados já carregados, em vez de mais uma query: mesmo
+ // espírito de _npCarregarMelhorias, só que pro filtro em vez do
+ // formulário de criação.
  (function() {
-  var melSet = {}, prodSet = {}, estSet = {};
+  var melSet = {}, prodSet = {}, cidSet = {}, estSet = {};
   allData.forEach(function(p) {
    (_projMelhoriaMap[p.id] || []).forEach(function(m) { melSet[m] = true; });
    (Array.isArray(p.produto) ? p.produto : (p.produto ? [p.produto] : [])).forEach(function(pr) { prodSet[pr] = true; });
    var oi = p.obra_id ? (_obraGeoMap[p.obra_id] || {}) : {};
+   if (oi.cidade) cidSet[oi.cidade] = true;
    if (oi.estado) estSet[oi.estado] = true;
   });
   var toSortedArr = function(obj) { return Object.keys(obj).sort(function(a,b){ return a.localeCompare(b); }); };
   _projMelhoriaOpcoesCache = toSortedArr(melSet);
   _projProdutoOpcoesCache = toSortedArr(prodSet);
+  _projCidadeOpcoesCache = toSortedArr(cidSet);
   _projEstadoOpcoesCache = toSortedArr(estSet);
  })();
  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
