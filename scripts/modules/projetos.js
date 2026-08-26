@@ -1202,19 +1202,32 @@ var _projMelhoriaMap = {}; // projeto_id → [nome, ...] das melhorias vinculada
 
 // Mesmo espírito de _garantirObraIdMap logo abaixo — carrega só id+nome+
 // projeto_id (leve) uma vez por sessão, não duplica se já carregado.
+// Achado real: nome de melhoria aparecia duas vezes na coluna Obra/Melhoria
+// — _dbLoadProjetos roda mais de uma vez em sequência rápida (ex.: reload
+// explícito após criar um projeto + reload disparado por realtime), e as
+// duas chamadas concorrentes de _garantirMelhoriaProjetoMap passavam pelo
+// guard acima antes da primeira terminar de popular o cache (_projMelhoriaMap
+// ainda vazio nas duas), cada uma fazendo seu próprio fetch e dando push no
+// mesmo nome duas vezes. _projMelhoriaMapPromise faz a segunda chamada
+// esperar a mesma promise em vez de refazer o fetch.
+var _projMelhoriaMapPromise = null;
 async function _garantirMelhoriaProjetoMap() {
  if (Object.keys(_projMelhoriaMap).length || !_sb) return;
- var all = []; var from = 0; var more = true;
- while (more) {
-  var res = await _sb.from('melhorias').select('nome, projeto_id').not('projeto_id', 'is', null).range(from, from + 999);
-  if (res.error || !res.data) break;
-  all = all.concat(res.data);
-  more = res.data.length === 1000; from += 1000;
- }
- all.forEach(function(m) {
-  if (!m.nome) return;
-  (_projMelhoriaMap[m.projeto_id] = _projMelhoriaMap[m.projeto_id] || []).push(m.nome);
- });
+ if (_projMelhoriaMapPromise) return _projMelhoriaMapPromise;
+ _projMelhoriaMapPromise = (async function() {
+  var all = []; var from = 0; var more = true;
+  while (more) {
+   var res = await _sb.from('melhorias').select('nome, projeto_id').not('projeto_id', 'is', null).range(from, from + 999);
+   if (res.error || !res.data) break;
+   all = all.concat(res.data);
+   more = res.data.length === 1000; from += 1000;
+  }
+  all.forEach(function(m) {
+   if (!m.nome) return;
+   (_projMelhoriaMap[m.projeto_id] = _projMelhoriaMap[m.projeto_id] || []).push(m.nome);
+  });
+ })();
+ await _projMelhoriaMapPromise;
 }
 
 // _obraIdMap normalmente é preenchido por _dbLoadObras (obras.js) — mas só
