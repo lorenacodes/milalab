@@ -27,17 +27,31 @@ async function _npPopularObras() {
  wrap.innerHTML = _srchSelMarkup('npObra', 'np-obra-id', '');
 }
 
-// Tipo de orçamento — pedido explícito: mesmo estilo de busca+single-select
-// (srch-sel) já usado no campo Obra, em vez do <select> nativo.
+// Tipo de orçamento — pedido explícito: mesmo estilo de pills coloridas
+// clicáveis já usado em Tipo(s) de Obra (_NO_TIPO_COR, wizard-nova-obra.js)
+// e no detalhamento do próprio Projeto (_projTipoPillsHTML/_projTipoToggle,
+// mais abaixo neste arquivo) — este par espelha o mesmo componente pro
+// formulário de criação, escrevendo no hidden #np-tipo em vez de em
+// _spProjAtivo (que só existe no contexto do detalhamento).
+function _npTipoPillsHTML(tipoAtual) {
+ var opcoes = (typeof _NO_TIPOS_OPCOES !== 'undefined' && _NO_TIPOS_OPCOES) || ['Telhados','Steel Frame','Modular','Misto (LSF + A36)','Solar'];
+ return opcoes.map(function(t) {
+  var sel = t === tipoAtual;
+  var cor = (typeof _NO_TIPO_COR !== 'undefined' && _NO_TIPO_COR[t]) || 'var(--navy)';
+  return '<button type="button" onclick="_npTipoToggle(\'' + t.replace(/'/g,"\\'") + '\')" style="padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid ' + cor + ';background:' + (sel?cor:'transparent') + ';color:' + (sel?'#fff':cor) + '">' + t + '</button>';
+ }).join('');
+}
+function _npTipoToggle(t) {
+ var idEl = document.getElementById('np-tipo');
+ if (idEl) idEl.value = t;
+ var pillsEl = document.getElementById('np-tipo-pills');
+ if (pillsEl) { pillsEl.style.outline = ''; pillsEl.innerHTML = _npTipoPillsHTML(t); }
+ if (typeof updateNpProdutoOptions === 'function') updateNpProdutoOptions();
+}
 function _npPopularTipo() {
- var wrap = document.getElementById('np-tipo-wrap');
- if (!wrap) return;
- _srchSelRegister('npTipo', {
-  options: (typeof _NO_TIPOS_OPCOES !== 'undefined' && _NO_TIPOS_OPCOES) || ['Telhados','Steel Frame','Modular','Misto (LSF + A36)','Solar'],
-  placeholder: 'Selecione o tipo...',
-  onSelect: function() { if (typeof updateNpProdutoOptions === 'function') updateNpProdutoOptions(); }
- });
- wrap.innerHTML = _srchSelMarkup('npTipo', 'np-tipo', '');
+ var idEl = document.getElementById('np-tipo'); if (idEl) idEl.value = '';
+ var pillsEl = document.getElementById('np-tipo-pills');
+ if (pillsEl) { pillsEl.style.outline = ''; pillsEl.innerHTML = _npTipoPillsHTML(''); }
 }
 
 // Responsável — multi-select com busca, ligado a usuários reais
@@ -212,7 +226,7 @@ async function submitNovoProjeto() {
  // obrigatório (projeto sem orçamento/obra associada precisa ficar
  // vinculado a alguma Melhoria em vez).
  if (!obraId && !_npMelhoriaSel.length) { _showToast('Vincule uma Obra ou uma Melhoria.', 'aviso'); return; }
- if (!tipo)   { var tipoBox = document.getElementById('sp-srch-npTipo-box'); if (tipoBox) tipoBox.style.borderColor = 'var(--red)'; _showToast('Selecione o tipo de orçamento.', 'aviso'); return; }
+ if (!tipo)   { var pillsWrap = document.getElementById('np-tipo-pills'); if (pillsWrap) pillsWrap.style.outline = '1.5px solid var(--red)'; _showToast('Selecione o tipo de orçamento.', 'aviso'); return; }
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
  const qtd    = parseFloat(document.getElementById('np-qtd').value) || null;
