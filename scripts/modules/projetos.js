@@ -217,8 +217,10 @@ async function submitNovoProjeto() {
 
  var nomeEl = document.getElementById('np-nome');
  var prodEl = document.getElementById('np-produto');
+ var respWrap = document.getElementById('np-responsavel-wrap');
  nomeEl.style.borderColor = '';
  prodEl.style.borderColor = '';
+ if (respWrap) respWrap.style.outline = '';
 
  if (!nomeDigitado) { nomeEl.style.borderColor = 'var(--red)'; nomeEl.focus(); _showToast('Informe o nome do projeto.', 'aviso'); return; }
  if (!prod) { prodEl.style.borderColor = 'var(--red)'; _showToast('Selecione o produto.', 'aviso'); return; }
@@ -227,6 +229,7 @@ async function submitNovoProjeto() {
  // vinculado a alguma Melhoria em vez).
  if (!obraId && !_npMelhoriaSel.length) { _showToast('Vincule uma Obra ou uma Melhoria.', 'aviso'); return; }
  if (!tipo)   { var pillsWrap = document.getElementById('np-tipo-pills'); if (pillsWrap) pillsWrap.style.outline = '1.5px solid var(--red)'; _showToast('Selecione o tipo de orçamento.', 'aviso'); return; }
+ if (!_npResponsavelSel.length) { if (respWrap) respWrap.style.outline = '1.5px solid var(--red)'; _showToast('Selecione o responsável pelo projeto.', 'aviso'); return; }
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
  const qtd    = parseFloat(document.getElementById('np-qtd').value) || null;
