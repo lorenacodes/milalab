@@ -1009,7 +1009,7 @@ function _projRenderGroupNode(node, path, tbody, forceHidden) {
   hd.style.position = 'static';
   hd.onclick = function(){ _projToggleGroup(pathKey); };
   hd.style.display = (forceHidden || !visCount) ? 'none' : '';
-  hd.innerHTML = '<td colspan="11" style="padding-left:' + indent + 'px">'
+  hd.innerHTML = '<td colspan="10" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + (k || '—') + '</strong>'
    + '<span style="color:var(--muted);font-size:9px;margin-left:6px">(' + visCount + ')</span>'
@@ -1083,25 +1083,24 @@ var _obraIdMap      = {}; // id → {nome, empresa} preenchido por _dbLoadObras
 
 async function _dbLoadProjetos() {
  var tbody=document.getElementById('proj-tbody');
- if(tbody) tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando projetos...</td></tr>';
+ if(tbody) tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando projetos...</td></tr>';
  var allData=[]; var from=0; var more=true;
  while(more){
   var res=await _sb.from('projetos').select('*').order('created_at',{ascending:false}).range(from,from+999);
   if(res.error){
-   if(tbody)tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar projetos: '+res.error.message+'</td></tr>';
+   if(tbody)tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar projetos: '+res.error.message+'</td></tr>';
    return;
   }
   if(res.data&&res.data.length)allData=allData.concat(res.data);
   more=res.data&&res.data.length===1000; from+=1000;
  }
  if(!allData.length){
-  if(tbody)tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Nenhum projeto encontrado.</td></tr>';
+  if(tbody)tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Nenhum projeto encontrado.</td></tr>';
   return;
  }
  allData.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
  _projetosArr=allData;
  if(!tbody)return;
- function _pad3(n){var s=String(n);while(s.length<3)s='0'+s;return s;}
  var _tCls={'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by'};
  var _eCls={
   'Orçamento':'bm','Análise Inicial':'bm','Aguardando Aprovação':'by',
@@ -1117,7 +1116,6 @@ async function _dbLoadProjetos() {
  var _emAnd=['Pré-projeto','Revisão Pré-Projeto','Projeto para Aprovação','Revisão Projeto','Projeto Executivo','Revisão Projeto Executivo','Ajustes de Piloto','Projeto em Andamento','Aguardando Produção'];
  var totV=0,totP=0,cAnd=0;
  tbody.innerHTML=allData.map(function(p,idx){
-  var cod='PRJ-'+_pad3(idx+1);
   var tipo=p.tipo_orcamento||'';
   var etapa=(p.etapa_projeto||'').trim();
   var prod=Array.isArray(p.produto)?(p.produto[0]||'—'):(p.produto||'—');
@@ -1134,7 +1132,6 @@ async function _dbLoadProjetos() {
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-tipo="'+tipo+'" data-id="'+(p.id||'')+'"'
    +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+(cliente||'').replace(/"/g,'&quot;')+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
    +' data-nome="'+(p.nome||'').replace(/"/g,'&quot;')+'" data-resp="'+(p.responsavel||'').replace(/"/g,'&quot;')+'" data-finalizado="'+(p.finalizado?'Sim':'Não')+'" data-funcional="'+(p.funcional?'Sim':'Não')+'">'
-   +'<td style="font-weight:600;color:var(--navy)">'+cod+'</td>'
    +'<td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+obraNome+'">'+cliente+'</td>'
    +'<td>'+(tipo?'<span class="badge '+(_tCls[tipo]||'bm')+'">'+tipo+'</span>':'—')+'</td>'
    +'<td style="font-size:12px">'+prod+'</td>'
