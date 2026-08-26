@@ -27,15 +27,40 @@ async function _npPopularObras() {
  wrap.innerHTML = _srchSelMarkup('npObra', 'np-obra-id', '');
 }
 
-// Responsável — multi-select com busca (_msRenderDropdown), ligado a
-// usuários reais (_usuariosCache), mesmo padrão já usado pra Produto aqui
-// e pro dropdown de Responsável do wizard de Nova Obra — deixa de ser
-// texto livre.
+// Responsável — multi-select com busca, ligado a usuários reais
+// (_respUsuarios, dashboard.js). Pedido explícito: mostrar a FOTO de cada
+// usuário na seleção — _msRenderDropdown genérico (usado pra Produto/
+// Cidade/Tipologia) não tem noção de avatar, então esse dropdown é
+// próprio, reaproveitando o mesmo visual (.fb-msel-*) + _userAvatarHTML
+// (mesmo helper de foto já usado no Gestor de Tarefas).
 var _npResponsavelSel = [];
+function _npResponsavelDropdownHTML() {
+ var sel = _npResponsavelSel;
+ var opcoes = (_respUsuarios || []).slice().sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
+ var btnLabel = _msBtnLabel(sel, 'Selecione o(s) responsável(is)...');
+ var searchHtml = opcoes.length > 0
+  ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">'
+  : '';
+ var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s){ return (s||'').toLowerCase(); };
+ var itemsHtml = opcoes.map(function(u) {
+  var nome = u.nome || u.email || '';
+  var esc = nome.replace(/"/g, '&quot;');
+  var norm = normalizar(nome);
+  var ck = sel.indexOf(nome) !== -1 ? ' checked' : '';
+  return '<label class="fb-msel-item" data-norm="' + norm + '" style="display:flex;align-items:center;gap:8px">'
+   + '<input type="checkbox" value="' + esc + '"' + ck + ' onchange="_npResponsavelToggle(\'npResp\',this.value,this.checked)">'
+   + _userAvatarHTML(u, 20) + '<span>' + nome + '</span>'
+   + '</label>';
+ }).join('');
+ return '<div class="fb-msel-wrap">'
+  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabel + '</button>'
+  + '<div class="fb-msel-panel">' + searchHtml + '<div class="fb-msel-list">' + itemsHtml + '</div></div>'
+  + '</div>';
+}
 function _npResponsavelToggle(campo, valor, checked) {
  _npResponsavelSel = _msToggle(_npResponsavelSel, valor, checked);
  var wrap = document.getElementById('np-responsavel-wrap');
- if (wrap) wrap.innerHTML = _msRenderDropdown('npResp', (_usuariosCache||[]).map(function(u){ return u.nome_display || u.email; }), _npResponsavelSel, '_npResponsavelToggle', 'Selecione o(s) responsável(is)...');
+ if (wrap) wrap.innerHTML = _npResponsavelDropdownHTML();
 }
 
 async function openNovoProjeto() {
@@ -49,9 +74,9 @@ async function openNovoProjeto() {
  var idEl = document.getElementById('np-obra-id'); if (idEl) idEl.value = '';
  _npResponsavelSel = [];
 
- await Promise.all([_npPopularObras(), _loadUsuariosCache()]);
+ await Promise.all([_npPopularObras(), _respLoadUsers()]);
  var respWrap = document.getElementById('np-responsavel-wrap');
- if (respWrap) respWrap.innerHTML = _msRenderDropdown('npResp', (_usuariosCache||[]).map(function(u){ return u.nome_display || u.email; }), [], '_npResponsavelToggle', 'Selecione o(s) responsável(is)...');
+ if (respWrap) respWrap.innerHTML = _npResponsavelDropdownHTML();
 
  calcProjetoTotais();
  document.getElementById('modal-novo-projeto').classList.add('open');
@@ -114,8 +139,8 @@ async function submitNovoProjeto() {
  const nomeDigitado = (document.getElementById('np-nome').value || '').trim();
  const obraNome = _srchSelState.npObra ? _srchSelState.npObra.selected : '';
 
- var respEmails = (_usuariosCache || [])
-  .filter(function(u){ return _npResponsavelSel.indexOf(u.nome_display || u.email) !== -1; })
+ var respEmails = (_respUsuarios || [])
+  .filter(function(u){ return _npResponsavelSel.indexOf(u.nome || u.email) !== -1; })
   .map(function(u){ return u.email; });
 
  const payload = {
