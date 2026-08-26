@@ -1306,12 +1306,34 @@ async function _garantirObraIdMap() {
  if (Object.keys(_obraIdMap).length || !_sb) return;
  var allObras = []; var from = 0; var more = true;
  while (more) {
-  var res = await _sb.from('obras').select('id, nome, cidade, estado').range(from, from + 999);
+  var res = await _sb.from('obras').select('id, nome').range(from, from + 999);
   if (res.error || !res.data) break;
   allObras = allObras.concat(res.data);
   more = res.data.length === 1000; from += 1000;
  }
- allObras.forEach(function(o) { _obraIdMap[o.id] = { nome: o.nome || '', cidade: o.cidade || '', estado: o.estado || '' }; });
+ allObras.forEach(function(o) { _obraIdMap[o.id] = { nome: o.nome || '' }; });
+}
+
+// Achado real: filtros de Cidade/Estado (Obra) sempre vinham vazios —
+// _obraIdMap é um cache COMPARTILHADO com obras.js (_dbLoadObras reseta e
+// repopula com {nome,empresa}, sem cidade/estado, toda vez que a aba Obras
+// carrega/navega, sem guard) — se Obras roda antes de Projetos na mesma
+// sessão (comum: sidebar já mostra contagem de Obras carregada), o mapa
+// chegava em projetos.js só com {nome,empresa} e o guard de
+// _garantirObraIdMap via "já tem conteúdo, não busca de novo" nunca mais
+// dava chance de completar com cidade/estado. Mapa separado, só pra isso,
+// evita depender da forma que outro módulo decidiu popular o cache dele.
+var _obraGeoMap = {}; // id → {cidade, estado}
+async function _garantirObraGeoMap() {
+ if (Object.keys(_obraGeoMap).length || !_sb) return;
+ var allObras = []; var from = 0; var more = true;
+ while (more) {
+  var res = await _sb.from('obras').select('id, cidade, estado').range(from, from + 999);
+  if (res.error || !res.data) break;
+  allObras = allObras.concat(res.data);
+  more = res.data.length === 1000; from += 1000;
+ }
+ allObras.forEach(function(o) { _obraGeoMap[o.id] = { cidade: o.cidade || '', estado: o.estado || '' }; });
 }
 
 async function _dbLoadProjetos() {
@@ -1319,6 +1341,7 @@ async function _dbLoadProjetos() {
  if(tbody) tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando projetos...</td></tr>';
  var allData=[]; var from=0; var more=true;
  await _garantirObraIdMap();
+ await _garantirObraGeoMap();
  await _garantirMelhoriaProjetoMap();
  // Presença (tem/não tem) de Fotos da Obra/Pré-Projeto/Projeto executivo
  // (documentos.tipo, mesmo bucket já usado no detalhamento) e de Tarefa
@@ -1375,6 +1398,7 @@ async function _dbLoadProjetos() {
   var pU=p.peso_kg!=null?Number(p.peso_kg):null;
   var pT=(pU!=null&&qtd!=null)?pU*qtd:pU;
   var obraInfo=p.obra_id?(_obraIdMap[p.obra_id]||{}):{};
+  var obraGeo=p.obra_id?(_obraGeoMap[p.obra_id]||{}):{};
   var obraNome=obraInfo.nome||'';
   var empNome=obraInfo.empresa||'';
   // Pedido explícito: projeto sem obra vinculada deve mostrar a(s)
@@ -1406,7 +1430,7 @@ async function _dbLoadProjetos() {
    // tarefas de TODOS os projetos de uma vez só pra filtrar (custo alto
    // pra tabela que já é grande), diferente do resto que já vem no SELECT.
    +' data-melhoria="'+attrEsc(melhoriasNomes.join(', '))+'" data-obra="'+attrEsc(obraNome)+'"'
-   +' data-cidade="'+attrEsc(obraInfo.cidade)+'" data-estado="'+attrEsc(obraInfo.estado)+'"'
+   +' data-cidade="'+attrEsc(obraGeo.cidade)+'" data-estado="'+attrEsc(obraGeo.estado)+'"'
    +' data-produto="'+attrEsc(produtoJoin)+'" data-descritivo="'+attrEsc(p.descritivo)+'"'
    +' data-qtd="'+(qtd!=null?qtd:'')+'" data-valorunit="'+(vU!=null?vU:'')+'" data-m2estr="'+(p.m2_estrutura!=null?p.m2_estrutura:'')+'"'
    +' data-pesouni="'+(pU!=null?pU:'')+'" data-maiorpeca="'+attrEsc(p.maior_peca)+'"'
@@ -1439,7 +1463,7 @@ async function _dbLoadProjetos() {
   allData.forEach(function(p) {
    (_projMelhoriaMap[p.id] || []).forEach(function(m) { melSet[m] = true; });
    (Array.isArray(p.produto) ? p.produto : (p.produto ? [p.produto] : [])).forEach(function(pr) { prodSet[pr] = true; });
-   var oi = p.obra_id ? (_obraIdMap[p.obra_id] || {}) : {};
+   var oi = p.obra_id ? (_obraGeoMap[p.obra_id] || {}) : {};
    if (oi.estado) estSet[oi.estado] = true;
   });
   var toSortedArr = function(obj) { return Object.keys(obj).sort(function(a,b){ return a.localeCompare(b); }); };
