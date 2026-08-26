@@ -217,6 +217,37 @@ test("_fbOperatorChange: trocar pra 'between' inicializa value como par vazio", 
  assert.deepEqual(_fbInstances.dt3.state.conditions[0].value, ['', '']);
 });
 
+// ── Tipo 'number' — usado pela aba Projetos (Quantidade, Valor da unidade,
+// M² Estrutura, Peso...) pra comparação numérica de verdade em vez de
+// tratar o valor como texto ('contém'/'é'). ──
+const NUMBER_FIELDS = [{ key: 'qtd', label: 'Quantidade', type: 'number' }];
+const NUMBER_ITEMS = [
+ { id: 1, qtd: 3 },
+ { id: 2, qtd: 10 },
+ { id: 3, qtd: 25 },
+ { id: 4, qtd: null },
+];
+
+test("number 'gt'/'lt': compara numericamente, não como string", () => {
+ _fbInit('n1', NUMBER_FIELDS, null);
+ _fbInstances.n1.state.conditions = [{ id: 'c1', field: 'qtd', operator: 'gt', value: '9' }];
+ assert.deepEqual(NUMBER_ITEMS.filter((i) => _fbEvaluate(i, 'n1')).map((i) => i.id), [2, 3]);
+});
+
+test("number 'between': filtra dentro do intervalo (inclusive nas duas pontas)", () => {
+ _fbInit('n2', NUMBER_FIELDS, null);
+ _fbInstances.n2.state.conditions = [{ id: 'c1', field: 'qtd', operator: 'between', value: [3, 10] }];
+ assert.deepEqual(NUMBER_ITEMS.filter((i) => _fbEvaluate(i, 'n2')).map((i) => i.id), [1, 2]);
+});
+
+test("number 'empty'/'nempty': null nunca entra em nenhuma comparação numérica", () => {
+ _fbInit('n3', NUMBER_FIELDS, null);
+ _fbInstances.n3.state.conditions = [{ id: 'c1', field: 'qtd', operator: 'empty' }];
+ assert.deepEqual(NUMBER_ITEMS.filter((i) => _fbEvaluate(i, 'n3')).map((i) => i.id), [4]);
+ _fbInstances.n3.state.conditions = [{ id: 'c1', field: 'qtd', operator: 'gte', value: '0' }];
+ assert.deepEqual(NUMBER_ITEMS.filter((i) => _fbEvaluate(i, 'n3')).map((i) => i.id), [1, 2, 3]);
+});
+
 // ── defaultValue — campos "binários" (ex.: "Atrasada" do Gestor de Tarefas)
 // onde só escolher o campo já expressa a intenção, sem precisar abrir o
 // dropdown de valor de novo pra confirmar algo óbvio. ──

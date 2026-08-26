@@ -1105,7 +1105,30 @@ var _projFbFields = [
  { key: 'etapa',   label: 'Etapa',             type: 'select', options: _projetosKanbanEtapaOrder },
  { key: 'compl',   label: 'Complexidade',      type: 'select', options: ['Simples','Média','Média - simples','Complexa','Alta'] },
  { key: 'cliente', label: 'Cliente/Obra',      type: 'text' },
+ // Pedido explícito: "Obra" tem que ser select+multi (buscável, escolher
+ // clicando), não texto livre — 'cliente' acima continua existindo pra
+ // busca combinada empresa+obra, este aqui é o nome da Obra isolado.
+ { key: 'obra',    label: 'Obra', type: 'select', options: function(){ return Object.keys(_obraIdMap||{}).map(function(id){ return _obraIdMap[id].nome; }).filter(Boolean).sort(function(a,b){ return a.localeCompare(b); }); } },
  { key: 'resp',    label: 'Responsável',       type: 'multitext', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
+ // Pedido explícito: filtros que faltavam na aba Projetos — ver
+ // comentário completo em _dbLoadProjetos (data-* de cada um, e por que
+ // Fotos da Obra/Pré-Projeto/Projeto executivo/Tarefa ficaram de fora).
+ { key: 'melhoria',   label: 'Melhoria',                  type: 'multitext', options: function(){ return _projMelhoriaOpcoesCache; } },
+ { key: 'cidade',     label: 'Cidade (Obra)',             type: 'select', options: function(){ return _projCidadeOpcoesCache; } },
+ { key: 'estado',     label: 'Estado (Obra)',             type: 'select', options: function(){ return _projEstadoOpcoesCache; } },
+ { key: 'produto',    label: 'Produto',                   type: 'multitext', options: function(){ return _projProdutoOpcoesCache; } },
+ { key: 'descritivo', label: 'Descritivo do projeto',     type: 'text' },
+ { key: 'qtd',        label: 'Quantidade',                type: 'number' },
+ { key: 'valorunit',  label: 'Valor da unidade',          type: 'number' },
+ { key: 'valor',      label: 'Valor total',               type: 'number' },
+ { key: 'm2estr',     label: 'M² Estrutura',              type: 'number' },
+ { key: 'pesouni',    label: 'Peso Uni (KG)',             type: 'number' },
+ { key: 'maiorpeca',  label: 'Maior peça',                type: 'text' },
+ { key: 'peso',       label: 'Peso Total',                type: 'number' },
+ { key: 'updatedat',  label: 'Horário da última alteração', type: 'date' },
+ { key: 'createdat',  label: 'Data de criação',           type: 'date' },
+ { key: 'atualizadopor', label: 'Alterado por último',    type: 'select', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
+ { key: 'criadopor',     label: 'Criado por',             type: 'select', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
 ];
 _fbInit('projetos', _projFbFields, _projApplyFilters);
 
@@ -1225,6 +1248,10 @@ function _projApplyFilters() {
 
 var _projetosArr    = [];
 var _obraIdMap      = {}; // id → {nome, empresa} preenchido por _dbLoadObras
+var _projMelhoriaOpcoesCache = []; // opções (nomes distintos) pro filtro "Melhoria"
+var _projProdutoOpcoesCache = [];  // opções (nomes distintos) pro filtro "Produto"
+var _projCidadeOpcoesCache = [];   // opções (nomes distintos) pro filtro "Cidade (Obra)"
+var _projEstadoOpcoesCache = [];   // opções (nomes distintos) pro filtro "Estado (Obra)"
 var _projMelhoriaMap = {}; // projeto_id → [nome, ...] das melhorias vinculadas — pedido explícito:
 // projeto sem obra deve mostrar a(s) melhoria(s) vinculada(s) em vez de "—".
 
@@ -1269,12 +1296,12 @@ async function _garantirObraIdMap() {
  if (Object.keys(_obraIdMap).length || !_sb) return;
  var allObras = []; var from = 0; var more = true;
  while (more) {
-  var res = await _sb.from('obras').select('id, nome').range(from, from + 999);
+  var res = await _sb.from('obras').select('id, nome, cidade, estado').range(from, from + 999);
   if (res.error || !res.data) break;
   allObras = allObras.concat(res.data);
   more = res.data.length === 1000; from += 1000;
  }
- allObras.forEach(function(o) { _obraIdMap[o.id] = { nome: o.nome || '' }; });
+ allObras.forEach(function(o) { _obraIdMap[o.id] = { nome: o.nome || '', cidade: o.cidade || '', estado: o.estado || '' }; });
 }
 
 async function _dbLoadProjetos() {
@@ -1335,9 +1362,31 @@ async function _dbLoadProjetos() {
   // qualquer um dos dois; sem obra, cai pro texto exibido (melhoria ou "—").
   var clienteBusca=((empNome?empNome+' — ':'')+(obraNome||obraOuMelhoria)).trim()||obraOuMelhoria;
   if(vT)totV+=vT;if(pT)totP+=pT;if(_emAnd.indexOf(etapa)!==-1)cAnd++;
+  var produtoJoin=Array.isArray(p.produto)?p.produto.join(', '):(p.produto||'');
+  var atualizadoPorNome=p.atualizado_por?_projAuditNome(p.atualizado_por):'';
+  var criadoPorNome=p.criado_por?_projAuditNome(p.criado_por):'';
+  var attrEsc=function(s){ return (s==null?'':String(s)).replace(/"/g,'&quot;').replace(/[\r\n]+/g,' '); };
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-tipo="'+tipo+'" data-id="'+(p.id||'')+'"'
-   +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+(clienteBusca||'').replace(/"/g,'&quot;')+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
-   +' data-nome="'+(p.nome||'').replace(/"/g,'&quot;')+'" data-resp="'+(p.responsavel||'').replace(/"/g,'&quot;')+'">'
+   +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+attrEsc(clienteBusca)+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
+   +' data-nome="'+attrEsc(p.nome)+'" data-resp="'+attrEsc(p.responsavel)+'"'
+   // Pedido explícito: filtros que não existiam na aba Projetos (Melhoria,
+   // Cidade/Estado da Obra, Obra dedicado, Produto, Descritivo, Quantidade,
+   // Valor da unidade, M² Estrutura, Peso Uni, Maior peça, Peso Total,
+   // Horário da última alteração, Data de criação, Alterado por último,
+   // Criado por) — cada um vira um data-* aqui pro _fbEvaluate ler (mesmo
+   // mecanismo de Tipo/Etapa/Cliente já usado, ver _projApplyFilters).
+   // Fotos da Obra/Pré-Projeto/Projeto executivo/Tarefa ficaram de fora
+   // dessa entrega: são presença de anexo/registro relacionado, não um
+   // valor escalar do projeto — exigiriam carregar contagem de anexos/
+   // tarefas de TODOS os projetos de uma vez só pra filtrar (custo alto
+   // pra tabela que já é grande), diferente do resto que já vem no SELECT.
+   +' data-melhoria="'+attrEsc(melhoriasNomes.join(', '))+'" data-obra="'+attrEsc(obraNome)+'"'
+   +' data-cidade="'+attrEsc(obraInfo.cidade)+'" data-estado="'+attrEsc(obraInfo.estado)+'"'
+   +' data-produto="'+attrEsc(produtoJoin)+'" data-descritivo="'+attrEsc(p.descritivo)+'"'
+   +' data-qtd="'+(qtd!=null?qtd:'')+'" data-valorunit="'+(vU!=null?vU:'')+'" data-m2estr="'+(p.m2_estrutura!=null?p.m2_estrutura:'')+'"'
+   +' data-pesouni="'+(pU!=null?pU:'')+'" data-maiorpeca="'+attrEsc(p.maior_peca)+'"'
+   +' data-updatedat="'+(p.updated_at?String(p.updated_at).slice(0,10):'')+'" data-createdat="'+(p.created_at?String(p.created_at).slice(0,10):'')+'"'
+   +' data-atualizadopor="'+attrEsc(atualizadoPorNome)+'" data-criadopor="'+attrEsc(criadoPorNome)+'">'
    // Achado real: "Nome do Projeto" nunca foi renderizado como coluna de
    // verdade (só existia como atributo data-nome, usado pra busca/filtro) —
    // cabeçalho da tabela também nunca teve essa coluna. Primeira célula
@@ -1353,6 +1402,25 @@ async function _dbLoadProjetos() {
    +'<td style="text-align:right">'+_fmtN(pT,1)+'</td>'
    +'<td>'+(etapa?'<span class="badge '+(_eCls[etapa]||'bm')+'">'+etapa+'</span>':'—')+'</td></tr>';
  }).join('');
+ // Opções dos novos filtros (Melhoria/Produto/Cidade/Estado) — computadas
+ // aqui a partir dos dados já carregados, em vez de mais uma query: mesmo
+ // espírito de _npCarregarMelhorias, só que pro filtro em vez do formulário
+ // de criação.
+ (function() {
+  var melSet = {}, prodSet = {}, cidSet = {}, estSet = {};
+  allData.forEach(function(p) {
+   (_projMelhoriaMap[p.id] || []).forEach(function(m) { melSet[m] = true; });
+   (Array.isArray(p.produto) ? p.produto : (p.produto ? [p.produto] : [])).forEach(function(pr) { prodSet[pr] = true; });
+   var oi = p.obra_id ? (_obraIdMap[p.obra_id] || {}) : {};
+   if (oi.cidade) cidSet[oi.cidade] = true;
+   if (oi.estado) estSet[oi.estado] = true;
+  });
+  var toSortedArr = function(obj) { return Object.keys(obj).sort(function(a,b){ return a.localeCompare(b); }); };
+  _projMelhoriaOpcoesCache = toSortedArr(melSet);
+  _projProdutoOpcoesCache = toSortedArr(prodSet);
+  _projCidadeOpcoesCache = toSortedArr(cidSet);
+  _projEstadoOpcoesCache = toSortedArr(estSet);
+ })();
  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  var kT=document.getElementById('proj-kpi-total');if(kT)kT.textContent=allData.length;
  var kA=document.getElementById('proj-kpi-andamento');if(kA)kA.textContent=cAnd;
