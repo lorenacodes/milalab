@@ -1835,14 +1835,20 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + (mostrarPropostaSolar
    ? '<div class="sp-stitle">Proposta Comercial Solar</div>'
      + '<div style="background:var(--yellow-dim);border:1px solid var(--yellow);border-radius:8px;padding:12px 14px;margin-bottom:12px">'
-     + '<select class="sp-inp" id="sp-prod-solar" style="margin-bottom:10px" onchange="_spCheckSolarBtn()">'
-     + '<option value="">Selecione o produto...</option>'
-     + SOLAR_PRODUTOS.map(function(p){ return '<option' + (p === prodSolar ? ' selected' : '') + '>' + p + '</option>'; }).join('')
-     + '</select>'
-     + '<div class="sp-g2">'
-     + '<div><div class="sp-label">Qtd. (placas)</div><input class="sp-inp" id="sp-qtd-solar" type="number" placeholder="0" value="' + (projSolar.quantidade != null ? projSolar.quantidade : '') + '" oninput="_spCheckSolarBtn()"></div>'
-     + '<div><div class="sp-label">Valor unit. (R$)</div><input class="sp-inp" id="sp-vl-solar" type="number" placeholder="0" value="' + (projSolar.valor_unitario != null ? projSolar.valor_unitario : '') + '" oninput="_spCheckSolarBtn()"></div>'
+     // Pedido explícito: Produto/Qtd./Valor unit. saíram daqui — são
+     // informações que já vêm da criação do Projeto Solar vinculado
+     // (produto[0]/quantidade/valor_unitario), pedir de novo aqui era
+     // redundante. Resumo só-leitura (pra saber qual projeto/valores essa
+     // proposta vai usar sem precisar sair da aba); editar de verdade
+     // continua sendo no próprio Projeto (aba Projetos/detalhamento).
+     + '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:12px">'
+     + '<div><div class="sp-label" style="margin-bottom:1px">Produto</div><b>' + (prodSolar || '—') + '</b></div>'
+     + '<div><div class="sp-label" style="margin-bottom:1px">Qtd. (placas)</div><b>' + (projSolar.quantidade != null ? projSolar.quantidade : '—') + '</b></div>'
+     + '<div><div class="sp-label" style="margin-bottom:1px">Valor unit. (R$)</div><b>' + (projSolar.valor_unitario != null ? fmtMoeda(projSolar.valor_unitario) : '—') + '</b></div>'
      + '</div>'
+     + (!(prodSolar && projSolar.quantidade != null && projSolar.valor_unitario != null)
+       ? '<div style="font-size:11px;color:var(--red);margin-bottom:10px">Preencha Produto/Quantidade/Valor unitário no projeto Solar vinculado (aba Projetos) antes de gerar a proposta.</div>'
+       : '')
      + '<div class="sp-g2" style="margin-top:8px">'
      + '<div><div class="sp-label">Frete</div><select class="sp-inp" id="sp-frete-solar" onchange="_spCheckSolarBtn()">'
        + '<option value="">Selecione...</option>'

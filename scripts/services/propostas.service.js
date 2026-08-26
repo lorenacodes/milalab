@@ -406,10 +406,22 @@ async function imprimirProposta() {
  });
 }
 
+// Produto/Qtd./Valor unit. não são mais campos deste formulário (pedido
+// explícito: já vêm do Projeto Solar vinculado, redundante pedir de novo
+// aqui) — lidos direto do projeto em vez de inputs próprios; ver
+// _spGerarProposta logo abaixo, mesma fonte.
+var _SOLAR_PRODUTOS_CHECK = ['Solo','Carport 2 Linhas','Carport 3 Linhas','Laje'];
+function _spProjSolarAtivo() {
+ var o = _obraAtiva || {};
+ return (o.projetos || []).find(function(p){
+  return (p.produto || []).some(function(pr){ return _SOLAR_PRODUTOS_CHECK.includes(pr); });
+ });
+}
 function _spCheckSolarBtn() {
- const prod  = document.getElementById('sp-prod-solar')?.value;
- const qtd   = parseFloat(document.getElementById('sp-qtd-solar')?.value) || 0;
- const vl    = parseFloat(document.getElementById('sp-vl-solar')?.value) || 0;
+ const projSolar = _spProjSolarAtivo();
+ const prod  = projSolar && (projSolar.produto || []).find(function(pr){ return _SOLAR_PRODUTOS_CHECK.includes(pr); });
+ const qtd   = (projSolar && projSolar.quantidade != null) ? Number(projSolar.quantidade) : 0;
+ const vl    = (projSolar && projSolar.valor_unitario != null) ? Number(projSolar.valor_unitario) : 0;
  const frete = document.getElementById('sp-frete-solar')?.value;
  const icms  = document.getElementById('sp-icms-solar')?.value;
  const btn   = document.getElementById('sp-btn-proposta');
@@ -433,9 +445,13 @@ function _spToggleDifal() {
 }
 
 async function _spGerarProposta() {
- const prod    = document.getElementById('sp-prod-solar')?.value || '';
- const qtd     = parseFloat(document.getElementById('sp-qtd-solar')?.value) || 0;
- const vuni    = parseFloat(document.getElementById('sp-vl-solar')?.value) || 0;
+ // Produto/Qtd./Valor unit. saíram do formulário (pedido explícito) — lidos
+ // direto do Projeto Solar vinculado em vez de inputs próprios, já que são
+ // os mesmos dados preenchidos na criação do projeto.
+ const projSolar = _spProjSolarAtivo();
+ const prod    = (projSolar && (projSolar.produto || []).find(function(pr){ return _SOLAR_PRODUTOS_CHECK.includes(pr); })) || '';
+ const qtd     = (projSolar && projSolar.quantidade != null) ? Number(projSolar.quantidade) : 0;
+ const vuni    = (projSolar && projSolar.valor_unitario != null) ? Number(projSolar.valor_unitario) : 0;
  const frete   = document.getElementById('sp-frete-solar')?.value || '';
  const icms    = document.getElementById('sp-icms-solar')?.value || '';
  const consumidorFinal = !!document.getElementById('sp-consfinal-solar')?.checked;
@@ -454,19 +470,16 @@ async function _spGerarProposta() {
  const empresaCnpj = empresaCadastro?.cnpj || '';
  const cidadeUf = [o.cidade, o.estado].filter(Boolean).join(' - ');
 
- const SOLAR_PRODUTOS = ['Solo','Carport 2 Linhas','Carport 3 Linhas','Laje'];
- const projSolar = (o.projetos || []).find(function(p){
-  return (p.produto || []).some(function(pr){ return SOLAR_PRODUTOS.includes(pr); });
- });
-
  const btn = document.getElementById('sp-btn-proposta');
  if (btn) { btn.disabled = true; btn.textContent = 'Gerando...'; }
 
  try {
   if (_dbOk && projSolar) {
+   // quantidade/valor_unitario não são reescritos aqui — já vêm do próprio
+   // projeto (fonte), não mudaram; só os campos específicos da proposta
+   // (frete/ICMS/DIFAL) são atualizados.
    const upd = await _sb.from('projetos').update({
-    quantidade: qtd, valor_unitario: vuni, frete: frete,
-    aliquota_icms: icms, consumidor_final: consumidorFinal,
+    frete: frete, aliquota_icms: icms, consumidor_final: consumidorFinal,
     difal_percentual: difalPercentual, updated_at: new Date().toISOString(),
    }).eq('id', projSolar.id);
    if (upd.error) _showToast('Erro ao salvar dados: ' + _supaErrPt(upd.error.message), 'erro');
