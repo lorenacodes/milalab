@@ -207,7 +207,6 @@ async function submitNovoProjeto() {
  const m2arq  = parseFloat(document.getElementById('np-m2arq').value) || null;
  const m2estr = parseFloat(document.getElementById('np-m2estr').value) || null;
  const etapa  = document.getElementById('np-etapa').value;
- const comp   = document.getElementById('np-complexidade').value;
  const desc   = (document.getElementById('np-desc').value || '').trim();
  const obraNome = _srchSelState.npObra ? _srchSelState.npObra.selected : '';
 
@@ -221,7 +220,6 @@ async function submitNovoProjeto() {
   tipo_orcamento: tipo,
   etapa_projeto: etapa || null,
   produto: prod ? [prod] : null,
-  complexidade: comp || null,
   m2_arquitetura: m2arq,
   m2_estrutura: m2estr,
   peso_kg: (qtd && pUnit) ? qtd * pUnit : null,
@@ -673,12 +671,6 @@ function _spProjetoRender(p, idx) {
   options: _projetosKanbanEtapaOrder, placeholder: 'Nenhuma etapa',
   onSelect: function() { _projScheduleAutoSave(); },
  });
- // Complexidade — mesmo padrão de single-select buscável do resto do
- // formulário (estava só no modal de criação, sem forma de editar depois).
- _srchSelRegister('projComplexidade', {
-  options: ['Simples', 'Média', 'Média - simples', 'Complexa', 'Alta'], placeholder: 'Nenhuma',
-  onSelect: function() { _projScheduleAutoSave(); },
- });
  // p.responsavel já chega aqui convertido de array-de-e-mails pra string
  // "Nome1, Nome2" (ver _emailsToNomes, chamado antes de _spProjetoRender
  // tanto no caminho de cache quanto no fetch direto por id) — desfaz pra
@@ -721,10 +713,7 @@ function _spProjetoRender(p, idx) {
    <div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-proj-cidade" value="Carregando..." readonly></div>
    <div class="sp-field"><div class="sp-label">Estado</div><input class="sp-inp" id="sp-proj-estado" value="Carregando..." readonly></div>
   </div>
-  <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Complexidade</div>${_srchSelMarkup('projComplexidade', 'sp-proj-complexidade', p.complexidade || '')}</div>
-   <div class="sp-field"><div class="sp-label">Responsável</div><div id="sp-proj-responsavel-dd" class="no-msel-wide">${_msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _respNomesAtuais, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...')}</div></div>
-  </div>
+  <div class="sp-field"><div class="sp-label">Responsável</div><div id="sp-proj-responsavel-dd" class="no-msel-wide">${_msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _respNomesAtuais, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...')}</div></div>
   <div class="sp-field"><div class="sp-label">Descritivo do projeto</div><textarea class="sp-inp" id="sp-proj-desc" rows="3" oninput="_projScheduleAutoSave()">${(p.descritivo||'')}</textarea></div>
 
   <div class="sp-stitle">Melhorias vinculadas</div>
@@ -915,7 +904,6 @@ async function _spSaveProjetoFull() {
   // ver comentário em _spProjetoRender) — calculado aqui, nunca digitado.
   peso_kg: (qtd && pUnit) ? qtd * pUnit : null,
   descritivo: (document.getElementById('sp-proj-desc')?.value || '').trim() || null,
-  complexidade: document.getElementById('sp-proj-complexidade')?.value || null,
   updated_at: new Date().toISOString(),
  };
  // Responsável: _spProjRespSel guarda nomes selecionados (multiselect não
@@ -1126,7 +1114,7 @@ function _projRenderGroupNode(node, path, tbody, forceHidden) {
   hd.style.position = 'static';
   hd.onclick = function(){ _projToggleGroup(pathKey); };
   hd.style.display = (forceHidden || !visCount) ? 'none' : '';
-  hd.innerHTML = '<td colspan="11" style="padding-left:' + indent + 'px">'
+  hd.innerHTML = '<td colspan="10" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + (k || '—') + '</strong>'
    + '<span style="color:var(--muted);font-size:9px;margin-left:6px">(' + visCount + ')</span>'
@@ -1238,21 +1226,21 @@ async function _garantirObraIdMap() {
 
 async function _dbLoadProjetos() {
  var tbody=document.getElementById('proj-tbody');
- if(tbody) tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando projetos...</td></tr>';
+ if(tbody) tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando projetos...</td></tr>';
  var allData=[]; var from=0; var more=true;
  await _garantirObraIdMap();
  await _garantirMelhoriaProjetoMap();
  while(more){
   var res=await _sb.from('projetos').select('*').order('created_at',{ascending:false}).range(from,from+999);
   if(res.error){
-   if(tbody)tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar projetos: '+res.error.message+'</td></tr>';
+   if(tbody)tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar projetos: '+res.error.message+'</td></tr>';
    return;
   }
   if(res.data&&res.data.length)allData=allData.concat(res.data);
   more=res.data&&res.data.length===1000; from+=1000;
  }
  if(!allData.length){
-  if(tbody)tbody.innerHTML='<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Nenhum projeto encontrado.</td></tr>';
+  if(tbody)tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Nenhum projeto encontrado.</td></tr>';
   return;
  }
  allData.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
@@ -1310,8 +1298,7 @@ async function _dbLoadProjetos() {
    +'<td style="text-align:right;font-weight:600;color:var(--green)">'+_fmtBRL(vT)+'</td>'
    +'<td style="text-align:right">'+_fmtN(pU,1)+'</td>'
    +'<td style="text-align:right">'+_fmtN(pT,1)+'</td>'
-   +'<td>'+(etapa?'<span class="badge '+(_eCls[etapa]||'bm')+'">'+etapa+'</span>':'—')+'</td>'
-   +'<td>'+(p.complexidade||'—')+'</td></tr>';
+   +'<td>'+(etapa?'<span class="badge '+(_eCls[etapa]||'bm')+'">'+etapa+'</span>':'—')+'</td></tr>';
  }).join('');
  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  var kT=document.getElementById('proj-kpi-total');if(kT)kT.textContent=allData.length;
