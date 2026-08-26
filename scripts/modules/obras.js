@@ -1809,47 +1809,23 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<button class="btn btn-ghost btn-sm" onclick="_spToggleNovoContato()">Cancelar</button>'
   + '</div></div>'
 
-  // "Empresa(s) vinculada(s)" e "Projetos vinculados" (chips) foram removidas
-  // daqui — pedido explícito de reestruturação: a página virou uma ficha
-  // única de rolagem contínua, e esses chips já eram redundantes com o campo
-  // Empresa logo acima (que tem seu próprio atalho "›") e com a seção
-  // Projetos completa mais abaixo (mesma rolagem, não mais uma aba separada)
-  // — mostrar a lista de projetos duas vezes na mesma página não ajuda em
-  // nada. "Resumo" continua: é agregado (totais), não repete a lista.
-  + '<div class="sp-stitle">Resumo</div>'
-  + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:16px">'
-  + '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">'
-  + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">Projetos</div>'
-  + '<div style="font-size:22px;font-weight:700;color:var(--text)">' + projetos.length + '</div></div>'
-  + '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">'
-  + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">Qtd. total</div>'
-  + '<div style="font-size:22px;font-weight:700;color:var(--text)">' + (totalQtd > 0 ? totalQtd.toLocaleString('pt-BR') : '—') + '</div></div>'
-  + '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">'
-  + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">Peso total</div>'
-  + '<div style="font-size:14px;font-weight:700;color:var(--text)">' + (totalPeso > 0 ? totalPeso.toLocaleString('pt-BR') + ' kg' : '—') + '</div></div>'
-  + '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center">'
-  + '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">Valor total</div>'
-  + '<div style="font-size:13px;font-weight:700;color:var(--green)">' + (totalValor > 0 ? fmtMoeda(totalValor) : '—') + '</div></div>'
-  + '</div>'
+  // "Empresa(s) vinculada(s)", "Projetos vinculados" (chips) e o bloco
+  // "Resumo" (Projetos/Qtd. total/Peso total/Valor total) foram removidos
+  // daqui — pedido explícito: não agregava nada de novo (totais já
+  // aparecem no rodapé da própria aba Projetos, chips já eram redundantes
+  // com o campo Empresa logo acima e a seção Projetos completa mais abaixo).
 
   + (mostrarPropostaSolar
    ? '<div class="sp-stitle">Proposta Comercial Solar</div>'
      + '<div style="background:var(--yellow-dim);border:1px solid var(--yellow);border-radius:8px;padding:12px 14px;margin-bottom:12px">'
-     // Pedido explícito: Produto/Qtd./Valor unit. saíram daqui — são
-     // informações que já vêm da criação do Projeto Solar vinculado
-     // (produto[0]/quantidade/valor_unitario), pedir de novo aqui era
-     // redundante. Resumo só-leitura (pra saber qual projeto/valores essa
-     // proposta vai usar sem precisar sair da aba); editar de verdade
-     // continua sendo no próprio Projeto (aba Projetos/detalhamento).
-     + '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:12px">'
-     + '<div><div class="sp-label" style="margin-bottom:1px">Produto</div><b>' + (prodSolar || '—') + '</b></div>'
-     + '<div><div class="sp-label" style="margin-bottom:1px">Qtd. (placas)</div><b>' + (projSolar.quantidade != null ? projSolar.quantidade : '—') + '</b></div>'
-     + '<div><div class="sp-label" style="margin-bottom:1px">Valor unit. (R$)</div><b>' + (projSolar.valor_unitario != null ? fmtMoeda(projSolar.valor_unitario) : '—') + '</b></div>'
-     + '</div>'
-     + (!(prodSolar && projSolar.quantidade != null && projSolar.valor_unitario != null)
-       ? '<div style="font-size:11px;color:var(--red);margin-bottom:10px">Preencha Produto/Quantidade/Valor unitário no projeto Solar vinculado (aba Projetos) antes de gerar a proposta.</div>'
-       : '')
-     + '<div class="sp-g2" style="margin-top:8px">'
+     // Pedido explícito: nem o resumo só-leitura de Produto/Qtd./Valor
+     // unit. agregava — removido de vez (esses dados já vêm do Projeto
+     // Solar vinculado, produto[0]/quantidade/valor_unitario, ver
+     // _spCheckSolarBtn/_spGerarProposta em propostas.service.js; o botão
+     // "Gerar Proposta Comercial" já fica escondido sozinho enquanto
+     // faltar algum desses 3 no projeto, sem precisar de aviso separado
+     // aqui). Só os campos específicos da proposta em si continuam aqui.
+     + '<div class="sp-g2">'
      + '<div><div class="sp-label">Frete</div><select class="sp-inp" id="sp-frete-solar" onchange="_spCheckSolarBtn()">'
        + '<option value="">Selecione...</option>'
        + ['CIF','FOB'].map(function(f){ return '<option' + (f === projSolar.frete ? ' selected' : '') + '>' + f + '</option>'; }).join('')
