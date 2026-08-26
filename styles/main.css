@@ -1186,7 +1186,7 @@ tbody[data-sp] tr:hover td{background:var(--navy-dim)!important}
 .proj-view-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border:none;border-radius:var(--r-sm);font-size:12px;font-weight:500;cursor:pointer;color:var(--muted);background:transparent;font-family:inherit;transition:all .15s;white-space:nowrap}
 .proj-view-btn:hover{color:var(--text)}
 .proj-view-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.15);font-weight:600}
-/* Mesmo padrão visual do Kanban de Obras (.kanban-col/.kc-*/.obra-card,
+/* Mesmo padrão visual do Kanban de Obras (.kanban-col, .kc-header, .obra-card
    acima) — min-width+max-width (não só flex-basis) pra travar a largura de
    verdade mesmo com texto longo dentro (Obra vinculada sem quebra de linha
    forçava a coluna a alargar além do previsto quando só havia flex-basis,
