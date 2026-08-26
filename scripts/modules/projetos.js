@@ -1129,6 +1129,13 @@ var _projFbFields = [
  { key: 'createdat',  label: 'Data de criação',           type: 'date' },
  { key: 'atualizadopor', label: 'Alterado por último',    type: 'select', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
  { key: 'criadopor',     label: 'Criado por',             type: 'select', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
+ // Presença (tem/não tem) — mesmo padrão de "campo de presença" de Obras
+ // (_OBRAS_PRESENCA_OPS/_obrasPresencaMatchValue, app.js): só "está vazio"
+ // (não tem)/"não está vazio" (tem), sem pedir escolher Sim/Não à toa.
+ { key: 'temfotos',      label: 'Fotos da Obra',          type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('temfotos') },
+ { key: 'tempreprojeto', label: 'Pré-Projeto',            type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('tempreprojeto') },
+ { key: 'temprojexec',   label: 'Projeto executivo',      type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('temprojexec') },
+ { key: 'temtarefa',     label: 'Tarefa',                 type: 'text', ops: _OBRAS_PRESENCA_OPS, matchValue: _obrasPresencaMatchValue('temtarefa') },
 ];
 _fbInit('projetos', _projFbFields, _projApplyFilters);
 
@@ -1310,6 +1317,21 @@ async function _dbLoadProjetos() {
  var allData=[]; var from=0; var more=true;
  await _garantirObraIdMap();
  await _garantirMelhoriaProjetoMap();
+ // Presença (tem/não tem) de Fotos da Obra/Pré-Projeto/Projeto executivo
+ // (documentos.tipo, mesmo bucket já usado no detalhamento) e de Tarefa
+ // (atividades_projetos) — pedido explícito: filtros que faltavam na aba
+ // Projetos. Mesmo padrão de "campo de presença" já usado em Obras
+ // (_OBRAS_PRESENCA_OPS/_obrasPresencaMatchValue, app.js): dataset guarda
+ // 'Sim'/'Não', sem exigir consulta por linha (2 queries em lote aqui, uma
+ // vez por load da tabela, não uma por projeto).
+ var _docPresence = { fotos_obra: {}, pre_projeto: {}, projeto_executivo: {} };
+ var _tarefaPresence = {};
+ if (_sb) {
+  var docRes = await _sb.from('documentos').select('projeto_id, tipo').not('projeto_id', 'is', null).in('tipo', ['fotos_obra', 'pre_projeto', 'projeto_executivo']);
+  (docRes.data || []).forEach(function(d) { if (_docPresence[d.tipo]) _docPresence[d.tipo][d.projeto_id] = true; });
+  var atvRes = await _sb.from('atividades_projetos').select('projeto_id');
+  (atvRes.data || []).forEach(function(a) { _tarefaPresence[a.projeto_id] = true; });
+ }
  while(more){
   var res=await _sb.from('projetos').select('*').order('created_at',{ascending:false}).range(from,from+999);
   if(res.error){
@@ -1386,7 +1408,9 @@ async function _dbLoadProjetos() {
    +' data-qtd="'+(qtd!=null?qtd:'')+'" data-valorunit="'+(vU!=null?vU:'')+'" data-m2estr="'+(p.m2_estrutura!=null?p.m2_estrutura:'')+'"'
    +' data-pesouni="'+(pU!=null?pU:'')+'" data-maiorpeca="'+attrEsc(p.maior_peca)+'"'
    +' data-updatedat="'+(p.updated_at?String(p.updated_at).slice(0,10):'')+'" data-createdat="'+(p.created_at?String(p.created_at).slice(0,10):'')+'"'
-   +' data-atualizadopor="'+attrEsc(atualizadoPorNome)+'" data-criadopor="'+attrEsc(criadoPorNome)+'">'
+   +' data-atualizadopor="'+attrEsc(atualizadoPorNome)+'" data-criadopor="'+attrEsc(criadoPorNome)+'"'
+   +' data-temfotos="'+(_docPresence.fotos_obra[p.id]?'Sim':'Não')+'" data-tempreprojeto="'+(_docPresence.pre_projeto[p.id]?'Sim':'Não')+'"'
+   +' data-temprojexec="'+(_docPresence.projeto_executivo[p.id]?'Sim':'Não')+'" data-temtarefa="'+(_tarefaPresence[p.id]?'Sim':'Não')+'">'
    // Achado real: "Nome do Projeto" nunca foi renderizado como coluna de
    // verdade (só existia como atributo data-nome, usado pra busca/filtro) —
    // cabeçalho da tabela também nunca teve essa coluna. Primeira célula
