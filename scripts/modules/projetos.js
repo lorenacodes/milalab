@@ -287,31 +287,41 @@ async function _renderProjetosKanban() {
 // fixos no HTML como em Obras), então os listeners são reanexados a cada
 // render — .proj-kn-body é recriado do zero em _renderProjetosKanban, então
 // não há risco de acumular listeners duplicados.
+// Clique vs. arraste: assim que 'dragstart' dispara de verdade (mesmo por
+// 1px de tremor do mouse), o Chrome passa a capturar o ponteiro pro loop
+// nativo de drag-and-drop e PARA DE DISPARAR 'mouseup' no elemento de
+// origem — dispara 'dragend' no lugar (tentativa anterior, baseada em
+// mousedown/mouseup, partia desse pressuposto errado e por isso não
+// funcionava em cliques reais, só em clique sintético via .click()/
+// dispatchEvent, que não passa pelo loop nativo de drag do navegador).
+// Solução: guarda a posição do dragstart; no dragend, se o deslocamento
+// final foi pequeno, trata como clique (abre o detalhamento) — sem mexer
+// no fluxo de 'drop', que continua responsável por persistir a etapa
+// quando o arraste é de verdade (deslocamento grande, solto em outra
+// coluna). Cliques que NUNCA chegam a dispar dragstart (deslocamento
+// realmente zero) continuam funcionando pelo 'click' nativo normal.
+var _projCardDragStartXY = null;
 function _onProjCardDragStart(e) {
  e.dataTransfer.setData('text/plain', this.dataset.id);
  e.dataTransfer.effectAllowed = 'move';
  this.classList.add('dragging');
+ _projCardDragStartXY = { x: e.clientX, y: e.clientY };
 }
-function _onProjCardDragEnd() { this.classList.remove('dragging'); }
-// Clique vs. arraste: mede o deslocamento entre mousedown e mouseup — só
-// abre o detalhamento se o mouse ficou praticamente parado (limiar de 5px).
-// Não depende do evento 'click' nativo porque esse é suprimido pelo
-// navegador sempre que um dragstart chegou a disparar nesse mesmo gesto.
-var _projCardDownXY = null;
-function _onProjCardMouseDown(e) { _projCardDownXY = { x: e.clientX, y: e.clientY }; }
-function _onProjCardMouseUp(e) {
- if (!_projCardDownXY) return;
- var dx = Math.abs(e.clientX - _projCardDownXY.x);
- var dy = Math.abs(e.clientY - _projCardDownXY.y);
- _projCardDownXY = null;
- if (dx <= 5 && dy <= 5) _spProjetoById(this.dataset.id);
+function _onProjCardDragEnd(e) {
+ this.classList.remove('dragging');
+ if (_projCardDragStartXY) {
+  var dx = Math.abs(e.clientX - _projCardDragStartXY.x);
+  var dy = Math.abs(e.clientY - _projCardDragStartXY.y);
+  if (dx <= 5 && dy <= 5) _spProjetoById(this.dataset.id);
+ }
+ _projCardDragStartXY = null;
 }
+function _onProjCardClick() { _spProjetoById(this.dataset.id); }
 function _setupProjetosKanbanDnD() {
  document.querySelectorAll('#proj-kanban .proj-kn-card').forEach(function(card) {
   card.addEventListener('dragstart', _onProjCardDragStart);
   card.addEventListener('dragend', _onProjCardDragEnd);
-  card.addEventListener('mousedown', _onProjCardMouseDown);
-  card.addEventListener('mouseup', _onProjCardMouseUp);
+  card.addEventListener('click', _onProjCardClick);
  });
  document.querySelectorAll('#proj-kanban .proj-kn-body').forEach(function(body) {
   body.addEventListener('dragover', function(e) { e.preventDefault(); body.classList.add('kc-dragover'); });
