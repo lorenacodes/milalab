@@ -664,7 +664,7 @@ function _spEntregaById(id) {
 
  _spSet('Entrega', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
  if (!_sb) return;
- _sb.from('entregas').select('*, obra:obra_id(nome, cidade, estado, tipo_obra, empresas_obras(empresa:empresa_id(nome)))').eq('id', id).single().then(function(res) {
+ _sb.from('entregas').select('*, obra:obra_id(nome, cidade, estado, tipo_obra, empresas_obras(empresa:empresa_id(nome))), entregas_obras(obra_id, obra:obra_id(id,nome,cidade,estado))').eq('id', id).single().then(function(res) {
   if (res.error || !res.data) {
    _spSet('Entrega', 'Erro', '<div style="color:var(--red);padding:20px">Entrega não encontrada.</div>', '');
    return;
@@ -673,29 +673,204 @@ function _spEntregaById(id) {
  });
 }
 
+// Entrega atualmente aberta no painel — autosave/chips/dropdowns lêem daqui
+// (mesmo padrão de _obraAtiva/_spProjAtivo em obras.js/projetos.js).
+var _spEntAtiva = null;
+
+// ── Obras vinculadas (entregas_obras) — M:N, obra_id continua sendo a
+// "obra primária" (tudo que já depende dela — Entregas de Obra, agregados
+// do dashboard — continua funcionando), a junção só permite vínculos
+// ADICIONAIS. Ver migração da seção 1 do plano.
+function _entObrasVinculadasList(e) {
+ var lista = [];
+ var vistos = {};
+ // e.obra (join via obra:obra_id) não traz `id` próprio (não foi pedido no
+ // select) — sem isso, o chip da obra primária ficaria sem id pra navegar/
+ // comparar contra e.obra_id.
+ if (e.obra && e.obra_id) { lista.push(Object.assign({ id: e.obra_id }, e.obra)); vistos[e.obra_id] = 1; }
+ (e.entregas_obras || []).forEach(function(l) {
+  if (l.obra && l.obra_id && !vistos[l.obra_id]) { vistos[l.obra_id] = 1; lista.push(l.obra); }
+ });
+ return lista;
+}
+function _entObrasChipsHTML(e) {
+ var lista = _entObrasVinculadasList(e);
+ if (!lista.length) return '<div class="sp-empty">Nenhuma obra vinculada a esta entrega.</div>';
+ return lista.map(function(o) {
+  var isPrimaria = String(o.id) === String(e.obra_id);
+  var sub = [o.cidade, o.estado].filter(Boolean).join('/');
+  var subLabel = (isPrimaria ? 'Principal' : '') + (sub ? (isPrimaria ? ' · ' : '') + sub : '');
+  return _spRelChipHTML('obras', o.id, o.nome || 'Obra sem nome', subLabel || null, "_entObraDesvincular('" + e.id + "','" + o.id + "')");
+ }).join('');
+}
+var _entObrasCache = null;
+async function _entCarregarObrasCache() {
+ if (_entObrasCache) return _entObrasCache;
+ if (!_sb) return [];
+ var data = []; var from = 0; var pageSize = 1000;
+ while (true) {
+  var res = await _sb.from('obras').select('id,nome,cidade,estado,endereco_entrega').order('nome').range(from, from + pageSize - 1);
+  if (res.error) break;
+  data = data.concat(res.data || []);
+  if (!res.data || res.data.length < pageSize) break;
+  from += pageSize;
+ }
+ _entObrasCache = data;
+ return data;
+}
+function _entObraAddMarkup() {
+ return '<div class="srch-sel" id="ent-obra-add-srch" style="flex:1;margin-top:10px">'
+  + '<div class="srch-sel-box" id="ent-obra-add-box" onclick="_entObraAddToggle()">'
+  + '<span class="srch-sel-val placeholder" id="ent-obra-add-val">+ Vincular outra obra...</span>'
+  + '<span class="srch-sel-chevron">▾</span></div>'
+  + '<div class="srch-sel-drop" id="ent-obra-add-drop">'
+  + '<input class="srch-sel-inp" id="ent-obra-add-inp" type="text" placeholder="Buscar obra..." oninput="_entObraAddFilter(this.value)">'
+  + '<div class="srch-sel-list" id="ent-obra-add-list"></div></div></div>';
+}
+async function _entObraAddToggle() {
+ var drop = document.getElementById('ent-obra-add-drop');
+ var box = document.getElementById('ent-obra-add-box');
+ if (!drop) return;
+ if (drop.classList.contains('open')) { _entObraAddClose(); return; }
+ await _entCarregarObrasCache();
+ drop.classList.add('open'); if (box) box.classList.add('open');
+ var inp = document.getElementById('ent-obra-add-inp');
+ if (inp) { inp.value = ''; inp.focus(); }
+ _entObraAddFilter('');
+ if (typeof _srchSelPositionEl === 'function') _srchSelPositionEl(drop, box);
+}
+function _entObraAddClose() {
+ var drop = document.getElementById('ent-obra-add-drop');
+ var box = document.getElementById('ent-obra-add-box');
+ if (drop) drop.classList.remove('open');
+ if (box) box.classList.remove('open');
+}
+function _entObraAddFilter(q) {
+ q = (q || '').toLowerCase();
+ var list = document.getElementById('ent-obra-add-list');
+ if (!list || !_spEntAtiva) return;
+ var jaVinculadas = {};
+ _entObrasVinculadasList(_spEntAtiva).forEach(function(o) { jaVinculadas[o.id] = 1; });
+ var matches = (_entObrasCache || []).filter(function(o) { return !jaVinculadas[o.id] && (o.nome || '').toLowerCase().indexOf(q) !== -1; }).slice(0, 60);
+ list.innerHTML = matches.length
+  ? matches.map(function(o) { return '<div class="srch-sel-opt" onclick="_entObraVincular(\'' + o.id + '\')">' + (o.nome || '(sem nome)').replace(/</g,'&lt;') + '</div>'; }).join('')
+  : '<div class="srch-sel-empty">Nenhuma obra encontrada.</div>';
+}
+async function _entObraVincular(obraId) {
+ _entObraAddClose();
+ var e = _spEntAtiva;
+ if (!e || !_sb) return;
+ var ins = await _sb.from('entregas_obras').insert({ entrega_id: e.id, obra_id: obraId });
+ if (ins.error) { alert('Erro ao vincular obra: ' + (ins.error.message || '')); return; }
+ var obraObj = (_entObrasCache || []).find(function(o) { return o.id === obraId; });
+ e.entregas_obras = (e.entregas_obras || []).concat([{ obra_id: obraId, obra: obraObj }]);
+ var eraAPrimeira = !e.obra_id;
+ if (eraAPrimeira) {
+  var upd = await _sb.from('entregas').update({ obra_id: obraId }).eq('id', e.id);
+  if (!upd.error) { e.obra_id = obraId; e.obra = obraObj; }
+ }
+ // Endereço de entrega — pré-preenche a partir da Obra só se a entrega ainda
+ // não tiver um (pedido explícito: "continua editável por entrega", não
+ // sobrescreve o que já foi digitado).
+ if (!e.endereco_entrega && obraObj && obraObj.endereco_entrega) {
+  var updEnd = await _sb.from('entregas').update({ endereco_entrega: obraObj.endereco_entrega }).eq('id', e.id);
+  if (!updEnd.error) e.endereco_entrega = obraObj.endereco_entrega;
+ }
+ var cached = (_entregasArr || []).find(function(x) { return String(x.id) === String(e.id); });
+ if (cached) Object.assign(cached, { obra_id: e.obra_id, obra: e.obra, entregas_obras: e.entregas_obras, endereco_entrega: e.endereco_entrega });
+ _spEntregaRender(e);
+ if (typeof _entApplyFilters === 'function') _entApplyFilters();
+}
+async function _entObraDesvincular(entregaId, obraId) {
+ var e = _spEntAtiva;
+ if (!e || !_sb) return;
+ if (!confirm('Desvincular esta obra da entrega?')) return;
+ var novoObraId = e.obra_id, novoObra = e.obra;
+ if (String(obraId) === String(e.obra_id)) {
+  // Desvincular a obra PRIMÁRIA: promove a próxima vinculada (se houver) —
+  // obra_id nunca fica "solto" apontando pra um vínculo já removido.
+  var outras = (e.entregas_obras || []).filter(function(l) { return String(l.obra_id) !== String(obraId); });
+  novoObraId = outras[0] ? outras[0].obra_id : null;
+  novoObra = outras[0] ? outras[0].obra : null;
+  var upd = await _sb.from('entregas').update({ obra_id: novoObraId }).eq('id', entregaId);
+  if (upd.error) { alert('Erro ao desvincular: ' + (upd.error.message || '')); return; }
+ }
+ var del = await _sb.from('entregas_obras').delete().eq('entrega_id', entregaId).eq('obra_id', obraId);
+ if (del.error) { alert('Erro ao desvincular: ' + (del.error.message || '')); return; }
+ e.obra_id = novoObraId; e.obra = novoObra;
+ e.entregas_obras = (e.entregas_obras || []).filter(function(l) { return String(l.obra_id) !== String(obraId); });
+ var cached = (_entregasArr || []).find(function(x) { return String(x.id) === String(entregaId); });
+ if (cached) Object.assign(cached, { obra_id: e.obra_id, obra: e.obra, entregas_obras: e.entregas_obras });
+ _spEntregaRender(e);
+ if (typeof _entApplyFilters === 'function') _entApplyFilters();
+}
+
+// ── Contato do orçamento — sempre lido da Obra PRIMÁRIA vinculada via
+// contatos_obras (chip somente leitura; não tem coluna própria em
+// `entregas`, ver decisão documentada no plano). 1º contato da junção,
+// mesma convenção de "principal" já usada pra empresas_obras/contatos_obras
+// em obras.js (sem coluna is_primary própria, é sempre a 1ª linha).
+async function _entCarregarContatoOrcamento(obraId) {
+ var wrap = document.getElementById('sp-ent-contato-orc');
+ if (!wrap) return;
+ if (!obraId || !_sb) { wrap.innerHTML = '<div class="sp-empty">Nenhuma obra vinculada.</div>'; return; }
+ var res = await _sb.from('contatos_obras').select('contato:contato_id(id,nome_completo,cargo)').eq('obra_id', obraId).limit(1);
+ wrap = document.getElementById('sp-ent-contato-orc'); // painel pode ter trocado enquanto a busca corria
+ if (!wrap) return;
+ var c = res.data && res.data[0] && res.data[0].contato;
+ wrap.innerHTML = c
+  ? _spRelChipHTML('contatos', c.id, c.nome_completo || 'Contato', c.cargo || null)
+  : '<div class="sp-empty">Nenhum contato de orçamento cadastrado na obra vinculada.</div>';
+}
+
+// ── Cidade/Estado da ENTREGA (colunas próprias, não da Obra) — Estado
+// primeiro (select UF fixo, UF_BRASIL de obras.js), Cidade depende do
+// Estado escolhido (cache de cidades reais por UF, lidas de `obras.cidade`
+// — não existe base de municípios no sistema, ver investigação do plano).
+var _entCidadesPorUFCache = {};
+async function _entCarregarCidadesPorUF(uf) {
+ if (!uf) return [];
+ if (_entCidadesPorUFCache[uf]) return _entCidadesPorUFCache[uf];
+ if (!_sb) return [];
+ var set = {}; var from = 0; var pageSize = 1000;
+ while (true) {
+  var res = await _sb.from('obras').select('cidade').eq('estado', uf).not('cidade', 'is', null).range(from, from + pageSize - 1);
+  if (res.error) break;
+  (res.data || []).forEach(function(r) { if (r.cidade) set[r.cidade] = 1; });
+  if (!res.data || res.data.length < pageSize) break;
+  from += pageSize;
+ }
+ var lista = Object.keys(set).sort(function(a, b) { return a.localeCompare(b, 'pt-BR'); });
+ _entCidadesPorUFCache[uf] = lista;
+ return lista;
+}
+
 function _spEntregaRender(e) {
+ _spEntAtiva = e;
+ // Ambos os ramos (cache-hit/fetch) de _spEntregaById já garantem .sp-open
+ // ANTES de chamar este render (ver correção do bug de cache), então não
+ // precisa repetir aqui.
  var atrasado  = _entIsLate(e);
  var titulo    = e.nome_entrega || 'Entrega';
- var obraNome  = (e.obra && e.obra.nome) || '';
  var obraId    = e.obra_id || '';
- var cidadeUf  = _entCidadeUf(e);
  var transp    = e.transporte || '';
  var qtd       = e.quantidade != null ? e.quantidade : '';
  var peso      = e.peso_kg != null ? e.peso_kg : '';
- // Formato dd/mm/aaaa (pt-BR) — antes exibia o ISO cru (aaaa-mm-dd) vindo
- // direto da coluna. Meio-dia UTC evita o "dia -1" causado por fuso quando
- // o navegador interpreta a data como UTC (mesmo truque usado em _entRowHTML).
- var dtFatFmt  = e.data_faturamento ? new Date(e.data_faturamento + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+ var maiorPeca = e.maior_peca_mm != null ? e.maior_peca_mm : '';
+ var valor     = e.valor != null ? e.valor : '';
+ // Formato dd/mm/aaaa (pt-BR) só pro rodapé/exibição — o campo de
+ // Faturamento em si agora é <input type=date> de verdade (editável), ver
+ // sub-aba Faturamento abaixo.
  var pedMila   = e.pedido_compusa_milatec || '';
  var pedMilaG  = e.pedido_compusa_mila || '';
- var maiorPeca = e.maior_peca_mm != null ? e.maior_peca_mm : '';
+ var criadoNome   = (typeof _projAuditNome === 'function') ? _projAuditNome(e.criado_por) : (e.criado_por || '—');
+ var alteradoNome = (typeof _projAuditNome === 'function') ? _projAuditNome(e.atualizado_por) : (e.atualizado_por || '—');
 
- // Transporte — virou select buscável/criável (mesmo padrão já usado no
- // formulário de criação da entrega, "entTransporte"), em vez de texto
- // livre. Kind próprio ("entDetTransporte") em vez de reaproveitar
- // "entTransporte": esta tela pode ser aberta sem o painel de Obra jamais
- // ter sido renderizado (ex.: a partir da lista/Kanban/Calendário de
- // Entregas), então não dá pra depender do registro que _spObraRender faz.
+ // Transporte — select buscável/criável (mesmo padrão já usado no
+ // formulário de criação da entrega, "entTransporte"). Kind próprio
+ // ("entDetTransporte") em vez de reaproveitar "entTransporte": esta tela
+ // pode ser aberta sem o painel de Obra jamais ter sido renderizado (ex.:
+ // a partir da lista/Kanban/Calendário de Entregas).
  _srchSelRegister('entDetTransporte', {
   options: function(){ return _obraTransporteCache || []; }, creatable: true, placeholder: 'Selecione o transporte...',
   onOpen: _obraCarregarTransportes,
@@ -704,78 +879,130 @@ function _spEntregaRender(e) {
    _spEntDetSalvarCampo(e.id, { transporte: v || null });
   },
  });
+ // Estado — select UF fixo (UF_BRASIL, obras.js). Ao trocar, re-renderiza o
+ // painel inteiro (mesma técnica simples e robusta usada em outros pontos
+ // do app pra refletir um campo dependente sem duplicar lógica de patch
+ // parcial de DOM) — assim a Cidade abaixo já nasce com as opções do novo UF.
+ _srchSelRegister('entDetEstado', {
+  options: (typeof UF_BRASIL !== 'undefined') ? UF_BRASIL : [], placeholder: 'Selecione o UF...',
+  onSelect: function(v) {
+   _spEntDetSalvarCampo(e.id, { estado: v || null, cidade: null });
+   e.estado = v || null; e.cidade = null;
+   _spEntregaRender(e);
+  },
+ });
+ _srchSelRegister('entDetCidade', {
+  options: function(){ return _entCidadesPorUFCache[e.estado] || []; }, creatable: true,
+  placeholder: e.estado ? 'Selecione a cidade...' : 'Selecione o Estado primeiro',
+  onOpen: function(){ return _entCarregarCidadesPorUF(e.estado); },
+  onSelect: function(v) { _spEntDetSalvarCampo(e.id, { cidade: v || null }); e.cidade = v || null; },
+ });
+
+ function badge(n) { return n ? ' (' + n + ')' : ''; }
 
  _spSet('Entrega', titulo, `
-  <div class="sp-field"><div class="sp-label">Entrega</div>
-   <input class="sp-inp" value="${titulo.replace(/"/g,'&quot;')}" readonly>
+  <input type="hidden" id="sp-ent-id" value="${e.id}">
+  <div class="spt-bar">
+   <button class="spt-btn active" data-target="spt-ent-geral" onclick="_sptSwitch('ent-geral',this)">Visão Geral</button>
+   <button class="spt-btn" data-target="spt-ent-obras" onclick="_sptSwitch('ent-obras',this)">Obras vinculadas${badge(_entObrasVinculadasList(e).length)}</button>
+   <button class="spt-btn" data-target="spt-ent-documentos" onclick="_sptSwitch('ent-documentos',this)">Documentos</button>
+   <button class="spt-btn" data-target="spt-ent-faturamento" onclick="_sptSwitch('ent-faturamento',this)">Faturamento</button>
   </div>
-  <div class="sp-field"><div class="sp-label">Obra / Cliente</div>
-   <input class="sp-inp" value="${(obraNome||'—').replace(/"/g,'&quot;')}" readonly style="opacity:.75">
-  </div>
-  <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Faturamento</div>
-    <input class="sp-inp" value="${dtFatFmt}" readonly style="opacity:.75">
+
+  <div class="spt-panel" id="spt-ent-geral">
+   <div class="sp-field"><div class="sp-label">Entrega</div>
+    <input class="sp-inp" value="${titulo.replace(/"/g,'&quot;')}" readonly>
    </div>
-   <div class="sp-field"><div class="sp-label">Cidade/UF</div>
-    <input class="sp-inp" value="${cidadeUf}" readonly style="opacity:.75">
+   <div class="sp-field"><div class="sp-label">Status</div>
+    <select class="sp-inp" onchange="_spEntDetSalvarCampo('${e.id}', { etapa: this.value || null })">
+     <option value="">Selecione...</option>
+     ${Object.keys(_entEtapaBucket).map(function(et){ return '<option value="' + et.replace(/"/g,'&quot;') + '" ' + (e.etapa === et ? 'selected' : '') + '>' + et + '</option>'; }).join('')}
+    </select>
+    ${atrasado ? '<div style="margin-top:6px;font-size:11px;font-weight:600;color:var(--red)">⚠ Faturamento vencido (atrasado)</div>' : ''}
+   </div>
+   <div class="sp-g2">
+    <div class="sp-field"><div class="sp-label">Transporte</div>
+     ${_srchSelMarkup('entDetTransporte', 'sp-entdet-transporte', transp)}
+    </div>
+    <div class="sp-field"><div class="sp-label">Peso (kg)</div>
+     <input class="sp-inp" type="number" value="${peso}" onchange="_spEntDetSalvarCampo('${e.id}', { peso_kg: this.value !== '' ? Number(this.value) : null })">
+    </div>
+   </div>
+   <div class="sp-g2">
+    <div class="sp-field"><div class="sp-label">Qtd. (peças)</div>
+     <input class="sp-inp" type="number" value="${qtd}" onchange="_spEntDetSalvarCampo('${e.id}', { quantidade: this.value !== '' ? Number(this.value) : null })">
+    </div>
+    <div class="sp-field"><div class="sp-label">Maior peça (mm)</div>
+     <input class="sp-inp" type="number" value="${maiorPeca}" onchange="_spEntDetSalvarCampo('${e.id}', { maior_peca_mm: this.value !== '' ? Number(this.value) : null })">
+    </div>
+   </div>
+   <div class="sp-g2">
+    <div class="sp-field"><div class="sp-label">Estado</div>
+     ${_srchSelMarkup('entDetEstado', 'sp-entdet-estado', e.estado || '')}
+    </div>
+    <div class="sp-field"><div class="sp-label">Cidade</div>
+     ${_srchSelMarkup('entDetCidade', 'sp-entdet-cidade', e.cidade || '')}
+    </div>
+   </div>
+   <div class="sp-field"><div class="sp-label">Endereço de entrega</div>
+    <input class="sp-inp" value="${(e.endereco_entrega||'').replace(/"/g,'&quot;')}" placeholder="Pré-preenchido ao vincular uma Obra — editável" onchange="_spEntDetSalvarCampo('${e.id}', { endereco_entrega: this.value || null })">
+   </div>
+   <div class="sp-field"><div class="sp-label">Contato do orçamento</div>
+    <div class="sp-rel-chips-wrap" id="sp-ent-contato-orc"><div class="sp-empty" style="padding:4px 0;font-size:11px">Carregando...</div></div>
    </div>
   </div>
-  <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Transporte</div>
-    ${_srchSelMarkup('entDetTransporte', 'sp-entdet-transporte', transp)}
-   </div>
-   <div class="sp-field"><div class="sp-label">Peso (kg)</div>
-    <input class="sp-inp" type="number" value="${peso}" onchange="_spEntDetSalvarCampo('${e.id}', { peso_kg: this.value !== '' ? Number(this.value) : null })">
-   </div>
-  </div>
-  <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Qtd. (peças)</div>
-    <input class="sp-inp" type="number" value="${qtd}" onchange="_spEntDetSalvarCampo('${e.id}', { quantidade: this.value !== '' ? Number(this.value) : null })">
-   </div>
-   <div class="sp-field"><div class="sp-label">Maior peça (mm)</div>
-    <input class="sp-inp" type="number" value="${maiorPeca}" onchange="_spEntDetSalvarCampo('${e.id}', { maior_peca_mm: this.value !== '' ? Number(this.value) : null })">
+
+  <div class="spt-panel" id="spt-ent-obras">
+   <div class="sp-rel-chips-wrap">${_entObrasChipsHTML(e)}</div>
+   ${_entObraAddMarkup()}
+   <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+     <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">Projeto(s) da obra principal</div>
+     ${obraId ? '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_entProjToggleForm(\'' + obraId + '\')">+ Adicionar projeto</button>' : ''}
+    </div>
+    <div class="sp-rel-chips-wrap" id="sp-ent-proj-chips">${obraId ? '<div class="sp-empty" style="padding:4px 0;font-size:11px">Carregando...</div>' : '<div class="sp-empty">Sem obra vinculada.</div>'}</div>
+    <div id="ent-proj-form-box" style="display:none;margin-top:10px"></div>
    </div>
   </div>
-  <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Pedido Milatec</div>
-    <input class="sp-inp" value="${pedMila}" readonly style="opacity:.6">
-   </div>
-   <div class="sp-field"><div class="sp-label">Pedido Mila</div>
-    <input class="sp-inp" value="${pedMilaG}" readonly style="opacity:.6">
-   </div>
-  </div>
-  <div class="sp-field">
-   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text)">
-    <input type="checkbox" id="sp-entdet-produzido" ${e.pedido_produzido ? 'checked' : ''} onchange="_spEntDetSalvarCampo('${e.id}', { pedido_produzido: this.checked })">
-    Pedido produzido
-   </label>
-  </div>
-  <div class="sp-field"><div class="sp-label">Status</div>
-   <select class="sp-inp" onchange="_spEntDetSalvarCampo('${e.id}', { etapa: this.value || null })">
-    <option value="">Selecione...</option>
-    ${Object.keys(_entEtapaBucket).map(function(et){ return '<option value="' + et.replace(/"/g,'&quot;') + '" ' + (e.etapa === et ? 'selected' : '') + '>' + et + '</option>'; }).join('')}
-   </select>
-   ${atrasado ? '<div style="margin-top:6px;font-size:11px;font-weight:600;color:var(--red)">⚠ Faturamento vencido (atrasado)</div>' : ''}
-  </div>
-  <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
-   <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Obra vinculada</div>
-   <div class="sp-rel-chips-wrap">${obraId ? _spRelChipHTML('obras', obraId, obraNome || 'Obra') : '<div class="sp-empty">Nenhuma obra vinculada a esta entrega.</div>'}</div>
-  </div>
-  <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
-   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">Projeto(s) da obra</div>
-    ${obraId ? '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_entProjToggleForm(\'' + obraId + '\')">+ Adicionar projeto</button>' : ''}
-   </div>
-   <div class="sp-rel-chips-wrap" id="sp-ent-proj-chips">${obraId ? '<div class="sp-empty" style="padding:4px 0;font-size:11px">Carregando...</div>' : '<div class="sp-empty">Sem obra vinculada.</div>'}</div>
-   <div id="ent-proj-form-box" style="display:none;margin-top:10px"></div>
-  </div>
-  <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
-   <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Documentos da entrega</div>
+
+  <div class="spt-panel" id="spt-ent-documentos">
    <div id="sp-ent-doc-wrap"><div class="sp-empty" style="padding:10px 0;font-size:11px">Carregando documentos...</div></div>
+  </div>
+
+  <div class="spt-panel" id="spt-ent-faturamento">
+   <div class="sp-g2">
+    <div class="sp-field"><div class="sp-label">Faturamento</div>
+     <input class="sp-inp" type="date" value="${e.data_faturamento || ''}" onchange="_spEntDetSalvarCampo('${e.id}', { data_faturamento: this.value || null })">
+    </div>
+    <div class="sp-field"><div class="sp-label">Valor</div>
+     <input class="sp-inp" type="number" step="0.01" value="${valor}" onchange="_spEntDetSalvarCampo('${e.id}', { valor: this.value !== '' ? Number(this.value) : null })">
+    </div>
+   </div>
+   <div class="sp-g2">
+    <div class="sp-field"><div class="sp-label">Pedido Compusa Milatec</div>
+     <input class="sp-inp" value="${pedMila.replace(/"/g,'&quot;')}" onchange="_spEntDetSalvarCampo('${e.id}', { pedido_compusa_milatec: this.value || null })">
+    </div>
+    <div class="sp-field"><div class="sp-label">Pedido Compusa Mila</div>
+     <input class="sp-inp" value="${pedMilaG.replace(/"/g,'&quot;')}" onchange="_spEntDetSalvarCampo('${e.id}', { pedido_compusa_mila: this.value || null })">
+    </div>
+   </div>
+   <div class="sp-field">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text)">
+     <input type="checkbox" id="sp-entdet-produzido" ${e.pedido_produzido ? 'checked' : ''} onchange="_spEntDetSalvarCampo('${e.id}', { pedido_produzido: this.checked })">
+     Pedido produzido
+    </label>
+   </div>
+  </div>
+
+  <div class="spt-panel" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
+   <div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">${criadoNome}</span></div>
+   <div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">${alteradoNome}</span></div>
   </div>`,
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 
+ if (typeof _sptInitScrollSpy === 'function') _sptInitScrollSpy();
  _spCarregarDocumentosEntrega(e.id, obraId);
+ _entCarregarContatoOrcamento(obraId);
  // Pedido explícito: obra sem nenhum Tipo de obra marcado não pode travar
  // o Tipo do projeto (campo obrigatório sem nenhuma opção pra escolher) —
  // cai pra lista completa (_NO_TIPOS_OPCOES) nesse caso, mesma regra do
@@ -1151,7 +1378,7 @@ async function _dbLoadEntregas() {
  while (true) {
   var res = await _sb
    .from('entregas')
-   .select('*, obra:obra_id(nome, cidade, estado, tipo_obra, empresas_obras(empresa:empresa_id(nome)))')
+   .select('*, obra:obra_id(nome, cidade, estado, tipo_obra, empresas_obras(empresa:empresa_id(nome))), entregas_obras(obra_id, obra:obra_id(id,nome,cidade,estado))')
    .order('created_at', { ascending: false })
    .range(from, from + pageSize - 1);
   if (res.error) { error = res.error; break; }
