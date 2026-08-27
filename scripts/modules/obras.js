@@ -3138,8 +3138,14 @@ async function _spUploadDocEntrega(file, entregaId, obraId, tipo) {
  var path = 'entregas/' + entregaId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.\-]/g,'_');
  var up = await _sb.storage.from('documentos_obras').upload(path, file, { upsert: false });
  if (up.error) { console.error('[Obras] erro ao enviar anexo de entrega:', up.error); return false; }
+ // Causa REAL de `documentos.entrega_id` estar em 0 linhas (auditoria):
+ // `documentos` NUNCA teve coluna `nome` (só `nome_arquivo`) — o insert
+ // abaixo incluía `nome: file.name` e falhava 100% das vezes (Postgres:
+ // "column \"nome\" does not exist"), silenciosamente (só console.error).
+ // A UI do dropzone (_spEntDetUploadFiles, entregas.js) sempre reportava
+ // isso como "arquivo(s) não enviado(s)", sem detalhar o motivo real.
  var ins = await _sb.from('documentos').insert({
-  obra_id: obraId, entrega_id: entregaId, nome_arquivo: file.name, nome: file.name,
+  obra_id: obraId, entrega_id: entregaId, nome_arquivo: file.name,
   tipo: tipo, categoria: 'Técnico', caminho_storage: path, tamanho_bytes: file.size,
   mime_type: file.type, status: 'Ativo', versao: 1, origem: 'upload_manual',
  });
