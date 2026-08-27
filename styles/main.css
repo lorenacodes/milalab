@@ -201,6 +201,10 @@ body.light .dash-panel{
     empurrão do título pra baixo da barra. */
  #page-projetos{overflow-x:hidden}
  #page-projetos .ph{margin-top:44px}
+ /* Entregas reaproveita o mesmo padrão de barra fixa de Obras/Projetos —
+    ver comentário completo em .obras-toolbar-fixed acima. */
+ #page-entregas{overflow-x:hidden}
+ #page-entregas .ph{margin-top:44px}
  /* Barra fixa única de Obras (Filtro/Agrupar/Ordenar/Período/Visualizações/
     Pesquisa + Kanban/Tabela/Nova Obra, na mesma linha) — position:fixed em
     vez de sticky de propósito: sticky só resolve o eixo vertical, então se

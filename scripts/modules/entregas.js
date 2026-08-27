@@ -69,44 +69,122 @@ function _entCidadeUf(e) {
 // Tarefas/Obras/Empresas/Instalações (filtro-builder/sort-builder/
 // group-builder/smart-search/saved-views), sobre campos REAIS (ver auditoria
 // acima) em vez dos 4 chips fixos de status ou de colunas fantasma.
+//
+// Listas de opções (Obra/Empresa/Cidade/Transporte/Categoria/Criado por...)
+// são funções, não arrays estáticos — _fbSearchableDropdown já suporta
+// `options` como função (ver scripts/lib/filtro-builder.js:354) e assim elas
+// sempre refletem o `_entregasArr` atual (recarregado/realtime), sem precisar
+// raspar o DOM da Tabela (que nem sempre está montado — Kanban/Calendário
+// também usam o filtro).
+function _entDistinctOptions(mapFn) {
+ var set = {};
+ (_entregasArr || []).forEach(function(e) { var v = mapFn(e); if (v) set[v] = 1; });
+ return Object.keys(set).sort(function(a, b) { return a.localeCompare(b, 'pt-BR'); });
+}
+// Presença de documento ("Nota Fiscal anexada?") — carregado 1x em bloco
+// (ver _entLoadDocPresence, chamado por _dbLoadEntregas) em vez de por
+// entrega individualmente: a Tabela/Kanban/Calendário nunca abrem o painel
+// de cada entrega, então não têm de outra forma como saber se há algum
+// documento anexado sem essa carga em lote.
+var _entDocEntregaIds = null; // Set<string> | null (null = ainda não carregado)
+async function _entLoadDocPresence() {
+ if (!_sb) return;
+ var ids = {};
+ var [diretoRes, viaJuncaoRes] = await Promise.all([
+  _sb.from('documentos').select('entrega_id').not('entrega_id', 'is', null),
+  _sb.from('documentos_entregas').select('entrega_id'),
+ ]);
+ (diretoRes.data || []).forEach(function(r) { if (r.entrega_id) ids[r.entrega_id] = 1; });
+ (viaJuncaoRes.data || []).forEach(function(r) { if (r.entrega_id) ids[r.entrega_id] = 1; });
+ _entDocEntregaIds = ids;
+ // Reaplica pro data-nota-fiscal das <tr> já renderizadas refletir a carga
+ // (chegou depois da 1ª renderização da Tabela) e pro filtro por Nota Fiscal
+ // (se alguém já tinha aberto o popover) funcionar sem precisar recarregar.
+ if (typeof _entApplyFilters === 'function') _entApplyFilters();
+}
+
 var _entFbFields = [
  // options em português (via _entBucketLabel) — o filtro comparava/exibia a
  // chave interna crua (aguardando/producao/transporte/entregue), que nunca
  // deveria aparecer pra usuária, só serve de índice interno pro bucket.
- { key: 'status',     label: 'Status',      type: 'select',
-   options: ['aguardando','producao','transporte','entregue'].map(function(k){ return _entBucketLabel[k]; }),
-   getValue: function(ds) { return _entBucketLabel[ds.status] || ds.status; } },
- { key: 'nomeEntrega', label: 'Entrega',     type: 'text' },
- { key: 'obra',        label: 'Obra',        type: 'text' },
- { key: 'empresa',     label: 'Empresa',     type: 'text' },
- { key: 'cidade',       label: 'Cidade',      type: 'text' },
- { key: 'estado',       label: 'Estado',      type: 'text' },
- { key: 'transporte',   label: 'Transporte',  type: 'text' },
- { key: 'dataFat',      label: 'Faturamento', type: 'date' },
+ // Pedido explícito: filtro de Status opera no nível da etapa CRUA (7
+ // valores reais), não do balde visual de 4 opções (esse continua só pro
+ // Kanban/agrupamento, ver _entGroupKeyFor abaixo) — esconder as etapas que
+ // não foram citadas no pedido mascararia dado real, então as 7 entram todas.
+ { key: 'status',      label: 'Status',       type: 'select',
+   options: Object.keys(_entEtapaBucket),
+   getValue: function(ds) { return ds.etapaRaw; } },
+ { key: 'nomeEntrega',   label: 'Entrega',      type: 'text' },
+ { key: 'obra',          label: 'Obra',         type: 'select', options: function() { return _entDistinctOptions(function(e){ return (e.obra && e.obra.nome) || ''; }); } },
+ { key: 'empresa',       label: 'Empresa',      type: 'select', options: function() { return _entDistinctOptions(function(e){ return (e.obra && e.obra.empresas_obras && e.obra.empresas_obras[0] && e.obra.empresas_obras[0].empresa && e.obra.empresas_obras[0].empresa.nome) || ''; }); } },
+ { key: 'cidade',        label: 'Cidade',       type: 'select', options: function() { return _entDistinctOptions(function(e){ return _entCidadeUf(e); }); } },
+ { key: 'estado',        label: 'Estado',       type: 'select', options: function() { return _entDistinctOptions(function(e){ return (e.obra && e.obra.estado) || e.estado || ''; }); } },
+ { key: 'transporte',    label: 'Transporte',   type: 'select', options: function() { return _entDistinctOptions(function(e){ return e.transporte || ''; }); } },
+ { key: 'dataFat',       label: 'Faturamento',  type: 'date' },
+ { key: 'pedidoProduzido', label: 'Pedido produzido', type: 'select', options: ['Sim', 'Não'] },
+ { key: 'quantidade',    label: 'Quantidade',   type: 'text' },
+ { key: 'peso',          label: 'Peso (kg)',    type: 'text' },
+ { key: 'maiorPeca',     label: 'Maior peça (mm)', type: 'text' },
+ { key: 'valor',         label: 'Valor',        type: 'text' },
+ { key: 'categoria',     label: 'Categoria (tipo de obra)', type: 'multitext', options: function() { return _entDistinctOptions2(function(e){ return (e.obra && e.obra.tipo_obra) || []; }); } },
+ { key: 'enderecoEntrega', label: 'Endereço de entrega', type: 'text' },
+ { key: 'pedidoCompusaMilatec', label: 'Pedido Compusa Milatec', type: 'text' },
+ { key: 'pedidoCompusaMila',    label: 'Pedido Compusa Mila',    type: 'text' },
+ // Presença de Nota Fiscal — depende de _entLoadDocPresence já ter
+ // terminado; antes disso, todas as entregas avaliam como "Não" (mesmo
+ // efeito de "ainda carregando", não trava a Tabela).
+ { key: 'notaFiscal',    label: 'Nota Fiscal anexada', type: 'select', options: ['Sim', 'Não'] },
+ { key: 'contatoOrcamento', label: 'Contato do orçamento', type: 'text' },
+ // Coluna real (`criado_por`/`atualizado_por`) guarda e-mail (trigger de
+ // auditoria, ver migração da seção 1); exibe/filtra pelo nome de exibição
+ // via _projAuditNome (projetos.js, já carregado antes deste módulo).
+ { key: 'criadoPor',     label: 'Criado por',   type: 'select', options: function() { return (_usuariosCache || []).map(function(u){ return u.nome_display || u.email; }); } },
+ { key: 'alteradoPor',   label: 'Alterado por', type: 'select', options: function() { return (_usuariosCache || []).map(function(u){ return u.nome_display || u.email; }); } },
+ { key: 'horarioCriacao', label: 'Criado em',   type: 'date' },
 ];
 _fbInit('entregas', _entFbFields, _entApplyFilters);
 
+// options() de campo multitext (Categoria) — lista achatada/distinta de um
+// campo array (obras.tipo_obra pode ter mais de 1 tipo por obra).
+function _entDistinctOptions2(mapFn) {
+ var set = {};
+ (_entregasArr || []).forEach(function(e) { (mapFn(e) || []).forEach(function(v){ if (v) set[v] = 1; }); });
+ return Object.keys(set).sort(function(a, b) { return a.localeCompare(b, 'pt-BR'); });
+}
+
 var _entSbFields = [
- { key: 'nomeEntrega', label: 'Entrega',      type: 'text' },
- { key: 'obra',        label: 'Obra',         type: 'text' },
- { key: 'dataFat',      label: 'Faturamento',  type: 'date' },
- { key: 'quantidade',   label: 'Qtd. (peças)', type: 'number', getValue: function(ds) { return parseFloat(ds.quantidade) || 0; } },
- { key: 'peso',         label: 'Peso (kg)',    type: 'number', getValue: function(ds) { return parseFloat(ds.peso) || 0; } },
+ { key: 'nomeEntrega', label: 'Entrega',       type: 'text' },
+ { key: 'obra',        label: 'Obra',          type: 'text' },
+ { key: 'status',      label: 'Etapa',         type: 'text', getValue: function(ds) { return ds.etapaRaw; } },
+ { key: 'transporte',  label: 'Transporte',    type: 'text' },
+ { key: 'cidadeObra',  label: 'Cidade (obra)', type: 'text' },
+ { key: 'dataFat',     label: 'Faturamento',   type: 'date' },
+ { key: 'quantidade',  label: 'Qtd. (peças)',  type: 'number', getValue: function(ds) { return parseFloat(ds.quantidade) || 0; } },
+ { key: 'peso',        label: 'Peso (kg)',     type: 'number', getValue: function(ds) { return parseFloat(ds.peso) || 0; } },
+ { key: 'maiorPeca',   label: 'Maior peça (mm)', type: 'number', getValue: function(ds) { return parseFloat(ds.maiorPeca) || 0; } },
+ { key: 'valor',       label: 'Valor',         type: 'number', getValue: function(ds) { return parseFloat(ds.valor) || 0; } },
 ];
 _sbInit('entregas', _entSbFields, _entApplyFilters);
 
-// Agrupamento — até 4 níveis (todos os campos disponíveis). Campos pedidos:
-// Cidade/Estado/Status/Transporte. _entRenderGroupNode já é recursivo desde
-// sempre (_gtBuildTree), só o maxLevels travava em 1.
+// Agrupamento — até 4 níveis (todos os campos disponíveis). Campos pedidos
+// originalmente: Cidade/Estado/Status/Transporte; adicionados: Entrega/
+// Valor/Faturamento/Quantidade/Peso/Maior peça. _entRenderGroupNode já é
+// recursivo desde sempre (_gtBuildTree), só o maxLevels travava em 1.
 var _entGroupCollapsed = {};
 function _entGroupKeyFor(e, field) {
  if (field === 'status')      return { key: _entBucketLabel[_entBucketFor(e.etapa)], sortKey: ['aguardando','producao','transporte','entregue'].indexOf(_entBucketFor(e.etapa)) };
  if (field === 'cidade')      return { key: _entCidadeUf(e) || '— Sem cidade', sortKey: null };
  if (field === 'estado') {
-  var uf = (e.obra && e.obra.estado) || '';
+  var uf = (e.obra && e.obra.estado) || e.estado || '';
   return { key: uf ? uf.toUpperCase() : '— Sem estado', sortKey: null };
  }
  if (field === 'transporte')  return { key: e.transporte || '— Sem transporte', sortKey: null };
+ if (field === 'nomeEntrega') return { key: e.nome_entrega || '— Sem nome', sortKey: null };
+ if (field === 'dataFat')     return { key: e.data_faturamento ? new Date(e.data_faturamento+'T00:00:00').toLocaleDateString('pt-BR') : '— Sem data', sortKey: e.data_faturamento || '' };
+ if (field === 'quantidade')  return { key: e.quantidade != null ? String(e.quantidade) : '— Sem quantidade', sortKey: e.quantidade || 0 };
+ if (field === 'peso')        return { key: e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') + ' kg' : '— Sem peso', sortKey: e.peso_kg || 0 };
+ if (field === 'maiorPeca')   return { key: e.maior_peca_mm != null ? Number(e.maior_peca_mm).toLocaleString('pt-BR') + ' mm' : '— Sem maior peça', sortKey: e.maior_peca_mm || 0 };
+ if (field === 'valor')       return { key: e.valor != null ? _entFmtBRL(e.valor) : '— Sem valor', sortKey: e.valor || 0 };
  return { key: '— Sem grupo', sortKey: null };
 }
 _gbInit('entregas', [
@@ -114,7 +192,15 @@ _gbInit('entregas', [
  { key: 'estado',      label: 'Estado' },
  { key: 'status',      label: 'Status' },
  { key: 'transporte',  label: 'Transporte' },
+ { key: 'nomeEntrega', label: 'Entrega' },
+ { key: 'dataFat',     label: 'Faturamento' },
+ { key: 'quantidade',  label: 'Quantidade' },
+ { key: 'peso',        label: 'Peso' },
+ { key: 'maiorPeca',   label: 'Maior peça' },
+ { key: 'valor',       label: 'Valor' },
 ], _entApplyFilters, 3);
+
+function _entFmtBRL(v) { return v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'; }
 
 // Pseudo-dataset: mesmos campos/mesma normalização que um <tr data-*> real
 // carregaria — permite _fbEvaluate/_sbCompare funcionarem idênticos com ou
@@ -124,15 +210,29 @@ function _entPseudoDataset(e) {
  var empNome  = (e.obra && e.obra.empresas_obras && e.obra.empresas_obras[0] && e.obra.empresas_obras[0].empresa && e.obra.empresas_obras[0].empresa.nome) || '';
  return {
   status:      _entBucketFor(e.etapa),
+  etapaRaw:    e.etapa || '',
   nomeEntrega: (e.nome_entrega || '').toLowerCase(),
   obra:        obraNome.toLowerCase(),
   empresa:     empNome.toLowerCase(),
   cidade:      _entCidadeUf(e).toLowerCase(),
-  estado:      ((e.obra && e.obra.estado) || '').toLowerCase(),
+  cidadeObra:  ((e.obra && e.obra.cidade) || '').toLowerCase(),
+  estado:      ((e.obra && e.obra.estado) || e.estado || '').toLowerCase(),
   transporte:  (e.transporte || '').toLowerCase(),
   dataFat:     e.data_faturamento || '',
   quantidade:  e.quantidade != null ? e.quantidade : 0,
   peso:        e.peso_kg != null ? e.peso_kg : 0,
+  maiorPeca:   e.maior_peca_mm != null ? e.maior_peca_mm : 0,
+  valor:       e.valor != null ? e.valor : 0,
+  pedidoProduzido: e.pedido_produzido ? 'sim' : 'não',
+  categoria:   ((e.obra && e.obra.tipo_obra) || []).join(','),
+  enderecoEntrega: (e.endereco_entrega || '').toLowerCase(),
+  pedidoCompusaMilatec: (e.pedido_compusa_milatec || '').toLowerCase(),
+  pedidoCompusaMila:    (e.pedido_compusa_mila || '').toLowerCase(),
+  notaFiscal:  (_entDocEntregaIds && _entDocEntregaIds[e.id]) ? 'sim' : 'não',
+  contatoOrcamento: '', // ver limitação documentada no header do arquivo
+  criadoPor:   (typeof _projAuditNome === 'function' ? _projAuditNome(e.criado_por) : (e.criado_por || '—')).toLowerCase(),
+  alteradoPor: (typeof _projAuditNome === 'function' ? _projAuditNome(e.atualizado_por) : (e.atualizado_por || '—')).toLowerCase(),
+  horarioCriacao: e.created_at ? String(e.created_at).slice(0, 10) : '',
  };
 }
 function _entSearchHaystack(e) {
@@ -261,7 +361,7 @@ function _entRenderGroupNode(node, path, rowsArr) {
   var indent = 12 + path.length * 20; // indentação por nível — antes fixa em 12px, ilegível com 2+ níveis
   rowsArr.push(
    '<tr class="gestor-group-hd" onclick="_entToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="6" style="padding-left:' + indent + 'px">'
+   + '<td colspan="10" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
    + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' entrega' + (total !== 1 ? 's' : '') + '</span>'
@@ -277,7 +377,7 @@ function _entRenderGrouped(levels) {
  var tree = _gtBuildTree(filtered, levels, _entGroupKeyFor, null, 0);
  var rowsArr = [];
  _entRenderGroupNode(tree, [], rowsArr);
- tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma entrega encontrada.</td></tr>';
+ tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma entrega encontrada.</td></tr>';
 
  var fbBadge = document.getElementById('fb-badge-entregas');
  var activeConds = _fbInstances.entregas.state.conditions.filter(_fbConditionIsUsable).length;
@@ -317,9 +417,11 @@ function setEntView(v) {
  document.getElementById('ent-view-tabela').style.display    = v === 'tabela'    ? '' : 'none';
  document.getElementById('ent-view-kanban').style.display    = v === 'kanban'    ? '' : 'none';
  document.getElementById('ent-view-calendario').style.display = v === 'calendario' ? '' : 'none';
- document.getElementById('ent-btn-tabela').className     = 'ent-view-btn' + (v === 'tabela'    ? ' active' : '');
- document.getElementById('ent-btn-kanban').className     = 'ent-view-btn' + (v === 'kanban'    ? ' active' : '');
- document.getElementById('ent-btn-calendario').className = 'ent-view-btn' + (v === 'calendario' ? ' active' : '');
+ // .vt-btn — mesmo toggle visual de Tabela/Kanban de Obras/Projetos
+ // (.view-toggle/.vt-btn), 3 opções em vez de 2.
+ document.getElementById('ent-btn-tabela').className     = 'vt-btn' + (v === 'tabela'    ? ' active' : '');
+ document.getElementById('ent-btn-kanban').className     = 'vt-btn' + (v === 'kanban'    ? ' active' : '');
+ document.getElementById('ent-btn-calendario').className = 'vt-btn' + (v === 'calendario' ? ' active' : '');
  if (v === 'kanban') _entRenderKanban();
  if (v === 'calendario') renderEntCal();
 }
@@ -477,12 +579,17 @@ function _spEntregaById(id) {
  // já que na prática é esse atalho que roda quando vem do Kanban/
  // calendário (a lista já está carregada em memória).
  if (typeof _spTrackDirectOpen === 'function') _spTrackDirectOpen('entregas', id);
+ // Ambos os ramos (cache-hit e fetch-do-banco) precisam abrir o drawer —
+ // antes só o ramo de fetch adicionava .sp-open, então clicar num card já
+ // carregado em memória (o caso comum vindo do Kanban/Calendário, onde a
+ // lista inteira já está em _entregasArr) rodava o render mas o painel
+ // continuava invisível (mesmo bug já corrigido em _spProjetoById).
+ document.getElementById('sp-overlay').classList.add('sp-open');
+ document.getElementById('sp-drawer').classList.add('sp-open');
  var e = (_entregasArr || []).find(function(x){ return String(x.id) === String(id); });
  if (e) { _spEntregaRender(e); return; }
 
  _spSet('Entrega', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
- document.getElementById('sp-overlay').classList.add('sp-open');
- document.getElementById('sp-drawer').classList.add('sp-open');
  if (!_sb) return;
  _sb.from('entregas').select('*, obra:obra_id(nome, cidade, estado, tipo_obra, empresas_obras(empresa:empresa_id(nome)))').eq('id', id).single().then(function(res) {
   if (res.error || !res.data) {
@@ -950,7 +1057,10 @@ function _entRowHTML(e) {
   + '<td style="font-size:12px;color:var(--muted)">' + (cidadeUf || '—') + '</td>'
   + '<td><span class="ent-date' + (atrasado ? ' overdue' : '') + '">' + (e.data_faturamento ? new Date(e.data_faturamento+'T00:00:00').toLocaleDateString('pt-BR') : '—') + '</span></td>'
   + '<td style="font-size:12px;color:var(--muted)">' + (e.transporte || '—') + '</td>'
+  + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.quantidade != null ? Number(e.quantidade).toLocaleString('pt-BR') : '—') + '</td>'
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') : '—') + '</td>'
+  + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.maior_peca_mm != null ? Number(e.maior_peca_mm).toLocaleString('pt-BR') : '—') + '</td>'
+  + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.valor != null ? _entFmtBRL(e.valor) : '—') + '</td>'
   + '<td><div class="ent-status"><span class="ent-status-dot" style="background:' + cor + '"></span>' + statusTxt + (atrasado ? ' <span class="ent-late-tag">Atrasado</span>' : '') + '</div></td>'
   + '<td><button class="btn btn-ghost btn-sm">Ver →</button></td>'
   + '</tr>';
@@ -980,6 +1090,9 @@ async function _dbLoadEntregas() {
  // Entrega a partir de um chip clicado em OUTRA entidade (ex.: Obra), e pelas
  // vistas Kanban/Calendário/agrupada, todas lendo direto deste array.
  _entregasArr = data || [];
+ // Carrega em paralelo (não bloqueia a Tabela) — reaplica o filtro sozinha
+ // quando terminar (ver _entLoadDocPresence).
+ _entLoadDocPresence();
  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  if (error || !data?.length) return;
  var groupLevels = (_gbInstances.entregas && _gbInstances.entregas.state.levels) || [];
