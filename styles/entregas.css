@@ -32,7 +32,11 @@
 
  /* Calendário */
  .ent-cal { margin-top:0 }
- .ent-cal-nav { display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border) }
+ /* gap em vez de justify-content:space-between — o seletor de período
+    (.gp-wrap#pp-wrap-entcal, margin-left:auto) é o 4º filho agora; com
+    space-between os 4 elementos ficariam espaçados uniformemente (título
+    "grudado" longe dos botões de navegação, que deveriam ficar juntos). */
+ .ent-cal-nav { display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border) }
  .ent-cal-title { font-size:14px;font-weight:600 }
  .ent-cal-navbtn { border:none;background:none;cursor:pointer;color:var(--muted);padding:4px 8px;border-radius:var(--r-sm);font-size:16px;line-height:1 }
  .ent-cal-navbtn:hover { background:rgba(0,0,0,.06);color:var(--text) }
@@ -46,18 +50,9 @@
  .ent-cal-day.today { background:var(--navy-dim) }
  .ent-cal-daynum { font-size:12px;color:var(--muted);font-weight:500;margin-bottom:5px }
  .ent-cal-day.today .ent-cal-daynum { background:#1B1B8F;color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px }
+ /* Cor por Status (bucket), inline via style — consistente com a legenda
+    (ver _entEventColor/_entCalEventHTML, entregas.js). Antes tinha uma
+    paleta de 10 classes fixas por hash de Transporte, sem relação com a
+    legenda (bug corrigido). */
  .ent-cal-event { font-size:11px;font-weight:500;padding:3px 6px;border-radius:4px;margin-bottom:3px;line-height:1.35;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:filter .1s }
  .ent-cal-event:hover { filter:brightness(1.08) }
- /* Cor por Transporte, não por status — mesma lógica de um campo "single
-    select" do Airtable, onde cada valor já nasce com uma cor fixa (ver
-    _entTransporteColorClass em entregas.js). Paleta de 10 tons distintos. */
- .ent-cal-event-pink   { background:rgba(219,39,119,.16);  color:#f472b6 }
- .ent-cal-event-cyan    { background:rgba(8,145,178,.16);   color:#22d3ee }
- .ent-cal-event-orange { background:rgba(217,119,6,.16);   color:#fb923c }
- .ent-cal-event-green  { background:var(--green-dim);      color:var(--green) }
- .ent-cal-event-purple { background:var(--purple-dim);     color:var(--purple) }
- .ent-cal-event-blue   { background:var(--blue-dim);       color:var(--blue) }
- .ent-cal-event-yellow { background:var(--yellow-dim);     color:var(--yellow) }
- .ent-cal-event-red    { background:var(--red-dim);        color:var(--red) }
- .ent-cal-event-teal   { background:rgba(13,148,136,.16);  color:#2dd4bf }
- .ent-cal-event-gray   { background:var(--surface2);       color:var(--muted) }

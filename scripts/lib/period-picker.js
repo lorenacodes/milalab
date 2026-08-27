@@ -65,7 +65,14 @@ function _ppPreset(instanceId, preset, btn) {
  var ini, fim;
  var lbl = document.getElementById('pp-btn-lbl-' + instanceId);
 
- if (preset === 'semana') {
+ // 'dia'/'3dias' — presets aditivos (ver Entregas, calendário com range Dia/
+ // 3 dias/Semana/Customizado): mesma mecânica de ini/fim dos presets
+ // existentes, só com intervalo de 1 ou 3 dias a partir de hoje.
+ if (preset === 'dia') {
+  ini = new Date(today); fim = new Date(today);
+ } else if (preset === '3dias') {
+  ini = new Date(today); fim = new Date(today); fim.setDate(fim.getDate() + 2);
+ } else if (preset === 'semana') {
   var r = _ppWeekRange(0); ini = r.ini; fim = r.fim;
  } else if (preset === 'prox2') {
   var r0 = _ppWeekRange(0), r1 = _ppWeekRange(1); ini = r0.ini; fim = r1.fim;

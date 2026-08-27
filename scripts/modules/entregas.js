@@ -480,36 +480,57 @@ var _ptMonths = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
                  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 var _ptDows   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
-// Cor do evento no Calendário por valor de Transporte (não por status) — o
-// mesmo texto de transporte sempre cai na mesma cor, igual a uma coluna de
-// "single select" do Airtable, onde cada opção já nasce com uma cor fixa.
-// Hash determinístico numa paleta de 8 tons (não depende de ordem de
-// aparição nem de armazenar nada — o mesmo valor dá a mesma cor sempre,
-// mesmo depois de recarregar a página).
-var _ENT_CAL_PALETTE = ['pink','cyan','orange','green','purple','blue','yellow','red','teal','gray'];
-function _entTransporteColorClass(transporte) {
- var t = (transporte || '').trim();
- if (!t) return 'gray';
- var hash = 0;
- for (var i = 0; i < t.length; i++) hash = (hash * 31 + t.charCodeAt(i)) | 0;
- var idx = Math.abs(hash) % _ENT_CAL_PALETTE.length;
- return _ENT_CAL_PALETTE[idx];
+// Cor do evento no Calendário — por STATUS (bucket), não mais por
+// Transporte: a legenda sempre prometeu "cor = status" (4 chips fixos,
+// Aguardando/Em produção/Em transporte/Entregue), mas o evento renderizava
+// com uma cor hash de Transporte, sem nenhuma relação com a legenda — bug
+// real reportado ("legenda não bate com a cor do evento"). Reaproveita
+// _entBucketCor (mesmas 4 cores da Tabela/Kanban), não uma paleta própria.
+function _entEventColor(e) {
+ var atrasado = _entIsLate(e);
+ return atrasado ? _entBucketCor.atrasado : _entBucketCor[_entBucketFor(e.etapa)];
+}
+function _entCalEventHTML(e) {
+ var cor = _entEventColor(e);
+ var label = e.nome_entrega || (e.obra && e.obra.nome) || 'Entrega';
+ var shortLabel = label.length > 28 ? label.substring(0, 28) + '…' : label;
+ var tTitle = label + ' — ' + (e.etapa || '') + (e.transporte ? (' — ' + e.transporte) : '');
+ return '<div class="ent-cal-event" style="background:' + cor + '22;color:' + cor + '" title="' + tTitle.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();_spEntregaById(\'' + e.id + '\')">' + shortLabel + '</div>';
 }
 
+// Seletor de período (Dia/3 dias/Semana/Customizado) — mesmo componente
+// genérico de Obras (period-picker.js/_ppInit), instância própria 'entcal'.
+// Preset padrão 'todas' é rotulado "Mês" na UI e mantém o grid mensal
+// original (_entCalMonth/_entCalYear); os outros presets trocam pro modo de
+// intervalo (ver renderEntCal/_entCalRenderRange abaixo).
+_ppInit('entcal', { onChange: function(){ renderEntCal(); }, defaultPreset: 'todas' });
+
 function entCalNav(dir) {
-  _entCalMonth += dir;
-  if (_entCalMonth > 11) { _entCalMonth = 0; _entCalYear++; }
-  if (_entCalMonth < 0)  { _entCalMonth = 11; _entCalYear--; }
+  var st = _ppGetState('entcal');
+  if (st.preset === 'todas') {
+    _entCalMonth += dir;
+    if (_entCalMonth > 11) { _entCalMonth = 0; _entCalYear++; }
+    if (_entCalMonth < 0)  { _entCalMonth = 11; _entCalYear--; }
+    renderEntCal();
+    return;
+  }
+  // Modo intervalo — desloca o range inteiro pela sua própria duração (Dia:
+  // ±1 dia; 3 dias/Semana/Customizado: ±duração do range), preservando o
+  // preset ativo (não volta pro grid mensal sozinho).
+  var diasRange = Math.round((st.fim - st.ini) / 86400000) + 1;
+  var novaIni = new Date(st.ini); novaIni.setDate(novaIni.getDate() + dir * diasRange);
+  var novaFim = new Date(st.fim); novaFim.setDate(novaFim.getDate() + dir * diasRange);
+  _ppInstances.entcal.state = { ini: novaIni, fim: novaFim, preset: st.preset };
+  if (typeof _ppSetInputDates === 'function') _ppSetInputDates('entcal', novaIni, novaFim);
   renderEntCal();
 }
 
-function renderEntCal() {
+// Grid mensal completo (comportamento original, preset 'todas'/"Mês").
+function _entCalRenderMonth() {
   var label = document.getElementById('ent-cal-label');
   if (label) label.textContent = _ptMonths[_entCalMonth] + ' ' + _entCalYear;
 
   var grid = document.getElementById('ent-cal-grid');
-  if (!grid) return;
-
   var filtered = _entFilteredSorted();
   var byDate = {};
   filtered.forEach(function(e) {
@@ -544,13 +565,7 @@ function renderEntCal() {
 
     html += '<div class="ent-cal-day' + (isToday ? ' today' : '') + '">';
     html += '<div class="ent-cal-daynum">' + d + '</div>';
-    dayEvents.forEach(function(e) {
-      var colorCls = _entTransporteColorClass(e.transporte);
-      var label = e.nome_entrega || (e.obra && e.obra.nome) || 'Entrega';
-      var shortLabel = label.length > 28 ? label.substring(0, 28) + '…' : label;
-      var tTitle = label + (e.transporte ? (' — ' + e.transporte) : '');
-      html += '<div class="ent-cal-event ent-cal-event-' + colorCls + '" title="' + tTitle.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();_spEntregaById(\'' + e.id + '\')">' + shortLabel + '</div>';
-    });
+    dayEvents.forEach(function(e) { html += _entCalEventHTML(e); });
     html += '</div>';
   }
 
@@ -561,7 +576,65 @@ function renderEntCal() {
   }
 
   grid.className = 'ent-cal-grid';
+  grid.style.gridTemplateColumns = '';
   grid.innerHTML = html;
+}
+
+// Intervalo curto (Dia/3 dias/Semana/Customizado) — grade de N colunas (1 a
+// N dias), sem células "other-month" (não faz sentido fora do grid mensal):
+// cada coluna é o próprio dia, com seu rótulo de data completo (dia da
+// semana + dia/mês) já que não há cabeçalho de dow fixo cobrindo o mês todo.
+function _entCalRenderRange(ini, fim) {
+  var label = document.getElementById('ent-cal-label');
+  var grid = document.getElementById('ent-cal-grid');
+  var filtered = _entFilteredSorted();
+  var byDate = {};
+  filtered.forEach(function(e) {
+   if (!e.data_faturamento) return;
+   (byDate[e.data_faturamento] = byDate[e.data_faturamento] || []).push(e);
+  });
+
+  var dias = [];
+  var d = new Date(ini);
+  while (d <= fim) { dias.push(new Date(d)); d.setDate(d.getDate() + 1); }
+
+  if (label) {
+   label.textContent = dias.length === 1
+    ? ini.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' })
+    : ini.toLocaleDateString('pt-BR', { day:'2-digit', month:'short' }) + ' – ' + fim.toLocaleDateString('pt-BR', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  var today = new Date(); today.setHours(0,0,0,0);
+  var html = '';
+  dias.forEach(function(dt) {
+    var dateStr = _entFmtDateISO(dt);
+    var isToday = dt.getTime() === today.getTime();
+    var dayEvents = byDate[dateStr] || [];
+    html += '<div class="ent-cal-dow">' + _ptDows[dt.getDay()] + ' ' + String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0') + '</div>';
+  });
+  grid.style.gridTemplateColumns = 'repeat(' + dias.length + ',1fr)';
+  grid.innerHTML = html; // linha de cabeçalho (dow + data) primeiro, igual ao grid mensal
+  html = '';
+  dias.forEach(function(dt) {
+    var dateStr = _entFmtDateISO(dt);
+    var isToday = dt.getTime() === today.getTime();
+    var dayEvents = byDate[dateStr] || [];
+    html += '<div class="ent-cal-day' + (isToday ? ' today' : '') + '">';
+    html += dayEvents.length
+     ? dayEvents.map(_entCalEventHTML).join('')
+     : '<div style="font-size:11px;color:var(--muted);padding:6px 2px">Nenhuma entrega</div>';
+    html += '</div>';
+  });
+  grid.className = 'ent-cal-grid';
+  grid.insertAdjacentHTML('beforeend', html);
+}
+
+function renderEntCal() {
+  var grid = document.getElementById('ent-cal-grid');
+  if (!grid) return;
+  var st = _ppGetState('entcal');
+  if (st.preset === 'todas' || !st.ini || !st.fim) { _entCalRenderMonth(); return; }
+  _entCalRenderRange(st.ini, st.fim);
 }
 
 var _entregasArr = [];
