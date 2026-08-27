@@ -4,13 +4,10 @@
  .ent-view-btn.active { background:#1B1B8F;color:#fff;border-color:#1B1B8F }
  .ent-view-btn:not(.active):hover { color:var(--text) }
 
- /* Tabela estilo Notion */
- .ent-table { width:100%;border-collapse:collapse;font-size:13px }
- .ent-table thead tr { border-bottom:1px solid var(--border) }
- .ent-table th { padding:7px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap }
- .ent-table td { padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle }
- .ent-table tbody tr:hover { background:rgba(0,0,0,.03) }
- body.light .ent-table tbody tr:hover { background:#F7F6F3 }
+ /* Tabela — mesmo padrão visual de Obras/Projetos (.tbl-box + table/th/td
+    globais de main.css); .ent-table só existe pra escopar os detalhes
+    abaixo (status/data), sem mais reescrever padding/tipografia da tabela. */
+ .ent-table th { white-space:nowrap }
  .ent-status { display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;white-space:nowrap }
  .ent-status-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0 }
  .ent-date { font-size:12px;color:var(--muted);white-space:nowrap }
