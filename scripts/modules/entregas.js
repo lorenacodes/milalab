@@ -27,7 +27,100 @@
 //    mapeamento correto, TUDO caía no fallback 'aguardando'. Ver
 //    _entEtapaBucket abaixo pro mapeamento real → 4 status visuais.
 // ═══════════════════════════════════════════════════════════════════════════════
-function openNovaEntrega() { alert('Modal "Nova Entrega" será implementado em breve.'); }
+// ── Modal "Nova Entrega" — botão único (topbar global, rota 'entregas' em
+// app.js), mesmo esqueleto open/close/submit do modal Novo Projeto
+// (openNovoProjeto/closeNovoProjeto/submitNovoProjeto, projetos.js).
+// Reaproveita o MESMO conjunto de campos/validação de _spCriarEntrega
+// (obras.js, formulário inline dentro do painel de Obra) — grava em
+// `entregas` + `entregas_obras` (vínculo primário), não só `obra_id`.
+async function _neObraPopular() {
+ var wrap = document.getElementById('ne-obra-wrap');
+ if (!wrap) return;
+ await _entCarregarObrasCache();
+ var lista = _entObrasCache || [];
+ _srchSelRegister('neObra', {
+  options: lista.map(function(o){ return o.nome || '(sem nome)'; }),
+  placeholder: 'Selecione a obra...',
+  onSelect: function(nome) {
+   var obra = lista.find(function(o){ return (o.nome || '(sem nome)') === nome; });
+   var idEl = document.getElementById('ne-obra-id');
+   if (idEl) idEl.value = obra ? obra.id : '';
+  },
+ });
+ wrap.innerHTML = _srchSelMarkup('neObra', 'ne-obra-id', '');
+}
+function _neTransportePopular() {
+ var wrap = document.getElementById('ne-transporte-wrap');
+ if (!wrap) return;
+ _srchSelRegister('neTransporte', {
+  options: function(){ return _obraTransporteCache || []; }, creatable: true, placeholder: 'Selecione o transporte...',
+  onOpen: _obraCarregarTransportes,
+  onSelect: function(v) { if (v && (_obraTransporteCache||[]).indexOf(v) === -1) _obraTransporteCache.push(v); },
+ });
+ wrap.innerHTML = _srchSelMarkup('neTransporte', 'ne-transporte-id', '');
+}
+async function openNovaEntrega() {
+ ['ne-nome','ne-data','ne-qtd','ne-peso','ne-maior-peca','ne-valor'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
+ var prod = document.getElementById('ne-produzido'); if (prod) prod.checked = false;
+ var doc = document.getElementById('ne-doc'); if (doc) doc.value = '';
+ var op = document.getElementById('ne-op'); if (op) op.value = '';
+ var etapaSel = document.getElementById('ne-etapa');
+ if (etapaSel) {
+  etapaSel.innerHTML = '<option value="">Selecione...</option>'
+   + Object.keys(_entEtapaBucket).map(function(et){ return '<option value="' + et.replace(/"/g,'&quot;') + '">' + et + '</option>'; }).join('');
+ }
+ await Promise.all([_neObraPopular(), Promise.resolve(_neTransportePopular())]);
+ document.getElementById('modal-nova-entrega').classList.add('open');
+ document.body.style.overflow = 'hidden';
+}
+function closeNovaEntrega() {
+ document.getElementById('modal-nova-entrega').classList.remove('open');
+ document.body.style.overflow = '';
+}
+async function submitNovaEntrega() {
+ var nome = (document.getElementById('ne-nome')?.value || '').trim();
+ var etapa = document.getElementById('ne-etapa')?.value || '';
+ var data = document.getElementById('ne-data')?.value || '';
+ var qtdStr = document.getElementById('ne-qtd')?.value || '';
+ var faltando = [];
+ if (!nome) faltando.push('Entrega');
+ if (!etapa) faltando.push('Etapa');
+ if (!data) faltando.push('Data de faturamento');
+ if (qtdStr === '') faltando.push('Quantidade');
+ if (faltando.length) { _showToast ? _showToast('Preencha: ' + faltando.join(', '), 'aviso') : alert('Preencha os campos obrigatórios: ' + faltando.join(', ') + '.'); return; }
+ if (!_sb) { _showToast ? _showToast('Sem conexão com o banco.', 'erro') : alert('Sem conexão com o banco.'); return; }
+ var obraId = document.getElementById('ne-obra-id')?.value || null;
+ var payload = {
+  obra_id: obraId,
+  nome_entrega: nome,
+  etapa: etapa,
+  data_faturamento: data,
+  quantidade: Number(qtdStr),
+  peso_kg: document.getElementById('ne-peso')?.value !== '' ? Number(document.getElementById('ne-peso').value) : null,
+  valor: document.getElementById('ne-valor')?.value !== '' ? Number(document.getElementById('ne-valor').value) : null,
+  maior_peca_mm: document.getElementById('ne-maior-peca')?.value !== '' ? Number(document.getElementById('ne-maior-peca').value) : null,
+  transporte: document.getElementById('ne-transporte-id')?.value?.trim() || null,
+  pedido_produzido: !!document.getElementById('ne-produzido')?.checked,
+ };
+ var res = await _sb.from('entregas').insert(payload).select().single();
+ if (res.error || !res.data) { var msg = 'Erro ao criar entrega: ' + (res.error?.message || ''); _showToast ? _showToast(msg, 'erro') : alert(msg); return; }
+ var nova = res.data;
+ // Vínculo primário também na junção — mesma obra de `obra_id`, consistente
+ // com o resto do app (Obras vinculadas do painel de detalhe lê daqui).
+ if (obraId) {
+  var insJ = await _sb.from('entregas_obras').insert({ entrega_id: nova.id, obra_id: obraId });
+  if (insJ.error) console.error('[Entregas] erro ao gravar vínculo primário em entregas_obras:', insJ.error);
+ }
+ var docFiles = Array.from(document.getElementById('ne-doc')?.files || []);
+ var opFile = document.getElementById('ne-op')?.files?.[0];
+ var anexosComErro = 0;
+ for (var i = 0; i < docFiles.length; i++) { if (!(await _spUploadDocEntrega(docFiles[i], nova.id, obraId, 'documento_especifico'))) anexosComErro++; }
+ if (opFile) { if (!(await _spUploadDocEntrega(opFile, nova.id, obraId, 'ordem_producao'))) anexosComErro++; }
+ if (anexosComErro) { var wmsg = 'Entrega criada, mas ' + anexosComErro + ' anexo(s) não foram enviados. Você pode anexá-los depois pelo painel de detalhe.'; _showToast ? _showToast(wmsg, 'aviso') : alert(wmsg); }
+ else { _showToast ? _showToast('Entrega criada com sucesso!', 'ok') : null; }
+ closeNovaEntrega();
+ if (typeof _dbLoadEntregas === 'function') _dbLoadEntregas();
+}
 
 // ── Status: mapeamento REAL etapa → bucket visual ──────────────────────────
 // A tabela `etapa` tem 7 valores reais + null (ver auditoria acima); o
