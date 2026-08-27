@@ -260,12 +260,19 @@ var _entSbFields = [
 _sbInit('entregas', _entSbFields, _entApplyFilters);
 
 // Agrupamento — até 4 níveis (todos os campos disponíveis). Campos pedidos
-// originalmente: Cidade/Estado/Status/Transporte; adicionados: Entrega/
-// Valor/Faturamento/Quantidade/Peso/Maior peça. _entRenderGroupNode já é
-// recursivo desde sempre (_gtBuildTree), só o maxLevels travava em 1.
+// originalmente: Cidade/Estado/Status/Transporte; adicionados depois:
+// Entrega/Valor/Faturamento/Quantidade/Peso/Maior peça, e — pedido
+// explícito separado — Obra/Empresa/Etapa da entrega, cujo dado já vinha
+// carregado em todo `e` (ver _entPseudoDataset logo abaixo: e.obra.nome,
+// e.obra.empresas_obras[0].empresa.nome, e.etapa cru), só faltava
+// aparecer aqui. 'status' continua existindo à parte (bucket de 4 valores
+// fixos, ver _entBucketFor) — 'etapa' é o valor cru (7 valores reais, mais
+// granular). _entRenderGroupNode já é recursivo desde sempre
+// (_gtBuildTree), só o maxLevels travava em 1.
 var _entGroupCollapsed = {};
 function _entGroupKeyFor(e, field) {
  if (field === 'status')      return { key: _entBucketLabel[_entBucketFor(e.etapa)], sortKey: ['aguardando','producao','transporte','entregue'].indexOf(_entBucketFor(e.etapa)) };
+ if (field === 'etapa')       return { key: e.etapa || '— Sem etapa', sortKey: null };
  if (field === 'cidade')      return { key: _entCidadeUf(e) || '— Sem cidade', sortKey: null };
  if (field === 'estado') {
   var uf = (e.obra && e.obra.estado) || e.estado || '';
@@ -278,12 +285,20 @@ function _entGroupKeyFor(e, field) {
  if (field === 'peso')        return { key: e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') + ' kg' : '— Sem peso', sortKey: e.peso_kg || 0 };
  if (field === 'maiorPeca')   return { key: e.maior_peca_mm != null ? Number(e.maior_peca_mm).toLocaleString('pt-BR') + ' mm' : '— Sem maior peça', sortKey: e.maior_peca_mm || 0 };
  if (field === 'valor')       return { key: e.valor != null ? _entFmtBRL(e.valor) : '— Sem valor', sortKey: e.valor || 0 };
+ if (field === 'obra')        return { key: (e.obra && e.obra.nome) || '— Sem obra', sortKey: null };
+ if (field === 'empresa') {
+  var emp = (e.obra && e.obra.empresas_obras && e.obra.empresas_obras[0] && e.obra.empresas_obras[0].empresa && e.obra.empresas_obras[0].empresa.nome) || '';
+  return { key: emp || '— Sem empresa', sortKey: null };
+ }
  return { key: '— Sem grupo', sortKey: null };
 }
 _gbInit('entregas', [
+ { key: 'obra',        label: 'Obra' },
+ { key: 'empresa',     label: 'Empresa' },
  { key: 'cidade',      label: 'Cidade' },
  { key: 'estado',      label: 'Estado' },
  { key: 'status',      label: 'Status' },
+ { key: 'etapa',       label: 'Etapa da entrega' },
  { key: 'transporte',  label: 'Transporte' },
  { key: 'nomeEntrega', label: 'Entrega' },
  { key: 'dataFat',     label: 'Faturamento' },
@@ -453,11 +468,11 @@ function _entRenderGroupNode(node, path, rowsArr) {
   var total = _gtTreeCount(child);
   var indent = 12 + path.length * 20; // indentação por nível — antes fixa em 12px, ilegível com 2+ níveis
   rowsArr.push(
-   '<tr class="gestor-group-hd" onclick="_entToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
+   '<tr class="' + _gtGroupClass(path.length) + '" onclick="_entToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
    + '<td colspan="10" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
-   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' entrega' + (total !== 1 ? 's' : '') + '</span>'
+   + _gtCountBadgeHTML(total, 'entrega' + (total !== 1 ? 's' : ''))
    + '</td></tr>'
   );
   if (!isCollapsed) _entRenderGroupNode(child, path.concat(k), rowsArr);

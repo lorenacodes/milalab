@@ -3412,14 +3412,14 @@ function _obrasRenderGroupNode(node, path, tbody, forceHidden) {
   var visCount = _gtTreeCount(child, function(tr){ return tr.style.display !== 'none'; });
   var indent = 12 + path.length * 20;
   var hd = document.createElement('tr');
-  hd.className = 'gestor-group-hd obras-group-row';
+  hd.className = _gtGroupClass(path.length) + ' obras-group-row';
   hd.style.position = 'static'; // sticky faria sentido só dentro de um scroll interno (não é o caso de Obras)
   hd.onclick = function(){ _obrasToggleGroup(pathKey); };
   hd.style.display = (forceHidden || !visCount) ? 'none' : '';
   hd.innerHTML = '<td colspan="11" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + (k || '—') + '</strong>'
-   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">(' + visCount + ')</span>'
+   + _gtCountBadgeHTML(visCount)
    + '</td>';
   tbody.appendChild(hd);
   _obrasRenderGroupNode(child, nodePath, tbody, forceHidden || isCollapsed);

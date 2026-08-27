@@ -60,14 +60,14 @@ function _instRenderGroupNode(node, path, tbody, forceHidden) {
   var visCount = _gtTreeCount(child, function(tr){ return tr.style.display !== 'none'; });
   var indent = 12 + path.length * 20;
   var hd = document.createElement('tr');
-  hd.className = 'gestor-group-hd inst-group-row';
+  hd.className = _gtGroupClass(path.length) + ' inst-group-row';
   hd.style.position = 'static';
   hd.onclick = function(){ _instToggleGroup(pathKey); };
   hd.style.display = (forceHidden || !visCount) ? 'none' : '';
   hd.innerHTML = '<td colspan="9" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + (k || '—') + '</strong>'
-   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">(' + visCount + ')</span>'
+   + _gtCountBadgeHTML(visCount)
    + '</td>';
   tbody.appendChild(hd);
   _instRenderGroupNode(child, nodePath, tbody, forceHidden || isCollapsed);

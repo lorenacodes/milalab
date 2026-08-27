@@ -1025,9 +1025,9 @@ function _gestorRenderGroupNode(node, path, rowNumRef, hoje, rowsArr) {
   var badge = nLate > 0
    ? '<span style="background:rgba(207,34,46,.12);color:#D6433C;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:6px">' + nLate + ' atrasadas</span>'
    : '';
-  var doneBadge = '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + nDone + '/' + total + ' concluídas</span>';
+  var doneBadge = _gtCountBadgeHTML(nDone + '/' + total, 'concluídas');
   rowsArr.push(
-   '<tr class="gestor-group-hd" onclick="_gestorToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
+   '<tr class="' + _gtGroupClass(path.length) + '" onclick="_gestorToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
    + '<td colspan="8" style="padding-left:' + (12 + indent) + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>' + doneBadge + badge
@@ -1064,17 +1064,17 @@ function _gestorRenderGrid() {
    var projKey = 'P::' + pk;
    var projCollapsed = _gestorCollapsed[projKey];
    var projTotal = proj.obraOrder.reduce(function(s,ok){ return s + proj.obras[ok].length; }, 0);
-   nrows += '<tr class="gestor-group-hd" onclick="_gestorToggleGroup(\'' + projKey.replace(/'/g,"\\'") + '\')">'
-    + '<td colspan="8"><span style="margin-right:4px">' + (projCollapsed?'▶':'▼') + '</span>'
-    + '<strong>' + pk + '</strong><span style="color:var(--muted);font-size:9px;margin-left:6px">' + projTotal + ' atividade' + (projTotal!==1?'s':'') + '</span></td></tr>';
+   nrows += '<tr class="' + _gtGroupClass(0) + '" onclick="_gestorToggleGroup(\'' + projKey.replace(/'/g,"\\'") + '\')">'
+    + '<td colspan="8" style="padding-left:12px"><span style="margin-right:4px">' + (projCollapsed?'▶':'▼') + '</span>'
+    + '<strong>' + pk + '</strong>' + _gtCountBadgeHTML(projTotal, 'atividade' + (projTotal!==1?'s':'')) + '</td></tr>';
    if (projCollapsed) return;
    proj.obraOrder.forEach(function(ok) {
     var items = proj.obras[ok];
     var obraKey = projKey + '::O::' + ok;
     var obraCollapsed = _gestorCollapsed[obraKey];
-    nrows += '<tr class="gestor-group-hd" onclick="_gestorToggleGroup(\'' + obraKey.replace(/'/g,"\\'") + '\')" style="background:var(--surface2)">'
-     + '<td colspan="8" style="padding-left:28px"><span style="margin-right:4px">' + (obraCollapsed?'▶':'▼') + '</span>'
-     + ok + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + items.length + '</span></td></tr>';
+    nrows += '<tr class="' + _gtGroupClass(1) + '" onclick="_gestorToggleGroup(\'' + obraKey.replace(/'/g,"\\'") + '\')">'
+     + '<td colspan="8" style="padding-left:32px"><span style="margin-right:4px">' + (obraCollapsed?'▶':'▼') + '</span>'
+     + '<strong>' + ok + '</strong>' + _gtCountBadgeHTML(items.length) + '</td></tr>';
     if (obraCollapsed) return;
     items.forEach(function(a) { nRowNum++; nrows += _gestorRenderRow(a, nRowNum); });
    });

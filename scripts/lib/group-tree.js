@@ -86,7 +86,25 @@ function _gtTreeCount(node, predicate) {
  return sum;
 }
 
+// ── Markup compartilhado do cabeçalho de grupo ──────────────────────────────
+// Pedido explícito: hierarquia entre níveis (principal → sub → registros)
+// era ilegível com 2+ agrupamentos — cada módulo (Obras/Instalações/
+// Entregas/Empresas/Contatos/Gestor de Tarefas) hand-rolava seu próprio
+// <tr class="gestor-group-hd"> com o MESMO peso visual em qualquer nível,
+// só a indentação (padding-left) crescia. Essas 2 funções centralizam a
+// classe (que carrega o peso visual decrescente por nível, ver
+// styles/main.css .gb-lvl-0/1/2) e o selo de contagem (pílula única, antes
+// cada módulo tinha um <span> de texto solto com estilo inline levemente
+// diferente) — cada módulo continua dono da própria lógica de agrupamento/
+// indentação numérica, só a APARÊNCIA do cabeçalho passa a vir daqui.
+function _gtGroupClass(level) {
+ return 'gestor-group-hd gb-lvl-' + Math.min(level, 2);
+}
+function _gtCountBadgeHTML(count, label) {
+ return '<span class="gb-count-badge">' + count + (label ? ' ' + label : '') + '</span>';
+}
+
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _gtCapitalize, _gtDateBucket, _gtBuildTree, _gtTreeCount };
+ module.exports = { _gtCapitalize, _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtGroupClass, _gtCountBadgeHTML };
 }
