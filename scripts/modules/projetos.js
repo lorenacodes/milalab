@@ -342,8 +342,26 @@ async function _renderProjetosKanban() {
  if (!container) return;
  container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">Carregando projetos do banco...</div>';
 
+ // Achado real: filtros que dependem de dado carregado à parte (Melhoria,
+ // Cidade/Estado da Obra, presença de Fotos/Pré-Projeto/Projeto executivo/
+ // Tarefa...) "não funcionavam direito" com o Kanban aberto — esta função
+ // fazia sua PRÓPRIA consulta, mais leve (menos colunas) e sem nenhuma das
+ // caches que os filtros novos passaram a depender, então os data-* que
+ // esses filtros leem nunca existiam nos .proj-kn-card. Agora carrega as
+ // mesmas caches de _dbLoadProjetos e usa select('*') + _projBuildRowData
+ // (mesma função, mesmo conjunto de data-* das duas visualizações).
+ await _garantirObraIdMap();
+ await _garantirObraGeoMap();
+ await _garantirMelhoriaProjetoMap();
+ await _projCarregarPresenca();
+
+ // Mantém o join aninhado obra:obra_id(...) só pro SUBTÍTULO do card (nome
+ // da Obra/Empresa exibido) — funciona sempre, mesmo se a aba Obras nunca
+ // foi visitada nesta sessão (_obraIdMap[id].empresa só existe depois que
+ // _dbLoadObras roda). Os data-* de filtro continuam vindo de
+ // _projBuildRowData (mesma função/mesmas caches da Tabela).
  var res = await _sb.from('projetos')
-  .select('id, nome, etapa_projeto, tipo_orcamento, produto, responsavel, valor_unitario, quantidade, peso_kg, obra_id, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
+  .select('*, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
   .order('created_at', { ascending: false });
 
  if (res.error || !res.data) {
@@ -395,13 +413,20 @@ async function _renderProjetosKanban() {
   var cards  = groups[etapa] || [];
   var dot    = etapaDot[etapa] || 'var(--muted)';
   var cardsHtml = cards.map(function(p) {
-   var tipo     = p.tipo_orcamento || '';
+   // data-* de filtro (Melhoria/Cidade/Estado/Produto/Descritivo/
+   // Quantidade/Valor da unidade/M² Estrutura/Peso Uni/Maior peça/datas/
+   // Alterado-Criado por/presença de Fotos-Pré-Projeto-Projeto executivo-
+   // Tarefa) vêm todos daqui — mesma função/mesmas caches da Tabela (ver
+   // comentário completo em _projBuildRowData).
+   var d        = _projBuildRowData(p);
+   var tipo     = d.tipo;
    var tipCls   = tipoCls[tipo]   || 'bm';
+   // Subtítulo exibido no card continua vindo do join aninhado (obra:
+   // obra_id(...) no SELECT acima) — funciona mesmo sem a aba Obras ter
+   // sido visitada nesta sessão, diferente de _obraIdMap[id].empresa (só
+   // populado por _dbLoadObras).
    var obraNome = (p.obra && p.obra.nome)   ? p.obra.nome   : '';
    var empNome  = (p.obra && p.obra.empresas_obras && p.obra.empresas_obras[0]?.empresa?.nome) ? p.obra.empresas_obras[0].empresa.nome : '';
-   var valorNum = (p.valor_unitario != null) ? Number(p.valor_unitario) * Number(p.quantidade || 1) : 0;
-   var pesoNum  = (p.peso_kg != null) ? Number(p.peso_kg) * Number(p.quantidade || 1) : 0;
-   var clienteStr = ((empNome ? empNome + ' — ' : '') + (obraNome||'—')).replace(/"/g,'&quot;');
    var subtitulo = ((empNome ? empNome + ' — ' : '') + obraNome) || 'Sem obra vinculada';
    var tagsHtml = (tipo ? '<span class="badge ' + tipCls + '" style="font-size:10px">' + tipo + '</span>' : '');
    // Clique abre o próprio projeto (_spProjetoById), não mais a Obra vinculada
@@ -419,9 +444,7 @@ async function _renderProjetosKanban() {
    // fisicamente as duas áreas — só a alcinha ".proj-kn-handle" é
    // draggable, o resto do card é clique puro, sem ambiguidade nenhuma
    // possível (ver _setupProjetosKanbanDnD abaixo).
-   return '<div class="proj-kn-card" data-id="' + p.id + '" title="Abrir projeto"'
-    + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '"'
-    + ' data-nome="' + (p.nome||'').replace(/"/g,'&quot;') + '" data-resp="' + (p.responsavel||'').replace(/"/g,'&quot;') + '">'
+   return '<div class="proj-kn-card" data-id="' + p.id + '" title="Abrir projeto"'+d.attrsHTML+'>'
     + '<div class="proj-kn-handle" draggable="true" title="Arrastar para outra etapa"><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.5"/><circle cx="7.5" cy="2.5" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="13.5" r="1.5"/><circle cx="7.5" cy="13.5" r="1.5"/></svg></div>'
     + '<div class="proj-kn-title">' + (p.nome || '(sem nome)') + '</div>'
     + (tagsHtml ? '<div class="proj-kn-tags">' + tagsHtml + '</div>' : '')
@@ -1421,6 +1444,69 @@ async function _garantirObraGeoMap() {
  allObras.forEach(function(o) { _obraGeoMap[o.id] = { cidade: o.cidade || '', estado: o.estado || '' }; });
 }
 
+// Presença (tem/não tem) de Fotos da Obra/Pré-Projeto/Projeto executivo
+// (documentos.tipo) e de Tarefa (atividades_projetos) — hoisted pra cache
+// de módulo (antes eram `var` locais só de _dbLoadProjetos). Achado real:
+// o filtro "Fotos da Obra" (e os outros 3 de presença) "não funcionava
+// direito" porque só a TABELA tinha esses data-* nas <tr> — o Kanban
+// (_renderProjetosKanban) nunca ganhou os mesmos atributos nos
+// .proj-kn-card, então aplicar qualquer um desses filtros com o Kanban
+// aberto escondia tudo (dataset undefined !== 'Sim', sempre falso). Cache
+// de módulo permite os DOIS renderizadores (_dbLoadProjetos/
+// _renderProjetosKanban) lerem o mesmo resultado via _projBuildRowData.
+var _projDocPresence = { fotos_obra: {}, pre_projeto: {}, projeto_executivo: {} };
+var _projTarefaPresence = {};
+async function _projCarregarPresenca() {
+ if (!_sb) return;
+ var docRes = await _sb.from('documentos').select('projeto_id, tipo').not('projeto_id', 'is', null).in('tipo', ['fotos_obra', 'pre_projeto', 'projeto_executivo']);
+ _projDocPresence = { fotos_obra: {}, pre_projeto: {}, projeto_executivo: {} };
+ (docRes.data || []).forEach(function(d) { if (_projDocPresence[d.tipo]) _projDocPresence[d.tipo][d.projeto_id] = true; });
+ var atvRes = await _sb.from('atividades_projetos').select('projeto_id');
+ _projTarefaPresence = {};
+ (atvRes.data || []).forEach(function(a) { _projTarefaPresence[a.projeto_id] = true; });
+}
+
+// Monta os campos computados + a string de atributos data-* usada tanto
+// pela <tr> da Tabela quanto pelo .proj-kn-card do Kanban — extraído pra cá
+// justamente pelo bug documentado acima em _projCarregarPresenca: as duas
+// visualizações precisam do EXATO mesmo conjunto de data-* pros filtros
+// funcionarem igual nas duas, e essa função central garante isso sem
+// duplicar a lógica (o jeito antigo, que foi como o Kanban ficou pra trás
+// quando novos filtros foram adicionados só na Tabela).
+function _projBuildRowData(p) {
+ var tipo=p.tipo_orcamento||'';
+ var etapa=(p.etapa_projeto||'').trim();
+ var prod=Array.isArray(p.produto)?(p.produto[0]||'—'):(p.produto||'—');
+ var qtd=p.quantidade!=null?Number(p.quantidade):null;
+ var vU=p.valor_unitario!=null?Number(p.valor_unitario):null;
+ var vT=(vU!=null&&qtd!=null)?vU*qtd:vU;
+ var pU=p.peso_kg!=null?Number(p.peso_kg):null;
+ var pT=(pU!=null&&qtd!=null)?pU*qtd:pU;
+ var obraInfo=p.obra_id?(_obraIdMap[p.obra_id]||{}):{};
+ var obraGeo=p.obra_id?(_obraGeoMap[p.obra_id]||{}):{};
+ var obraNome=obraInfo.nome||'';
+ var empNome=obraInfo.empresa||'';
+ var melhoriasNomes=_projMelhoriaMap[p.id]||[];
+ var obraOuMelhoria = obraNome || (melhoriasNomes.length ? melhoriasNomes.join(', ') : '—');
+ var clienteBusca=((empNome?empNome+' — ':'')+(obraNome||obraOuMelhoria)).trim()||obraOuMelhoria;
+ var produtoJoin=Array.isArray(p.produto)?p.produto.join(', '):(p.produto||'');
+ var atualizadoPorNome=p.atualizado_por?_projAuditNome(p.atualizado_por):'';
+ var criadoPorNome=p.criado_por?_projAuditNome(p.criado_por):'';
+ var attrEsc=function(s){ return (s==null?'':String(s)).replace(/"/g,'&quot;').replace(/[\r\n]+/g,' '); };
+ var attrsHTML = ' data-tipo="'+tipo+'" data-etapa="'+etapa+'" data-cliente="'+attrEsc(clienteBusca)+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
+  +' data-nome="'+attrEsc(p.nome)+'" data-resp="'+attrEsc(p.responsavel)+'"'
+  +' data-melhoria="'+attrEsc(melhoriasNomes.join(', '))+'" data-obra="'+attrEsc(obraNome)+'"'
+  +' data-cidade="'+attrEsc(obraGeo.cidade)+'" data-estado="'+attrEsc(obraGeo.estado)+'"'
+  +' data-produto="'+attrEsc(produtoJoin)+'" data-descritivo="'+attrEsc(p.descritivo)+'"'
+  +' data-qtd="'+(qtd!=null?qtd:'')+'" data-valorunit="'+(vU!=null?vU:'')+'" data-m2estr="'+(p.m2_estrutura!=null?p.m2_estrutura:'')+'"'
+  +' data-pesouni="'+(pU!=null?pU:'')+'" data-maiorpeca="'+attrEsc(p.maior_peca)+'"'
+  +' data-updatedat="'+(p.updated_at?String(p.updated_at).slice(0,10):'')+'" data-createdat="'+(p.created_at?String(p.created_at).slice(0,10):'')+'"'
+  +' data-atualizadopor="'+attrEsc(atualizadoPorNome)+'" data-criadopor="'+attrEsc(criadoPorNome)+'"'
+  +' data-temfotos="'+(_projDocPresence.fotos_obra[p.id]?'Sim':'Não')+'" data-tempreprojeto="'+(_projDocPresence.pre_projeto[p.id]?'Sim':'Não')+'"'
+  +' data-temprojexec="'+(_projDocPresence.projeto_executivo[p.id]?'Sim':'Não')+'" data-temtarefa="'+(_projTarefaPresence[p.id]?'Sim':'Não')+'"';
+ return { tipo:tipo, etapa:etapa, prod:prod, qtd:qtd, vU:vU, vT:vT, pU:pU, pT:pT, obraNome:obraNome, empNome:empNome, obraOuMelhoria:obraOuMelhoria, attrsHTML:attrsHTML };
+}
+
 async function _dbLoadProjetos() {
  var tbody=document.getElementById('proj-tbody');
  if(tbody) tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando projetos...</td></tr>';
@@ -1428,21 +1514,7 @@ async function _dbLoadProjetos() {
  await _garantirObraIdMap();
  await _garantirObraGeoMap();
  await _garantirMelhoriaProjetoMap();
- // Presença (tem/não tem) de Fotos da Obra/Pré-Projeto/Projeto executivo
- // (documentos.tipo, mesmo bucket já usado no detalhamento) e de Tarefa
- // (atividades_projetos) — pedido explícito: filtros que faltavam na aba
- // Projetos. Mesmo padrão de "campo de presença" já usado em Obras
- // (_OBRAS_PRESENCA_OPS/_obrasPresencaMatchValue, app.js): dataset guarda
- // 'Sim'/'Não', sem exigir consulta por linha (2 queries em lote aqui, uma
- // vez por load da tabela, não uma por projeto).
- var _docPresence = { fotos_obra: {}, pre_projeto: {}, projeto_executivo: {} };
- var _tarefaPresence = {};
- if (_sb) {
-  var docRes = await _sb.from('documentos').select('projeto_id, tipo').not('projeto_id', 'is', null).in('tipo', ['fotos_obra', 'pre_projeto', 'projeto_executivo']);
-  (docRes.data || []).forEach(function(d) { if (_docPresence[d.tipo]) _docPresence[d.tipo][d.projeto_id] = true; });
-  var atvRes = await _sb.from('atividades_projetos').select('projeto_id');
-  (atvRes.data || []).forEach(function(a) { _tarefaPresence[a.projeto_id] = true; });
- }
+ await _projCarregarPresenca();
  while(more){
   var res=await _sb.from('projetos').select('*').order('created_at',{ascending:false}).range(from,from+999);
   if(res.error){
@@ -1474,69 +1546,23 @@ async function _dbLoadProjetos() {
  var _emAnd=['Pré-projeto','Revisão Pré-Projeto','Projeto para Aprovação','Revisão Projeto','Projeto Executivo','Revisão Projeto Executivo','Ajustes de Piloto','Projeto em Andamento','Aguardando Produção'];
  var totV=0,totP=0,cAnd=0;
  tbody.innerHTML=allData.map(function(p,idx){
-  var tipo=p.tipo_orcamento||'';
-  var etapa=(p.etapa_projeto||'').trim();
-  var prod=Array.isArray(p.produto)?(p.produto[0]||'—'):(p.produto||'—');
-  var qtd=p.quantidade!=null?Number(p.quantidade):null;
-  var vU=p.valor_unitario!=null?Number(p.valor_unitario):null;
-  var vT=(vU!=null&&qtd!=null)?vU*qtd:vU;
-  var pU=p.peso_kg!=null?Number(p.peso_kg):null;
-  var pT=(pU!=null&&qtd!=null)?pU*qtd:pU;
-  var obraInfo=p.obra_id?(_obraIdMap[p.obra_id]||{}):{};
-  var obraGeo=p.obra_id?(_obraGeoMap[p.obra_id]||{}):{};
-  var obraNome=obraInfo.nome||'';
-  var empNome=obraInfo.empresa||'';
-  // Pedido explícito: projeto sem obra vinculada deve mostrar a(s)
-  // melhoria(s) vinculada(s) em vez de "—" (coluna virou "Obra/Melhoria" no
-  // cabeçalho — ver index.html). Nome completo, sem truncar (achado real:
-  // max-width+ellipsis cortava nomes de obra longos).
-  var melhoriasNomes=_projMelhoriaMap[p.id]||[];
-  var obraOuMelhoria = obraNome || (melhoriasNomes.length ? melhoriasNomes.join(', ') : '—');
-  // Cliente/Obra (busca/filtro) combina empresa+obra pra achar por
-  // qualquer um dos dois; sem obra, cai pro texto exibido (melhoria ou "—").
-  var clienteBusca=((empNome?empNome+' — ':'')+(obraNome||obraOuMelhoria)).trim()||obraOuMelhoria;
-  if(vT)totV+=vT;if(pT)totP+=pT;if(_emAnd.indexOf(etapa)!==-1)cAnd++;
-  var produtoJoin=Array.isArray(p.produto)?p.produto.join(', '):(p.produto||'');
-  var atualizadoPorNome=p.atualizado_por?_projAuditNome(p.atualizado_por):'';
-  var criadoPorNome=p.criado_por?_projAuditNome(p.criado_por):'';
-  var attrEsc=function(s){ return (s==null?'':String(s)).replace(/"/g,'&quot;').replace(/[\r\n]+/g,' '); };
-  return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-tipo="'+tipo+'" data-id="'+(p.id||'')+'"'
-   +' data-etapa="'+etapa+'" data-cliente="'+attrEsc(clienteBusca)+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
-   +' data-nome="'+attrEsc(p.nome)+'" data-resp="'+attrEsc(p.responsavel)+'"'
-   // Pedido explícito: filtros que não existiam na aba Projetos (Melhoria,
-   // Cidade/Estado da Obra, Obra dedicado, Produto, Descritivo, Quantidade,
-   // Valor da unidade, M² Estrutura, Peso Uni, Maior peça, Peso Total,
-   // Horário da última alteração, Data de criação, Alterado por último,
-   // Criado por) — cada um vira um data-* aqui pro _fbEvaluate ler (mesmo
-   // mecanismo de Tipo/Etapa/Cliente já usado, ver _projApplyFilters).
-   // Fotos da Obra/Pré-Projeto/Projeto executivo/Tarefa ficaram de fora
-   // dessa entrega: são presença de anexo/registro relacionado, não um
-   // valor escalar do projeto — exigiriam carregar contagem de anexos/
-   // tarefas de TODOS os projetos de uma vez só pra filtrar (custo alto
-   // pra tabela que já é grande), diferente do resto que já vem no SELECT.
-   +' data-melhoria="'+attrEsc(melhoriasNomes.join(', '))+'" data-obra="'+attrEsc(obraNome)+'"'
-   +' data-cidade="'+attrEsc(obraGeo.cidade)+'" data-estado="'+attrEsc(obraGeo.estado)+'"'
-   +' data-produto="'+attrEsc(produtoJoin)+'" data-descritivo="'+attrEsc(p.descritivo)+'"'
-   +' data-qtd="'+(qtd!=null?qtd:'')+'" data-valorunit="'+(vU!=null?vU:'')+'" data-m2estr="'+(p.m2_estrutura!=null?p.m2_estrutura:'')+'"'
-   +' data-pesouni="'+(pU!=null?pU:'')+'" data-maiorpeca="'+attrEsc(p.maior_peca)+'"'
-   +' data-updatedat="'+(p.updated_at?String(p.updated_at).slice(0,10):'')+'" data-createdat="'+(p.created_at?String(p.created_at).slice(0,10):'')+'"'
-   +' data-atualizadopor="'+attrEsc(atualizadoPorNome)+'" data-criadopor="'+attrEsc(criadoPorNome)+'"'
-   +' data-temfotos="'+(_docPresence.fotos_obra[p.id]?'Sim':'Não')+'" data-tempreprojeto="'+(_docPresence.pre_projeto[p.id]?'Sim':'Não')+'"'
-   +' data-temprojexec="'+(_docPresence.projeto_executivo[p.id]?'Sim':'Não')+'" data-temtarefa="'+(_tarefaPresence[p.id]?'Sim':'Não')+'">'
-   // Achado real: "Nome do Projeto" nunca foi renderizado como coluna de
-   // verdade (só existia como atributo data-nome, usado pra busca/filtro) —
-   // cabeçalho da tabela também nunca teve essa coluna. Primeira célula
-   // agora mostra o nome de fato.
+  var d=_projBuildRowData(p);
+  if(d.vT)totV+=d.vT;if(d.pT)totP+=d.pT;if(_emAnd.indexOf(d.etapa)!==-1)cAnd++;
+  // Achado real: "Nome do Projeto" nunca foi renderizado como coluna de
+  // verdade (só existia como atributo data-nome, usado pra busca/filtro) —
+  // cabeçalho da tabela também nunca teve essa coluna. Primeira célula
+  // agora mostra o nome de fato.
+  return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-id="'+(p.id||'')+'"'+d.attrsHTML+'>'
    +'<td style="font-weight:600;color:var(--navy)">'+(p.nome||'(sem nome)')+'</td>'
-   +'<td style="font-size:12px;white-space:normal;word-break:break-word" title="'+(obraOuMelhoria||'').replace(/"/g,'&quot;')+'">'+obraOuMelhoria+'</td>'
-   +'<td>'+(tipo?'<span class="badge '+(_tCls[tipo]||'bm')+'">'+tipo+'</span>':'—')+'</td>'
-   +'<td style="font-size:12px">'+prod+'</td>'
-   +'<td style="text-align:right">'+(qtd!=null?qtd:'—')+'</td>'
-   +'<td style="text-align:right">'+_fmtBRL(vU)+'</td>'
-   +'<td style="text-align:right;font-weight:600;color:var(--green)">'+_fmtBRL(vT)+'</td>'
-   +'<td style="text-align:right">'+_fmtN(pU,1)+'</td>'
-   +'<td style="text-align:right">'+_fmtN(pT,1)+'</td>'
-   +'<td>'+(etapa?'<span class="badge '+(_eCls[etapa]||'bm')+'">'+etapa+'</span>':'—')+'</td></tr>';
+   +'<td style="font-size:12px;white-space:normal;word-break:break-word" title="'+(d.obraOuMelhoria||'').replace(/"/g,'&quot;')+'">'+d.obraOuMelhoria+'</td>'
+   +'<td>'+(d.tipo?'<span class="badge '+(_tCls[d.tipo]||'bm')+'">'+d.tipo+'</span>':'—')+'</td>'
+   +'<td style="font-size:12px">'+d.prod+'</td>'
+   +'<td style="text-align:right">'+(d.qtd!=null?d.qtd:'—')+'</td>'
+   +'<td style="text-align:right">'+_fmtBRL(d.vU)+'</td>'
+   +'<td style="text-align:right;font-weight:600;color:var(--green)">'+_fmtBRL(d.vT)+'</td>'
+   +'<td style="text-align:right">'+_fmtN(d.pU,1)+'</td>'
+   +'<td style="text-align:right">'+_fmtN(d.pT,1)+'</td>'
+   +'<td>'+(d.etapa?'<span class="badge '+(_eCls[d.etapa]||'bm')+'">'+d.etapa+'</span>':'—')+'</td></tr>';
  }).join('');
  // Opções dos novos filtros (Melhoria/Produto/Cidade/Estado) — computadas
  // aqui a partir dos dados já carregados, em vez de mais uma query: mesmo
