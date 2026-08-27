@@ -343,7 +343,7 @@ async function _renderProjetosKanban() {
  container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted);font-size:13px">Carregando projetos do banco...</div>';
 
  var res = await _sb.from('projetos')
-  .select('id, nome, etapa_projeto, tipo_orcamento, produto, complexidade, responsavel, valor_unitario, quantidade, peso_kg, obra_id, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
+  .select('id, nome, etapa_projeto, tipo_orcamento, produto, responsavel, valor_unitario, quantidade, peso_kg, obra_id, obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))')
   .order('created_at', { ascending: false });
 
  if (res.error || !res.data) {
@@ -354,7 +354,6 @@ async function _renderProjetosKanban() {
  var data     = res.data;
  data.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
  var tipoCls  = {'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by'};
- var complCls = {'Simples':'bg','Média':'by','Média - simples':'by','Complexa':'br','Alta':'br'};
  // Cor do ponto no cabeçalho da coluna — mesmo espírito de _etapaDot em
  // obras.js (cor sólida, não mais um badge colorido no cabeçalho, pra
  // seguir o padrão visual exato do Kanban de Obras: .kc-dot + .kc-label).
@@ -398,16 +397,13 @@ async function _renderProjetosKanban() {
   var cardsHtml = cards.map(function(p) {
    var tipo     = p.tipo_orcamento || '';
    var tipCls   = tipoCls[tipo]   || 'bm';
-   var compl    = p.complexidade  || '';
-   var cmpCls   = complCls[compl] || 'bm';
    var obraNome = (p.obra && p.obra.nome)   ? p.obra.nome   : '';
    var empNome  = (p.obra && p.obra.empresas_obras && p.obra.empresas_obras[0]?.empresa?.nome) ? p.obra.empresas_obras[0].empresa.nome : '';
    var valorNum = (p.valor_unitario != null) ? Number(p.valor_unitario) * Number(p.quantidade || 1) : 0;
    var pesoNum  = (p.peso_kg != null) ? Number(p.peso_kg) * Number(p.quantidade || 1) : 0;
    var clienteStr = ((empNome ? empNome + ' — ' : '') + (obraNome||'—')).replace(/"/g,'&quot;');
    var subtitulo = ((empNome ? empNome + ' — ' : '') + obraNome) || 'Sem obra vinculada';
-   var tagsHtml = (tipo ? '<span class="badge ' + tipCls + '" style="font-size:10px">' + tipo + '</span>' : '')
-    + (compl ? '<span class="badge ' + cmpCls + '" style="font-size:10px">' + compl + '</span>' : '');
+   var tagsHtml = (tipo ? '<span class="badge ' + tipCls + '" style="font-size:10px">' + tipo + '</span>' : '');
    // Clique abre o próprio projeto (_spProjetoById), não mais a Obra vinculada
    // — abrir a Obra era o comportamento antigo e escondia o detalhamento do
    // Projeto atrás de um passo a mais.
@@ -424,7 +420,7 @@ async function _renderProjetosKanban() {
    // draggable, o resto do card é clique puro, sem ambiguidade nenhuma
    // possível (ver _setupProjetosKanbanDnD abaixo).
    return '<div class="proj-kn-card" data-id="' + p.id + '" title="Abrir projeto"'
-    + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-compl="' + compl + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '"'
+    + ' data-tipo="' + tipo + '" data-etapa="' + etapa + '" data-cliente="' + clienteStr + '" data-valor="' + valorNum + '" data-peso="' + pesoNum + '"'
     + ' data-nome="' + (p.nome||'').replace(/"/g,'&quot;') + '" data-resp="' + (p.responsavel||'').replace(/"/g,'&quot;') + '">'
     + '<div class="proj-kn-handle" draggable="true" title="Arrastar para outra etapa"><svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="2.5" cy="2.5" r="1.5"/><circle cx="7.5" cy="2.5" r="1.5"/><circle cx="2.5" cy="8" r="1.5"/><circle cx="7.5" cy="8" r="1.5"/><circle cx="2.5" cy="13.5" r="1.5"/><circle cx="7.5" cy="13.5" r="1.5"/></svg></div>'
     + '<div class="proj-kn-title">' + (p.nome || '(sem nome)') + '</div>'
@@ -1182,16 +1178,15 @@ async function _projTarefasCarregar(projetoId) {
 // _fbEvaluate/_sbCompare recebem o .dataset de cada <tr>/.proj-kn-card
 // direto (ver data-* adicionados nos templates de _dbLoadProjetos/
 // _renderProjetosKanban).
-// Etapa/Complexidade/Cliente(Obra) viram 'select' — antes 'text' exigia
-// digitar exatamente o valor, o que o pedido original aponta como bug
-// específico ("filtros de Etapa e Obra... deveriam seguir o padrão de
-// single-select"). filtro-builder.js já mostra 'select' como lista
-// clicável com busca automática acima de 8 opções — sem digitação livre.
+// Etapa/Cliente(Obra) viram 'select' — antes 'text' exigia digitar
+// exatamente o valor, o que o pedido original aponta como bug específico
+// ("filtros de Etapa e Obra... deveriam seguir o padrão de single-select").
+// filtro-builder.js já mostra 'select' como lista clicável com busca
+// automática acima de 8 opções — sem digitação livre.
 var _projFbFields = [
  { key: 'nome',    label: 'Nome do Projeto',   type: 'text' },
  { key: 'tipo',    label: 'Tipo de orçamento', type: 'select', options: ['Telhados','Steel Frame','Modular','Solar','Misto (LSF + A36)'] },
  { key: 'etapa',   label: 'Etapa',             type: 'select', options: _projetosKanbanEtapaOrder },
- { key: 'compl',   label: 'Complexidade',      type: 'select', options: ['Simples','Média','Média - simples','Complexa','Alta'] },
  { key: 'cliente', label: 'Cliente/Obra',      type: 'text' },
  // Pedido explícito: "Obra" tem que ser select+multi (buscável, escolher
  // clicando), não texto livre — 'cliente' acima continua existindo pra
@@ -1249,7 +1244,6 @@ var _projGbFields = [
  { key: 'nome',    label: 'Nome do Projeto' },
  { key: 'tipo',    label: 'Tipo de orçamento' },
  { key: 'etapa',   label: 'Etapa' },
- { key: 'compl',   label: 'Complexidade' },
  { key: 'cliente', label: 'Cliente/Obra' },
 ];
 _gbInit('projetos', _projGbFields, _projApplyFilters, 3);
@@ -1507,7 +1501,7 @@ async function _dbLoadProjetos() {
   var criadoPorNome=p.criado_por?_projAuditNome(p.criado_por):'';
   var attrEsc=function(s){ return (s==null?'':String(s)).replace(/"/g,'&quot;').replace(/[\r\n]+/g,' '); };
   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'projetos\',this)" data-tipo="'+tipo+'" data-id="'+(p.id||'')+'"'
-   +' data-etapa="'+etapa+'" data-compl="'+(p.complexidade||'')+'" data-cliente="'+attrEsc(clienteBusca)+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
+   +' data-etapa="'+etapa+'" data-cliente="'+attrEsc(clienteBusca)+'" data-valor="'+(vT||0)+'" data-peso="'+(pT||0)+'"'
    +' data-nome="'+attrEsc(p.nome)+'" data-resp="'+attrEsc(p.responsavel)+'"'
    // Pedido explícito: filtros que não existiam na aba Projetos (Melhoria,
    // Cidade/Estado da Obra, Obra dedicado, Produto, Descritivo, Quantidade,
