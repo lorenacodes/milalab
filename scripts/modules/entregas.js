@@ -552,11 +552,13 @@ function _entCardHTML(e) {
  var atrasado = _entIsLate(e);
  var obraNome = (e.obra && e.obra.nome) || '';
  var dt = e.data_faturamento ? new Date(e.data_faturamento+'T00:00:00').toLocaleDateString('pt-BR') : '';
+ var etapaCls = atrasado ? BADGE_ETAPA_ENTREGA_BUCKET_CLS.atrasado : (BADGE_ETAPA_ENTREGA_BUCKET_CLS[bucket] || 'bm');
  return '<div class="obra-card ent-card" data-id="' + e.id + '" onclick="_spEntregaById(\'' + e.id + '\')">'
   + (atrasado ? '<span class="ent-card-late" title="Faturamento vencido">Atrasado</span>' : '')
   + '<div class="oc-title">' + (e.nome_entrega || 'Entrega sem nome') + '</div>'
   + (obraNome ? '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + obraNome + '</div>' : '')
   + '<div class="oc-tags">'
+  + (e.etapa ? '<span class="badge ' + etapaCls + '" style="font-size:10px">' + e.etapa + '</span>' : '')
   + (e.transporte ? '<span class="badge bg" style="font-size:10px">' + e.transporte + '</span>' : '')
   + '</div>'
   + (dt ? '<div class="oc-date">Faturamento ' + dt + '</div>' : '')
@@ -1022,6 +1024,7 @@ function _spEntregaRender(e) {
     <input class="sp-inp" value="${titulo.replace(/"/g,'&quot;')}" readonly>
    </div>
    <div class="sp-field"><div class="sp-label">Status</div>
+    ${e.etapa ? '<div style="margin-bottom:6px">' + _badgeHTML(e.etapa, atrasado ? BADGE_ETAPA_ENTREGA_BUCKET_CLS.atrasado : (BADGE_ETAPA_ENTREGA_BUCKET_CLS[_entBucketFor(e.etapa)] || 'bm')) + '</div>' : ''}
     <select class="sp-inp" onchange="_spEntDetSalvarCampo('${e.id}', { etapa: this.value || null })">
      <option value="">Selecione...</option>
      ${Object.keys(_entEtapaBucket).map(function(et){ return '<option value="' + et.replace(/"/g,'&quot;') + '" ' + (e.etapa === et ? 'selected' : '') + '>' + et + '</option>'; }).join('')}
@@ -1448,7 +1451,6 @@ function _spEntDetFileDrop(event, entregaId, obraId, tipo, labelId) {
 function _entRowHTML(e) {
  var bucket    = _entBucketFor(e.etapa);
  var atrasado  = _entIsLate(e);
- var cor       = atrasado ? _entBucketCor.atrasado : _entBucketCor[bucket];
  var statusTxt = e.etapa || _entBucketLabel[bucket];
  var obraNome  = (e.obra && e.obra.nome) || '';
  var empNome   = (e.obra && e.obra.empresas_obras && e.obra.empresas_obras[0] && e.obra.empresas_obras[0].empresa && e.obra.empresas_obras[0].empresa.nome) || '';
@@ -1469,7 +1471,7 @@ function _entRowHTML(e) {
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') : '—') + '</td>'
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.maior_peca_mm != null ? Number(e.maior_peca_mm).toLocaleString('pt-BR') : '—') + '</td>'
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.valor != null ? _entFmtBRL(e.valor) : '—') + '</td>'
-  + '<td><div class="ent-status"><span class="ent-status-dot" style="background:' + cor + '"></span>' + statusTxt + (atrasado ? ' <span class="ent-late-tag">Atrasado</span>' : '') + '</div></td>'
+  + '<td><span class="badge ' + (atrasado ? BADGE_ETAPA_ENTREGA_BUCKET_CLS.atrasado : (BADGE_ETAPA_ENTREGA_BUCKET_CLS[bucket] || 'bm')) + '">' + statusTxt + '</span>' + (atrasado ? ' <span class="ent-late-tag">Atrasado</span>' : '') + '</td>'
   + '<td><button class="btn btn-ghost btn-sm">Ver →</button></td>'
   + '</tr>';
 }

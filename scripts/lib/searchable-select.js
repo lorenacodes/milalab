@@ -45,15 +45,33 @@ function _srchSelOptionsOf(kind) {
  var opts = typeof st.options === 'function' ? st.options() : (st.options || []);
  return opts || [];
 }
-function _srchSelMarkup(kind, hiddenId, atual) {
+// badgeCls (opcional, 4º parâmetro): quando informado, o valor atual no
+// "trigger box" (a caixinha fechada, antes de abrir o dropdown) é renderizado
+// como um pill badge colorido (mesmo componente .badge/.bX do resto do
+// sistema) em vez de texto puro — ex.: Canal de Vendas/Cidade/Estado, sempre
+// cinza ('bm'). badgeMap (opcional, 5º parâmetro): pra campos onde a cor
+// varia por valor (ex.: Etapa do Negócio/Projeto) — em vez de uma classe
+// fixa, passa o mapa (BADGE_ETAPA_NEGOCIO etc.) e a classe é recalculada via
+// _badgeCls(badgeMap, valor) tanto no render inicial quanto sempre que o
+// usuário escolhe um novo valor no dropdown (_srchSelSelectItem abaixo), pra
+// a cor do badge sempre bater com o valor atual, não travar na cor de quando
+// o campo abriu. 100% opt-in: nenhum call site existente que não passa esses
+// parâmetros muda de comportamento.
+function _srchSelMarkup(kind, hiddenId, atual, badgeCls, badgeMap) {
  var st = _srchSelState[kind];
  st.selected = atual || '';
  st.hiddenId = hiddenId;
+ st.badgeCls = badgeCls || '';
+ st.badgeMap = badgeMap || null;
  var temValor = !!st.selected;
+ var curBadgeCls = st.badgeMap ? _badgeCls(st.badgeMap, st.selected) : st.badgeCls;
+ var valHTML = temValor
+  ? (curBadgeCls ? _badgeHTML(st.selected, curBadgeCls) : String(st.selected).replace(/</g,'&lt;'))
+  : (st.placeholder || 'Selecione...');
  return '<input type="hidden" id="' + hiddenId + '" value="' + String(st.selected).replace(/"/g,'&quot;') + '">'
   + '<div class="srch-sel" id="sp-srch-' + kind + '-srch">'
   + '<div class="srch-sel-box" id="sp-srch-' + kind + '-box" onclick="_srchSelToggle(\'' + kind + '\')">'
-  + '<span class="srch-sel-val' + (temValor?'':' placeholder') + '" id="sp-srch-' + kind + '-val">' + (temValor ? String(st.selected).replace(/</g,'&lt;') : (st.placeholder || 'Selecione...')) + '</span>'
+  + '<span class="srch-sel-val' + (temValor?'':' placeholder') + '" id="sp-srch-' + kind + '-val">' + valHTML + '</span>'
   + '<button class="srch-sel-clr" id="sp-srch-' + kind + '-clr" style="display:' + (temValor?'':'none') + '" onclick="event.stopPropagation();_srchSelClear(\'' + kind + '\')" title="Remover">✕</button>'
   + '<span class="srch-sel-chevron">▾</span>'
   + '</div>'
@@ -177,7 +195,12 @@ function _srchSelSelectItem(kind, value) {
  var valEl = document.getElementById('sp-srch-' + kind + '-val');
  var clrEl = document.getElementById('sp-srch-' + kind + '-clr');
  if (hidEl) hidEl.value = st.selected;
- if (valEl) { valEl.textContent = st.selected || st.placeholder || 'Selecione...'; valEl.classList.toggle('placeholder', !st.selected); }
+ if (valEl) {
+  var selBadgeCls = st.badgeMap ? _badgeCls(st.badgeMap, st.selected) : st.badgeCls;
+  if (st.selected && selBadgeCls) { valEl.innerHTML = _badgeHTML(st.selected, selBadgeCls); }
+  else { valEl.textContent = st.selected || st.placeholder || 'Selecione...'; }
+  valEl.classList.toggle('placeholder', !st.selected);
+ }
  if (clrEl) clrEl.style.display = st.selected ? '' : 'none';
  _srchSelClose(kind);
  if (typeof st.onSelect === 'function') st.onSelect(st.selected);

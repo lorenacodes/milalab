@@ -11,9 +11,10 @@ function _spObras(row, tds) {
 }
 
 
-var _tipoClsBd = {
- 'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by','Misto (LSF+A36)':'bn'
-};
+// Alias pro mapa único BADGE_TIPO_OBRA (scripts/lib/badge-colors.js) — nome
+// local mantido pra não mexer em nenhum call site existente, só aponta pra
+// mesma referência de objeto (sem cópia divergente).
+var _tipoClsBd = BADGE_TIPO_OBRA;
 
 // Tag "Automático" — pedido explícito: campo readonly calculado (Quantidade/
 // Valor da obra, somados dos Projetos vinculados) precisava deixar claro,
@@ -40,17 +41,10 @@ function _tipoOrcamentoBadgeCls(tipo) { return _tipoOrcamentoCls[tipo] || 'bo'; 
 // instalacoes.js, cópia local — usado tanto no card de instalações
 // vinculadas quanto na busca de "vincular existente" abaixo).
 var _instStatusClsObra = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
-var _etapaClsBd = {
- 'Orçamento':'bb','Atualização de orçamento':'bb','Follow-up':'by','Negociação':'bp',
- 'Aprovação de projeto':'by','Piloto':'bn','Projeto aprovado':'bn','Em Andamento':'bn',
- 'Pós-vendas':'bg','Concluído':'bg','Negócio perdido':'br'
-};
-var _etapaDot = {
- 'Orçamento':'var(--blue)','Atualização de orçamento':'var(--blue)','Follow-up':'var(--yellow)',
- 'Negociação':'var(--purple)','Aprovação de projeto':'var(--yellow)','Piloto':'var(--navy)',
- 'Projeto aprovado':'var(--navy)','Em Andamento':'var(--navy)','Pós-vendas':'var(--green)',
- 'Concluído':'var(--green)','Negócio perdido':'var(--red)'
-};
+// Aliases pros mapas únicos BADGE_ETAPA_NEGOCIO/BADGE_ETAPA_NEGOCIO_DOT
+// (scripts/lib/badge-colors.js) — mesma ideia do alias de _tipoClsBd acima.
+var _etapaClsBd = BADGE_ETAPA_NEGOCIO;
+var _etapaDot = BADGE_ETAPA_NEGOCIO_DOT;
 var _etapaKcId = {
  'Orçamento':'kc-orcamento','Atualização de orçamento':'kc-atualizacao','Follow-up':'kc-followup',
  'Negociação':'kc-negociacao','Aprovação de projeto':'kc-aprovacao-projeto','Piloto':'kc-piloto',
@@ -405,10 +399,10 @@ async function _dbLoadObras() {
    + _obrasExtraDatasetAttrs(o, propostaMap, docsPresenca, projAgg, entAgg, temInstalacao, temTarefa, temRegistro) + '>'
    +'<td><div style="font-weight:500">'+o.nome+'</div><div style="font-size:11px;color:var(--muted)">'+(empNome||'—')+(loc?' · <b>'+loc+'</b>':'')+'</div></td>'
    +'<td><div class="oc-tags" style="margin-bottom:0">'+catBadges+'</div></td>'
-   +'<td style="color:var(--muted)">'+(o.cidade||'—')+'</td>'
-   +'<td style="color:var(--muted)">'+(o.estado||'—')+'</td>'
+   +'<td style="color:var(--muted)">'+(o.cidade?_badgeHTML(o.cidade,'bm',true):'—')+'</td>'
+   +'<td style="color:var(--muted)">'+(o.estado?_badgeHTML(o.estado,'bm',true):'—')+'</td>'
    +'<td style="text-align:center;color:var(--muted)">'+qtd+'</td>'
-   +'<td style="color:var(--muted)">'+(o.canal_vendas||'—')+'</td>'
+   +'<td style="color:var(--muted)">'+(o.canal_vendas?_badgeHTML(o.canal_vendas,'bm',true):'—')+'</td>'
    +'<td><span class="badge '+eCls+'">'+(etapa||'—')+'</span></td>'
    +'<td style="color:var(--muted);font-size:12px">'+dataEnvio+'</td>'
    +'<td style="text-align:center">'+propostaCell+'</td>'
@@ -1509,7 +1503,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   ? entregas.map(function(e){
      var bucket = _entBucketFor(e.etapa);
      var etapaBadge = e.etapa
-      ? '<span class="badge" style="background:' + _entBucketCor[bucket] + '22;color:' + _entBucketCor[bucket] + ';font-size:10px">' + e.etapa + '</span>'
+      ? _badgeHTML(e.etapa, BADGE_ETAPA_ENTREGA_BUCKET_CLS[bucket] || 'bm', true)
       : '—';
      // onclick no card inteiro (não só no título) — achado real: só o texto
      // do título respondia ao clique, o resto do card (grid de campos)
@@ -1693,7 +1687,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div class="sp-field"><div class="sp-label">Tipo(s) de obra</div>'
   + '<div id="sp-tipo-pills" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">' + _spTipoPillsHTML(tipoArr) + '</div></div>'
   + '<div class="sp-field"><div class="sp-label">Etapa do Negócio</div>'
-  + _srchSelMarkup('etapa', 'sp-etapa', o.etapa_negocio || '') + '</div>'
+  + _srchSelMarkup('etapa', 'sp-etapa', o.etapa_negocio || '', _badgeCls(BADGE_ETAPA_NEGOCIO, o.etapa_negocio || ''), BADGE_ETAPA_NEGOCIO) + '</div>'
 
   + '<div class="sp-g2">'
   // Antes era readonly (mostrava created_at, um timestamp de sistema) —
@@ -1720,9 +1714,9 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   + '<div id="sp-vg-propostas-lista" style="padding:4px 0;font-size:12px;color:var(--muted)">Verificando...</div></div>'
 
   + '<div class="sp-g3">'
-  + '<div class="sp-field"><div class="sp-label">Cidade</div>' + _srchSelMarkup('cidade', 'sp-cidade', o.cidade || '') + '</div>'
-  + '<div class="sp-field"><div class="sp-label">UF</div>' + _srchSelMarkup('uf', 'sp-uf', (o.estado||'').toUpperCase()) + '</div>'
-  + '<div class="sp-field"><div class="sp-label">Canal de vendas</div>' + _srchSelMarkup('canal', 'sp-canal', o.canal_vendas || '') + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Cidade</div>' + _srchSelMarkup('cidade', 'sp-cidade', o.cidade || '', 'bm') + '</div>'
+  + '<div class="sp-field"><div class="sp-label">UF</div>' + _srchSelMarkup('uf', 'sp-uf', (o.estado||'').toUpperCase(), 'bm') + '</div>'
+  + '<div class="sp-field"><div class="sp-label">Canal de vendas</div>' + _srchSelMarkup('canal', 'sp-canal', o.canal_vendas || '', 'bm') + '</div>'
   + '</div>'
   // Pedido explícito: endereço ficava espremido lado a lado com CNO (2
   // colunas) — endereços reais são longos (rua + número + cidade/UF +

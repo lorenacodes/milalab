@@ -371,19 +371,13 @@ async function _renderProjetosKanban() {
 
  var data     = res.data;
  data.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
- var tipoCls  = {'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by'};
+ // Alias pro mapa único BADGE_TIPO_OBRA (scripts/lib/badge-colors.js).
+ var tipoCls  = BADGE_TIPO_OBRA;
  // Cor do ponto no cabeçalho da coluna — mesmo espírito de _etapaDot em
  // obras.js (cor sólida, não mais um badge colorido no cabeçalho, pra
  // seguir o padrão visual exato do Kanban de Obras: .kc-dot + .kc-label).
- var etapaDot = {
-  'Orçamento':'var(--blue)','Análise Inicial':'var(--blue)','Aguardando Aprovação':'var(--yellow)',
-  'Pré-projeto':'var(--blue)','Revisão Pré-Projeto':'var(--yellow)',
-  'Projeto para Aprovação':'var(--navy)','Revisão Projeto':'var(--yellow)',
-  'Projeto Executivo':'var(--navy)','Revisão Projeto Executivo':'var(--yellow)',
-  'Ajustes de Piloto':'var(--yellow)','Projeto em Andamento':'var(--yellow)',
-  'Aguardando Produção':'var(--yellow)','Projeto Finalizado':'var(--green)',
-  'Pós-vendas':'var(--green)','Negócio perdido':'var(--red)'
- };
+ // Alias pro mapa único BADGE_ETAPA_PROJETO_DOT (scripts/lib/badge-colors.js).
+ var etapaDot = BADGE_ETAPA_PROJETO_DOT;
 
  // Agrupa por etapa — trim para ignorar espaços extras vindos do Airtable
  var groups = {};
@@ -421,6 +415,7 @@ async function _renderProjetosKanban() {
    var d        = _projBuildRowData(p);
    var tipo     = d.tipo;
    var tipCls   = tipoCls[tipo]   || 'bm';
+   var etapaCls = _badgeCls(BADGE_ETAPA_PROJETO, etapa);
    // Subtítulo exibido no card continua vindo do join aninhado (obra:
    // obra_id(...) no SELECT acima) — funciona mesmo sem a aba Obras ter
    // sido visitada nesta sessão, diferente de _obraIdMap[id].empresa (só
@@ -428,7 +423,8 @@ async function _renderProjetosKanban() {
    var obraNome = (p.obra && p.obra.nome)   ? p.obra.nome   : '';
    var empNome  = (p.obra && p.obra.empresas_obras && p.obra.empresas_obras[0]?.empresa?.nome) ? p.obra.empresas_obras[0].empresa.nome : '';
    var subtitulo = ((empNome ? empNome + ' — ' : '') + obraNome) || 'Sem obra vinculada';
-   var tagsHtml = (tipo ? '<span class="badge ' + tipCls + '" style="font-size:10px">' + tipo + '</span>' : '');
+   var tagsHtml = (tipo ? '<span class="badge ' + tipCls + '" style="font-size:10px">' + tipo + '</span>' : '')
+    + (etapa ? '<span class="badge ' + etapaCls + '" style="font-size:10px">' + etapa + '</span>' : '');
    // Clique abre o próprio projeto (_spProjetoById), não mais a Obra vinculada
    // — abrir a Obra era o comportamento antigo e escondia o detalhamento do
    // Projeto atrás de um passo a mais.
@@ -612,16 +608,10 @@ async function _spProjetoById(id) {
 // Projetos (_renderProjetosKanban, acima) e no card de Projeto vinculado
 // no detalhamento de Obra (obras.js) — mantidos como cópia local (não são
 // globais em nenhum dos dois lugares) só pra não inventar uma paleta nova.
-var _projTipoCls = {'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by'};
-var _projEtapaCls = {
- 'Orçamento':'bm','Análise Inicial':'bm','Aguardando Aprovação':'by',
- 'Pré-projeto':'bm','Revisão Pré-Projeto':'by',
- 'Projeto para Aprovação':'bb','Revisão Projeto':'by',
- 'Projeto Executivo':'bb','Revisão Projeto Executivo':'by',
- 'Ajustes de Piloto':'by','Projeto em Andamento':'by',
- 'Aguardando Produção':'by','Projeto Finalizado':'bg',
- 'Pós-vendas':'bg','Negócio perdido':'br'
-};
+// Aliases pros mapas únicos BADGE_TIPO_OBRA/BADGE_ETAPA_PROJETO
+// (scripts/lib/badge-colors.js) — mesma ideia dos aliases em obras.js.
+var _projTipoCls = BADGE_TIPO_OBRA;
+var _projEtapaCls = BADGE_ETAPA_PROJETO;
 
 // Auditoria: criado_por é NOVO (coluna + trigger trg_projetos_criado_por
 // adicionados agora, pedido explícito) — só passa a ter valor real em
@@ -771,7 +761,7 @@ function _spProjetoRender(p, idx) {
     ${p.obra_id ? '<button type=\"button\" class=\"btn btn-ghost\" style=\"padding:4px 10px;font-size:11px;flex-shrink:0\" onclick=\"_projDesvincularObra()\">Desvincular</button>' : ''}
    </div>
   </div>
-  <div class="sp-field"><div class="sp-label">Etapa do projeto <span class="req">*</span></div>${_srchSelMarkup('projEtapa', 'sp-proj-etapa', etapaAtual)}</div>
+  <div class="sp-field"><div class="sp-label">Etapa do projeto <span class="req">*</span></div>${_srchSelMarkup('projEtapa', 'sp-proj-etapa', etapaAtual, _badgeCls(BADGE_ETAPA_PROJETO, etapaAtual), BADGE_ETAPA_PROJETO)}</div>
 
   ${!p.obra_id ? '' : `
   <div class="sp-stitle">Informações técnicas</div>
@@ -790,8 +780,8 @@ function _spProjetoRender(p, idx) {
    <div class="sp-field"><div class="sp-label">Peso total (kg)</div><input class="sp-inp" id="sp-proj-pesototal" value="${pesoTotalAtual != null ? Number(pesoTotalAtual).toLocaleString('pt-BR',{minimumFractionDigits:2}) : ''}" readonly></div>
   </div>
   <div class="sp-g2">
-   <div class="sp-field"><div class="sp-label">Cidade</div><input class="sp-inp" id="sp-proj-cidade" value="Carregando..." readonly></div>
-   <div class="sp-field"><div class="sp-label">Estado</div><input class="sp-inp" id="sp-proj-estado" value="Carregando..." readonly></div>
+   <div class="sp-field"><div class="sp-label">Cidade</div><div id="sp-proj-cidade" style="padding:6px 0"><span style="font-size:12px;color:var(--muted)">Carregando...</span></div></div>
+   <div class="sp-field"><div class="sp-label">Estado</div><div id="sp-proj-estado" style="padding:6px 0"><span style="font-size:12px;color:var(--muted)">Carregando...</span></div></div>
   </div>
   `}
   <div class="sp-field"><div class="sp-label">Responsável</div><div id="sp-proj-responsavel-dd" class="no-msel-wide">${_msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _respNomesAtuais, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...')}</div></div>
@@ -869,15 +859,17 @@ function _spProjetoRender(p, idx) {
   var estEl = document.getElementById('sp-proj-estado');
   if (!cidEl || !estEl) return;
   if (!p.obra_id || !_sb) {
-   cidEl.value = '—'; estEl.value = '—';
+   cidEl.innerHTML = '—'; estEl.innerHTML = '—';
    _projTipoOpcoesAtuais = [];
    var pillsElVazio = document.getElementById('sp-proj-tipo-pills');
    if (pillsElVazio) pillsElVazio.innerHTML = _projTipoPillsHTML(_NO_TIPOS_OPCOES || [], p.tipo_orcamento || '');
    return;
   }
   _sb.from('obras').select('cidade,estado,tipo_obra').eq('id', p.obra_id).single().then(function(res) {
-   cidEl.value = (res.data && res.data.cidade) || '—';
-   estEl.value = (res.data && res.data.estado) || '—';
+   var cidVal = res.data && res.data.cidade;
+   var estVal = res.data && res.data.estado;
+   cidEl.innerHTML = cidVal ? _badgeHTML(cidVal, 'bm') : '—';
+   estEl.innerHTML = estVal ? _badgeHTML(estVal, 'bm') : '—';
    var opcoes = (res.data && res.data.tipo_obra) || [];
    _projTipoOpcoesAtuais = opcoes;
    // Se o tipo atual do projeto não é mais um dos tipos da obra (obra
@@ -1477,6 +1469,11 @@ function _projBuildRowData(p) {
  var tipo=p.tipo_orcamento||'';
  var etapa=(p.etapa_projeto||'').trim();
  var prod=Array.isArray(p.produto)?(p.produto[0]||'—'):(p.produto||'—');
+ // Todos os produtos selecionados (não só o 1º) — usado na tabela pra
+ // renderizar 1 pill badge cinza por valor, mesmo padrão de multi-badge já
+ // usado pro Tipo de Obra (catBadges em obras.js).
+ var prodArr=Array.isArray(p.produto)?p.produto.filter(Boolean):(p.produto?[p.produto]:[]);
+ var prodBadgesHTML=prodArr.length ? prodArr.map(function(pr){ return _badgeHTML(pr,'bm',true); }).join(' ') : '—';
  var qtd=p.quantidade!=null?Number(p.quantidade):null;
  var vU=p.valor_unitario!=null?Number(p.valor_unitario):null;
  var vT=(vU!=null&&qtd!=null)?vU*qtd:vU;
@@ -1504,7 +1501,7 @@ function _projBuildRowData(p) {
   +' data-atualizadopor="'+attrEsc(atualizadoPorNome)+'" data-criadopor="'+attrEsc(criadoPorNome)+'"'
   +' data-temfotos="'+(_projDocPresence.fotos_obra[p.id]?'Sim':'Não')+'" data-tempreprojeto="'+(_projDocPresence.pre_projeto[p.id]?'Sim':'Não')+'"'
   +' data-temprojexec="'+(_projDocPresence.projeto_executivo[p.id]?'Sim':'Não')+'" data-temtarefa="'+(_projTarefaPresence[p.id]?'Sim':'Não')+'"';
- return { tipo:tipo, etapa:etapa, prod:prod, qtd:qtd, vU:vU, vT:vT, pU:pU, pT:pT, obraNome:obraNome, empNome:empNome, obraOuMelhoria:obraOuMelhoria, attrsHTML:attrsHTML };
+ return { tipo:tipo, etapa:etapa, prod:prod, prodBadgesHTML:prodBadgesHTML, qtd:qtd, vU:vU, vT:vT, pU:pU, pT:pT, obraNome:obraNome, empNome:empNome, obraOuMelhoria:obraOuMelhoria, attrsHTML:attrsHTML };
 }
 
 async function _dbLoadProjetos() {
@@ -1531,16 +1528,10 @@ async function _dbLoadProjetos() {
  allData.forEach(function(p){ if (Array.isArray(p.responsavel)) p.responsavel = _emailsToNomes(p.responsavel); });
  _projetosArr=allData;
  if(!tbody)return;
- var _tCls={'Telhados':'bg','Steel Frame':'bp','Modular':'bb','Solar':'by'};
- var _eCls={
-  'Orçamento':'bm','Análise Inicial':'bm','Aguardando Aprovação':'by',
-  'Pré-projeto':'bm','Revisão Pré-Projeto':'by',
-  'Projeto para Aprovação':'bb','Revisão Projeto':'by',
-  'Projeto Executivo':'bb','Revisão Projeto Executivo':'by',
-  'Ajustes de Piloto':'by','Projeto em Andamento':'by',
-  'Aguardando Produção':'by','Projeto Finalizado':'bg',
-  'Pós-vendas':'bg','Negócio perdido':'br'
- };
+ // Aliases pros mapas únicos BADGE_TIPO_OBRA/BADGE_ETAPA_PROJETO
+ // (scripts/lib/badge-colors.js).
+ var _tCls=BADGE_TIPO_OBRA;
+ var _eCls=BADGE_ETAPA_PROJETO;
  function _fmtBRL(v){return v!=null?'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2}):'—';}
  function _fmtN(v,d){return v!=null?Number(v).toLocaleString('pt-BR',{minimumFractionDigits:d||0}):'—';}
  var _emAnd=['Pré-projeto','Revisão Pré-Projeto','Projeto para Aprovação','Revisão Projeto','Projeto Executivo','Revisão Projeto Executivo','Ajustes de Piloto','Projeto em Andamento','Aguardando Produção'];
@@ -1556,7 +1547,7 @@ async function _dbLoadProjetos() {
    +'<td style="font-weight:600;color:var(--navy)">'+(p.nome||'(sem nome)')+'</td>'
    +'<td style="font-size:12px;white-space:normal;word-break:break-word" title="'+(d.obraOuMelhoria||'').replace(/"/g,'&quot;')+'">'+d.obraOuMelhoria+'</td>'
    +'<td>'+(d.tipo?'<span class="badge '+(_tCls[d.tipo]||'bm')+'">'+d.tipo+'</span>':'—')+'</td>'
-   +'<td style="font-size:12px">'+d.prod+'</td>'
+   +'<td style="font-size:12px">'+d.prodBadgesHTML+'</td>'
    +'<td style="text-align:right">'+(d.qtd!=null?d.qtd:'—')+'</td>'
    +'<td style="text-align:right">'+_fmtBRL(d.vU)+'</td>'
    +'<td style="text-align:right;font-weight:600;color:var(--green)">'+_fmtBRL(d.vT)+'</td>'
