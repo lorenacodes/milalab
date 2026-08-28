@@ -826,10 +826,20 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
 .gv-save-btn{width:100%;margin-top:6px;padding:7px;font-size:11px;font-weight:600;border:1px dashed var(--border);border-radius:var(--r-sm);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit}
 .gv-save-btn:hover{border-color:var(--navy);color:var(--navy)}
 
-/* Group Builder — lista rápida de campos (popover "Agrupar") */
-.gb-quick-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:8px 0 4px;padding-top:6px;border-top:1px solid var(--border)}
-.gb-quick-item{display:block;width:100%;text-align:left;padding:6px 8px;font-size:12px;color:var(--text);background:none;border:none;border-radius:var(--r-sm);cursor:pointer;font-family:inherit}
-.gb-quick-item:hover{background:var(--surface2);color:var(--navy)}
+/* Group Builder — popover compacto estilo Airtable ("Agrupar por [Campo ▼]"
+   + "depois por..." + link discreto pra adicionar mais um nível), ancorado
+   no botão via .fb-pop/_tsSmartPosition. Antes reaproveitava .fb-pop na
+   largura cheia (560px, pensada pro Filtro com condição/operador/valor) —
+   .gb-pop estreita isso pro Agrupar, que só precisa de campo + ordem. */
+.fb-pop.gb-pop{width:236px;padding:10px}
+.gb-hd{margin-bottom:8px}
+.gb-row{margin-bottom:6px;gap:6px}
+.gb-row .fb-lead-wrap{width:58px}
+.gb-row .fb-lead{font-size:10px}
+.gb-row .fb-field-sel{flex:1;min-width:0;padding:5px 6px;font-size:11.5px}
+.gb-dir-sel{flex:0 0 50px;min-width:0;padding:5px 4px;font-size:11px}
+.gb-add-link{display:block;width:100%;text-align:left;padding:5px 2px;margin-top:2px;font-size:11.5px;font-weight:600;color:var(--navy);background:none;border:none;cursor:pointer;font-family:inherit}
+.gb-add-link:hover{text-decoration:underline}
 /* Grid */
 .gestor-grid-wrap{overflow-x:auto;overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;scrollbar-width:auto;scrollbar-color:var(--muted) var(--surface2)}
 .gestor-grid-wrap::-webkit-scrollbar{height:14px;width:14px}
