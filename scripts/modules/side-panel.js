@@ -190,6 +190,9 @@ function _spRender(section, row) {
  else if (section === 'instalacoes') _spInstalacoes(row, tds);
  else if (section === 'empresas') _spEmpresas(row, tds);
  else if (section === 'contatos') _spContatos(row, tds);
+ // Melhorias: a origem do clique aqui é um <div class="melh-card">, não uma
+ // <tr> — `tds` chega vazio e o renderer busca tudo por id (ver melhorias.js).
+ else if (section === 'melhorias') _spMelhorias(row, tds);
 }
 
 // ── Renderer: Empresas ──────────────────────────────────────────────────

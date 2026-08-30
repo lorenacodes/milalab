@@ -723,7 +723,8 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
  .inic-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:var(--r-sm);border:1px solid var(--border);color:var(--muted);background:var(--surface)}
  /* ── PÁGINA MELHORIAS ── */
  .melh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px}
- .melh-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s}
+ /* cursor:pointer — o card abre o painel de detalhe da iniciativa (antes esta tela era só leitura) */
+ .melh-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s;cursor:pointer}
  .melh-card:hover{border-color:var(--yellow)}
  .melh-card-title{font-size:13px;font-weight:600;line-height:1.4;color:var(--text)}
  .melh-card-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
