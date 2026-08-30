@@ -77,7 +77,14 @@ function closeNovaEntrega() {
  document.getElementById('modal-nova-entrega').classList.remove('open');
  document.body.style.overflow = '';
 }
+// Guarda de clique duplo (_ccUmaVez, concurrency.js): dois cliques rápidos no
+// botão "Criar" disparavam dois INSERTs e criavam DUAS entregas iguais — não
+// havia trava nenhuma. A 2ª chamada agora é ignorada enquanto a 1ª não
+// termina, e o botão fica desabilitado nesse intervalo.
 async function submitNovaEntrega() {
+ return _ccUmaVez('nova-entrega', _submitNovaEntregaReal, document.getElementById('ne-submit'));
+}
+async function _submitNovaEntregaReal() {
  var nome = (document.getElementById('ne-nome')?.value || '').trim();
  var etapa = document.getElementById('ne-etapa')?.value || '';
  var data = document.getElementById('ne-data')?.value || '';
@@ -102,15 +109,19 @@ async function submitNovaEntrega() {
   transporte: document.getElementById('ne-transporte-id')?.value?.trim() || null,
   pedido_produzido: !!document.getElementById('ne-produzido')?.checked,
  };
- var res = await _sb.from('entregas').insert(payload).select().single();
- if (res.error || !res.data) { var msg = 'Erro ao criar entrega: ' + (res.error?.message || ''); _showToast ? _showToast(msg, 'erro') : alert(msg); return; }
- var nova = res.data;
- // Vínculo primário também na junção — mesma obra de `obra_id`, consistente
- // com o resto do app (Obras vinculadas do painel de detalhe lê daqui).
- if (obraId) {
-  var insJ = await _sb.from('entregas_obras').insert({ entrega_id: nova.id, obra_id: obraId });
-  if (insJ.error) console.error('[Entregas] erro ao gravar vínculo primário em entregas_obras:', insJ.error);
+ // Criar a entrega e gravar o vínculo primário em entregas_obras eram DOIS
+ // requests separados: se o segundo falhasse (rede, RLS, timeout), a entrega
+ // ficava criada e órfã — sem obra vinculada — e o frontend não tinha como
+ // desfazer o primeiro. Agora os dois acontecem dentro da MESMA transação,
+ // na função criar_entrega_com_obra (migração concorrencia_historico_fase1):
+ // ou os dois gravam, ou nenhum grava.
+ var res = await _sb.rpc('criar_entrega_com_obra', { p_dados: payload, p_obra_id: obraId });
+ if (res.error || !res.data) {
+  console.error('[Entregas] erro ao criar entrega:', res.error);
+  _showToast('Não foi possível criar a entrega. Nada foi salvo — confira os campos e tente de novo.', 'erro');
+  return;
  }
+ var nova = Array.isArray(res.data) ? res.data[0] : res.data;
  var docFiles = Array.from(document.getElementById('ne-doc')?.files || []);
  var opFile = document.getElementById('ne-op')?.files?.[0];
  var anexosComErro = 0;
@@ -180,15 +191,37 @@ function _entDistinctOptions(mapFn) {
 // de cada entrega, então não têm de outra forma como saber se há algum
 // documento anexado sem essa carga em lote.
 var _entDocEntregaIds = null; // Set<string> | null (null = ainda não carregado)
+
+// Lê uma tabela inteira em blocos de 1000 — ver comentário em
+// _entLoadDocPresence sobre o corte silencioso do Supabase.
+async function _entCarregarPaginado(tabela, colunas, aplicarFiltros) {
+ var tudo = [], from = 0, pageSize = 1000;
+ while (true) {
+  var q = _sb.from(tabela).select(colunas);
+  if (typeof aplicarFiltros === 'function') q = aplicarFiltros(q);
+  var res = await q.range(from, from + pageSize - 1);
+  if (res.error) { console.error('[Entregas] erro ao ler ' + tabela + ':', res.error); break; }
+  var lote = res.data || [];
+  tudo = tudo.concat(lote);
+  if (lote.length < pageSize) break;
+  from += pageSize;
+ }
+ return tudo;
+}
 async function _entLoadDocPresence() {
  if (!_sb) return;
  var ids = {};
- var [diretoRes, viaJuncaoRes] = await Promise.all([
-  _sb.from('documentos').select('entrega_id').not('entrega_id', 'is', null),
-  _sb.from('documentos_entregas').select('entrega_id'),
+ // BUG REAL corrigido aqui: as duas consultas vinham sem paginação nenhuma e
+ // o Supabase corta em 1000 linhas SEM avisar. Como hoje são 4.349 documentos
+ // com entrega_id e 4.014 vínculos em documentos_entregas, mais de 3/4 dos
+ // vínculos eram ignorados — o filtro "Nota Fiscal anexada" respondia "Não"
+ // pra centenas de entregas que TÊM nota, sem nenhum sintoma visível.
+ var [direto, viaJuncao] = await Promise.all([
+  _entCarregarPaginado('documentos', 'entrega_id', function(q){ return q.not('entrega_id', 'is', null); }),
+  _entCarregarPaginado('documentos_entregas', 'entrega_id'),
  ]);
- (diretoRes.data || []).forEach(function(r) { if (r.entrega_id) ids[r.entrega_id] = 1; });
- (viaJuncaoRes.data || []).forEach(function(r) { if (r.entrega_id) ids[r.entrega_id] = 1; });
+ direto.forEach(function(r) { if (r.entrega_id) ids[r.entrega_id] = 1; });
+ viaJuncao.forEach(function(r) { if (r.entrega_id) ids[r.entrega_id] = 1; });
  _entDocEntregaIds = ids;
  // Reaplica pro data-nota-fiscal das <tr> já renderizadas refletir a carga
  // (chegou depois da 1ª renderização da Tabela) e pro filtro por Nota Fiscal
@@ -418,6 +451,9 @@ function _entApplyFilters() {
  // sempre (baixo custo: nenhuma das duas views toca o DOM se não estiver visível).
  _entRenderKanbanIfVisible();
  _entRenderCalIfVisible();
+ // Tempo real só depois que a lista carregou; idempotente por chave, então
+ // voltar pra esta aba não cria um 2º handler.
+ _entregasIniciarTempoReal();
 }
 
 // ── Lista filtrada+ordenada em memória — usada por Kanban/Calendário (que
@@ -770,6 +806,21 @@ function _spEntregaById(id) {
 // (mesmo padrão de _obraAtiva/_spProjAtivo em obras.js/projetos.js).
 var _spEntAtiva = null;
 
+// Rótulos amigáveis dos campos de Entrega — o MESMO mapa alimenta o histórico
+// de alterações e a mensagem de conflito de concorrência, pra os dois nunca
+// divergirem. Rótulo null = campo técnico, fora do histórico.
+var _ENT_CAMPO_LABEL = {
+ nome_entrega: 'Entrega', etapa: 'Status', data_faturamento: 'Data de faturamento',
+ quantidade: 'Quantidade', peso_kg: 'Peso (kg)', valor: 'Valor',
+ maior_peca_mm: 'Maior peça (mm)', transporte: 'Transporte',
+ pedido_produzido: 'Pedido produzido', obra_id: 'Obra vinculada',
+ endereco_entrega: 'Endereço de entrega', cidade: 'Cidade', estado: 'Estado',
+ nota_fiscal: 'Nota fiscal', observacoes: 'Observações',
+ updated_at: null, created_at: null, criado_por: null, atualizado_por: null,
+ id: null, airtable_id: null,
+};
+if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('entregas', _ENT_CAMPO_LABEL);
+
 // ── Obras vinculadas (entregas_obras) — M:N, obra_id continua sendo a
 // "obra primária" (tudo que já depende dela — Entregas de Obra, agregados
 // do dashboard — continua funcionando), a junção só permite vínculos
@@ -854,7 +905,11 @@ async function _entObraVincular(obraId) {
  var e = _spEntAtiva;
  if (!e || !_sb) return;
  var ins = await _sb.from('entregas_obras').insert({ entrega_id: e.id, obra_id: obraId });
- if (ins.error) { alert('Erro ao vincular obra: ' + (ins.error.message || '')); return; }
+ if (ins.error) {
+  console.error('[Entregas] erro ao vincular obra à entrega:', ins.error);
+  _showToast('Não foi possível vincular esta obra. O vínculo NÃO foi salvo — tente de novo em instantes.', 'erro');
+  return;
+ }
  var obraObj = (_entObrasCache || []).find(function(o) { return o.id === obraId; });
  e.entregas_obras = (e.entregas_obras || []).concat([{ obra_id: obraId, obra: obraObj }]);
  var eraAPrimeira = !e.obra_id;
@@ -886,10 +941,18 @@ async function _entObraDesvincular(entregaId, obraId) {
   novoObraId = outras[0] ? outras[0].obra_id : null;
   novoObra = outras[0] ? outras[0].obra : null;
   var upd = await _sb.from('entregas').update({ obra_id: novoObraId }).eq('id', entregaId);
-  if (upd.error) { alert('Erro ao desvincular: ' + (upd.error.message || '')); return; }
+  if (upd.error) {
+   console.error('[Entregas] erro ao limpar a obra primária da entrega:', upd.error);
+   _showToast('Não foi possível desvincular esta obra. Nada foi alterado — tente de novo em instantes.', 'erro');
+   return;
+  }
  }
  var del = await _sb.from('entregas_obras').delete().eq('entrega_id', entregaId).eq('obra_id', obraId);
- if (del.error) { alert('Erro ao desvincular: ' + (del.error.message || '')); return; }
+ if (del.error) {
+  console.error('[Entregas] erro ao remover vínculo entrega↔obra:', del.error);
+  _showToast('Não foi possível desvincular esta obra. O vínculo continua como estava — tente de novo em instantes.', 'erro');
+  return;
+ }
  e.obra_id = novoObraId; e.obra = novoObra;
  e.entregas_obras = (e.entregas_obras || []).filter(function(l) { return String(l.obra_id) !== String(obraId); });
  var cached = (_entregasArr || []).find(function(x) { return String(x.id) === String(entregaId); });
@@ -1000,6 +1063,7 @@ function _spEntregaRender(e) {
    <button class="spt-btn" data-target="spt-ent-obras" onclick="_sptSwitch('ent-obras',this)">Obras vinculadas${badge(_entObrasVinculadasList(e).length)}</button>
    <button class="spt-btn" data-target="spt-ent-documentos" onclick="_sptSwitch('ent-documentos',this)">Documentos</button>
    <button class="spt-btn" data-target="spt-ent-faturamento" onclick="_sptSwitch('ent-faturamento',this)">Faturamento</button>
+   <button class="spt-btn" data-target="spt-ent-historico" onclick="_sptSwitch('ent-historico',this)">Histórico</button>
   </div>
 
   <div class="spt-panel" id="spt-ent-geral">
@@ -1087,13 +1151,25 @@ function _spEntregaRender(e) {
    </div>
   </div>
 
+  <div class="spt-panel" id="spt-ent-historico">
+   <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Histórico de alterações</div>
+   ${typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-ent-historico') : ''}
+  </div>
+
   <div class="spt-panel" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
    <div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">${criadoNome}</span></div>
    <div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">${alteradoNome}</span></div>
   </div>`,
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 
+ // Baseline do controle de concorrência: estado do registro como está no
+ // banco no momento em que o painel abriu (ver concurrency.js).
+ if (typeof _ccSetBaseline === 'function') _ccSetBaseline('entregas', e.id, e);
+ if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
  if (typeof _sptInitScrollSpy === 'function') _sptInitScrollSpy();
+ // Histórico de alterações (audit_log) — mesmo componente compartilhado de
+ // Obra/Projeto (scripts/lib/historico.js).
+ if (typeof _histCarregar === 'function') _histCarregar('sp-ent-historico', 'entregas', e.id);
  _spCarregarDocumentosEntrega(e.id, obraId);
  _entCarregarContatoOrcamento(obraId);
  // Pedido explícito: obra sem nenhum Tipo de obra marcado não pode travar
@@ -1290,7 +1366,11 @@ async function _entProjSalvar() {
   descritivo: p.descritivo || null,
  };
  var res = await _sb.from('projetos').insert(payload).select('id,nome').single();
- if (res.error) { _showToast('Erro ao criar projeto: ' + res.error.message, 'erro'); return; }
+ if (res.error) {
+  console.error('[Entregas] erro ao criar projeto a partir do painel de Entrega:', res.error);
+  _showToast('Não foi possível criar o projeto. Nada foi salvo — confira os campos e tente de novo.', 'erro');
+  return;
+ }
  _showToast('Projeto criado com sucesso!', 'ok');
  _entProjToggleForm(p.obraId);
  _spCarregarProjetosEntrega(p.obraId, p.tipoObraOpcoes);
@@ -1303,11 +1383,89 @@ async function _entProjSalvar() {
 // precisar recarregar tudo do banco.
 async function _spEntDetSalvarCampo(entregaId, patch) {
  if (!_sb || !entregaId) return;
- const { error } = await _sb.from('entregas').update(patch).eq('id', entregaId);
- if (error) { alert('Erro ao salvar: ' + (error.message || '')); return; }
- var cached = (_entregasArr || []).find(function(x){ return String(x.id) === String(entregaId); });
- if (cached) Object.assign(cached, patch);
- if (typeof _entApplyFilters === 'function') _entApplyFilters();
+ // Trava otimista + diff (concurrency.js). Aqui o payload já era pequeno (1
+ // campo por chamada), então o risco de sobrescrever campo alheio era baixo —
+ // mas o de sobrescrever o MESMO campo com um valor obsoleto era real: dois
+ // usuários mudando o Status da mesma entrega, o último ganhava em silêncio.
+ var r = await _ccSaveComFeedback('entregas', entregaId, patch, {
+  onRecarregar: function () { _spEntregaById(entregaId); },
+ });
+ if (!r || !r.ok) return;
+ _entPatchNaLista(r.row);
+}
+
+// ── Atualização pontual de UMA entrega na Tabela/Kanban/Calendário ───────────
+// Espelha a linha vinda do banco no cache e redesenha só aquela <tr> (usando
+// o MESMO _entRowHTML do load), preservando filtro/agrupamento/scroll.
+function _entPatchNaLista(row, realce) {
+ if (!row || !row.id) return;
+ var idx = (_entregasArr || []).findIndex(function (x) { return String(x.id) === String(row.id); });
+ // O payload do tempo real traz só as colunas de `entregas` — as associações
+ // (obra, entregas_obras) vêm de um join e precisam ser preservadas.
+ var completo = idx !== -1 ? Object.assign(_entregasArr[idx], row) : Object.assign({}, row);
+ if (idx === -1) _entregasArr.unshift(completo);
+
+ var tr = document.querySelector('#ent-tbody tr[data-id="' + row.id + '"]');
+ if (tr && typeof _entRowHTML === 'function') {
+  var tmp = document.createElement('tbody');
+  tmp.innerHTML = _entRowHTML(completo);
+  var novo = tmp.firstElementChild;
+  if (novo) {
+   if (tr.classList.contains('sp-active')) novo.classList.add('sp-active');
+   tr.replaceWith(novo);
+   if (typeof _spRow !== 'undefined' && _spRow === tr) _spRow = novo;
+   if (realce) {
+    novo.style.transition = 'background .9s';
+    novo.style.background = 'rgba(37,99,235,.10)';
+    setTimeout(function () { novo.style.background = ''; }, 1500);
+   }
+  }
+ }
+ // Kanban/Calendário leem direto de _entregasArr — já atualizado acima.
+ if (typeof _entRenderKanbanIfVisible === 'function') _entRenderKanbanIfVisible();
+ if (typeof _entRenderCalIfVisible === 'function') _entRenderCalIfVisible();
+}
+
+// ── Tempo real: Entregas ────────────────────────────────────────
+function _entregasIniciarTempoReal() {
+ if (typeof _rtWatchRows !== 'function') return;
+ _rtWatchRows('entregas', 'entregas', {
+  onUpdate: function (nova) {
+   if (!nova || !nova.id) return;
+   var eco = typeof _rtSouEu === 'function' && _rtSouEu(nova.atualizado_por);
+   _entPatchNaLista(nova, !eco);
+   if (eco) return;
+   if (_spEntAtiva && String(_spEntAtiva.id) === String(nova.id)
+    && document.getElementById('sp-drawer')?.classList.contains('sp-open')
+    && typeof _rtAvisoAlteracaoExterna === 'function') {
+    // Painel aberto: avisa, mas NÃO redesenha por baixo de quem pode estar
+    // digitando. O baseline avança pro merge automático continuar valendo.
+    _rtAvisoAlteracaoExterna(nova.atualizado_por, "_spEntregaById('" + nova.id + "')");
+    if (typeof _ccSetBaseline === 'function') _ccSetBaseline('entregas', nova.id, nova);
+   }
+  },
+  onInsert: function (nova) {
+   if (!nova || !nova.id) return;
+   if ((_entregasArr || []).some(function (x) { return String(x.id) === String(nova.id); })) return;
+   // Entrega nova precisa dos joins de Obra pra <tr> sair completa — recarrega
+   // a lista só nesse caso (evento raro), nunca a cada edição de campo.
+   if (typeof _dbLoadEntregas === 'function') _dbLoadEntregas();
+  },
+  onDelete: function (_nova, antiga) {
+   var id = antiga && antiga.id;
+   if (!id) return;
+   var i = (_entregasArr || []).findIndex(function (x) { return String(x.id) === String(id); });
+   if (i !== -1) _entregasArr.splice(i, 1);
+   var tr = document.querySelector('#ent-tbody tr[data-id="' + id + '"]');
+   if (tr) tr.remove();
+   if (_spEntAtiva && String(_spEntAtiva.id) === String(id)) {
+    _showToast('A entrega que você tinha aberta foi excluída por outro usuário.', 'aviso');
+    closePanel();
+   }
+   if (typeof _entRenderKanbanIfVisible === 'function') _entRenderKanbanIfVisible();
+   if (typeof _entRenderCalIfVisible === 'function') _entRenderCalIfVisible();
+  },
+ });
 }
 
 // ── Documentos da entrega — 4 categorias reais do formulário do Airtable

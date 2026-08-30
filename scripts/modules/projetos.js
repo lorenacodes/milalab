@@ -347,7 +347,8 @@ async function _renderProjetosKanban() {
   .order('created_at', { ascending: false });
 
  if (res.error || !res.data) {
-  container.innerHTML = '<div style="color:var(--red);padding:20px;font-size:13px">Erro ao carregar projetos: ' + (res.error ? res.error.message : 'sem dados') + '</div>';
+  console.error('[Projetos] erro ao carregar a lista do Kanban:', res.error);
+  container.innerHTML = '<div style="color:var(--red);padding:20px;font-size:13px">Não foi possível carregar os projetos agora. Verifique sua conexão e recarregue a página.</div>';
   return;
  }
 
@@ -617,6 +618,22 @@ function _projAuditNome(email) {
  return (u && u.nome_display) || email;
 }
 
+// Rótulos amigáveis dos campos de Projeto — o MESMO mapa serve pro histórico
+// de alterações ("Fulano alterou Etapa do projeto de X para Y") e pra
+// mensagem de conflito de concorrência, pra os dois nunca divergirem.
+// Rótulo null = campo técnico/de auditoria, fora do histórico.
+var _PROJ_CAMPO_LABEL = {
+ nome: 'Nome', tipo_orcamento: 'Tipo', produto: 'Produto',
+ etapa_projeto: 'Etapa do projeto', quantidade: 'Quantidade',
+ valor_unitario: 'Valor unitário', peso_kg: 'Peso total',
+ m2_estrutura: 'm² de estrutura', m2_arquitetura: 'm² de arquitetura',
+ maior_peca: 'Maior peça', descritivo: 'Descritivo',
+ responsavel: 'Responsável', obra_id: 'Obra vinculada', empresa_id: 'Empresa',
+ updated_at: null, created_at: null, criado_por: null, atualizado_por: null,
+ id: null, airtable_id: null,
+};
+if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('projetos', _PROJ_CAMPO_LABEL);
+
 var _spProjAtivo = null; // projeto atualmente aberto no painel (autosave/recalc lêem daqui)
 var _projTipoOpcoesAtuais = []; // tipo(s) de obra da Obra vinculada — restringe as opções do pill-select de Tipo
 
@@ -703,6 +720,16 @@ async function _projDesvincularObra() {
 
 function _spProjetoRender(p, idx) {
  _spProjAtivo = p;
+ // Baseline pro controle de concorrência (concurrency.js): o estado do
+ // registro como está no banco no momento em que o painel abriu. `p` vem de
+ // _projetosArr, onde `responsavel` já foi convertido de array de e-mails
+ // (o que está no banco) pra string de nomes (o que a UI antiga espera) —
+ // sem desfazer essa conversão aqui, o diff acharia que o Responsável mudou
+ // em TODO save e o campo seria regravado à toa.
+ var baseProj = Object.assign({}, p);
+ if (typeof baseProj.responsavel === 'string') baseProj.responsavel = _nomesStrToEmails(baseProj.responsavel);
+ if (typeof _ccSetBaseline === 'function') _ccSetBaseline('projetos', p.id, baseProj);
+ if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
  var obraInfo = p.obra_id ? (_obraIdMap[p.obra_id] || {}) : {};
  var obraNome = obraInfo.nome || '—';
  var tipo   = p.tipo_orcamento || '';
@@ -816,6 +843,9 @@ function _spProjetoRender(p, idx) {
   </div>
 
   ${_projAuditHTML(p)}
+
+  <div class="sp-stitle">Histórico de alterações</div>
+  ${typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-proj-historico') : ''}
  `;
 
  // Excluir projeto disponível pra qualquer usuário (pedido explícito, sem
@@ -895,6 +925,10 @@ function _spProjetoRender(p, idx) {
  _projFotosCarregar(p.id, p.obra_id);
  _projDocsCarregar(p.id, p.obra_id);
  _projTarefasCarregar(p.id);
+ // Histórico de alterações (audit_log) — mesmo componente compartilhado que
+ // Obra e Entrega usam (scripts/lib/historico.js). Carrega depois do render
+ // pra não segurar a abertura do painel.
+ if (typeof _histCarregar === 'function') _histCarregar('sp-proj-historico', 'projetos', p.id);
 
  // Responsável: se _usuariosCache ainda não tinha carregado quando o dropdown
  // foi montado acima (raro — carrega em segundo plano desde o boot do app,
@@ -967,7 +1001,9 @@ async function _spSaveProjetoFull() {
   // ver comentário em _spProjetoRender) — calculado aqui, nunca digitado.
   peso_kg: (qtd && pUnit) ? qtd * pUnit : null,
   descritivo: (document.getElementById('sp-proj-desc')?.value || '').trim() || null,
-  updated_at: new Date().toISOString(),
+  // updated_at fica por conta do trigger trg_projetos_updated_at (banco) —
+  // mandá-lo do cliente era ignorado na prática e atrapalhava o diff de
+  // campos alterados do controle de concorrência.
  };
  // Responsável: _spProjRespSel guarda nomes selecionados (multiselect não
  // tem <select> nativo pra ler) — converte pra e-mails contra _usuariosCache
@@ -994,20 +1030,104 @@ async function _spSaveProjetoFull() {
   if (_spProjAtivo && typeof _srchSelSelectItem === 'function') _srchSelSelectItem('projEtapa', _spProjAtivo.etapa_projeto || '');
  }
  if (faltando.length) _showToast('Campo obrigatório: ' + faltando.join(', ') + '. Alteração não foi salva.', 'erro');
- var camposReais = Object.keys(payload).filter(function(k){ return k !== 'updated_at'; });
- if (!camposReais.length) return;
- var res = await _sb.from('projetos').update(payload).eq('id', id);
- if (res.error) { console.error('[Projetos] erro ao salvar:', res.error); _showToast('Erro ao salvar: ' + _supaErrPt(res.error.message), 'erro'); return; }
+ if (!Object.keys(payload).length) return;
+ // Trava otimista + diff de campos (concurrency.js). Antes era um
+ // `.update(payload).eq('id', id)` cru, que regravava TODOS os campos do
+ // painel a cada 700ms de digitação — inclusive os que este usuário não
+ // tocou, desfazendo em silêncio o que outro usuário tivesse acabado de
+ // salvar no mesmo projeto.
+ var r = await _ccSaveComFeedback('projetos', id, payload, {
+  onRecarregar: function () { _spProjetoById(id); },
+ });
+ if (!r || !r.ok) return;
  // _spProjAtivo/_projetosArr guardam responsavel como STRING de nomes
  // (convenção do resto do arquivo — ver _emailsToNomes em _dbLoadProjetos/
  // _spProjetoById), não o array de e-mails que acabou de ir pro banco;
  // sem essa conversão, reabrir este projeto sem recarregar a página
  // quebraria o split(', ') que popula o multiselect de Responsável.
- var payloadCache = Object.assign({}, payload);
- if ('responsavel' in payloadCache) payloadCache.responsavel = _emailsToNomes(payloadCache.responsavel);
- if (_spProjAtivo && String(_spProjAtivo.id) === String(id)) Object.assign(_spProjAtivo, payloadCache);
- var cacheIdx = (_projetosArr||[]).findIndex(function(x){ return String(x.id) === String(id); });
- if (cacheIdx !== -1) Object.assign(_projetosArr[cacheIdx], payloadCache);
+ _projPatchNaLista(r.row);
+}
+
+// ── Atualização pontual de UM projeto na Tabela/Kanban ───────────────────────
+// Espelha no cache em memória e redesenha só a <tr>/card daquele projeto —
+// nunca a lista inteira, pra não perder filtro/agrupamento/ordenação/scroll de
+// quem estiver olhando a grade. Usado pelo autosave e pelos eventos de tempo
+// real (_projetosIniciarTempoReal).
+function _projPatchNaLista(row, realce) {
+ if (!row || !row.id) return;
+ var doCache = Object.assign({}, row);
+ if ('responsavel' in doCache) doCache.responsavel = _emailsToNomes(doCache.responsavel);
+ if (_spProjAtivo && String(_spProjAtivo.id) === String(row.id)) Object.assign(_spProjAtivo, doCache);
+ var idx = (_projetosArr || []).findIndex(function (x) { return String(x.id) === String(row.id); });
+ if (idx !== -1) Object.assign(_projetosArr[idx], doCache); else _projetosArr.unshift(doCache);
+
+ var tr = document.querySelector('#proj-tbody tr[data-id="' + row.id + '"]');
+ if (tr) {
+  // data-* alimentam filtro/ordenação/agrupamento — precisam acompanhar o
+  // valor novo, senão a linha continuaria sendo filtrada pelo antigo.
+  if (doCache.nome != null) tr.dataset.nome = doCache.nome;
+  if (doCache.etapa_projeto != null) tr.dataset.etapa = doCache.etapa_projeto;
+  if (doCache.tipo_orcamento != null) tr.dataset.tipo = doCache.tipo_orcamento;
+  if (doCache.updated_at) tr.dataset.updatedat = String(doCache.updated_at).slice(0, 10);
+  if (realce) {
+   tr.style.transition = 'background .9s';
+   tr.style.background = 'rgba(37,99,235,.10)';
+   setTimeout(function () { tr.style.background = ''; }, 1500);
+  }
+ }
+ var card = document.querySelector('.proj-kn-card[data-id="' + row.id + '"]');
+ if (card) {
+  if (doCache.etapa_projeto != null) card.dataset.etapa = doCache.etapa_projeto;
+  var t = card.querySelector('.oc-title, .pc-title');
+  if (t && doCache.nome != null) t.textContent = doCache.nome;
+ }
+}
+
+// ── Tempo real: Projetos ─────────────────────────────────────────────────────
+// Mesma estratégia de Obras: assinatura por linha, com chave de módulo pra não
+// duplicar handler ao voltar pra aba, e nada de recarregar a lista inteira.
+function _projetosIniciarTempoReal() {
+ if (typeof _rtWatchRows !== 'function') return;
+ _rtWatchRows('projetos', 'projetos', {
+  onUpdate: function (nova) {
+   if (!nova || !nova.id) return;
+   var eco = typeof _rtSouEu === 'function' && _rtSouEu(nova.atualizado_por);
+   _projPatchNaLista(nova, !eco);
+   if (eco) return;
+   if (_spProjAtivo && String(_spProjAtivo.id) === String(nova.id)
+    && document.getElementById('sp-drawer')?.classList.contains('sp-open')
+    && typeof _rtAvisoAlteracaoExterna === 'function') {
+    // Painel aberto: avisa, NÃO redesenha por baixo de quem pode estar
+    // digitando. O baseline avança pra o merge automático continuar valendo.
+    _rtAvisoAlteracaoExterna(nova.atualizado_por, "_spProjetoById('" + nova.id + "')");
+    if (typeof _ccSetBaseline === 'function') _ccSetBaseline('projetos', nova.id, nova);
+   }
+  },
+  onInsert: function (nova) {
+   if (!nova || !nova.id) return;
+   if ((_projetosArr || []).some(function (x) { return String(x.id) === String(nova.id); })) return;
+   // A <tr> de Projetos é montada dentro do .map() de _dbLoadProjetos com
+   // vários mapas auxiliares (obra/melhoria/presença de documento) que não
+   // vêm no payload do tempo real — recarregar a lista é o único jeito
+   // correto aqui, e só acontece quando um projeto NOVO aparece (evento
+   // raro), nunca a cada edição de campo.
+   if (typeof _dbLoadProjetos === 'function') _dbLoadProjetos();
+  },
+  onDelete: function (_nova, antiga) {
+   var id = antiga && antiga.id;
+   if (!id) return;
+   var i = (_projetosArr || []).findIndex(function (x) { return String(x.id) === String(id); });
+   if (i !== -1) _projetosArr.splice(i, 1);
+   var tr = document.querySelector('#proj-tbody tr[data-id="' + id + '"]');
+   if (tr) tr.remove();
+   var card = document.querySelector('.proj-kn-card[data-id="' + id + '"]');
+   if (card) card.remove();
+   if (_spProjAtivo && String(_spProjAtivo.id) === String(id)) {
+    _showToast('O projeto que você tinha aberto foi excluído por outro usuário.', 'aviso');
+    closePanel();
+   }
+  },
+ });
 }
 
 // ── Exclusão de Projeto — disponível pra qualquer usuário (pedido explícito).
@@ -1019,7 +1139,11 @@ async function _spSaveProjetoFull() {
 async function _spExcluirProjeto(id, nome) {
  if (!confirm('Excluir "' + (nome || 'este projeto') + '" PERMANENTEMENTE?\n\nMelhorias, documentos e tarefas vinculados a este projeto também serão excluídos. Esta ação não pode ser desfeita.')) return;
  var res = await _sb.from('projetos').delete().eq('id', id);
- if (res.error) { alert('Erro ao excluir: ' + (res.error?.message || '')); return; }
+ if (res.error) {
+  console.error('[Projetos] erro ao excluir projeto:', res.error);
+  _showToast('Não foi possível excluir este projeto. Ele NÃO foi excluído — tente de novo em instantes.', 'erro');
+  return;
+ }
  closePanel();
  if (typeof _dbLoadProjetos === 'function') _dbLoadProjetos();
 }
@@ -1427,6 +1551,25 @@ async function _garantirObraGeoMap() {
  allObras.forEach(function(o) { _obraGeoMap[o.id] = { cidade: o.cidade || '', estado: o.estado || '' }; });
 }
 
+// Lê uma tabela inteira em blocos de 1000. O Supabase/PostgREST aplica um
+// limite de 1000 linhas por resposta e NÃO sinaliza que truncou — sem paginar,
+// qualquer consulta que passe disso devolve dados incompletos em silêncio.
+// `aplicarFiltros` (opcional) recebe e devolve o query builder.
+async function _projCarregarPaginado(tabela, colunas, aplicarFiltros) {
+ var tudo = [], from = 0, pageSize = 1000;
+ while (true) {
+  var q = _sb.from(tabela).select(colunas);
+  if (typeof aplicarFiltros === 'function') q = aplicarFiltros(q);
+  var res = await q.range(from, from + pageSize - 1);
+  if (res.error) { console.error('[Projetos] erro ao ler ' + tabela + ':', res.error); break; }
+  var lote = res.data || [];
+  tudo = tudo.concat(lote);
+  if (lote.length < pageSize) break;
+  from += pageSize;
+ }
+ return tudo;
+}
+
 async function _dbLoadProjetos() {
  var tbody=document.getElementById('proj-tbody');
  if(tbody) tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando projetos...</td></tr>';
@@ -1444,15 +1587,24 @@ async function _dbLoadProjetos() {
  var _docPresence = { fotos_obra: {}, pre_projeto: {}, projeto_executivo: {} };
  var _tarefaPresence = {};
  if (_sb) {
-  var docRes = await _sb.from('documentos').select('projeto_id, tipo').not('projeto_id', 'is', null).in('tipo', ['fotos_obra', 'pre_projeto', 'projeto_executivo']);
-  (docRes.data || []).forEach(function(d) { if (_docPresence[d.tipo]) _docPresence[d.tipo][d.projeto_id] = true; });
-  var atvRes = await _sb.from('atividades_projetos').select('projeto_id');
-  (atvRes.data || []).forEach(function(a) { _tarefaPresence[a.projeto_id] = true; });
+  // Paginado: o Supabase corta em 1000 linhas SEM avisar (mesmo achado já
+  // corrigido em _dbLoadEntregas). Estas duas consultas vinham sem paginação
+  // nenhuma — hoje são 887 documentos e 532 vínculos de tarefa, ou seja
+  // ainda abaixo do corte, mas na primeira vez que passassem de 1000 os
+  // filtros de presença ("tem Pré-projeto?", "tem Tarefa?") passariam a
+  // responder "Não" para registros que TÊM, sem nenhum sintoma visível.
+  var docsProj = await _projCarregarPaginado('documentos', 'projeto_id, tipo', function(q) {
+   return q.not('projeto_id', 'is', null).in('tipo', ['fotos_obra', 'pre_projeto', 'projeto_executivo']);
+  });
+  docsProj.forEach(function(d) { if (_docPresence[d.tipo]) _docPresence[d.tipo][d.projeto_id] = true; });
+  var atvProj = await _projCarregarPaginado('atividades_projetos', 'projeto_id');
+  atvProj.forEach(function(a) { _tarefaPresence[a.projeto_id] = true; });
  }
  while(more){
   var res=await _sb.from('projetos').select('*').order('created_at',{ascending:false}).range(from,from+999);
   if(res.error){
-   if(tbody)tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar projetos: '+res.error.message+'</td></tr>';
+   console.error('[Projetos] erro ao carregar a lista de projetos:', res.error);
+   if(tbody)tbody.innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Não foi possível carregar os projetos agora. Verifique sua conexão e recarregue a página.</td></tr>';
    return;
   }
   if(res.data&&res.data.length)allData=allData.concat(res.data);
@@ -1569,4 +1721,7 @@ async function _dbLoadProjetos() {
  var kV=document.getElementById('proj-kpi-valor');if(kV)kV.textContent='R$ '+Math.round(totV).toLocaleString('pt-BR');
  var kP=document.getElementById('proj-kpi-peso');if(kP)kP.textContent=Math.round(totP).toLocaleString('pt-BR');
  var hint=document.getElementById('proj-count-hint');if(hint)hint.textContent=allData.length+' projetos · clique em uma linha para editar';
+ // Tempo real só depois que a lista carregou (não no boot) — e idempotente
+ // por chave, então voltar pra esta aba não cria um 2º handler.
+ _projetosIniciarTempoReal();
 }

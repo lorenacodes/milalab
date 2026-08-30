@@ -366,7 +366,7 @@ async function _dbLoadObras() {
  } catch (e) {
   console.error('[Obras] erro ao carregar a lista de obras:', e);
   var tbodyErr = document.getElementById('obras-tbody');
-  if (tbodyErr) tbodyErr.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:24px">Erro ao carregar obras: ' + (e && e.message ? e.message : 'erro desconhecido') + '</td></tr>';
+  if (tbodyErr) tbodyErr.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:24px">Não foi possível carregar as obras agora. Verifique sua conexão e recarregue a página.</td></tr>';
   return;
  }
  if(!allObras.length)return;
@@ -700,7 +700,8 @@ async function _spObraById(id) {
   ]);
 
   if (obraRes.error) {
-   _spSet('Obra', 'Erro', '<div style="color:var(--red);padding:20px">Obra não encontrada: ' + obraRes.error.message + '</div>', '');
+   console.error('[Obras] erro ao carregar a obra ' + id + ':', obraRes.error);
+   _spSet('Obra', 'Erro', '<div style="color:var(--red);padding:20px">Não foi possível abrir esta obra. Ela pode ter sido excluída, ou houve falha de conexão. Feche o painel e tente de novo.</div>', '');
    return;
   }
   if (entregasRes.error) console.error('[MilaTec] Erro ao carregar entregas:', entregasRes.error);
@@ -726,7 +727,7 @@ async function _spObraById(id) {
   await _spObrasRender(_obraAtiva, projetos, entregas, instalacoes, atividades);
  } catch(err) {
   console.error('[MilaTec] Erro ao carregar obra:', err);
-  _spSet('Obra', 'Erro interno', '<div style="color:var(--red);padding:20px">Erro inesperado: ' + err.message + '</div>', '');
+  _spSet('Obra', 'Erro interno', '<div style="color:var(--red);padding:20px">Não foi possível abrir esta obra agora. Feche o painel e tente de novo; se continuar, avise o suporte.</div>', '');
  }
 }
 
@@ -1154,7 +1155,8 @@ async function _spEnviarDocObra() {
 
  var upRes = await _sb.storage.from('documentos_obras').upload(path, file, { upsert: false });
  if (upRes.error) {
-  _showToast('Erro no upload: ' + upRes.error.message, 'erro');
+  console.error('[Obras] erro no upload do arquivo:', upRes.error);
+  _showToast('Não foi possível enviar o arquivo. Ele NÃO foi salvo — verifique sua conexão e tente de novo.', 'erro');
   if (btn) { btn.disabled = false; btn.textContent = 'Enviar documento'; btn.style.opacity = ''; }
   return;
  }
@@ -1174,7 +1176,8 @@ async function _spEnviarDocObra() {
   origem: 'upload_manual'
  });
  if (ins.error) {
-  _showToast('Arquivo enviado, mas erro ao registrar: ' + ins.error.message, 'aviso');
+  console.error('[Obras] arquivo subiu mas o registro em documentos falhou:', ins.error);
+  _showToast('O arquivo foi enviado, mas não ficou vinculado à obra. Envie de novo para que ele apareça na lista.', 'aviso');
   if (btn) { btn.disabled = false; btn.textContent = 'Enviar documento'; btn.style.opacity = ''; }
   return;
  }
@@ -1292,7 +1295,8 @@ async function _spAbrirDocStorage(path, nomeArquivo, bucket, docId, obraId, clas
   var res = await _sb.storage.from(bucket || 'documentos_obras').createSignedUrl(path, 3600);
   if (res.error) {
    console.error('[Storage] createSignedUrl erro:', res.error, '| path:', path);
-   _spDocPdfModalErro('Erro ao carregar: ' + (res.error.message || 'Sem permissão ou arquivo não encontrado'));
+   console.error('[Obras] erro ao abrir o documento:', res.error);
+   _spDocPdfModalErro('Não foi possível abrir este arquivo. Ele pode ter sido removido, ou você não tem permissão para vê-lo.');
    return;
   }
   var url = res.data && res.data.signedUrl;
@@ -2207,7 +2211,7 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
   console.error('[MilaTec] Erro no render do painel:', renderErr);
   _spSet('Obra', 'Erro de renderização',
    '<div style="color:var(--red);padding:20px;font-size:13px">'
-   + '<b>Erro ao montar o painel:</b><br><code>' + renderErr.message + '</code></div>',
+   + '<b>Não foi possível montar o painel desta obra.</b><br>Feche e abra de novo; se continuar, avise o suporte.</div>',
    '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>'
   );
  }
@@ -2579,7 +2583,11 @@ async function _spObEmpresaSelectItem(id, nome) {
  if (!id || !_obraAtiva || !_obraAtiva.id) return;
  if ((_obraAtiva.empresas || []).some(function(e){ return e.id === id; })) return; // já vinculada
  var ins = await _sb.from('empresas_obras').insert({ obra_id: _obraAtiva.id, empresa_id: id });
- if (ins.error) { alert('Erro ao vincular empresa: ' + (ins.error.message || '')); return; }
+ if (ins.error) {
+  console.error('[Obras] erro ao vincular empresa à obra:', ins.error);
+  _showToast('Não foi possível vincular esta empresa. O vínculo NÃO foi salvo — tente de novo em instantes.', 'erro');
+  return;
+ }
  var empObj = (_empresasArr || []).find(function(e){ return e.id === id; }) || { id: id, nome: nome };
  _spEmpresaObraLocalAdd(empObj);
  _dbLoadObras(); _dbLoadObrasKanban();
@@ -2612,7 +2620,11 @@ async function _spDesvincularEmpresaObra(empresaId) {
  var emp = (_obraAtiva.empresas || []).find(function(e){ return e.id === empresaId; });
  if (!confirm('Desvincular "' + (emp ? emp.nome : 'esta empresa') + '" desta obra?')) return;
  var del = await _sb.from('empresas_obras').delete().eq('obra_id', _obraAtiva.id).eq('empresa_id', empresaId);
- if (del.error) { alert('Erro ao desvincular: ' + (del.error.message || '')); return; }
+ if (del.error) {
+  console.error('[Obras] erro ao desvincular empresa da obra:', del.error);
+  _showToast('Não foi possível desvincular esta empresa. O vínculo continua como estava — tente de novo em instantes.', 'erro');
+  return;
+ }
  _obraAtiva.empresas_obras = (_obraAtiva.empresas_obras || []).filter(function(l){ return l.empresa_id !== empresaId; });
  _obraAtiva.empresas = (_obraAtiva.empresas || []).filter(function(e){ return e.id !== empresaId; });
  if (_obraAtiva.empresa_id === empresaId) {
@@ -2703,7 +2715,11 @@ async function _spObContatoSelectItem(id, label) {
  if (!id || !_obraAtiva || !_obraAtiva.id) return;
  if ((_obraAtiva.contatos || []).some(function(c){ return c.id === id; })) return; // já vinculado
  var ins = await _sb.from('contatos_obras').upsert({ obra_id: _obraAtiva.id, contato_id: id }, { onConflict: 'obra_id,contato_id', ignoreDuplicates: true });
- if (ins.error) { alert('Erro ao vincular contato: ' + (ins.error.message || '')); return; }
+ if (ins.error) {
+  console.error('[Obras] erro ao vincular contato à obra:', ins.error);
+  _showToast('Não foi possível vincular este contato. O vínculo NÃO foi salvo — tente de novo em instantes.', 'erro');
+  return;
+ }
  var cttObj = (_contatosArr || []).find(function(c){ return c.id === id; }) || { id: id, nome_completo: label };
  _spContatoObraLocalAdd(cttObj);
 }
@@ -2734,7 +2750,11 @@ async function _spDesvincularContatoObra(contatoId) {
  var ctt = (_obraAtiva.contatos || []).find(function(c){ return c.id === contatoId; });
  if (!confirm('Desvincular "' + (ctt ? ctt.nome_completo : 'este contato') + '" desta obra?')) return;
  var del = await _sb.from('contatos_obras').delete().eq('obra_id', _obraAtiva.id).eq('contato_id', contatoId);
- if (del.error) { alert('Erro ao desvincular: ' + (del.error.message || '')); return; }
+ if (del.error) {
+  console.error('[Obras] erro ao desvincular contato da obra:', del.error);
+  _showToast('Não foi possível desvincular este contato. O vínculo continua como estava — tente de novo em instantes.', 'erro');
+  return;
+ }
  _obraAtiva.contatos_obras = (_obraAtiva.contatos_obras || []).filter(function(l){ return l.contato_id !== contatoId; });
  _obraAtiva.contatos = (_obraAtiva.contatos || []).filter(function(c){ return c.id !== contatoId; });
  if (_obraAtiva.contato_id === contatoId) {
@@ -2804,7 +2824,11 @@ async function _spCriarEmpresaObra() {
   url_site: document.getElementById('sp-new-emp-site')?.value?.trim() || null,
  };
  const { data, error } = await _sb.from('empresas').insert(payload).select().single();
- if (error || !data) { alert('Erro ao criar empresa: ' + (error?.message || '')); return; }
+ if (error || !data) {
+  console.error('[Obras] erro ao criar empresa:', error);
+  _showToast('Não foi possível criar a empresa. Nada foi salvo — confira os campos e tente de novo.', 'erro');
+  return;
+ }
  // Vincula já à obra atual (mesmo espírito de _spCriarContato, que já grava
  // o vínculo na hora de criar) — pedido explícito: antes, o vínculo só era
  // gravado quando o formulário INTEIRO da Obra fosse salvo (_spSaveObraFull),
@@ -2987,7 +3011,11 @@ async function _spCriarInstalacao() {
   detalhes: document.getElementById('sp-new-inst-detalhes')?.value?.trim() || null,
  };
  const { data: instRow, error } = await _sb.from('instalacoes').insert(payload).select('id').single();
- if (error) { alert('Erro ao criar instalação: ' + (error?.message || '')); return; }
+ if (error) {
+  console.error('[Obras] erro ao criar instalação:', error);
+  _showToast('Não foi possível criar a instalação. Nada foi salvo — confira os campos e tente de novo.', 'erro');
+  return;
+ }
  // Vincula a esta Obra — obras_instalacoes é N:N de verdade (decisão
  // confirmada com a usuária: Instalação pode ter várias Obras, igual ao
  // Airtable) — instalacoes.obra_id não é mais usado pra novos registros.
@@ -3001,7 +3029,8 @@ async function _spCriarInstalacao() {
  if (obraLinkRes.error) {
   console.error('[Obras] erro ao vincular instalação à obra:', obraLinkRes.error);
   await _sb.from('instalacoes').delete().eq('id', instRow.id);
-  alert('Erro ao vincular a instalação à obra — a instalação não foi criada. Tente novamente: ' + _supaErrPt(obraLinkRes.error.message));
+  console.error('[Obras] erro ao vincular instalação à obra (instalação desfeita):', obraLinkRes.error);
+  _showToast('Não foi possível vincular a instalação à obra. Nada foi salvo — tente criar de novo.', 'erro');
   return;
  }
  // Vincula a(s) equipe(s) selecionada(s) — junção instalacoes_equipe, sem
@@ -3194,7 +3223,11 @@ async function _spProjSalvar() {
   descritivo: p.descritivo || null,
  };
  var res = await _sb.from('projetos').insert(payload).select('id,nome').single();
- if (res.error) { _showToast('Erro ao criar projeto: ' + res.error.message, 'erro'); return; }
+ if (res.error) {
+  console.error('[Obras] erro ao criar projeto a partir do painel de Obra:', res.error);
+  _showToast('Não foi possível criar o projeto. Nada foi salvo — confira os campos e tente de novo.', 'erro');
+  return;
+ }
  _showToast('Projeto criado com sucesso!', 'ok');
  _spNovoProj = null;
  _spObraById(_obraAtiva.id);
@@ -3309,7 +3342,11 @@ async function _spCriarEntrega() {
   pedido_produzido: !!document.getElementById('sp-new-ent-produzido')?.checked,
  };
  const { data: nova, error } = await _sb.from('entregas').insert(payload).select().single();
- if (error || !nova) { alert('Erro ao criar entrega: ' + (error?.message || '')); return; }
+ if (error || !nova) {
+  console.error('[Obras] erro ao criar entrega a partir do painel de Obra:', error);
+  _showToast('Não foi possível criar a entrega. Nada foi salvo — confira os campos e tente de novo.', 'erro');
+  return;
+ }
  const docFiles = Array.from(document.getElementById('sp-new-ent-doc')?.files || []);
  const opFile = document.getElementById('sp-new-ent-op')?.files?.[0];
  let anexosComErro = 0;
@@ -3326,7 +3363,11 @@ async function _spCriarEntrega() {
 async function _spDesvincularEntrega(id, nome) {
  if (!confirm('Desvincular "' + (nome || 'esta entrega') + '" desta obra?\n\nA entrega não será excluída, só deixa de aparecer aqui.')) return;
  const { error } = await _sb.from('entregas').update({ obra_id: null }).eq('id', id);
- if (error) { alert('Erro ao desvincular: ' + (error?.message || '')); return; }
+ if (error) {
+  console.error('[Obras] erro ao desvincular a entrega da obra:', error);
+  _showToast('Não foi possível desvincular esta entrega. Nada foi alterado — tente de novo em instantes.', 'erro');
+  return;
+ }
  if (_obraAtiva && _obraAtiva.id) _spObraById(_obraAtiva.id);
  if (typeof _dbLoadEntregas === 'function') _dbLoadEntregas();
 }
@@ -3337,7 +3378,11 @@ async function _spDesvincularEntrega(id, nome) {
 async function _spExcluirEntrega(id, nome) {
  if (!confirm('Excluir "' + (nome || 'esta entrega') + '" PERMANENTEMENTE?\n\nOs documentos anexados a ela também serão excluídos. Esta ação não pode ser desfeita.')) return;
  const { error } = await _sb.from('entregas').delete().eq('id', id);
- if (error) { alert('Erro ao excluir: ' + (error?.message || '')); return; }
+ if (error) {
+  console.error('[Obras] erro ao excluir entrega:', error);
+  _showToast('Não foi possível excluir esta entrega. Ela NÃO foi excluída — tente de novo em instantes.', 'erro');
+  return;
+ }
  if (_obraAtiva && _obraAtiva.id) _spObraById(_obraAtiva.id);
  if (typeof _dbLoadEntregas === 'function') _dbLoadEntregas();
 }
@@ -3351,7 +3396,11 @@ async function _spExcluirEntrega(id, nome) {
 async function _spExcluirObra(id, nome) {
  if (!confirm('Excluir "' + (nome || 'esta obra') + '" PERMANENTEMENTE?\n\nDocumentos e vínculos com empresa/contato/tarefas desta obra também serão excluídos. Projetos, Entregas e Instalações vinculados NÃO serão excluídos — só ficam sem obra associada. Esta ação não pode ser desfeita.')) return;
  const { error } = await _sb.from('obras').delete().eq('id', id);
- if (error) { alert('Erro ao excluir: ' + (error?.message || '')); return; }
+ if (error) {
+  console.error('[Obras] erro ao excluir obra:', error);
+  _showToast('Não foi possível excluir esta obra. Ela NÃO foi excluída — tente de novo em instantes.', 'erro');
+  return;
+ }
  closePanel();
  if (typeof _dbLoadObras === 'function') _dbLoadObras();
  if (typeof _dbLoadObrasKanban === 'function') _dbLoadObrasKanban();
@@ -3406,7 +3455,11 @@ async function _spCriarContato() {
  // aqui tentava gravar empresa_id direto em contatos e quebrava com
  // "Could not find the 'empresa_id' column of 'contatos'".
  const { data, error } = await _sb.from('contatos').insert(payload).select().single();
- if (error || !data) { alert('Erro ao criar contato: ' + (error?.message || '')); return; }
+ if (error || !data) {
+  console.error('[Obras] erro ao criar contato:', error);
+  _showToast('Não foi possível criar o contato. Nada foi salvo — confira os campos e tente de novo.', 'erro');
+  return;
+ }
  if (empId) {
   const { error: linkError } = await _sb.from('contatos_empresas').insert({ contato_id: data.id, empresa_id: empId, is_primary: true });
   if (linkError) console.error('[Obras] erro ao vincular contato_empresas na criação rápida:', linkError);
