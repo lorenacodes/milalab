@@ -1421,22 +1421,54 @@ var _fornSetoresSel   = [];
 var _fornCidadesDisponiveis = []; // cidades do estado selecionado no momento
 var _fornCidadeCache  = {}; // cache por UF — mesmo padrão de _cidadeCache (wizard-nova-obra.js)
 
+// Rótulos de campo pro conflito e pro Histórico (mesmo mapa, ver
+// concurrency.js/historico.js). A tabela `fornecedores` só passou a alimentar
+// a audit_log na migração concorrencia_historico_fase2 — antes não tinha
+// trigger de auditoria nenhum, então não havia histórico pra mostrar.
+var _FORNECEDOR_CAMPO_LABEL = {
+ nome: 'Nome', cnpj: 'CNPJ', contato: 'Contato', telefone: 'Telefone',
+ email: 'E-mail', endereco: 'Endereço', estado: 'Estado', cidades: 'Cidades',
+ setores: 'Setores', experiencia: 'Experiência', observacoes: 'Observações',
+ status: 'Status', criado_por: null,
+};
+var _MATERIAL_CAMPO_LABEL = {
+ grupo: 'Grupo', subgrupo: 'Subgrupo', codigo: 'Código',
+ descricao: 'Descrição', valor_unitario: 'Valor unitário',
+};
+if (typeof _ccRegistrarLabels === 'function') {
+ _ccRegistrarLabels('fornecedores', _FORNECEDOR_CAMPO_LABEL);
+ _ccRegistrarLabels('materiais_catalogo', _MATERIAL_CAMPO_LABEL);
+}
+
 async function _dbLoadFornecedores() {
  var tbody = document.getElementById('forn-tbody');
  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
  if (!_sb) return;
- var res = await _sb.from('fornecedores')
-  .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, experiencia, observacoes, fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, status_cotacao, created_at)')
-  .order('nome');
- if (res.error) {
-  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Erro ao carregar fornecedores: ' + _supaErrPt(res.error.message) + '</td></tr>';
-  return;
+ // Paginação: o PostgREST devolve no máximo 1000 linhas por requisição, e esta
+ // consulta não tinha .range() nenhum — hoje passa despercebido (poucos
+ // fornecedores), mas a partir da milésima linha a lista simplesmente pararia
+ // de mostrar o resto, sem erro nenhum. Mesmo laço já usado em Empresas/
+ // Contatos/Instalações.
+ // updated_at entra no select porque é a coluna da trava otimista (_ccSave).
+ var linhas = []; var from = 0; var mais = true;
+ while (mais) {
+  var res = await _sb.from('fornecedores')
+   .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, experiencia, observacoes, updated_at, fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, status_cotacao, created_at)')
+   .order('nome').range(from, from + 999);
+  if (res.error) {
+   console.error('[Fornecedores] erro ao carregar a lista:', res.error);
+   if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Não foi possível carregar os fornecedores agora. Tente recarregar a página.</td></tr>';
+   return;
+  }
+  linhas = linhas.concat(res.data || []);
+  mais = (res.data || []).length === 1000; from += 1000;
  }
- _fornecedoresArr = (res.data || []).map(function(f) {
+ _fornInitRealtime();
+ _fornecedoresArr = linhas.map(function(f) {
   return {
    id: f.id, nome: f.nome, cnpj: f.cnpj, contato: f.contato, telefone: f.telefone, email: f.email,
    endereco: f.endereco, estado: f.estado, cidades: f.cidades || [], setores: f.setores || [],
-   experiencia: f.experiencia, observacoes: f.observacoes,
+   experiencia: f.experiencia, observacoes: f.observacoes, updated_at: f.updated_at,
    produtos: (f.fornecedores_produtos || []).map(function(p){
     return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total, status_cotacao: p.status_cotacao, created_at: p.created_at };
    }),
@@ -1448,6 +1480,40 @@ async function _dbLoadFornecedores() {
 function searchFornecedores(q) {
  _fornBusca = q;
  _renderFornecedores();
+}
+
+// Tempo real de Fornecedores. A tabela só entrou na publication
+// supabase_realtime na migração concorrencia_historico_fase2 — antes nenhum
+// evento chegava. A lista é re-renderizada inteira a partir de
+// _fornecedoresArr (é assim que _renderFornecedores já funciona, com cards
+// montados do zero), então aqui basta atualizar o array e redesenhar.
+function _fornInitRealtime() {
+ if (typeof _rtWatchRows !== 'function') return;
+ _rtWatchRows('fornecedores', 'fornecedores', {
+  onUpdate: function (nova) {
+   if (!nova || !nova.id) return;
+   var idx = (_fornecedoresArr || []).findIndex(function (x) { return String(x.id) === String(nova.id); });
+   if (idx === -1) return;
+   // `produtos` é sintetizado do join e não vem no payload do postgres_changes
+   // — preservar, senão a lista de produtos do fornecedor sumiria da tela.
+   Object.keys(nova).forEach(function (k) { if (k !== 'produtos') _fornecedoresArr[idx][k] = nova[k]; });
+   _renderFornecedores();
+   // Cadastro aberto neste fornecedor: avança o baseline pro merge automático
+   // continuar valendo, sem redesenhar o formulário por baixo de quem digita.
+   if (String(_editingFornId) === String(nova.id) && typeof _ccSetBaseline === 'function') {
+    _ccSetBaseline('fornecedores', nova.id, nova);
+   }
+  },
+  // Fornecedor novo/excluído precisa do join de produtos pra ficar completo.
+  onInsert: function () { if (typeof _dbLoadFornecedores === 'function') _dbLoadFornecedores(); },
+  onDelete: function (_nova, antiga) {
+   var id = antiga && antiga.id;
+   if (!id) return;
+   var i = (_fornecedoresArr || []).findIndex(function (x) { return String(x.id) === String(id); });
+   if (i !== -1) _fornecedoresArr.splice(i, 1);
+   _renderFornecedores();
+  },
+ });
 }
 
 var _fornStatusCor = { 'Em análise': 'nt-tag-yellow', 'Aprovado': 'nt-tag-green', 'Recusado': 'nt-tag-red', 'Aguardando retorno': 'nt-tag-gray', 'Cancelado': 'nt-tag-red' };
@@ -1622,9 +1688,23 @@ function _fmDbInit() {
  if (_fmDbInitPromise) return _fmDbInitPromise;
  _fmDbInitPromise = (async function() {
   if (!_sb) { _fmDb = []; _fmDbRender(); return; }
-  var res = await _sb.from('materiais_catalogo').select('*').order('grupo');
-  _fmDb = res.error ? [] : res.data.map(_fmCatalogoToShort);
-  if (res.error) console.error('[Fornecedores] erro ao carregar banco de materiais:', res.error);
+  // Paginação: sem .range() o PostgREST corta em 1000 linhas silenciosamente.
+  // São 122 materiais hoje, mas o catálogo é exatamente o tipo de tabela que
+  // cresce sem ninguém reparar.
+  var linhas = []; var from = 0; var mais = true; var falhou = false;
+  while (mais) {
+   var res = await _sb.from('materiais_catalogo').select('*').order('grupo').range(from, from + 999);
+   if (res.error) { console.error('[Fornecedores] erro ao carregar banco de materiais:', res.error); falhou = true; break; }
+   linhas = linhas.concat(res.data || []);
+   mais = (res.data || []).length === 1000; from += 1000;
+  }
+  // Baseline de cada linha do catálogo: _fmDb guarda só a forma curta
+  // ({id,g,sg,cod,d,vl}), que não serve pra trava otimista — o baseline
+  // precisa da linha inteira, com o updated_at (ver _fmDbPersist).
+  if (typeof _ccSetBaseline === 'function') {
+   linhas.forEach(function (r) { _ccSetBaseline('materiais_catalogo', r.id, r); });
+  }
+  _fmDb = falhou ? [] : linhas.map(_fmCatalogoToShort);
   _fmDbRender();
  })();
  return _fmDbInitPromise;
@@ -1660,21 +1740,53 @@ function _fmDbAddRow() {
  var body = document.getElementById('fm-db-body');
  if (body) body.scrollTop = body.scrollHeight;
 }
+// Guarda contra duplo-clique: sem ela, dois cliques no "Salvar" disparavam
+// duas passadas concorrentes pelo catálogo inteiro, e as linhas NOVAS (sem id
+// ainda) eram inseridas DUAS vezes — item duplicado no banco de materiais.
 async function _fmDbPersist(btn) {
+ return _ccUmaVez('salvar-banco-materiais', function () { return _fmDbPersistReal(btn); }, btn);
+}
+async function _fmDbPersistReal(btn) {
  if (!_sb || !_fmDb) return;
- var erro = null;
+ var erro = null, conflitos = [];
  for (var i = 0; i < _fmDb.length && !erro; i++) {
   var c = _fmDb[i];
   var payload = { grupo: c.g, subgrupo: c.sg || null, codigo: c.cod || null, descricao: c.d, valor_unitario: c.vl };
   if (c.id) {
-   var up = await _sb.from('materiais_catalogo').update(payload).eq('id', c.id);
-   if (up.error) erro = up.error;
+   // Antes daqui saía um UPDATE pra CADA uma das ~122 linhas do catálogo a
+   // cada clique em "Salvar", mesmo nas que ninguém tinha tocado: além do
+   // desperdício (122 requisições e 122 linhas de histórico por clique),
+   // isso regravava por cima de qualquer alteração que outro usuário tivesse
+   // feito nas outras linhas enquanto esta tela estava aberta. _ccSave manda
+   // só o que mudou de verdade e recusa a gravação quando o outro usuário
+   // mexeu na MESMA linha (devolve semMudanca pras linhas intocadas, então na
+   // prática o clique não gera requisição nenhuma pra elas).
+   var up = await _ccSave('materiais_catalogo', c.id, payload);
+   if (up.erro) erro = up.erro;
+   else if (up.conflito) conflitos.push(c.d || c.cod || ('linha ' + (i + 1)));
+   else if (up.excluido) conflitos.push((c.d || 'linha ' + (i + 1)) + ' (excluída por outro usuário)');
   } else {
-   var ins = await _sb.from('materiais_catalogo').insert(payload).select('id').single();
-   if (ins.error) erro = ins.error; else c.id = ins.data.id;
+   var ins = await _sb.from('materiais_catalogo').insert(payload).select('*').single();
+   if (ins.error) erro = ins.error;
+   else {
+    c.id = ins.data.id;
+    // Baseline da linha recém-criada, pro próximo "Salvar" já ter com o que
+    // comparar em vez de reenviar tudo.
+    if (typeof _ccSetBaseline === 'function') _ccSetBaseline('materiais_catalogo', c.id, ins.data);
+   }
   }
  }
- if (erro) { _showToast('Erro ao salvar banco de materiais: ' + _supaErrPt(erro.message), 'erro'); return; }
+ if (erro) {
+  console.error('[Banco de materiais] erro ao salvar:', erro);
+  _showToast('Não foi possível salvar o banco de materiais. Confira a conexão e tente de novo.', 'erro');
+  return;
+ }
+ if (conflitos.length) {
+  _showToast('Estes itens foram alterados por outro usuário e NÃO foram salvos: '
+   + conflitos.slice(0, 3).join('; ') + (conflitos.length > 3 ? ' e mais ' + (conflitos.length - 3) : '')
+   + '. Reabra o banco de materiais para ver os valores atuais.', 'erro');
+  return;
+ }
  _showToast('Banco de materiais salvo!', 'ok');
  if (btn) { var txt = btn.textContent; btn.textContent = 'Salvo!'; setTimeout(function(){ btn.textContent = txt; }, 1800); }
 }
@@ -1891,6 +2003,9 @@ function openNovoFornecedor() {
 async function editFornecedor(id) {
  var f = _fornecedoresArr.find(function(x){return x.id === id;});
  if (!f) return;
+ // Baseline da trava otimista: como o registro está no banco no momento em que
+ // o cadastro abre. É contra ele que _ccSave compara (ver concurrency.js).
+ if (typeof _ccSetBaseline === 'function') _ccSetBaseline('fornecedores', id, f);
  _editingFornId = id;
  _fornProdutoCount = 0;
  _fornCidadesSel = (f.cidades || []).slice();
@@ -1965,27 +2080,43 @@ function _fornAutoSaveQueue(patch, immediate) {
  _fornAutoSaveTimer = setTimeout(_fornAutoSaveFlush, immediate ? 120 : 700);
 }
 
-function _fornAutoSaveFlush() {
+async function _fornAutoSaveFlush() {
  if (!_editingFornId || !_fornAutoSavePending) return;
  var id = _editingFornId, patch = _fornAutoSavePending;
  _fornAutoSavePending = null;
- patch.updated_at = new Date().toISOString();
- _sb.from('fornecedores').update(patch).eq('id', id).then(function(res) {
-  if (String(_editingFornId) !== String(id)) return;
-  if (res.error) {
-   _fornAutoSaveStatus('error', 'Erro ao salvar: ' + _supaErrPt(res.error.message));
-   console.error('[auto-save fornecedor]', res.error);
-   return;
+ // updated_at NÃO é mais forjado aqui: quem mantém a coluna é o trigger
+ // trg_fornecedores_updated_at, e é ela a trava otimista de _ccSave.
+ //
+ // Este autosave já mandava só os campos tocados (a fila _fornAutoSavePending
+ // é montada campo a campo), então o caso "regravei o formulário inteiro por
+ // cima" não existia aqui — o que faltava era a trava: sem ela, dois usuários
+ // editando o MESMO campo do mesmo fornecedor ainda perdiam a alteração de um
+ // deles em silêncio. _ccSave recusa essa gravação e avisa em português.
+ var r = await _ccSave('fornecedores', id, patch);
+ if (String(_editingFornId) !== String(id)) return; // trocou de fornecedor no meio
+ if (r.semMudanca) { _fornAutoSaveStatus('saved', 'Alterações salvas'); return; }
+ if (r.excluido) {
+  _fornAutoSaveStatus('error', 'Este fornecedor foi excluído por outro usuário.');
+  return;
+ }
+ if (r.erro) {
+  console.error('[auto-save fornecedor]', r.erro);
+  _fornAutoSaveStatus('error', 'Não foi possível salvar. Sua alteração continua na tela.');
+  return;
+ }
+ if (r.conflito) {
+  _fornAutoSaveStatus('error', _ccMsgConflito('fornecedores', r.campos));
+  if (r.atual) {
+   var iC = _fornecedoresArr.findIndex(function(x){ return String(x.id) === String(id); });
+   if (iC !== -1) Object.assign(_fornecedoresArr[iC], r.atual);
+   _renderFornecedores();
   }
-  _fornAutoSaveStatus('saved', 'Alterações salvas');
-  var idx = _fornecedoresArr.findIndex(function(x){ return String(x.id) === String(id); });
-  if (idx !== -1) Object.assign(_fornecedoresArr[idx], patch);
-  _renderFornecedores();
- }).catch(function(e) {
-  if (String(_editingFornId) !== String(id)) return;
-  _fornAutoSaveStatus('error', 'Erro: ' + e.message);
-  console.error('[auto-save fornecedor]', e);
- });
+  return;
+ }
+ _fornAutoSaveStatus('saved', 'Alterações salvas');
+ var idx = _fornecedoresArr.findIndex(function(x){ return String(x.id) === String(id); });
+ if (idx !== -1) Object.assign(_fornecedoresArr[idx], r.row || patch);
+ _renderFornecedores();
 }
 
 function _fornAutoSaveFlushNow() {
@@ -2111,7 +2242,13 @@ function _fornMostrarErros(erros) {
  });
 }
 
+// Guarda contra duplo-clique (_ccUmaVez, concurrency.js): sem ela, dois
+// cliques rápidos em "Salvar fornecedor" na CRIAÇÃO disparavam dois INSERTs e
+// criavam dois fornecedores iguais.
 async function submitNovoFornecedor() {
+ return _ccUmaVez('salvar-fornecedor', _submitNovoFornecedorReal, 'fn-drw-submit-btn');
+}
+async function _submitNovoFornecedorReal() {
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
  var dados = {
@@ -2147,12 +2284,27 @@ async function submitNovoFornecedor() {
 
  var fornecedorId = _editingFornId;
  if (fornecedorId) {
-  var upd = await _sb.from('fornecedores').update(payload).eq('id', fornecedorId);
-  if (upd.error) { _showToast('Erro ao salvar fornecedor: ' + _supaErrPt(upd.error.message), 'erro'); return; }
+  // criado_por só faz sentido na criação — reenviá-lo no UPDATE reescreveria
+  // o autor original com quem editou por último (e ainda apareceria no
+  // histórico como se o "criador" tivesse mudado).
+  delete payload.criado_por;
+  var upd = await _ccSave('fornecedores', fornecedorId, payload);
+  if (upd.excluido) { _showToast('Este fornecedor foi excluído por outro usuário. Nada foi salvo.', 'erro'); return; }
+  if (upd.erro) {
+   console.error('[Fornecedores] erro ao salvar:', upd.erro);
+   _showToast('Não foi possível salvar o fornecedor. Suas alterações continuam na tela.', 'erro');
+   return;
+  }
+  if (upd.conflito) { _showToast(_ccMsgConflito('fornecedores', upd.campos), 'erro'); _dbLoadFornecedores(); return; }
  } else {
-  var ins = await _sb.from('fornecedores').insert(payload).select('id').single();
-  if (ins.error) { _showToast('Erro ao criar fornecedor: ' + _supaErrPt(ins.error.message), 'erro'); return; }
+  var ins = await _sb.from('fornecedores').insert(payload).select('*').single();
+  if (ins.error) {
+   console.error('[Fornecedores] erro ao criar:', ins.error);
+   _showToast('Não foi possível criar o fornecedor. Nada foi salvo.', 'erro');
+   return;
+  }
   fornecedorId = ins.data.id;
+  if (typeof _ccSetBaseline === 'function') _ccSetBaseline('fornecedores', fornecedorId, ins.data);
  }
 
  // Grava produtos por diff (update/insert/delete) em vez de substituir tudo —
@@ -2160,7 +2312,11 @@ async function submitNovoFornecedor() {
  // NUNCA é enviado — é coluna gerada pelo próprio Postgres (quantidade *
  // valor_unitario), garantindo que nunca fica inconsistente.
  var salvarProdRes = await _fornSalvarProdutos(fornecedorId, dados.produtos);
- if (salvarProdRes.error) { _showToast('Fornecedor salvo, mas houve erro ao gravar produtos: ' + _supaErrPt(salvarProdRes.error.message), 'erro'); closeNovoFornecedor(); _dbLoadFornecedores(); return; }
+ if (salvarProdRes.error) {
+  console.error('[Fornecedores] erro ao gravar produtos:', salvarProdRes.error);
+  _showToast('Os dados do fornecedor foram salvos, mas a lista de produtos não. Reabra o cadastro e confira os produtos.', 'erro');
+  closeNovoFornecedor(); _dbLoadFornecedores(); return;
+ }
 
  _showToast('Fornecedor salvo com sucesso!', 'ok');
  closeNovoFornecedor();
