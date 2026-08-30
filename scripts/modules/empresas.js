@@ -1282,10 +1282,14 @@ async function _spSaveEmpresa() {
   // ultima_alteracao_por NÃO é mais setado aqui — o trigger
   // set_audit_fields() (empresas/contatos) agora é a única fonte de verdade
   // pra esse campo em todo UPDATE, então a app não precisa (e não deve)
-  // mandar esse valor manualmente. ultima_modificacao continua manual —
-  // é uma coluna separada, fora do escopo desta rodada (ver comentário em
-  // _spEmpresas acima).
-  ultima_modificacao: new Date().toISOString(),
+  // mandar esse valor manualmente.
+  //
+  // ultima_modificacao continua sendo mantida pela aplicação (coluna separada,
+  // sem trigger), mas NÃO entra aqui no literal de propósito: ela muda a cada
+  // chamada, então entraria no diff sempre e o autosave nunca conseguiria
+  // concluir "nada mudou" — cada pausa de digitação viraria um UPDATE de
+  // verdade e uma linha de histórico, mesmo sem ninguém ter alterado nada.
+  // É acrescentada logo abaixo, só depois de confirmado que há alteração real.
  };
  if (!payload.nome) { _showToast('Informe a Razão Social.', 'erro'); return; }
  if (payload.cnpj && await _empCnpjJaExiste(payload.cnpj, id)) {
