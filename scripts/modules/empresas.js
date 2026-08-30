@@ -18,6 +18,26 @@ var EMPRESA_ESTADO_OPCOES = ['AL','AP','BA','CE','DF','ES','GO','MA','MG','MS','
 // abaixo, aqui reaproveitados pro <select>/multiselect do painel de detalhe.
 var EMPRESA_FASE_OPCOES = ['Cliente','Cliente inativo','Cliente recorrente','Consumidor Final','Lead','Parceiro comercial'];
 var EMPRESA_CATEGORIA_OPCOES = ['Modular','Solar','Steel Frame','Telhados'];
+
+// ── Rótulos de campo pro controle de concorrência e pro Histórico ────────────
+// Mesmo mapa serve às duas coisas (ver concurrency.js/historico.js): é ele que
+// faz a mensagem de conflito dizer "Razão Social" em vez de "nome", e o
+// histórico dizer "Fase do Ciclo de Vida" em vez de "fase_ciclo_vida".
+// Rótulo null = campo técnico, fica FORA do histórico (senão toda alteração
+// viraria também "ultima_modificacao mudou", que é ruído puro).
+var _EMPRESA_CAMPO_LABEL = {
+ nome: 'Razão Social', cnpj: 'CNPJ', url_site: 'URL do site', estado: 'Estado',
+ fase_ciclo_vida: 'Fase do Ciclo de Vida', categoria: 'Categoria',
+ ultima_modificacao: null, ultima_alteracao_por: null, criado_por: null,
+};
+var _CONTATO_CAMPO_LABEL = {
+ nome_completo: 'Nome', cargo: 'Cargo', email: 'E-mail', telefone: 'Telefone',
+ ultima_alteracao_por: null, criado_por: null, empresa_id: null,
+};
+if (typeof _ccRegistrarLabels === 'function') {
+ _ccRegistrarLabels('empresas', _EMPRESA_CAMPO_LABEL);
+ _ccRegistrarLabels('contatos', _CONTATO_CAMPO_LABEL);
+}
 function _spEmpOptSelect(list, atual) {
  return '<option value="">—</option>' + list.map(function(o) {
   return '<option value="' + o + '"' + (o === atual ? ' selected' : '') + '>' + o + '</option>';
@@ -379,7 +399,15 @@ async function _spEmpresas(row, tds) {
   + '</div>';
 
  _spSet('Empresa', nome,
-  '<div class="sp-field"><div class="sp-label">Razão Social <span style="color:var(--red)">*</span></div>'
+  // Barra de sub-abas no mesmo padrão de Obra/Projeto/Entrega (.spt-bar /
+  // .spt-panel — as seções ficam TODAS visíveis, a barra só rola até elas),
+  // acrescentada aqui pra caber a nova sub-aba "Histórico".
+  '<div class="spt-bar">'
+  + '<button class="spt-btn active" data-target="spt-emp-geral" onclick="_sptSwitch(\'emp-geral\',this)">Visão Geral</button>'
+  + '<button class="spt-btn" data-target="spt-emp-historico" onclick="_sptSwitch(\'emp-historico\',this)">Histórico</button>'
+  + '</div>'
+  + '<div class="spt-panel" id="spt-emp-geral">'
+  + '<div class="sp-field"><div class="sp-label">Razão Social <span style="color:var(--red)">*</span></div>'
   + '<input class="sp-inp" id="sp-emp-nome" value="'+nome.replace(/"/g,'&quot;')+'" oninput="_empScheduleAutoSave()"></div>'
   + '<div class="sp-g2">'
   // Sem asterisco aqui de propósito: diferente da criação (onde CNPJ é
@@ -415,7 +443,16 @@ async function _spEmpresas(row, tds) {
   + '<div id="sp-emp-contatos" class="sp-rel-chips-wrap">'
   + '<div style="font-size:12px;color:var(--muted);padding:12px 0">Carregando contatos...</div>'
   + '</div></div>'
-  + auditHtml,
+  + auditHtml
+  + '</div>' // fim spt-panel emp-geral
+  // Histórico de alterações — componente compartilhado (scripts/lib/historico.js),
+  // lendo a mesma audit_log que já era alimentada pelo trigger trg_empresas_audit.
+  // A migração concorrencia_historico_fase2 liberou a LEITURA dessas linhas pros
+  // usuários comuns (antes só admin enxergava, então isto sairia sempre vazio).
+  + '<div class="spt-panel" id="spt-emp-historico">'
+  + '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Histórico de alterações</div>'
+  + (typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-emp-historico') : '')
+  + '</div>',
   // Sem botão "Salvar": o painel já autosalva (_empScheduleAutoSave, ver
   // campos acima) — pedir pra clicar em algo pra persistir uma mudança que
   // já foi salva sozinha é redundante e confunde ("salvei ou não?").
@@ -426,6 +463,13 @@ async function _spEmpresas(row, tds) {
  );
 
  _spEmpRenderCategoriaDropdown();
+ // Baseline do controle de concorrência: o registro como está no banco no
+ // momento em que o painel abriu. É contra ELE que _ccSave compara pra mandar
+ // só os campos alterados e pra travar por updated_at (ver concurrency.js).
+ if (typeof _ccSetBaseline === 'function' && empId && emp.id) _ccSetBaseline('empresas', empId, emp);
+ if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
+ if (typeof _sptInitScrollSpy === 'function') _sptInitScrollSpy();
+ if (typeof _histCarregar === 'function' && empId) _histCarregar('sp-emp-historico', 'empresas', empId);
 
  if (!_sb || !empId) return;
 
@@ -495,6 +539,18 @@ async function _spEmpresas(row, tds) {
 // versão anterior só buscava a partir do 2º caractere e não mostrava nada de
 // cara). Clicar num item já vincula na hora (sem precisar de um botão
 // "Confirmar" à parte) e a caixa fecha sozinha.
+// Reabre o painel de uma empresa a partir do id, sem depender da <tr> da
+// listagem (que pode nem existir se o filtro atual esconder a linha). Usado
+// pelo botão "Atualizar" da faixa de alteração externa e pelo recarregamento
+// após conflito — de propósito NÃO passa por _spOpenEntityById, que empilharia
+// a entidade na pilha de navegação como se fosse uma abertura nova.
+function _spEmpresaById(id) {
+ if (!id) return;
+ var row = document.querySelector('#emp-tbody tr[data-id="' + id + '"]');
+ if (!row) { row = document.createElement('tr'); row.dataset.id = String(id); }
+ _spEmpresas(row, []);
+}
+
 var _empLinkCache = { obra: null, contato: null }; // cache da lista completa por tipo, carregada 1x por abertura
 function _empLinkToggle(tipo) {
  var box = document.getElementById('sp-emp-link-' + tipo);
@@ -618,7 +674,13 @@ function _spContatoById(id) {
  var email = c.email || '';
  var tel   = c.telefone || '';
  _spSet('Contato', nome,
-  '<div class="sp-field"><div class="sp-label">Nome</div>'
+  // Mesma barra de sub-abas do painel de Empresa (ver _spEmpresas).
+  '<div class="spt-bar">'
+  + '<button class="spt-btn active" data-target="spt-ctt-geral" onclick="_sptSwitch(\'ctt-geral\',this)">Visão Geral</button>'
+  + '<button class="spt-btn" data-target="spt-ctt-historico" onclick="_sptSwitch(\'ctt-historico\',this)">Histórico</button>'
+  + '</div>'
+  + '<div class="spt-panel" id="spt-ctt-geral">'
+  + '<div class="sp-field"><div class="sp-label">Nome</div>'
   + '<input class="sp-inp" id="sp-ctt-nome" value="'+nome.replace(/"/g,'&quot;')+'" oninput="_cttScheduleAutoSave()"></div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Cargo</div>'+_spCttCargoMarkup(cargo)+'</div>'
@@ -652,11 +714,24 @@ function _spContatoById(id) {
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de criação</span><span class="drw-audit-val">'+(c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '—')+'</span></div>'
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">'+(c.ultima_alteracao_por||'—')+'</span></div>'
   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última modificação</span><span class="drw-audit-val">'+(c.updated_at ? new Date(c.updated_at).toLocaleString('pt-BR') : '—')+'</span></div>'
+  + '</div>'
+  + '</div>' // fim spt-panel ctt-geral
+  // Histórico de alterações — mesmo componente compartilhado; trg_contatos_audit
+  // já alimentava a audit_log, faltava só a permissão de leitura (Fase 2).
+  + '<div class="spt-panel" id="spt-ctt-historico">'
+  + '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Histórico de alterações</div>'
+  + (typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-ctt-historico') : '')
   + '</div>',
   // Mesmo padrão de _spDeleteEmpresa: "Excluir" fica no painel de detalhe
   // (com confirm() nativo), não só na listagem — é a única ação destrutiva.
   '<button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);margin-right:auto" onclick="_spDeleteContato(\''+_spCttCurrentId+'\',\''+nome.replace(/'/g,"\\'")+'\')">Excluir contato</button> '
   + '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+
+ // Baseline da trava otimista + histórico (mesmo tratamento de _spEmpresas).
+ if (typeof _ccSetBaseline === 'function' && c.id) _ccSetBaseline('contatos', _spCttCurrentId, c);
+ if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
+ if (typeof _sptInitScrollSpy === 'function') _sptInitScrollSpy();
+ if (typeof _histCarregar === 'function' && _spCttCurrentId) _histCarregar('sp-ctt-historico', 'contatos', _spCttCurrentId);
 
  if (!_sb || !_spCttCurrentId) return;
  _cttRenderEmpresasVinculadas();
@@ -824,17 +899,111 @@ async function _spSaveContato() {
   email:         emailVal || null,
   telefone:      telDigits.length > 0 ? _cttTelMaskValue(telDigits) : null,
  };
- var { error } = await _sb.from('contatos').update(payload).eq('id', id);
- if (error) { _showToast('Erro ao salvar contato: ' + _supaErrPt(error.message), 'erro'); return; }
+ // Mesma correção de concorrência do painel de Empresa (ver _spSaveEmpresa):
+ // só os campos que ESTE usuário mexeu vão pro banco, e a trava por updated_at
+ // recusa a gravação quando dois usuários editam o MESMO campo do contato.
+ var r = await _ccSaveComFeedback('contatos', id, payload, {
+  toastOk: false,
+  onRecarregar: function (atual) {
+   if (atual) _cttPatchNaLista(atual);
+   if (String(_spCttCurrentId) === String(id)) _spContatoById(id);
+  },
+ });
+ if (!r || r.conflito || r.erro || r.excluido || r.semMudanca) return;
+
  var titleEl = document.getElementById('sp-title');
  if (titleEl) titleEl.textContent = payload.nome_completo;
- var idx = (_contatosArr || []).findIndex(function(c){ return String(c.id) === String(id); });
- if (idx !== -1) {
-  Object.assign(_contatosArr[idx], payload);
-  var tr = document.querySelector('#ctt-tbody tr[data-id="'+id+'"]');
-  if (tr) tr.outerHTML = _cttRowHTML(_contatosArr[idx]);
-  if (typeof _cttApplyFilters === 'function') _cttApplyFilters();
- }
+ _cttPatchNaLista(r.row || payload, id);
+}
+
+// Mesma função de _empPatchNaLista, pro lado dos Contatos. Preserva
+// contatos_empresas/empresa_id (vínculos), que o payload do tempo real e o
+// retorno do UPDATE não trazem.
+function _cttPatchNaLista(patch, idExplicito) {
+ if (!patch) return;
+ var id = idExplicito || patch.id;
+ if (!id) return;
+ var idx = (_contatosArr || []).findIndex(function (c) { return String(c.id) === String(id); });
+ if (idx === -1) return;
+ Object.keys(patch).forEach(function (k) {
+  if (k === 'contatos_empresas' || k === 'empresa_id') return;
+  _contatosArr[idx][k] = patch[k];
+ });
+ var tr = document.querySelector('#ctt-tbody tr[data-id="' + id + '"]');
+ if (tr) tr.outerHTML = _cttRowHTML(_contatosArr[idx]);
+ if (typeof _cttApplyFilters === 'function') _cttApplyFilters();
+}
+
+// ── Tempo real por linha (Empresas e Contatos) ───────────────────────────────
+// Antes destas duas telas não tinham tempo real NENHUM nas tabelas principais
+// (só os vínculos N:N em realtime-sync.js): uma alteração feita por outro
+// usuário só aparecia depois de um F5. Aqui a linha alterada chega pronta no
+// payload, então dá pra repintar só a <tr> dela — sem recarregar as 656
+// empresas/720 contatos e sem apagar filtro/agrupamento/scroll de quem olha.
+// A chave de registro ('empresas'/'contatos') faz _rtWatchRows SUBSTITUIR o
+// handler anterior em vez de acumular um novo a cada visita à aba.
+function _empInitRealtime() {
+ if (typeof _rtWatchRows !== 'function') return;
+ _rtWatchRows('empresas', 'empresas', {
+  onUpdate: function (nova) {
+   if (!nova || !nova.id) return;
+   var eco = typeof _rtSouEu === 'function' && _rtSouEu(nova.ultima_alteracao_por);
+   _empPatchNaLista(nova);
+   if (eco) return;
+   if (String(_spEmpCurrentId) === String(nova.id)
+    && document.getElementById('sp-drawer')?.classList.contains('sp-open')
+    && typeof _rtAvisoAlteracaoExterna === 'function') {
+    // Painel aberto: avisa numa faixa e deixa o usuário recarregar quando
+    // quiser — nunca redesenha por baixo de quem pode estar digitando.
+    _rtAvisoAlteracaoExterna(nova.ultima_alteracao_por, "_spEmpresaById('" + nova.id + "')");
+    if (typeof _ccSetBaseline === 'function') _ccSetBaseline('empresas', nova.id, nova);
+   }
+  },
+  onInsert: function () {
+   // Empresa nova precisa dos joins (contatos/obras) pra <tr> sair completa —
+   // recarrega a lista só nesse caso (evento raro), nunca a cada edição.
+   if (typeof _dbLoadEmpresas === 'function') _dbLoadEmpresas();
+  },
+  onDelete: function (_nova, antiga) {
+   var id = antiga && antiga.id;
+   if (!id) return;
+   var i = (_empresasArr || []).findIndex(function (e) { return String(e.id) === String(id); });
+   if (i !== -1) _empresasArr.splice(i, 1);
+   var tr = document.querySelector('#emp-tbody tr[data-id="' + id + '"]');
+   if (tr) tr.remove();
+   if (String(_spEmpCurrentId) === String(id)) {
+    _showToast('A empresa que você tinha aberta foi excluída por outro usuário.', 'erro');
+    closePanel();
+   }
+  },
+ });
+ _rtWatchRows('contatos', 'contatos', {
+  onUpdate: function (nova) {
+   if (!nova || !nova.id) return;
+   var eco = typeof _rtSouEu === 'function' && _rtSouEu(nova.ultima_alteracao_por);
+   _cttPatchNaLista(nova);
+   if (eco) return;
+   if (String(_spCttCurrentId) === String(nova.id)
+    && document.getElementById('sp-drawer')?.classList.contains('sp-open')
+    && typeof _rtAvisoAlteracaoExterna === 'function') {
+    _rtAvisoAlteracaoExterna(nova.ultima_alteracao_por, "_spContatoById('" + nova.id + "')");
+    if (typeof _ccSetBaseline === 'function') _ccSetBaseline('contatos', nova.id, nova);
+   }
+  },
+  onInsert: function () { if (typeof _dbLoadContatos === 'function') _dbLoadContatos(); },
+  onDelete: function (_nova, antiga) {
+   var id = antiga && antiga.id;
+   if (!id) return;
+   var i = (_contatosArr || []).findIndex(function (c) { return String(c.id) === String(id); });
+   if (i !== -1) _contatosArr.splice(i, 1);
+   var tr = document.querySelector('#ctt-tbody tr[data-id="' + id + '"]');
+   if (tr) tr.remove();
+   if (String(_spCttCurrentId) === String(id)) {
+    _showToast('O contato que você tinha aberto foi excluído por outro usuário.', 'erro');
+    closePanel();
+   }
+  },
+ });
 }
 
 var _empColorPalette = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
@@ -890,7 +1059,10 @@ async function _dbLoadEmpresas() {
  var allData = []; var from = 0; var more = true;
  while (more) {
   var res = await _sb.from('empresas')
-   .select('id, nome, cnpj, estado, fase_ciclo_vida, categoria, url_site, criado_por, ultima_alteracao_por, ultima_modificacao, created_at, contatos_empresas(contato_id), empresas_obras(obra:obra_id(nome))')
+   // updated_at é obrigatório aqui: é a coluna que _ccSave usa como trava
+   // otimista (ver concurrency.js). Sem ela no baseline, todo autosave gastaria
+   // dois round-trips extras redescobrindo o updated_at antes de conseguir gravar.
+   .select('id, nome, cnpj, estado, fase_ciclo_vida, categoria, url_site, criado_por, ultima_alteracao_por, ultima_modificacao, created_at, updated_at, contatos_empresas(contato_id), empresas_obras(obra:obra_id(nome))')
    .order('nome').range(from, from + 999);
   if (res.error || !res.data || !res.data.length) break;
   allData = allData.concat(res.data);
@@ -913,6 +1085,7 @@ async function _dbLoadEmpresas() {
  var tbody = document.getElementById('emp-tbody');
  if (!tbody) return;
 
+ _empInitRealtime();
  tbody.innerHTML = allData.map(_empRowHTML).join('');
  // Reaplica filtro/busca/ordenação/agrupamento atuais (se algum estiver
  // ativo) — sem isso, um recarregamento em segundo plano (realtime, ou o
@@ -1073,6 +1246,7 @@ async function _dbLoadContatos() {
  var tbody = document.getElementById('ctt-tbody');
  if (!tbody) return;
 
+ _empInitRealtime();
  tbody.innerHTML = allData.map(_cttRowHTML).join('');
  // Reaplica filtro/busca/ordenação/agrupamento atuais — mesmo motivo do
  // _empApplyFilters() em _dbLoadEmpresas acima.
@@ -1120,23 +1294,59 @@ async function _spSaveEmpresa() {
   return;
  }
 
- var { error } = await _sb.from('empresas').update(payload).eq('id', id);
- if (error) {
-  _showToast('Erro ao salvar empresa: ' + _supaErrPt(error.message), 'erro');
-  return;
- }
+ // ── Controle de concorrência (ver concurrency.js) ───────────────────────────
+ // Antes daqui saía um UPDATE com o payload INTEIRO a cada pausa de digitação:
+ // se outro usuário tivesse mudado a Fase enquanto este painel estava aberto,
+ // este autosave regravaria a Fase ANTIGA (a que está na tela desde antes) e
+ // desfaria a alteração dele sem ninguém perceber. Agora só os campos que ESTE
+ // usuário realmente mexeu vão pro banco, e a trava por updated_at recusa a
+ // gravação quando os dois mexeram no MESMO campo.
+ //
+ // ultima_modificacao é tratada à parte de propósito: ela muda a cada chamada
+ // (new Date()), então se entrasse no diff junto o _ccSave nunca veria
+ // "nada mudou" e todo tique do autosave viraria um UPDATE de verdade (e uma
+ // linha de histórico). Só é acrescentada DEPOIS de confirmado que há
+ // alteração real de conteúdo.
+ var baseline = (typeof _ccGetBaseline === 'function') ? _ccGetBaseline('empresas', id) : null;
+ if (typeof _ccDiff === 'function' && !Object.keys(_ccDiff(baseline, payload)).length) return;
+ payload.ultima_modificacao = new Date().toISOString();
+
+ var r = await _ccSaveComFeedback('empresas', id, payload, {
+  toastOk: false, // autosave silencioso: só fala quando dá problema
+  onRecarregar: function (atual) {
+   // Conflito ou merge automático: a linha do banco é a verdade. Repinta a
+   // lista e reabre o painel com os valores certos.
+   if (atual) _empPatchNaLista(atual);
+   if (String(_spEmpCurrentId) === String(id)) _spEmpresaById(id);
+  },
+ });
+ if (!r || r.conflito || r.erro || r.excluido || r.semMudanca) return;
+
  var titleEl = document.getElementById('sp-title');
  if (titleEl) titleEl.textContent = payload.nome;
- // Atualiza o cache local em vez de recarregar as 638 empresas do banco a
+ // Atualiza o cache local em vez de recarregar as 656 empresas do banco a
  // cada autosave (a cada pausa de digitação) — só a linha/registro editado
  // muda; _dbLoadEmpresas() completo fica só pra criação/exclusão de fato.
- var idx = (_empresasArr || []).findIndex(function(e){ return String(e.id) === String(id); });
- if (idx !== -1) {
-  Object.assign(_empresasArr[idx], payload);
-  var tr = document.querySelector('#emp-tbody tr[data-id="'+id+'"]');
-  if (tr) tr.outerHTML = _empRowHTML(_empresasArr[idx]);
-  if (typeof _empApplyFilters === 'function') _empApplyFilters();
- }
+ _empPatchNaLista(r.row || payload, id);
+}
+
+// Aplica uma linha vinda do banco (save próprio ou evento de tempo real) no
+// array em memória e redesenha SÓ a <tr> dela — nunca a lista inteira, pra não
+// perder filtro/agrupamento/scroll de quem está olhando. Preserva os campos de
+// junção (contatos_empresas/empresas_obras) que o payload do realtime não traz.
+function _empPatchNaLista(patch, idExplicito) {
+ if (!patch) return;
+ var id = idExplicito || patch.id;
+ if (!id) return;
+ var idx = (_empresasArr || []).findIndex(function (e) { return String(e.id) === String(id); });
+ if (idx === -1) return;
+ Object.keys(patch).forEach(function (k) {
+  if (k === 'contatos_empresas' || k === 'empresas_obras') return;
+  _empresasArr[idx][k] = patch[k];
+ });
+ var tr = document.querySelector('#emp-tbody tr[data-id="' + id + '"]');
+ if (tr) tr.outerHTML = _empRowHTML(_empresasArr[idx]);
+ if (typeof _empApplyFilters === 'function') _empApplyFilters();
 }
 
 // Mesmo padrão de confirm() nativo já usado em _taskDelete (dashboard.js) e
@@ -2319,7 +2529,16 @@ function openNovaEmpresa() {
  _spEmpRenderCategoriaDropdown();
  document.addEventListener('keydown', _spEsc, {once:true});
 }
+// Guarda contra duplo-clique/dupla execução (_ccUmaVez, concurrency.js). O
+// `btn.disabled` que já existia lá dentro só protege enquanto o botão está no
+// DOM com aquele id exato; _ccUmaVez trava a AÇÃO em si, então também cobre
+// Enter no formulário e qualquer outro caminho que chame a função. Sem isso,
+// duas execuções criam duas empresas/contatos iguais — o que já aconteceu de
+// verdade nos dados (pares "TESTE"/"TESTE SOLAR" duplicados em produção).
 async function _spCriarEmpresa() {
+ return _ccUmaVez('criar-empresa', _spCriarEmpresaReal, 'sp-emp-criar-btn');
+}
+async function _spCriarEmpresaReal() {
  var nomeEl = document.getElementById('sp-emp-nome');
  var cnpjEl = document.getElementById('sp-emp-cnpj');
  var nome = (nomeEl || {}).value ? nomeEl.value.trim() : '';
@@ -2430,7 +2649,11 @@ function openNovoContato() {
  document.addEventListener('keydown', _spEsc, {once:true});
 }
 
+// Mesma guarda de duplo-clique de _spCriarEmpresa (ver comentário lá).
 async function _cttCriarContato() {
+ return _ccUmaVez('criar-contato', _cttCriarContatoReal, 'sp-ctt-criar-btn');
+}
+async function _cttCriarContatoReal() {
  var nomeEl = document.getElementById('sp-ctt-nome');
  var nome = (nomeEl || {}).value ? nomeEl.value.trim() : '';
  if (nomeEl) { nomeEl.style.borderColor = nome ? '' : 'var(--red)'; nomeEl.style.boxShadow = nome ? '' : '0 0 0 2px rgba(239,68,68,.18)'; }
