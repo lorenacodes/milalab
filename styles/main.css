@@ -1168,6 +1168,22 @@ td{font-size:13px}
 .sp-item-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--muted)}
 .sp-item-meta b{color:var(--text)}
 .sp-empty{text-align:center;padding:32px 16px;color:var(--muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--r-md)}
+
+/* ── Histórico de alterações (scripts/lib/historico.js) ──────────────────────
+   Uma linha por alteração, no formato "Fulano alterou X de A para B" + a data
+   embaixo em cinza. Usado igual nas 3 entidades (Obra/Projeto/Entrega). */
+.hist-item{border:1px solid var(--border);border-radius:var(--r-md);padding:9px 11px;margin-bottom:7px;background:var(--surface)}
+.hist-linha{font-size:12px;line-height:1.5;color:var(--text)}
+.hist-linha + .hist-linha{margin-top:3px}
+.hist-quando{font-size:10px;color:var(--muted);margin-top:5px}
+.hist-de{color:var(--muted);text-decoration:line-through}
+.hist-para{color:var(--green,#15803d);font-weight:600}
+
+/* Aviso "outro usuário alterou este registro" no topo do painel de detalhe —
+   NÃO fecha o painel nem sobrescreve o que o usuário está digitando; ele
+   decide quando recarregar (ver _rtAvisoAlteracaoExterna, realtime-sync.js). */
+.sp-aviso-externo{display:flex;align-items:center;gap:10px;background:#fff8e1;border:1px solid #f0c36d;color:#7a5600;border-radius:var(--r-md);padding:8px 11px;font-size:12px;margin-bottom:12px}
+.sp-aviso-externo button{background:#7a5600;color:#fff;border:0;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0}
 /* highlight clicked row */
 tr.sp-active td{background:var(--yellow-dim)!important}
 /* hover on clickable rows */

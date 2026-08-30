@@ -376,9 +376,51 @@ async function _dbLoadObras() {
   var emp = (o.empresa && o.empresa.nome) || '';
   _obraIdMap[o.id] = { nome: o.nome || '', empresa: emp };
  });
+ // Espelho em memória da lista + o "contexto" (mapas de proposta/agregados)
+ // que o HTML de cada linha precisa. Guardados aqui pra que uma alteração
+ // pontual (autosave desta aba ou evento de tempo real de OUTRO usuário)
+ // consiga redesenhar SÓ a <tr> daquela obra, com exatamente o mesmo HTML,
+ // sem refazer as 8 consultas paginadas da lista inteira.
+ _obrasArr = allObras;
+ _obrasCtx = { propostaMap: propostaMap, docsPresenca: docsPresenca, projAgg: projAgg, entAgg: entAgg, temInstalacao: temInstalacao, temTarefa: temTarefa, temRegistro: temRegistro };
  var tbody=document.getElementById('obras-tbody'); if(!tbody)return;
  try {
- tbody.innerHTML=allObras.map(function(o){
+ tbody.innerHTML=allObras.map(function(o){ return _obraRowHTML(o, _obrasCtx); }).join('');
+ } catch (e) {
+  // Erro SÍNCRONO dentro do .map() (ex.: TypeError num campo inesperado)
+  // não é pego pelo try/catch das queries acima (esse já retornou antes de
+  // chegar aqui) — sem isto, a tela ficava travada em "Carregando
+  // obras..." pra sempre e o erro só aparecia no console (foi exatamente
+  // o que aconteceu com o bug do caminho_storage nulo).
+  console.error('[Obras] erro ao renderizar a lista de obras:', e);
+  tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:24px">Não foi possível exibir a lista de obras. Recarregue a página; se continuar, avise o suporte.</td></tr>';
+  return;
+ }
+ // Badge do menu lateral: agora vem de _navBadgesLoadInitial() (RPC de
+ // contagem única, no boot) + realtime — não mais como efeito colateral
+ // de carregar a lista inteira aqui.
+ // Assinatura de tempo real criada só quando a lista de fato carregou (não no
+ // boot, pra não abrir canal de quem nunca visita a aba). _rtWatchRows é
+ // idempotente por chave, então voltar pra esta aba não duplica nada.
+ _obrasIniciarTempoReal();
+}
+
+// Espelho em memória da lista de Obras + contexto do último load (ver
+// _dbLoadObras). O banco continua sendo a fonte da verdade: todo evento de
+// tempo real e todo save sobrescrevem a entrada correspondente aqui com a
+// linha que veio do banco (_obraPatchNaLista) — este array nunca "evolui
+// sozinho" em paralelo ao Postgres.
+var _obrasArr = [];
+var _obrasCtx = { propostaMap: {}, docsPresenca: { temArt: new Set(), temCalculo: new Set() }, projAgg: {}, entAgg: {}, temInstalacao: new Set(), temTarefa: new Set(), temRegistro: new Set() };
+
+// HTML de UMA linha da tabela de Obras. Extraído de dentro do .map() de
+// _dbLoadObras sem nenhuma mudança de conteúdo — só virou função nomeada pra
+// poder ser reaproveitado no redesenho pontual de uma linha só.
+function _obraRowHTML(o, ctx) {
+  ctx = ctx || _obrasCtx;
+  var propostaMap = ctx.propostaMap || {}, docsPresenca = ctx.docsPresenca || { temArt: new Set(), temCalculo: new Set() };
+  var projAgg = ctx.projAgg || {}, entAgg = ctx.entAgg || {};
+  var temInstalacao = ctx.temInstalacao || new Set(), temTarefa = ctx.temTarefa || new Set(), temRegistro = ctx.temRegistro || new Set();
   var tipos=o.tipo_obra||[]; var etapa=o.etapa_negocio||''; var eCls=_etapaClsBd[etapa]||'bm';
   var empNome=(o.empresa&&o.empresa.nome)||(_empresasArr&&o.empresa_id?((_empresasArr.find(function(e){return e.id===o.empresa_id;})||{}).nome||''):'')||'';
   var loc=[o.cidade,o.estado].filter(Boolean).join(' - ');
@@ -414,20 +456,16 @@ async function _dbLoadObras() {
    +'<td style="text-align:center">'+propostaCell+'</td>'
    +'<td style="font-weight:600">'+valor+'</td>'
    +'<td><button class="btn btn-ghost btn-sm" onclick="_spObraById(\''+o.id+'\')">Abrir</button></td></tr>';
- }).join('');
- } catch (e) {
-  // Erro SÍNCRONO dentro do .map() (ex.: TypeError num campo inesperado)
-  // não é pego pelo try/catch das queries acima (esse já retornou antes de
-  // chegar aqui) — sem isto, a tela ficava travada em "Carregando
-  // obras..." pra sempre e o erro só aparecia no console (foi exatamente
-  // o que aconteceu com o bug do caminho_storage nulo).
-  console.error('[Obras] erro ao renderizar a lista de obras:', e);
-  tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:24px">Erro ao exibir obras: ' + (e && e.message ? e.message : 'erro desconhecido') + '</td></tr>';
-  return;
- }
- // Badge do menu lateral: agora vem de _navBadgesLoadInitial() (RPC de
- // contagem única, no boot) + realtime — não mais como efeito colateral
- // de carregar a lista inteira aqui.
+}
+
+// Contador de cada coluna do Kanban. Extraído do fim de _dbLoadObrasKanban
+// porque agora um card pode trocar de coluna sozinho (evento de tempo real de
+// outro usuário movendo a obra de etapa), sem passar por um reload inteiro.
+function _obrasKanbanAtualizarContadores() {
+ document.querySelectorAll('.kanban-col').forEach(function (col) {
+  var badge = col.querySelector('.kc-count');
+  if (badge) badge.textContent = col.querySelectorAll('.obra-card').length;
+ });
 }
 
 async function _dbLoadObrasKanban() {
@@ -540,12 +578,7 @@ async function _dbLoadObrasKanban() {
   body.appendChild(card);
  });
 
- // Atualiza contadores de cada coluna
- document.querySelectorAll('.kanban-col').forEach(col => {
-  const count = col.querySelectorAll('.obra-card').length;
-  const badge = col.querySelector('.kc-count');
-  if (badge) badge.textContent = count;
- });
+ _obrasKanbanAtualizarContadores();
 
  _setupObrasKanbanDnD();
 }
@@ -683,6 +716,13 @@ async function _spObraById(id) {
 
   _obraAtiva = _normObraAssoc(obraRes.data);
   _obraAtiva.projetos = projetos;
+  // Estado "como veio do banco" no momento em que o painel abriu — é contra
+  // ELE que _ccSave (concurrency.js) compara pra mandar só os campos que este
+  // usuário realmente mexeu, e é o updated_at DELE que serve de trava
+  // otimista. Sem isso o autosave voltaria a gravar o formulário inteiro por
+  // cima do que outro usuário tiver alterado nesse meio tempo.
+  _ccSetBaseline('obras', id, obraRes.data);
+  if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
   await _spObrasRender(_obraAtiva, projetos, entregas, instalacoes, atividades);
  } catch(err) {
   console.error('[MilaTec] Erro ao carregar obra:', err);
@@ -2178,6 +2218,10 @@ async function _spObrasRender(o, projetos, entregas, instalacoes, atividades) {
 // TODO INSERT/UPDATE/DELETE de `obras`) — só nunca tinha UI. Rótulos amigáveis
 // pra quem já é reconhecível; campos técnicos/de auditoria (null aqui) são
 // ignorados no diff pra não poluir com ruído tipo "updated_at mudou".
+// O MESMO mapa serve pra duas coisas: os rótulos do histórico e os rótulos da
+// mensagem de conflito de concorrência ("...alterado por outro usuário
+// (Etapa do Negócio)") — registrado em _CC_LABELS pra as duas telas nunca
+// divergirem. Rótulo null = campo técnico, fora do histórico.
 var _OBRA_CAMPO_LABEL = {
  nome: 'Nome', tipo_obra: 'Tipo(s) de obra', etapa_negocio: 'Etapa do Negócio',
  cidade: 'Cidade', estado: 'Estado', canal_vendas: 'Canal de vendas',
@@ -2185,58 +2229,15 @@ var _OBRA_CAMPO_LABEL = {
  data_criacao: 'Data do orçamento', data_envio_proposta: 'Data envio da proposta',
  motivo_perdido: 'Motivo perdido', empresa_id: 'Empresa vinculada',
  updated_at: null, ultima_alteracao_por: null, created_at: null, criado_por: null, id: null,
+ airtable_id: null, data_fechamento: 'Data de fechamento',
 };
-function _spHistFmtVal(v) {
- if (v == null || v === '') return '—';
- if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
- if (typeof v === 'object') return JSON.stringify(v);
- return String(v);
-}
-function _spHistoricoItemHTML(row) {
- var dt = new Date(row.created_at);
- var dtFmt = dt.toLocaleDateString('pt-BR') + ' às ' + dt.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
- var opLabel = { INSERT: 'Criação', UPDATE: 'Alteração', DELETE: 'Exclusão' }[row.operacao] || row.operacao;
- var diffsHtml = '';
- if (row.operacao === 'UPDATE' && row.dados_anteriores && row.dados_novos) {
-  var before = row.dados_anteriores, after = row.dados_novos;
-  var changed = Object.keys(after).filter(function(k) {
-   if (_OBRA_CAMPO_LABEL[k] === null) return false;
-   return JSON.stringify(before[k]) !== JSON.stringify(after[k]);
-  });
-  if (changed.length) {
-   diffsHtml = '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px">'
-    + changed.map(function(k) {
-       var label = _OBRA_CAMPO_LABEL[k] || k;
-       return '<div style="font-size:11px"><b>' + label + ':</b> '
-        + '<span style="color:var(--red);text-decoration:line-through">' + _spHistFmtVal(before[k]) + '</span>'
-        + ' → <span style="color:var(--green)">' + _spHistFmtVal(after[k]) + '</span></div>';
-      }).join('')
-    + '</div>';
-  }
- }
- return '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface)">'
-  + '<div style="display:flex;align-items:center;justify-content:space-between">'
-  + '<span style="font-size:11px;font-weight:700;color:var(--text)">' + opLabel + '</span>'
-  + '<span style="font-size:10px;color:var(--muted)">' + dtFmt + '</span>'
-  + '</div>'
-  + '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + (row.usuario_email || '—') + '</div>'
-  + diffsHtml
-  + '</div>';
-}
+if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('obras', _OBRA_CAMPO_LABEL);
+
+// Render do histórico agora é o componente compartilhado (scripts/lib/
+// historico.js), o mesmo usado por Projeto e Entrega — antes esta lógica
+// existia só aqui e estava presa ao mapa de campos de Obra.
 async function _spCarregarHistoricoObra(obraId) {
- var container = document.getElementById('sp-obra-historico');
- if (!container || !_sb) return;
- var isAdmin = !!(_currentUser && _currentUser.isAdmin);
- var res = await _sb.from('audit_log').select('*').eq('tabela', 'obras').eq('registro_id', obraId).order('created_at', { ascending: false }).limit(50);
- if (res.error) { container.innerHTML = '<div class="sp-empty" style="color:var(--red)">Erro ao carregar histórico.</div>'; return; }
- var rows = res.data || [];
- if (!rows.length) {
-  container.innerHTML = isAdmin
-   ? '<div class="sp-empty">Nenhuma alteração registrada ainda.</div>'
-   : '<div class="sp-empty">Histórico de alterações visível apenas para administradores.</div>';
-  return;
- }
- container.innerHTML = rows.map(_spHistoricoItemHTML).join('');
+ if (typeof _histCarregar === 'function') await _histCarregar('sp-obra-historico', 'obras', obraId);
 }
 
 // Lista de "Proposta Comercial" na Visão Geral — pedido explícito: uma obra
@@ -2372,7 +2373,11 @@ async function _spSaveObraFull() {
   // fórmula do totalValor exibido no rodapé da aba Projetos.
   valor: (_obraAtiva.projetos || []).reduce(function(s, p){ return s + (Number(p.valor_unitario) * Number(p.quantidade || 1) || 0); }, 0),
   endereco_entrega:  document.getElementById('sp-end-entrega')?.value?.trim() || null,
-  updated_at:        new Date().toISOString(),
+  // updated_at NÃO vai mais no payload: quem o mantém é o trigger
+  // trg_obras_updated_at, no banco. Mandá-lo daqui era pior do que inútil —
+  // o valor do cliente era sobrescrito pelo trigger de qualquer jeito, e
+  // enquanto isso ele fazia TODO save parecer "tem campo alterado" mesmo
+  // quando nada tinha mudado de verdade.
  };
  // Empresa(s) e Contato(s) NÃO são mais tocados aqui — cada vínculo/
  // desvínculo já é gravado na hora (_spObEmpresaSelectItem/
@@ -2381,17 +2386,143 @@ async function _spSaveObraFull() {
  // geral apagava/reinseria só 1 empresa e fazia upsert de só 1 contato a
  // cada edição de qualquer campo — incompatível com uma obra ter mais de
  // uma Empresa/Contato vinculado (pedido explícito).
- var { error } = await _sb.from('obras').update(payload).eq('id', id);
- if (error) {
-  _showToast('Erro ao salvar obra: ' + _supaErrPt(error.message), 'erro');
- } else {
-  _obraAtiva = { ..._obraAtiva, ...payload };
-  _dbLoadObras();
-  _dbLoadObrasKanban();
-  // Pedido explícito: confirmação visual assim que a alteração chega no
-  // banco — sem isso não tinha nenhum feedback de sucesso, só de erro.
-  _showToast('Alteração salva', 'ok');
+ // Grava com trava otimista + diff de campos (ver concurrency.js). Antes era
+ // um `.update(payload).eq('id', id)` cru: mandava TODOS os campos do
+ // formulário a cada tecla, então salvar o Nome também regravava a Cidade
+ // com o valor velho que estava na tela — desfazendo, sem aviso, o que outro
+ // usuário tivesse acabado de mudar na mesma obra.
+ var r = await _ccSaveComFeedback('obras', id, payload, {
+  onRecarregar: function () { _spObraById(id); },
+ });
+ if (!r || !r.ok) return;
+ _obraAtiva = Object.assign({}, _obraAtiva, r.row);
+ // Antes recarregava as DUAS listas inteiras (8 consultas paginadas cada) a
+ // cada save do painel — a cada 700ms de digitação. Agora atualiza só a
+ // linha da tabela e o card do Kanban desta obra, o que também preserva
+ // filtro/agrupamento/scroll de quem estiver com a grade aberta.
+ _obraPatchNaLista(r.row);
+}
+
+// ── Atualização pontual de UMA obra na Tabela e no Kanban ────────────────────
+// Usado tanto pelo próprio autosave quanto pelos eventos de tempo real
+// (_rtWatchRows abaixo). Não redesenha a lista: só mexe nos campos visíveis da
+// <tr>/card que corresponde a esta obra, então filtro, agrupamento, ordenação
+// e posição de rolagem do usuário ficam exatamente onde estavam.
+function _obraPatchNaLista(o, realce) {
+ if (!o || !o.id) return;
+ // Cache em memória é só um espelho do banco — nunca uma fonte de verdade
+ // paralela: a linha que veio do banco manda. Preserva as associações
+ // (empresa/contato, que vêm de outro select) quando o payload do tempo real
+ // traz só as colunas da própria tabela.
+ var idx = (_obrasArr || []).findIndex(function (x) { return String(x.id) === String(o.id); });
+ var completo = idx !== -1 ? Object.assign(_obrasArr[idx], o) : _normObraAssoc(Object.assign({}, o));
+
+ var tr = document.querySelector('#obras-tbody tr[data-id="' + o.id + '"]');
+ if (tr) {
+  // Redesenha a linha inteira com o MESMO builder do load (data-* de filtro/
+  // ordenação/agrupamento inclusos, senão a linha continuaria sendo filtrada
+  // pelo valor antigo). Substitui só esta <tr> — o resto da tabela, o scroll,
+  // o filtro aplicado e o agrupamento ficam intactos.
+  var novaTr = document.createElement('tbody');
+  novaTr.innerHTML = _obraRowHTML(completo, _obrasCtx);
+  var el = novaTr.firstElementChild;
+  if (el) {
+   if (tr.classList.contains('sp-active')) el.classList.add('sp-active');
+   tr.replaceWith(el);
+   if (realce) {
+    el.style.transition = 'background .9s';
+    el.style.background = 'rgba(37,99,235,.10)';
+    setTimeout(function () { el.style.background = ''; }, 1500);
+   }
+   // Se a linha estava selecionada no painel, _spRow precisa apontar pro
+   // elemento NOVO — senão closePanel() tentaria limpar um nó já descartado.
+   if (typeof _spRow !== 'undefined' && _spRow === tr) _spRow = el;
+  }
  }
+
+ // Kanban: card é criado por createElement em _dbLoadObrasKanban, não por
+ // string de HTML — dá pra atualizar os data-* e o texto no lugar.
+ var card = document.querySelector('.obra-card[data-id="' + o.id + '"]');
+ if (card) {
+  if (completo.etapa_negocio != null) card.dataset.etapa = completo.etapa_negocio;
+  if (completo.nome != null) card.dataset.nome = completo.nome;
+  if (completo.cidade != null) card.dataset.cidade = completo.cidade;
+  if (completo.estado != null) card.dataset.estado = completo.estado;
+  if (completo.valor !== undefined) card.dataset.valor = completo.valor != null ? completo.valor : 0;
+  if (completo.updated_at) card.dataset.updatedAt = String(completo.updated_at).substring(0, 10);
+  if (completo.ultima_alteracao_por !== undefined) card.dataset.alteradoPor = completo.ultima_alteracao_por || '';
+  var tituloEl = card.querySelector('.oc-title');
+  if (tituloEl && completo.nome != null) tituloEl.textContent = completo.nome;
+  // Mudou de etapa → o card pertence a OUTRA coluna. Move o nó em vez de
+  // recarregar o Kanban inteiro (que perderia o filtro/scroll de quem olha).
+  var colId = (typeof _etapaKcId !== 'undefined' && _etapaKcId[completo.etapa_negocio]) || null;
+  var colDestino = colId && document.getElementById(colId);
+  var bodyDestino = colDestino && colDestino.querySelector('.kc-body');
+  if (bodyDestino && card.parentElement !== bodyDestino) {
+   bodyDestino.insertBefore(card, bodyDestino.firstChild);
+   _obrasKanbanAtualizarContadores();
+  }
+  if (realce) {
+   card.style.transition = 'box-shadow .9s';
+   card.style.boxShadow = '0 0 0 2px rgba(37,99,235,.45)';
+   setTimeout(function () { card.style.boxShadow = ''; }, 1500);
+  }
+ }
+}
+
+// ── Tempo real: Obras ────────────────────────────────────────────────────────
+// Exigência explícita: se o usuário A altera uma obra, o usuário B que está
+// com a lista (ou aquela obra) aberta precisa ver a mudança sozinho, sem F5 e
+// sem polling. _rtWatchRows (realtime-sync.js) entrega a LINHA nova; daqui em
+// diante nada de recarregar lista: só a <tr>/card daquela obra é redesenhado.
+// A chave 'obras' garante que voltar pra esta aba não empilhe um 2º handler.
+function _obrasIniciarTempoReal() {
+ if (typeof _rtWatchRows !== 'function') return;
+ _rtWatchRows('obras', 'obras', {
+  onUpdate: function (nova) {
+   if (!nova || !nova.id) return;
+   // Eco do próprio save deste usuário: a tela já está com o valor certo.
+   if (typeof _rtSouEu === 'function' && _rtSouEu(nova.ultima_alteracao_por)) { _obraPatchNaLista(nova, false); return; }
+   _obraPatchNaLista(nova, true);
+   // Obra aberta no painel: NÃO redesenha o painel (o usuário pode estar
+   // digitando). Mostra a faixa de aviso e deixa ELE decidir quando atualizar.
+   if (_obraAtiva && String(_obraAtiva.id) === String(nova.id)
+    && document.getElementById('sp-drawer')?.classList.contains('sp-open')
+    && typeof _rtAvisoAlteracaoExterna === 'function') {
+    _rtAvisoAlteracaoExterna(nova.ultima_alteracao_por, "_spObraById('" + nova.id + "')");
+    // O baseline precisa acompanhar mesmo sem recarregar a tela: assim, se
+    // este usuário salvar em seguida um campo que o outro NÃO mexeu, o
+    // merge automático de _ccSave funciona em vez de acusar conflito falso.
+    if (typeof _ccSetBaseline === 'function') _ccSetBaseline('obras', nova.id, nova);
+   }
+  },
+  onInsert: function (nova) {
+   if (!nova || !nova.id) return;
+   if ((_obrasArr || []).some(function (x) { return String(x.id) === String(nova.id); })) return;
+   var tbody = document.getElementById('obras-tbody');
+   if (!tbody) return;
+   _obrasArr.unshift(_normObraAssoc(Object.assign({}, nova)));
+   var tmp = document.createElement('tbody');
+   tmp.innerHTML = _obraRowHTML(_obrasArr[0], _obrasCtx);
+   if (tmp.firstElementChild) tbody.insertBefore(tmp.firstElementChild, tbody.firstChild);
+  },
+  onDelete: function (_nova, antiga) {
+   // REPLICA IDENTITY padrão: no DELETE o payload traz só a PK — que é tudo
+   // o que precisamos pra achar a linha.
+   var id = antiga && antiga.id;
+   if (!id) return;
+   var i = (_obrasArr || []).findIndex(function (x) { return String(x.id) === String(id); });
+   if (i !== -1) _obrasArr.splice(i, 1);
+   var tr = document.querySelector('#obras-tbody tr[data-id="' + id + '"]');
+   if (tr) tr.remove();
+   var card = document.querySelector('.obra-card[data-id="' + id + '"]');
+   if (card) card.remove();
+   if (_obraAtiva && String(_obraAtiva.id) === String(id)) {
+    _showToast('A obra que você tinha aberta foi excluída por outro usuário.', 'aviso');
+    closePanel();
+   }
+  },
+ });
 }
 
 // ── Empresa: caixa "Adicionar empresa existente" (busca componente srch-sel,
