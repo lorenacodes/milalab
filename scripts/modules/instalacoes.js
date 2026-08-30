@@ -39,6 +39,11 @@ var _instGbFields = [
  { key: 'cliente', label: 'Cliente' },
 ];
 _gbInit('instalacoes', _instGbFields, _instApplyFilters, 3);
+// Lista em memória das instalações carregadas (antes este módulo não tinha
+// cache nenhum: a listagem era montada direto num `allData` local e qualquer
+// atualização exigia recarregar tudo do banco). É o que permite o tempo real
+// e o autosave redesenharem só a <tr> alterada.
+var _instArr = [];
 var _instGroupCollapsed = {};
 function _instToggleGroup(key) {
  _instGroupCollapsed[key] = !_instGroupCollapsed[key];
@@ -126,6 +131,15 @@ function _spInstalacoes(row, tds) {
 // local (não é global em nenhum dos dois lugares).
 var _instStatusCls = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
 var _instAtiva = null; // instalação atualmente aberta no painel (autosave lê daqui)
+
+// Rótulos de campo — servem à mensagem de conflito (concurrency.js) e ao
+// Histórico (historico.js). Rótulo null = campo técnico, fora do histórico.
+var _INSTALACAO_CAMPO_LABEL = {
+ tipo_servico: 'Tipo de Serviço', funil: 'Status', data_inicio: 'Data início',
+ data_fim: 'Data fim', dias_executados: 'Nº dias executados', detalhes: 'Detalhes',
+ numero: 'Número', obra_id: null,
+};
+if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('instalacoes', _INSTALACAO_CAMPO_LABEL);
 var _instDetEquipeSel = [];
 var _instEquipesCacheDet = null;
 
@@ -192,6 +206,11 @@ function _spInstalacaoRender(inst) {
 
  var html = `
   <input type="hidden" id="sp-inst-id" value="${inst.id}">
+  <div class="spt-bar">
+   <button class="spt-btn active" data-target="spt-inst-geral" onclick="_sptSwitch('inst-geral',this)">Visão Geral</button>
+   <button class="spt-btn" data-target="spt-inst-historico" onclick="_sptSwitch('inst-historico',this)">Histórico</button>
+  </div>
+  <div class="spt-panel" id="spt-inst-geral">
   <div class="sp-field"><div class="sp-label">Tipo de Serviço <span class="req">*</span></div>${_srchSelMarkup('instDetTipo', 'sp-inst-tipo', inst.tipo_servico || '')}</div>
   <div class="sp-field"><div class="sp-label">Status <span class="req">*</span></div>${_srchSelMarkup('instDetStatus', 'sp-inst-status', inst.funil || '')}</div>
   <div class="sp-g2">
@@ -221,6 +240,11 @@ function _spInstalacaoRender(inst) {
     ? obras.map(function(o){ return _spRelChipHTML('obras', o.id, o.nome || '—', null, '_instObraDesvincular(\'' + inst.id + '\',\'' + o.id + '\')'); }).join('')
     : '<div class="sp-empty">Nenhuma obra vinculada.</div>'
   }</div>
+  </div>
+  <div class="spt-panel" id="spt-inst-historico">
+   <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Histórico de alterações</div>
+   ${typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-inst-historico') : ''}
+  </div>
  `;
 
  // Exclusão disponível pra qualquer usuário (RLS de `instalacoes` já é
@@ -230,6 +254,13 @@ function _spInstalacaoRender(inst) {
  _spSet('Instalação', titulo, html,
   '<button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);margin-right:auto" onclick="_spExcluirInstalacao(\'' + inst.id + '\',\'' + titulo.replace(/'/g,"\\'") + '\')">Excluir instalação</button> '
   + '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+
+ // Baseline da trava otimista: o registro como veio do banco na abertura do
+ // painel (ver concurrency.js). É contra ele que _ccSave decide o que mandar.
+ if (typeof _ccSetBaseline === 'function') _ccSetBaseline('instalacoes', inst.id, inst);
+ if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
+ if (typeof _sptInitScrollSpy === 'function') _sptInitScrollSpy();
+ if (typeof _histCarregar === 'function') _histCarregar('sp-inst-historico', 'instalacoes', inst.id);
 
  _instDetEquipeSel = equipes.map(function(e){ return e.nome; });
  _instCarregarEquipesCacheDet().then(function(){
@@ -321,7 +352,10 @@ async function _spSalvarInstalacaoFull() {
   data_fim: elFim?.value || null,
   dias_executados: document.getElementById('sp-inst-dias-exec')?.value !== '' ? Number(document.getElementById('sp-inst-dias-exec')?.value) : null,
   detalhes: document.getElementById('sp-inst-detalhes')?.value?.trim() || null,
-  updated_at: new Date().toISOString(),
+  // updated_at NÃO é mais mandado daqui: quem mantém essa coluna é o trigger
+  // trg_instalacoes_updated_at (set_updated_at) no banco, e é exatamente ela
+  // que _ccSave usa como trava otimista. Um valor forjado pelo cliente aqui
+  // seria sobrescrito pelo trigger de qualquer jeito e só atrapalharia o diff.
  };
  var faltando = [];
  if (!payload.tipo_servico) { faltando.push('Tipo de Serviço'); delete payload.tipo_servico; if (_instAtiva && typeof _srchSelSelectItem === 'function') _srchSelSelectItem('instDetTipo', _instAtiva.tipo_servico || ''); }
@@ -329,17 +363,36 @@ async function _spSalvarInstalacaoFull() {
  if (!payload.data_inicio) { faltando.push('Data início'); delete payload.data_inicio; if (elInicio && _instAtiva) elInicio.value = _instAtiva.data_inicio || ''; }
  if (!payload.data_fim) { faltando.push('Data fim'); delete payload.data_fim; if (elFim && _instAtiva) elFim.value = _instAtiva.data_fim || ''; }
  if (faltando.length) _showToast('Campo obrigatório: ' + faltando.join(', ') + '. Alteração não foi salva.', 'erro');
- var camposReais = Object.keys(payload).filter(function(k){ return k !== 'updated_at'; });
- if (!camposReais.length) return;
- var res = await _sb.from('instalacoes').update(payload).eq('id', id);
- if (res.error) { console.error('[Instalações] erro ao salvar:', res.error); _showToast('Erro ao salvar: ' + _supaErrPt(res.error.message), 'erro'); return; }
- if (_instAtiva && String(_instAtiva.id) === String(id)) Object.assign(_instAtiva, payload);
+ if (!Object.keys(payload).length) return;
+
+ // Controle de concorrência (ver concurrency.js): antes daqui saía o payload
+ // INTEIRO a cada pausa de digitação, então dois usuários na mesma instalação
+ // se atropelavam — quem salvasse por último regravava os valores que tinha na
+ // tela desde antes por cima do trabalho do outro, sem aviso. Agora só os
+ // campos que ESTE usuário mexeu vão pro banco.
+ var r = await _ccSaveComFeedback('instalacoes', id, payload, {
+  toastOk: false, // autosave silencioso: só fala quando dá problema
+  onRecarregar: function () {
+   // Conflito ou merge automático: relê do banco e redesenha o painel com os
+   // valores certos (aqui o registro precisa dos joins de obra/equipe, então
+   // recarrega pelo caminho normal em vez de aplicar a linha crua).
+   if (String((_instAtiva || {}).id) === String(id)) _spInstalacaoById(id);
+  },
+ });
+ if (!r || r.conflito || r.erro || r.excluido || r.semMudanca) return;
+ if (_instAtiva && String(_instAtiva.id) === String(id)) Object.assign(_instAtiva, r.row || payload);
+ _instPatchNaLista(r.row || payload, id);
 }
 
 async function _spExcluirInstalacao(id, nome) {
  if (!confirm('Excluir "' + (nome || 'esta instalação') + '" PERMANENTEMENTE?\n\nVínculos com obras/equipes/documentos desta instalação também serão excluídos. Esta ação não pode ser desfeita.')) return;
  var res = await _sb.from('instalacoes').delete().eq('id', id);
- if (res.error) { alert('Erro ao excluir: ' + (res.error?.message || '')); return; }
+ if (res.error) {
+  // Detalhe técnico só no console; o usuário lê português.
+  console.error('[Instalações] erro ao excluir:', res.error);
+  _showToast('Não foi possível excluir esta instalação. Nada foi alterado.', 'erro');
+  return;
+ }
  closePanel();
  if (typeof _dbLoadInstalacoes === 'function') _dbLoadInstalacoes();
 }
@@ -356,8 +409,10 @@ async function _dbLoadInstalacoes() {
    // era hardcoded "—" antes, nunca tinha sido ligada de verdade a nenhum
    // dado; "Obra"/"Cliente" liam só de instalacoes.obra_id, que só guarda
    // 1 obra — ver _spInstalacaoById abaixo pro detalhamento completo.
+   // updated_at é obrigatório aqui: é a coluna que _ccSave usa como trava
+   // otimista (concurrency.js) e que alimenta o baseline do painel.
    var res = await _sb.from('instalacoes')
-    .select('id, numero, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, obras_instalacoes(obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))), instalacoes_equipe(equipe:equipe_id(nome))')
+    .select('id, numero, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, updated_at, obras_instalacoes(obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))), instalacoes_equipe(equipe:equipe_id(nome))')
     .order('data_inicio', { ascending: false })
     .range(from, from + 999);
    if (res.error) throw new Error(res.error.message);
@@ -365,50 +420,115 @@ async function _dbLoadInstalacoes() {
    if (!res.data || res.data.length < 1000) break;
    from += 1000;
   }
+  _instArr = allData;
   // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem no
   // boot) — antes só era preenchido aqui, ou seja, só depois que o usuário
   // abrisse a aba Instalações pelo menos uma vez (bug relatado).
-  // Tempo real: recarrega sozinho quando a tabela mudar (sync do Airtable
-  // ou outro usuário editando) — sem precisar recarregar a página.
-  if (typeof _rtWatch === 'function') _rtWatch('instalacoes', _dbLoadInstalacoes);
+  // Tempo real POR LINHA (_instInitRealtime): o _rtWatch que estava aqui
+  // recarregava a lista inteira a cada alteração de qualquer instalação, o que
+  // apagava filtro/agrupamento/scroll de quem estivesse olhando a tela.
+  _instInitRealtime();
   if (!tbody) return;
   if (!allData.length) {
    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Nenhuma instalação encontrada.</td></tr>';
    return;
   }
-  var funilCls = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
-  tbody.innerHTML = allData.map(function(inst) {
-   var obrasLigadas = (inst.obras_instalacoes || []).map(function(x){ return x.obra; }).filter(Boolean);
-   var obraNome = obrasLigadas.length ? obrasLigadas.map(function(o){ return o.nome; }).join(', ') : '—';
-   var clienteNome = '—';
-   try { clienteNome = obrasLigadas[0].empresas_obras[0].empresa.nome || '—'; } catch(e) {}
-   var tipo = inst.tipo_servico || '—';
-   var equipeNomes = (inst.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean).join(', ') || '—';
-   var funil = inst.funil || '—';
-   var cls = funilCls[funil] || 'bm';
-   var fmtDate = function(d) {
-    if (!d) return '<span style="color:var(--border)">—</span>';
-    var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2);
-   };
-   var dias = inst.dias_executados != null ? inst.dias_executados : (inst.data_inicio && inst.data_fim ? Math.round((new Date(inst.data_fim)-new Date(inst.data_inicio))/86400000) : '—');
-   // Nome/"Instalação" segue a fórmula pedida explicitamente (igual ao
-   // Airtable): "{ID sequencial} - {Categoria do Serviço} - {Obra}".
-   var nomeInst = (inst.numero != null ? inst.numero : '?') + ' - ' + (tipo !== '—' ? tipo : 'Instalação') + ' - ' + (obraNome !== '—' ? obraNome : '(sem obra)');
-   return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'instalacoes\',this)" data-id="'+inst.id+'" data-funil="'+funil+'"'
-    +' data-tipo="'+(tipo!=='—'?tipo:'')+'" data-obra="'+(obraNome!=='—'?obraNome.replace(/"/g,'&quot;'):'')+'" data-cliente="'+(clienteNome!=='—'?clienteNome.replace(/"/g,'&quot;'):'')+'"'
-    +' data-inicio="'+(inst.data_inicio||'')+'" data-fim="'+(inst.data_fim||'')+'" data-dias="'+(typeof dias==='number'?dias:0)+'">'
-    + '<td style="font-weight:500">' + nomeInst + '</td>'
-    + '<td style="color:var(--muted);font-size:12px">' + clienteNome + '</td>'
-    + '<td>' + (tipo !== '—' ? '<span class="badge bg">'+tipo+'</span>' : '<span style="color:var(--border)">—</span>') + '</td>'
-    + '<td style="font-size:12px;color:var(--muted)">' + equipeNomes + '</td>'
-    + '<td style="font-size:12px;color:var(--muted)">' + fmtDate(inst.data_inicio) + '</td>'
-    + '<td style="font-size:12px;color:var(--muted)">' + fmtDate(inst.data_fim) + '</td>'
-    + '<td style="text-align:center;font-size:12px">' + dias + '</td>'
-    + '<td><span class="badge '+cls+'">'+funil+'</span></td>'
-    + '<td><button class="btn btn-ghost btn-sm">Ver &rarr;</button></td>'
-    + '</tr>';
-  }).join('');
+  tbody.innerHTML = allData.map(_instRowHTML).join('');
  } catch(e) {
-  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--red)">Erro: '+e.message+'</td></tr>';
+  // Mensagem técnica fica só no console; o usuário lê português.
+  console.error('[Instalações] erro ao carregar a lista:', e);
+  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--red)">Não foi possível carregar as instalações agora. Tente recarregar a página.</td></tr>';
  }
+}
+
+// Uma instalação → uma <tr>. Extraído do corpo de _dbLoadInstalacoes pra que o
+// tempo real consiga redesenhar SÓ a linha alterada (mesmo padrão de
+// _obraRowHTML/_entRowHTML), em vez de recarregar a lista inteira e derrubar o
+// filtro/agrupamento/scroll de quem está olhando.
+function _instRowHTML(inst) {
+ var funilCls = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
+ var obrasLigadas = (inst.obras_instalacoes || []).map(function(x){ return x.obra; }).filter(Boolean);
+ var obraNome = obrasLigadas.length ? obrasLigadas.map(function(o){ return o.nome; }).join(', ') : '—';
+ var clienteNome = '—';
+ try { clienteNome = obrasLigadas[0].empresas_obras[0].empresa.nome || '—'; } catch(e) {}
+ var tipo = inst.tipo_servico || '—';
+ var equipeNomes = (inst.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean).join(', ') || '—';
+ var funil = inst.funil || '—';
+ var cls = funilCls[funil] || 'bm';
+ var fmtDate = function(d) {
+  if (!d) return '<span style="color:var(--border)">—</span>';
+  var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2);
+ };
+ var dias = inst.dias_executados != null ? inst.dias_executados : (inst.data_inicio && inst.data_fim ? Math.round((new Date(inst.data_fim)-new Date(inst.data_inicio))/86400000) : '—');
+ // Nome/"Instalação" segue a fórmula pedida explicitamente (igual ao
+ // Airtable): "{ID sequencial} - {Categoria do Serviço} - {Obra}".
+ var nomeInst = (inst.numero != null ? inst.numero : '?') + ' - ' + (tipo !== '—' ? tipo : 'Instalação') + ' - ' + (obraNome !== '—' ? obraNome : '(sem obra)');
+ return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'instalacoes\',this)" data-id="'+inst.id+'" data-funil="'+funil+'"'
+  +' data-tipo="'+(tipo!=='—'?tipo:'')+'" data-obra="'+(obraNome!=='—'?obraNome.replace(/"/g,'&quot;'):'')+'" data-cliente="'+(clienteNome!=='—'?clienteNome.replace(/"/g,'&quot;'):'')+'"'
+  +' data-inicio="'+(inst.data_inicio||'')+'" data-fim="'+(inst.data_fim||'')+'" data-dias="'+(typeof dias==='number'?dias:0)+'">'
+  + '<td style="font-weight:500">' + nomeInst + '</td>'
+  + '<td style="color:var(--muted);font-size:12px">' + clienteNome + '</td>'
+  + '<td>' + (tipo !== '—' ? '<span class="badge bg">'+tipo+'</span>' : '<span style="color:var(--border)">—</span>') + '</td>'
+  + '<td style="font-size:12px;color:var(--muted)">' + equipeNomes + '</td>'
+  + '<td style="font-size:12px;color:var(--muted)">' + fmtDate(inst.data_inicio) + '</td>'
+  + '<td style="font-size:12px;color:var(--muted)">' + fmtDate(inst.data_fim) + '</td>'
+  + '<td style="text-align:center;font-size:12px">' + dias + '</td>'
+  + '<td><span class="badge '+cls+'">'+funil+'</span></td>'
+  + '<td><button class="btn btn-ghost btn-sm">Ver &rarr;</button></td>'
+  + '</tr>';
+}
+
+// Aplica no array em memória a linha alterada (save próprio ou tempo real) e
+// redesenha só a <tr> dela. Preserva os joins (obras/equipes), que o payload
+// do postgres_changes não traz.
+function _instPatchNaLista(patch, idExplicito) {
+ if (!patch) return;
+ var id = idExplicito || patch.id;
+ if (!id) return;
+ var idx = (_instArr || []).findIndex(function (x) { return String(x.id) === String(id); });
+ if (idx === -1) return;
+ Object.keys(patch).forEach(function (k) {
+  if (k === 'obras_instalacoes' || k === 'instalacoes_equipe') return;
+  _instArr[idx][k] = patch[k];
+ });
+ var tr = document.querySelector('#inst-tbody tr[data-id="' + id + '"]');
+ if (tr) tr.outerHTML = _instRowHTML(_instArr[idx]);
+ if (typeof _instApplyFilters === 'function') _instApplyFilters();
+}
+
+// Tempo real por linha. Substitui o _rtWatch antigo (que recarregava a lista
+// INTEIRA a cada alteração de qualquer instalação, apagando filtro e scroll de
+// quem estivesse olhando). A chave 'instalacoes' faz _rtWatchRows substituir o
+// handler anterior em vez de acumular um novo a cada visita à aba.
+function _instInitRealtime() {
+ if (typeof _rtWatchRows !== 'function') return;
+ _rtWatchRows('instalacoes', 'instalacoes', {
+  onUpdate: function (nova) {
+   if (!nova || !nova.id) return;
+   _instPatchNaLista(nova);
+   if (String((_instAtiva || {}).id) === String(nova.id)
+    && document.getElementById('sp-drawer')?.classList.contains('sp-open')
+    && typeof _rtAvisoAlteracaoExterna === 'function') {
+    // instalacoes não tem coluna de "quem alterou" — a faixa sai sem nome,
+    // que _rtAvisoAlteracaoExterna já trata como "Outro usuário".
+    _rtAvisoAlteracaoExterna(null, "_spInstalacaoById('" + nova.id + "')");
+    if (typeof _ccSetBaseline === 'function') _ccSetBaseline('instalacoes', nova.id, nova);
+   }
+  },
+  // Instalação nova precisa dos joins de obra/equipe pra <tr> sair completa —
+  // recarrega a lista só nesse caso (evento raro), nunca a cada edição.
+  onInsert: function () { if (typeof _dbLoadInstalacoes === 'function') _dbLoadInstalacoes(); },
+  onDelete: function (_nova, antiga) {
+   var id = antiga && antiga.id;
+   if (!id) return;
+   var i = (_instArr || []).findIndex(function (x) { return String(x.id) === String(id); });
+   if (i !== -1) _instArr.splice(i, 1);
+   var tr = document.querySelector('#inst-tbody tr[data-id="' + id + '"]');
+   if (tr) tr.remove();
+   if (String((_instAtiva || {}).id) === String(id)) {
+    _showToast('A instalação que você tinha aberta foi excluída por outro usuário.', 'erro');
+    closePanel();
+   }
+  },
+ });
 }
