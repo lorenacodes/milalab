@@ -1,7 +1,7 @@
 // node --test scripts/lib/group-tree.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { _gtDateBucket, _gtBuildTree, _gtTreeCount } = require('./group-tree.js');
+const { _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtGroupClass, _gtCountBadgeHTML } = require('./group-tree.js');
 
 // Data-base fixa (não usar "hoje" de verdade — o teste tem que dar o mesmo
 // resultado em qualquer dia em que rodar).
@@ -139,4 +139,23 @@ test('_gtTreeCount: soma recursiva através de múltiplos níveis', () => {
  assert.equal(_gtTreeCount(tree.children['João']), 2); // total do João (soma dos 2 meses)
  assert.equal(_gtTreeCount(tree, (i) => i.done), 2); // predicado: só concluídas
  assert.equal(_gtTreeCount(tree.children['João'], (i) => i.done), 1);
+});
+
+// ── _gtGroupClass/_gtCountBadgeHTML — markup compartilhado do cabeçalho de
+// grupo (mesma classe/pílula em Obras/Instalações/Entregas/Empresas/
+// Contatos/Gestor de Tarefas, ver comentário em group-tree.js). ──
+test('_gtGroupClass: nível 0/1/2 viram gb-lvl-0/1/2', () => {
+ assert.equal(_gtGroupClass(0), 'gestor-group-hd gb-lvl-0');
+ assert.equal(_gtGroupClass(1), 'gestor-group-hd gb-lvl-1');
+ assert.equal(_gtGroupClass(2), 'gestor-group-hd gb-lvl-2');
+});
+
+test('_gtGroupClass: nível além do teto visual (3+) trava em gb-lvl-2', () => {
+ assert.equal(_gtGroupClass(3), 'gestor-group-hd gb-lvl-2');
+ assert.equal(_gtGroupClass(7), 'gestor-group-hd gb-lvl-2');
+});
+
+test('_gtCountBadgeHTML: número sozinho ou com rótulo', () => {
+ assert.equal(_gtCountBadgeHTML(5), '<span class="gb-count-badge">5</span>');
+ assert.equal(_gtCountBadgeHTML(5, 'entregas'), '<span class="gb-count-badge">5 entregas</span>');
 });

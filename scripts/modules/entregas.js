@@ -293,12 +293,19 @@ var _entSbFields = [
 _sbInit('entregas', _entSbFields, _entApplyFilters);
 
 // Agrupamento — até 4 níveis (todos os campos disponíveis). Campos pedidos
-// originalmente: Cidade/Estado/Status/Transporte; adicionados: Entrega/
-// Valor/Faturamento/Quantidade/Peso/Maior peça. _entRenderGroupNode já é
-// recursivo desde sempre (_gtBuildTree), só o maxLevels travava em 1.
+// originalmente: Cidade/Estado/Status/Transporte; adicionados depois:
+// Entrega/Valor/Faturamento/Quantidade/Peso/Maior peça, e — pedido
+// explícito separado — Obra/Empresa/Etapa da entrega, cujo dado já vinha
+// carregado em todo `e` (ver _entPseudoDataset logo abaixo: e.obra.nome,
+// e.obra.empresas_obras[0].empresa.nome, e.etapa cru), só faltava
+// aparecer aqui. 'status' continua existindo à parte (bucket de 4 valores
+// fixos, ver _entBucketFor) — 'etapa' é o valor cru (7 valores reais, mais
+// granular). _entRenderGroupNode já é recursivo desde sempre
+// (_gtBuildTree), só o maxLevels travava em 1.
 var _entGroupCollapsed = {};
 function _entGroupKeyFor(e, field) {
  if (field === 'status')      return { key: _entBucketLabel[_entBucketFor(e.etapa)], sortKey: ['aguardando','producao','transporte','entregue'].indexOf(_entBucketFor(e.etapa)) };
+ if (field === 'etapa')       return { key: e.etapa || '— Sem etapa', sortKey: null };
  if (field === 'cidade')      return { key: _entCidadeUf(e) || '— Sem cidade', sortKey: null };
  if (field === 'estado') {
   var uf = (e.obra && e.obra.estado) || e.estado || '';
@@ -311,12 +318,20 @@ function _entGroupKeyFor(e, field) {
  if (field === 'peso')        return { key: e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') + ' kg' : '— Sem peso', sortKey: e.peso_kg || 0 };
  if (field === 'maiorPeca')   return { key: e.maior_peca_mm != null ? Number(e.maior_peca_mm).toLocaleString('pt-BR') + ' mm' : '— Sem maior peça', sortKey: e.maior_peca_mm || 0 };
  if (field === 'valor')       return { key: e.valor != null ? _entFmtBRL(e.valor) : '— Sem valor', sortKey: e.valor || 0 };
+ if (field === 'obra')        return { key: (e.obra && e.obra.nome) || '— Sem obra', sortKey: null };
+ if (field === 'empresa') {
+  var emp = (e.obra && e.obra.empresas_obras && e.obra.empresas_obras[0] && e.obra.empresas_obras[0].empresa && e.obra.empresas_obras[0].empresa.nome) || '';
+  return { key: emp || '— Sem empresa', sortKey: null };
+ }
  return { key: '— Sem grupo', sortKey: null };
 }
 _gbInit('entregas', [
+ { key: 'obra',        label: 'Obra' },
+ { key: 'empresa',     label: 'Empresa' },
  { key: 'cidade',      label: 'Cidade' },
  { key: 'estado',      label: 'Estado' },
  { key: 'status',      label: 'Status' },
+ { key: 'etapa',       label: 'Etapa da entrega' },
  { key: 'transporte',  label: 'Transporte' },
  { key: 'nomeEntrega', label: 'Entrega' },
  { key: 'dataFat',     label: 'Faturamento' },
@@ -489,11 +504,11 @@ function _entRenderGroupNode(node, path, rowsArr) {
   var total = _gtTreeCount(child);
   var indent = 12 + path.length * 20; // indentação por nível — antes fixa em 12px, ilegível com 2+ níveis
   rowsArr.push(
-   '<tr class="gestor-group-hd" onclick="_entToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
+   '<tr class="' + _gtGroupClass(path.length) + '" onclick="_entToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
    + '<td colspan="10" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
-   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' entrega' + (total !== 1 ? 's' : '') + '</span>'
+   + _gtCountBadgeHTML(total, 'entrega' + (total !== 1 ? 's' : ''))
    + '</td></tr>'
   );
   if (!isCollapsed) _entRenderGroupNode(child, path.concat(k), rowsArr);
@@ -573,11 +588,13 @@ function _entCardHTML(e) {
  var atrasado = _entIsLate(e);
  var obraNome = (e.obra && e.obra.nome) || '';
  var dt = e.data_faturamento ? new Date(e.data_faturamento+'T00:00:00').toLocaleDateString('pt-BR') : '';
+ var etapaCls = atrasado ? BADGE_ETAPA_ENTREGA_BUCKET_CLS.atrasado : (BADGE_ETAPA_ENTREGA_BUCKET_CLS[bucket] || 'bm');
  return '<div class="obra-card ent-card" data-id="' + e.id + '" onclick="_spEntregaById(\'' + e.id + '\')">'
   + (atrasado ? '<span class="ent-card-late" title="Faturamento vencido">Atrasado</span>' : '')
   + '<div class="oc-title">' + (e.nome_entrega || 'Entrega sem nome') + '</div>'
   + (obraNome ? '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + obraNome + '</div>' : '')
   + '<div class="oc-tags">'
+  + (e.etapa ? '<span class="badge ' + etapaCls + '" style="font-size:10px">' + e.etapa + '</span>' : '')
   + (e.transporte ? '<span class="badge bg" style="font-size:10px">' + e.transporte + '</span>' : '')
   + '</div>'
   + (dt ? '<div class="oc-date">Faturamento ' + dt + '</div>' : '')
@@ -1071,6 +1088,7 @@ function _spEntregaRender(e) {
     <input class="sp-inp" value="${titulo.replace(/"/g,'&quot;')}" readonly>
    </div>
    <div class="sp-field"><div class="sp-label">Status</div>
+    ${e.etapa ? '<div style="margin-bottom:6px">' + _badgeHTML(e.etapa, atrasado ? BADGE_ETAPA_ENTREGA_BUCKET_CLS.atrasado : (BADGE_ETAPA_ENTREGA_BUCKET_CLS[_entBucketFor(e.etapa)] || 'bm')) + '</div>' : ''}
     <select class="sp-inp" onchange="_spEntDetSalvarCampo('${e.id}', { etapa: this.value || null })">
      <option value="">Selecione...</option>
      ${Object.keys(_entEtapaBucket).map(function(et){ return '<option value="' + et.replace(/"/g,'&quot;') + '" ' + (e.etapa === et ? 'selected' : '') + '>' + et + '</option>'; }).join('')}
@@ -1591,7 +1609,6 @@ function _spEntDetFileDrop(event, entregaId, obraId, tipo, labelId) {
 function _entRowHTML(e) {
  var bucket    = _entBucketFor(e.etapa);
  var atrasado  = _entIsLate(e);
- var cor       = atrasado ? _entBucketCor.atrasado : _entBucketCor[bucket];
  var statusTxt = e.etapa || _entBucketLabel[bucket];
  var obraNome  = (e.obra && e.obra.nome) || '';
  var empNome   = (e.obra && e.obra.empresas_obras && e.obra.empresas_obras[0] && e.obra.empresas_obras[0].empresa && e.obra.empresas_obras[0].empresa.nome) || '';
@@ -1612,7 +1629,7 @@ function _entRowHTML(e) {
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') : '—') + '</td>'
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.maior_peca_mm != null ? Number(e.maior_peca_mm).toLocaleString('pt-BR') : '—') + '</td>'
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.valor != null ? _entFmtBRL(e.valor) : '—') + '</td>'
-  + '<td><div class="ent-status"><span class="ent-status-dot" style="background:' + cor + '"></span>' + statusTxt + (atrasado ? ' <span class="ent-late-tag">Atrasado</span>' : '') + '</div></td>'
+  + '<td><span class="badge ' + (atrasado ? BADGE_ETAPA_ENTREGA_BUCKET_CLS.atrasado : (BADGE_ETAPA_ENTREGA_BUCKET_CLS[bucket] || 'bm')) + '">' + statusTxt + '</span>' + (atrasado ? ' <span class="ent-late-tag">Atrasado</span>' : '') + '</td>'
   + '<td><button class="btn btn-ghost btn-sm">Ver →</button></td>'
   + '</tr>';
 }

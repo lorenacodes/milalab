@@ -826,10 +826,20 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
 .gv-save-btn{width:100%;margin-top:6px;padding:7px;font-size:11px;font-weight:600;border:1px dashed var(--border);border-radius:var(--r-sm);background:transparent;color:var(--muted);cursor:pointer;font-family:inherit}
 .gv-save-btn:hover{border-color:var(--navy);color:var(--navy)}
 
-/* Group Builder — lista rápida de campos (popover "Agrupar") */
-.gb-quick-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:8px 0 4px;padding-top:6px;border-top:1px solid var(--border)}
-.gb-quick-item{display:block;width:100%;text-align:left;padding:6px 8px;font-size:12px;color:var(--text);background:none;border:none;border-radius:var(--r-sm);cursor:pointer;font-family:inherit}
-.gb-quick-item:hover{background:var(--surface2);color:var(--navy)}
+/* Group Builder — popover compacto estilo Airtable ("Agrupar por [Campo ▼]"
+   + "depois por..." + link discreto pra adicionar mais um nível), ancorado
+   no botão via .fb-pop/_tsSmartPosition. Antes reaproveitava .fb-pop na
+   largura cheia (560px, pensada pro Filtro com condição/operador/valor) —
+   .gb-pop estreita isso pro Agrupar, que só precisa de campo + ordem. */
+.fb-pop.gb-pop{width:236px;padding:10px}
+.gb-hd{margin-bottom:8px}
+.gb-row{margin-bottom:6px;gap:6px}
+.gb-row .fb-lead-wrap{width:58px}
+.gb-row .fb-lead{font-size:10px}
+.gb-row .fb-field-sel{flex:1;min-width:0;padding:5px 6px;font-size:11.5px}
+.gb-dir-sel{flex:0 0 50px;min-width:0;padding:5px 4px;font-size:11px}
+.gb-add-link{display:block;width:100%;text-align:left;padding:5px 2px;margin-top:2px;font-size:11.5px;font-weight:600;color:var(--navy);background:none;border:none;cursor:pointer;font-family:inherit}
+.gb-add-link:hover{text-decoration:underline}
 /* Grid */
 .gestor-grid-wrap{overflow-x:auto;overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;scrollbar-width:auto;scrollbar-color:var(--muted) var(--surface2)}
 .gestor-grid-wrap::-webkit-scrollbar{height:14px;width:14px}
@@ -893,6 +903,37 @@ body.light .gestor-group-hd{background:var(--surface2);border-bottom-color:rgba(
    lateral reforça que é o MESMO elemento reagindo, não um controle novo. */
 .gestor-group-hd:hover td{background:rgba(61,79,209,.07)!important}
 .gestor-group-hd strong{text-transform:uppercase;font-size:11px;letter-spacing:.3px}
+/* Pedido explícito: hierarquia entre níveis de agrupamento (principal →
+   sub → registros) era ilegível com 2+ níveis — a indentação (padding-left
+   crescente, já existia por módulo) sozinha não bastava, porque o CABEÇALHO
+   em si tinha sempre a MESMA borda/peso/tamanho em qualquer nível, então não
+   dava pra "bater o olho" e saber que um grupo é filho de outro, só pela
+   posição. Classe adicional gb-lvl-N (N=0,1,2 — mesmo teto de _gbInit's
+   maxLevels em todo módulo) some peso visual conforme aprofunda: borda mais
+   fina, fundo mais claro, texto menor e sem uppercase a partir do nível 1.
+   Módulos continuam calculando o padding-left numérico (12 + nível*20,
+   já existente em cada um) — só a CLASSE muda por módulo, reaproveitando a
+   mesma cascata CSS em todos (Obras/Instalações/Entregas/Empresas/
+   Contatos/Gestor de Tarefas). */
+.gestor-group-hd.gb-lvl-0 td{border-left-width:4px}
+.gestor-group-hd.gb-lvl-0 strong{font-size:11.5px;font-weight:700}
+.gestor-group-hd.gb-lvl-1{background:var(--surface)}
+.gestor-group-hd.gb-lvl-1 td{border-left-width:3px;border-left-color:var(--muted)}
+.gestor-group-hd.gb-lvl-1 strong{text-transform:none;font-size:11px;font-weight:600;letter-spacing:0}
+.gestor-group-hd.gb-lvl-2{background:var(--surface)}
+.gestor-group-hd.gb-lvl-2 td{border-left-width:2px;border-left-color:var(--border)}
+.gestor-group-hd.gb-lvl-2 strong{text-transform:none;font-size:10.5px;font-weight:600;letter-spacing:0;color:var(--muted)}
+/* Divisor sutil ANTES de cada grupo de nível 0 — marca onde um agrupamento
+   principal termina e o próximo começa, sem precisar de :first-child (a
+   1ª linha da tabela já tem a borda do <thead> logo acima, então o traço
+   extra não soma visualmente ali). */
+.gestor-group-hd.gb-lvl-0 td{box-shadow:inset 0 1px 0 var(--border)}
+/* Selo de contagem — pedido explícito: cada módulo tinha um <span> de texto
+   solto com estilo inline levemente diferente; agora é 1 componente visual
+   único (pílula), reaproveitado em qualquer nível/módulo. */
+.gb-count-badge{display:inline-block;margin-left:7px;padding:1px 7px;border-radius:999px;font-size:9.5px;font-weight:600;color:var(--muted);background:rgba(127,127,142,.14);vertical-align:middle}
+.gestor-group-hd.gb-lvl-0 .gb-count-badge{color:var(--navy);background:rgba(61,79,209,.12)}
+body:not(.light) .gestor-group-hd.gb-lvl-0 .gb-count-badge{color:#AFC6FB}
 /* Gantt */
 .gestor-timeline-wrap{overflow:auto;flex:1;min-height:0;background:var(--surface)}
 /* Métricas */

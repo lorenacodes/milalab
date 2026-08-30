@@ -2027,18 +2027,19 @@ function _empRenderGroupNode(node, path, rowsArr) {
   var nodePath = 'empresas::' + path.concat(k).join(' :: ');
   var isCollapsed = !!_empGroupCollapsed[nodePath];
   var total = _gtTreeCount(child);
+  var indent = 12 + path.length * 20;
   rowsArr.push(
-   '<tr class="gestor-group-hd" onclick="_empToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="6" style="padding-left:12px">'
+   '<tr class="' + _gtGroupClass(path.length) + '" onclick="_empToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
+   + '<td colspan="6" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
-   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' empresa' + (total !== 1 ? 's' : '') + '</span>'
+   + _gtCountBadgeHTML(total, 'empresa' + (total !== 1 ? 's' : ''))
    + '</td></tr>'
   );
   if (!isCollapsed) _empRenderGroupNode(child, path.concat(k), rowsArr);
  });
 }
-function _empRenderGrouped(groupField) {
+function _empRenderGrouped(groupLevels) {
  var tbody = document.getElementById('emp-tbody');
  if (!tbody) return;
  var buscaNorm = _ssNormalize(((document.getElementById('emp-search') || {}).value || '').trim());
@@ -2054,7 +2055,7 @@ function _empRenderGrouped(groupField) {
  });
  filtered.sort(function(a, b) { return _sbCompare(_empPseudoDataset(a), _empPseudoDataset(b), 'empresas'); });
 
- var tree = _gtBuildTree(filtered, [{ field: groupField, dir: _gbPrimaryDir('empresas') }], _empGroupKeyFor, null, 0);
+ var tree = _gtBuildTree(filtered, groupLevels, _empGroupKeyFor, null, 0);
  var rowsArr = [];
  _empRenderGroupNode(tree, [], rowsArr);
  tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma empresa encontrada.</td></tr>';
@@ -2069,8 +2070,12 @@ function _empRenderGrouped(groupField) {
 }
 
 function _empApplyFilters() {
- var groupField = _gbPrimaryField('empresas');
- if (groupField) { _empRenderGrouped(groupField); return; }
+ // Pedido explícito: agrupamento em mais de 1 nível — antes só lia
+ // _gbPrimaryField (o 1º nível) e descartava o resto do que o popover de
+ // Agrupar deixava configurar; agora lê o array completo, mesmo padrão já
+ // usado em Obras/Instalações/Entregas/Projetos/Gestor de Tarefas.
+ var groupLevels = (_gbInstances.empresas && _gbInstances.empresas.state.levels) || [];
+ if (groupLevels.length) { _empRenderGrouped(groupLevels); return; }
 
  // Saindo do modo agrupado: a tbody ainda tem as <tr class="gestor-group-hd">
  // inseridas por _empRenderGrouped (o caminho flat abaixo só ESCONDE/MOSTRA/
@@ -2157,18 +2162,19 @@ function _cttRenderGroupNode(node, path, rowsArr) {
   var nodePath = 'contatos::' + path.concat(k).join(' :: ');
   var isCollapsed = !!_cttGroupCollapsed[nodePath];
   var total = _gtTreeCount(child);
+  var indent = 12 + path.length * 20;
   rowsArr.push(
-   '<tr class="gestor-group-hd" onclick="_cttToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="7" style="padding-left:12px">'
+   '<tr class="' + _gtGroupClass(path.length) + '" onclick="_cttToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
+   + '<td colspan="7" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
-   + '<span style="color:var(--muted);font-size:9px;margin-left:6px">' + total + ' contato' + (total !== 1 ? 's' : '') + '</span>'
+   + _gtCountBadgeHTML(total, 'contato' + (total !== 1 ? 's' : ''))
    + '</td></tr>'
   );
   if (!isCollapsed) _cttRenderGroupNode(child, path.concat(k), rowsArr);
  });
 }
-function _cttRenderGrouped(groupField) {
+function _cttRenderGrouped(groupLevels) {
  var tbody = document.getElementById('ctt-tbody');
  if (!tbody) return;
  var buscaNorm = _ssNormalize(((document.getElementById('ctt-search') || {}).value || '').trim());
@@ -2184,7 +2190,7 @@ function _cttRenderGrouped(groupField) {
  });
  filtered.sort(function(a, b) { return _sbCompare(_cttPseudoDataset(a), _cttPseudoDataset(b), 'contatos'); });
 
- var tree = _gtBuildTree(filtered, [{ field: groupField, dir: _gbPrimaryDir('contatos') }], _cttGroupKeyFor, null, 0);
+ var tree = _gtBuildTree(filtered, groupLevels, _cttGroupKeyFor, null, 0);
  var rowsArr = [];
  _cttRenderGroupNode(tree, [], rowsArr);
  tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhum contato encontrado.</td></tr>';
@@ -2199,8 +2205,10 @@ function _cttRenderGrouped(groupField) {
 }
 
 function _cttApplyFilters() {
- var groupField = _gbPrimaryField('contatos');
- if (groupField) { _cttRenderGrouped(groupField); return; }
+ // Mesmo motivo do _empApplyFilters acima: array completo de níveis, não
+ // só o primeiro.
+ var groupLevels = (_gbInstances.contatos && _gbInstances.contatos.state.levels) || [];
+ if (groupLevels.length) { _cttRenderGrouped(groupLevels); return; }
 
  // Mesmo motivo do _empApplyFilters acima: remove os cabeçalhos de grupo
  // deixados por _cttRenderGrouped ao sair do modo agrupado.
@@ -2563,15 +2571,18 @@ var _empSbFields = [
 ];
 _sbInit('empresas', _empSbFields, _empApplyFilters);
 
-// Agrupamento — travado em 1 nível (maxLevels:1, o pedido não envolvia
-// múltiplos níveis como o Gestor de Tarefas tem). Campos mínimos pedidos:
-// Fase, Estado, Categoria (ver _empGroupKeyFor acima pra semântica de cada).
+// Agrupamento — até 3 níveis, mesmo teto de Obras/Instalações/Entregas/
+// Projetos (auditoria encontrou isto travado em 1 nível sem motivo técnico
+// real — _empRenderGroupNode já era recursivo, só _empApplyFilters/
+// _empRenderGrouped liam só o 1º nível do estado do popover). Campos
+// mínimos pedidos: Fase, Estado, Categoria (ver _empGroupKeyFor acima pra
+// semântica de cada).
 _gbInit('empresas', [
  { key: 'nome',      label: 'Nome' },
  { key: 'fase',      label: 'Fase' },
  { key: 'estado',    label: 'Estado' },
  { key: 'categoria', label: 'Categoria' },
-], _empApplyFilters, 1);
+], _empApplyFilters, 3);
 
 /* Filtro/Ordenação de Contatos — mesma migração acima, reaproveitando
    _cttCampos que já existia (nome/cargo/empresa, com o vocabulário real de
@@ -2600,11 +2611,12 @@ var _cttSbFields = [
 ];
 _sbInit('contatos', _cttSbFields, _cttApplyFilters);
 
-// Agrupamento — travado em 1 nível, mesma engine de Empresas/Gestor de
-// Tarefas. "Nome" agrupa pela letra inicial (A-Z), mesmo esquema de Empresas
-// (ver _cttGroupKeyFor acima).
+// Agrupamento — até 3 níveis, mesma engine de Empresas/Gestor de Tarefas
+// (ver comentário equivalente em _gbInit('empresas', ...) acima). "Nome"
+// agrupa pela letra inicial (A-Z), mesmo esquema de Empresas (ver
+// _cttGroupKeyFor acima).
 _gbInit('contatos', [
  { key: 'nome',    label: 'Nome do contato' },
  { key: 'cargo',   label: 'Cargo' },
  { key: 'empresa', label: 'Empresa' },
-], _cttApplyFilters, 1);
+], _cttApplyFilters, 3);
