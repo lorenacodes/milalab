@@ -67,12 +67,33 @@ async function _pageLoadMelhorias() {
  }
 
  try {
-  var res = await _sb.from('melhorias')
-   .select('id, airtable_id, nome, area, created_at, updated_at')
-   .order('created_at', { ascending: false })
-   .limit(100);
-  _melhData = res.data || [];
+  // `status` e `descricao` EXISTEM na tabela mas não estavam sendo trazidas:
+  // por isso o badge de status e o resumo do card ficavam sempre vazios, e o
+  // filtro por Status nunca casava nada (comparava sempre contra undefined).
+  //
+  // Paginação em vez de .limit(100): são 13 iniciativas hoje, mas um teto fixo
+  // de 100 esconderia o resto silenciosamente quando a tabela crescer.
+  //
+  // ATENÇÃO (deixado como está de propósito): as 13 linhas em produção têm
+  // status = 'ativo' — valor que não existe nem no mapa de cores
+  // (_melhStatusColor), nem nos 4 KPIs (Backlog/Em andamento/Pausado/
+  // Concluído), nem na lista de opções do filtro. Então os KPIs continuam
+  // zerados mesmo com esta correção. Reconciliar esse vocabulário com o do
+  // Airtable é decisão de negócio: inventar um "de-para" aqui esconderia a
+  // divergência em vez de resolvê-la.
+  var linhas = []; var from = 0; var mais = true;
+  while (mais) {
+   var res = await _sb.from('melhorias')
+    .select('id, airtable_id, nome, area, status, descricao, created_at, updated_at')
+    .order('created_at', { ascending: false })
+    .range(from, from + 999);
+   if (res.error) { console.error('[Melhorias] erro ao carregar:', res.error); break; }
+   linhas = linhas.concat(res.data || []);
+   mais = (res.data || []).length === 1000; from += 1000;
+  }
+  _melhData = linhas;
  } catch(e) {
+  console.error('[Melhorias] erro ao carregar:', e);
   _melhData = [];
  }
 
