@@ -913,6 +913,21 @@ var _taskAutoSavePending = null;
 var _taskAutoSaveTimer = null;
 var _taskAutoSaveFadeTimer = null;
 
+// Rótulos de campo da atividade — usados tanto na mensagem de conflito
+// (concurrency.js) quanto no Histórico (historico.js), pro usuário ler
+// "Data de fim" em vez de "data_prazo". Rótulo null = campo técnico/derivado,
+// fica fora do histórico pra não virar ruído.
+var _ATIVIDADE_CAMPO_LABEL = {
+ titulo: 'Nome da atividade', descricao: 'Descrição', status: 'Status',
+ prioridade: 'Prioridade', area: 'Área', tipo_atividade: 'Tipo de atividade',
+ data_inicio: 'Data de início', data_prazo: 'Data de fim',
+ responsavel: 'Responsáveis', obra_id: 'Obra', projeto_id: 'Projeto',
+ melhoria_id: 'Melhoria', visibilidade: 'Privacidade', origem: 'Origem',
+ concluida_em: 'Concluída em', historico: null, criado_por: null,
+ atualizado_por: null, rec_serie_id: null, recorrencia: 'Recorrência',
+};
+if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('atividades', _ATIVIDADE_CAMPO_LABEL);
+
 function _taskAutoSaveStatus(state, msg) {
  var el = document.getElementById('task-drw-savestatus');
  if (!el) return;
@@ -967,8 +982,13 @@ function _taskAutoSaveFlush() {
   _showToast('Campo obrigatório: ' + bloqueados.join(', ') + '. Alteração não foi salva.', 'erro');
  }
  if (!Object.keys(patch).length) { _taskAutoSaveStatus(); return; }
- patch.updated_at = new Date().toISOString();
- _sb.from('atividades').update(patch).eq('id', id).then(function(res) {
+ // updated_at NÃO é mais forjado aqui: quem mantém a coluna é o trigger
+ // trg_atividades_updated_at, e é exatamente ela que _ccSave usa como trava
+ // otimista. O patch já era incremental (só os campos tocados), então o que
+ // faltava era a trava: sem ela, dois usuários editando o MESMO campo da
+ // mesma atividade — situação corriqueira no Gestor de Tarefas, que é
+ // compartilhado por setor — perdiam a alteração de um deles em silêncio.
+ _ccSave('atividades', id, patch).then(function(r) {
   // Só pula a atualização de UI se o usuário JÁ ABRIU OUTRA atividade
   // enquanto salvava (_taskEditId aponta pra outro id) — fechar o painel
   // (_taskEditId vira null) NÃO deve bloquear isso: é o caso mais comum
@@ -976,17 +996,30 @@ function _taskAutoSaveFlush() {
   // em memória bem aí, deixando Meu Painel/Gestor de Tarefas com dado velho
   // até um F5.
   if (_taskEditId && String(_taskEditId) !== String(id)) return;
-  if (res.error) {
-   _taskAutoSaveStatus('error', 'Erro ao salvar: ' + _supaErrPt(res.error.message));
-   console.error('[auto-save]', res.error);
+  if (r.semMudanca) { _taskAutoSaveStatus(); return; }
+  if (r.excluido) {
+   _taskAutoSaveStatus('error', 'Esta atividade foi excluída por outro usuário.');
+   return;
+  }
+  if (r.erro) {
+   console.error('[auto-save]', r.erro);
+   _taskAutoSaveStatus('error', 'Não foi possível salvar. Sua alteração continua na tela.');
+   return;
+  }
+  if (r.conflito) {
+   _taskAutoSaveStatus('error', _ccMsgConflito('atividades', r.campos));
+   _showToast(_ccMsgConflito('atividades', r.campos), 'erro');
+   // Os dois caches (Gestor e Meu Painel) recebem o estado real do banco,
+   // pra a tela parar de mostrar um valor que não foi gravado.
+   if (r.atual) _taskApplyPatchEverywhere(id, r.atual);
    return;
   }
   _taskAutoSaveStatus('saved', 'Alterações salvas');
-  _taskApplyPatchEverywhere(id, patch);
+  _taskApplyPatchEverywhere(id, r.row || patch);
  }).catch(function(e) {
   if (_taskEditId && String(_taskEditId) !== String(id)) return;
-  _taskAutoSaveStatus('error', 'Erro: ' + e.message);
   console.error('[auto-save]', e);
+  _taskAutoSaveStatus('error', 'Não foi possível salvar. Sua alteração continua na tela.');
  });
 }
 
@@ -1152,6 +1185,12 @@ function _taskDrawerOpen(editId) {
 
  // Guardar referência da tarefa atual para colaboração
  window._drwCurrentTask = t || null;
+ // Baseline da trava otimista (ver concurrency.js): estado da atividade como
+ // ela está no banco no momento em que o drawer abriu. É contra ele que
+ // _ccSave decide o que gravar e detecta a escrita concorrente de outro
+ // usuário. `t` vem dos caches _gestorAllAt/_dashAllAtRaw, que já trazem
+ // updated_at no select — que é justamente a coluna da trava.
+ if (t && t.id && typeof _ccSetBaseline === 'function') _ccSetBaseline('atividades', t.id, t);
 
  // ── Aba Comunicação ──
  var histWrap = get('drw-hist-wrap');
@@ -1226,15 +1265,29 @@ function _taskDrawerOpen(editId) {
  if (t && auditTab && auditBody) {
   auditTab.style.display = '';
   if (auditPane) auditPane.style.display = '';
-  var criador  = t.created_by  || t.responsavel || '—';
-  var updBy    = t.updated_by  || '—';
+  // As colunas reais em `atividades` são criado_por/atualizado_por (mantidas
+  // pelos triggers set_atividades_atualizado_por e afins). Este bloco lia
+  // t.created_by/t.updated_by, que não existem em lugar nenhum — por isso
+  // "Criado por"/"Última alteração por" mostravam sempre "—". Os nomes
+  // antigos ficam como fallback pra não quebrar nada que ainda os popule.
+  var criador  = t.criado_por     || t.created_by || t.responsavel || '—';
+  var updBy    = t.atualizado_por || t.updated_by || '—';
   var origem   = t.origem      || 'Dashboard';
   var criadoEm = t.created_at  ? new Date(t.created_at).toLocaleString('pt-BR') : '—';
   auditBody.innerHTML =
-   '<div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">' + criador + '</span></div>'
+   '<div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">' + _histEsc(_histNome(criador)) + '</span></div>'
    + '<div class="drw-audit-row"><span class="drw-audit-lbl">Data de criação</span><span class="drw-audit-val">' + criadoEm + '</span></div>'
-   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">' + updBy + '</span></div>'
-   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Origem</span><span class="drw-audit-val">' + origem + '</span></div>';
+   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">' + _histEsc(_histNome(updBy)) + '</span></div>'
+   + '<div class="drw-audit-row"><span class="drw-audit-lbl">Origem</span><span class="drw-audit-val">' + _histEsc(origem) + '</span></div>'
+   // Histórico de alterações campo a campo — mesmo componente compartilhado
+   // de Obra/Projeto/Entrega/Empresa (scripts/lib/historico.js). A tabela
+   // atividades já era auditada pelo trigger trg_atividades_audit; faltava só
+   // a permissão de leitura, liberada na migração desta fase.
+   + '<div style="margin-top:18px;border-top:1px solid var(--border);padding-top:12px">'
+   + '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Histórico de alterações</div>'
+   + (typeof _histPanelHTML === 'function' ? _histPanelHTML('drw-audit-historico') : '')
+   + '</div>';
+  if (typeof _histCarregar === 'function') _histCarregar('drw-audit-historico', 'atividades', t.id);
  } else {
   if (auditTab) auditTab.style.display = 'none';
   if (auditPane) auditPane.style.display = 'none';
