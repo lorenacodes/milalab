@@ -11,7 +11,7 @@
    — header/footer nunca se movem enquanto o formulário rola. */
 #aut-modal-overlay {
  position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,.32);
- opacity: 0; pointer-events: none; transition: opacity .18s;
+ opacity: 0; pointer-events: none; transition: opacity var(--dur-slow, .18s) var(--ease-standard, ease);
 }
 #aut-modal-overlay.aut-modal-open { opacity: 1; pointer-events: all; }
 #aut-modal {
@@ -22,7 +22,7 @@
  box-shadow: var(--shadow-2, 0 12px 48px rgba(0,0,0,.22));
  opacity: 0; pointer-events: none;
  transform: translate(-50%, -50%) scale(.97);
- transition: opacity .18s, transform .18s cubic-bezier(.4,0,.2,1);
+ transition: opacity var(--dur-slow, .18s) var(--ease-standard, ease), transform var(--dur-slow, .18s) var(--ease-standard, cubic-bezier(.4,0,.2,1));
 }
 #aut-modal.aut-modal-open { opacity: 1; pointer-events: all; transform: translate(-50%, -50%) scale(1); }
 .autm-header {
@@ -37,9 +37,11 @@
 .autm-title { font-size: 14px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .autm-close {
  flex-shrink: 0; background: none; border: 0; color: var(--muted); cursor: pointer;
- font-size: 20px; line-height: 1; padding: 2px 6px; border-radius: 6px; transition: background .12s, color .12s;
+ font-size: 20px; line-height: 1; padding: 2px 6px; border-radius: 6px;
+ transition: background var(--dur-fast, .12s) var(--ease-standard, ease), color var(--dur-fast, .12s) var(--ease-standard, ease), transform var(--dur-fast, .12s) var(--ease-standard, ease);
 }
 .autm-close:hover { background: var(--surface-2, rgba(127,127,127,.1)); color: var(--text); }
+.autm-close:active { transform: scale(.9); }
 .autm-body { flex: 1 1 auto; overflow-y: auto; padding: var(--sp-5, 20px); }
 .autm-footer {
  flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
@@ -104,10 +106,12 @@
 .aut-card {
  background: var(--surface); border: 1px solid var(--border);
  border-radius: var(--r-md); padding: var(--sp-4); box-shadow: var(--shadow-1);
- cursor: pointer; transition: box-shadow .15s, border-color .15s;
+ cursor: pointer;
+ transition: box-shadow var(--dur-base, .15s) var(--ease-standard, ease), border-color var(--dur-base, .15s) var(--ease-standard, ease), transform var(--dur-fast, .12s) var(--ease-standard, ease);
  display: flex; flex-direction: column; gap: var(--sp-3);
 }
 .aut-card:hover { border-color: var(--green); box-shadow: var(--shadow-2); }
+.aut-card:active { transform: scale(.99); }
 .aut-card-off { opacity: .6; }
 
 .aut-card-hd { display: flex; align-items: center; gap: var(--sp-2); }
@@ -166,8 +170,10 @@
 .aut-chip {
  font-size: 11px; padding: 4px 10px; border-radius: 14px; cursor: pointer;
  border: 1px solid var(--border); background: transparent; color: var(--muted);
+ transition: border-color var(--dur-fast, .12s) var(--ease-standard, ease), color var(--dur-fast, .12s) var(--ease-standard, ease), transform var(--dur-fast, .12s) var(--ease-standard, ease);
 }
 .aut-chip.active { color: var(--text); border-color: var(--navy); font-weight: 600; }
+.aut-chip:active { transform: scale(.95); }
 
 /* ── Painel de detalhe ───────────────────────────────────────────────────── */
 .aut-resumo {
@@ -189,8 +195,9 @@
 .aut-cond-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .aut-cond-val { margin-top: 8px; }
 .aut-cond-novalue { font-size: 11px; color: var(--muted); font-style: italic; }
-.aut-x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 4px; }
+.aut-x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 4px; transition: color var(--dur-fast, .12s) var(--ease-standard, ease), transform var(--dur-fast, .12s) var(--ease-standard, ease); }
 .aut-x:hover { color: var(--red); }
+.aut-x:active { transform: scale(.9); }
 
 /* Valores de campo lista/multi como chips clicáveis — nunca digitação livre
    onde o campo original é uma lista de opções (exigência da especificação). */
@@ -198,8 +205,10 @@
 .aut-vchip {
  font-size: 11px; padding: 3px 9px; border-radius: 12px; cursor: pointer;
  border: 1px solid var(--border); background: transparent; color: var(--muted);
+ transition: color var(--dur-fast, .12s) var(--ease-standard, ease), background var(--dur-fast, .12s) var(--ease-standard, ease), border-color var(--dur-fast, .12s) var(--ease-standard, ease), transform var(--dur-fast, .12s) var(--ease-standard, ease);
 }
 .aut-vchip.active { color: #fff; background: var(--navy-solid); border-color: var(--navy-solid); font-weight: 600; }
+.aut-vchip:active { transform: scale(.95); }
 .aut-vchip-orfao { border-style: dashed; background: var(--yellow); color: var(--text); border-color: var(--yellow); }
 
 .aut-add { margin-top: 2px; }
@@ -217,9 +226,14 @@
 .aut-flow-card {
  display: flex; align-items: center; gap: 10px; padding: 12px;
  border: 1px solid var(--border); border-radius: 10px; background: var(--card, var(--bg));
- cursor: pointer; transition: border-color .12s, box-shadow .12s;
+ cursor: pointer;
+ transition: border-color var(--dur-fast, .12s) var(--ease-standard, ease), box-shadow var(--dur-fast, .12s) var(--ease-standard, ease), transform var(--dur-fast, .12s) var(--ease-standard, ease);
 }
 .aut-flow-card:hover { border-color: var(--navy); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+/* .aut-flow-actions-outer reaproveita esta classe mas não é clicável (é só
+   o container do card "Ações" — o clique de verdade é no .aut-flow-nested
+   de dentro) — sem o :not(), o wrapper inteiro pareceria pressionável. */
+.aut-flow-card:not(.aut-flow-actions-outer):active { transform: scale(.99); }
 .aut-flow-icon {
  flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
  display: flex; align-items: center; justify-content: center;
@@ -262,9 +276,10 @@
 .aut-flow-nested {
  display: flex; align-items: center; gap: 10px; padding: 10px;
  border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2, rgba(127,127,127,.06));
- cursor: pointer; transition: border-color .12s;
+ cursor: pointer; transition: border-color var(--dur-fast, .12s) var(--ease-standard, ease), transform var(--dur-fast, .12s) var(--ease-standard, ease);
 }
 .aut-flow-nested:hover { border-color: var(--navy); }
+.aut-flow-nested:active { transform: scale(.99); }
 
 .aut-sujo-bar {
  position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px;
@@ -302,7 +317,9 @@
  border: 1px solid var(--border); border-radius: var(--r-full, 999px);
  background: transparent; color: var(--muted); cursor: pointer;
  font-size: var(--fs-caption); font-weight: 600;
+ transition: border-color var(--dur-base, .15s) var(--ease-standard, ease), color var(--dur-base, .15s) var(--ease-standard, ease), transform var(--dur-fast, .12s) var(--ease-standard, ease);
 }
+.autw-step:active { transform: scale(.96); }
 .autw-step-n {
  width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
  display: flex; align-items: center; justify-content: center;
