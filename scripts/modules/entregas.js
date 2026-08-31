@@ -423,18 +423,31 @@ function _entFmtDateISO(d) { return d.toISOString().slice(0,10); }
 function _entQuickPreset(name, btn) {
  var inst = _fbInstances.entregas;
  var conds = [];
+ // BUG real (achado real, confirmado contra o banco): o campo 'status' do
+ // filtro guarda a etapa CRUA (getValue: ds.etapaRaw, ver _entFbFields acima
+ // — ex.: "Entrega realizada", "Produção"), não a chave do balde
+ // ("entregue"/"producao"/...). "A realizar" comparava com 'entregue', que
+ // nunca bate com etapa nenhuma — não excluía nada, todas as entregas
+ // passavam, inclusive as já entregues. Pior: "A programar"/"Entregas esse
+ // ano"/"2 semanas" nunca excluíam por status NENHUMA vez (só filtravam por
+ // data) — conferido contra o banco: 6 entregas já realizadas sem data de
+ // faturamento apareciam em "A programar", e 366 já realizadas com data
+ // deste ano apareciam em "Entregas esse ano". Todo filtro de PENDÊNCIA
+ // (tudo, exceto "Todas as entregas", que existe justamente pra mostrar
+ // tudo) precisa excluir "Entrega realizada" — não só o "A realizar".
+ var naoRealizada = { id:'qv0', field:'status', operator:'neq', value:'Entrega realizada' };
  if (name === 'a-realizar') {
-  conds = [{ id:'qv1', field:'status', operator:'neq', value:'entregue' }];
+  conds = [naoRealizada];
  } else if (name === 'a-programar') {
-  conds = [{ id:'qv1', field:'dataFat', operator:'empty', value:'' }];
+  conds = [naoRealizada, { id:'qv1', field:'dataFat', operator:'empty', value:'' }];
  } else if (name === 'ano') {
   var y = new Date().getFullYear();
-  conds = [{ id:'qv1', field:'dataFat', operator:'between', value:[y+'-01-01', y+'-12-31'] }];
+  conds = [naoRealizada, { id:'qv1', field:'dataFat', operator:'between', value:[y+'-01-01', y+'-12-31'] }];
  } else if (name === '2semanas') {
   var hoje = new Date(); hoje.setHours(0,0,0,0);
   var fim = new Date(hoje); fim.setDate(fim.getDate()+14);
-  conds = [{ id:'qv1', field:'dataFat', operator:'between', value:[_entFmtDateISO(hoje), _entFmtDateISO(fim)] }];
- } // 'todas' → conds fica []
+  conds = [naoRealizada, { id:'qv1', field:'dataFat', operator:'between', value:[_entFmtDateISO(hoje), _entFmtDateISO(fim)] }];
+ } // 'todas' → conds fica [] (mostra tudo, inclusive já realizadas — é o propósito desta aba)
  inst.state.conditions = conds;
  document.querySelectorAll('.ent-qv-btn').forEach(function(b){ b.classList.remove('active'); });
  if (btn) btn.classList.add('active');
