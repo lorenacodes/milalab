@@ -720,22 +720,24 @@ function _spAutomacaoRender(a) {
   + '</div>'
 
   + '<div class="spt-panel" id="spt-aut-config">'
-  // Topo do detalhe: nome + status + a frase gerada dos dados. Antes o painel
-  // abria direto na frase técnica, sem dizer se a automação estava valendo —
-  // o status só aparecia no interruptor mais abaixo.
-  + '<div class="aut-head">'
-  + '<div class="aut-head-top">'
-  + '<span class="aut-head-nome">' + _autEsc(a.nome || 'Sem nome') + '</span>'
-  + (a.ativo ? '<span class="aut-pill aut-pill-on">Ativa</span>' : '<span class="aut-pill aut-pill-off">Inativa</span>')
-  + '</div>'
-  + '<div class="aut-head-frase">' + _autEsc(_autFraseLegivel(_autAtiva)) + '</div>'
+  // Topo do detalhe: status + a frase gerada dos dados, num card de destaque.
+  // O NOME já está no cabeçalho do modal — repeti-lo aqui de novo, grande, era
+  // a mesma informação duas vezes competindo por atenção (achado real: "essa
+  // parte aqui está muito mal formatada"). O que falta dizer aqui é só o
+  // estado (ativa/inativa) e o resumo em português.
+  + '<div class="aut-summary-card' + (a.ativo ? '' : ' aut-summary-card-off') + '">'
+  + '<span class="aut-summary-status">' + (a.ativo
+      ? '<span class="aut-status-dot aut-status-dot-on"></span>Ativa'
+      : '<span class="aut-status-dot"></span>Inativa') + '</span>'
+  + '<div class="aut-summary-frase">' + _autEsc(_autFraseLegivel(_autAtiva)) + '</div>'
   + '</div>'
   + '<label class="aut-toggle"><input type="checkbox" id="aut-ativo" ' + (a.ativo ? 'checked' : '') + ' onchange="_autSalvarAtivo()">'
   + '<span>Automação ativa</span></label>'
   + '<div class="aut-hint">Automação inativa não é executada nem processa eventos. Ao reativar, ela volta a valer só para as próximas mudanças — nada é processado retroativamente.</div>'
   + '<div class="sp-field"><div class="sp-label">Nome</div><input class="sp-inp" id="aut-nome" value="' + _autEsc(a.nome || '') + '" oninput="_autMarcarSujo()"></div>'
-  + '<div class="sp-field"><div class="sp-label">Descrição</div><textarea class="sp-inp" rows="2" id="aut-desc" oninput="_autMarcarSujo()">' + _autEsc(a.descricao || '') + '</textarea></div>'
+  + '<div class="sp-field"><div class="sp-label">Descrição</div><textarea class="sp-inp" rows="2" id="aut-desc" placeholder="Opcional" oninput="_autMarcarSujo()">' + _autEsc(a.descricao || '') + '</textarea></div>'
 
+  + '<div class="sp-stitle">Como funciona</div>'
   + '<div class="aut-flow">'
 
   + '<div class="aut-flow-label">GATILHO</div>'
@@ -783,7 +785,11 @@ function _spAutomacaoRender(a) {
   // dono): enquanto está inativa, testar de novo não agrega — quem quer
   // testar antes de existir usa o assistente de criação, que já exige teste.
   + (a.ativo
-     ? '<button type="button" class="btn btn-ghost aut-add" onclick="_autTestarEdicao()">Testar automação</button>'
+     ? '<div class="sp-stitle">Testar</div>'
+       + '<div class="aut-hint">Simula a automação com um registro real, sem criar nada de verdade.</div>'
+       + '<button type="button" class="btn btn-ghost aut-add" onclick="_autTestarEdicao()">'
+       + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="vertical-align:-2px;margin-right:5px"><path d="M9 18V6l8 6-8 6z"/></svg>'
+       + 'Testar automação</button>'
        + '<div id="aut-teste-edicao" style="display:none"></div>'
      : '')
   + '<div id="aut-sujo-bar" class="aut-sujo-bar" style="display:none">'
@@ -793,9 +799,12 @@ function _spAutomacaoRender(a) {
   + '</div>'
   + '</div>'
 
-  + '<div class="spt-panel" id="spt-aut-exec"><div id="aut-exec-lista"><div class="aut-empty">Carregando...</div></div></div>'
+  + '<div class="spt-panel" id="spt-aut-exec">'
+  + '<div class="sp-stitle">Histórico de execuções</div>'
+  + '<div id="aut-exec-lista"><div class="aut-empty">Carregando...</div></div>'
+  + '</div>'
   + '<div class="spt-panel" id="spt-aut-hist">'
-  + '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Histórico de alterações desta automação</div>'
+  + '<div class="sp-stitle">Alterações</div>'
   + (typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-aut-hist') : '')
   + '</div>';
 
