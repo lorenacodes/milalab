@@ -16,6 +16,24 @@
  .ent-date.ok { color:#22c55e;font-weight:500 }
  .ent-late-tag { font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--red);background:var(--red-dim);border-radius:var(--r-full);padding:1px 6px;margin-left:2px }
 
+ /* Dropzone de anexo — modal "Nova Entrega" (Documento da entrega/Ordem de
+    Produção). Antes eram <input type="file"> nus dentro de um .mf, que uma
+    regra global (.mf input[type="file"]{display:none}, main.css — pensada
+    pro upload de avatar) escondia sem deixar NENHUM jeito de clicar; aqui
+    aplicamos o mesmo padrão visual/label-wraps-input já usado e funcionando
+    no dropzone do painel de detalhe da entrega (_spEntDetDropzone,
+    entregas.js), só que sem upload imediato — os arquivos ficam no <input>
+    até "Criar entrega" (a entrega ainda não existe, não tem em cima do que
+    gravar o anexo). */
+ /* .mf .ne-dropzone (não só .ne-dropzone): precisa vencer .mf label de
+    main.css (mesma especificidade que uma classe sozinha), que forçaria
+    text-transform:uppercase/gap:3px pensados pro rótulo do campo, não pro
+    texto "Clique ou arraste" deste dropzone. */
+ .mf .ne-dropzone { display:flex;align-items:center;justify-content:center;gap:6px;border:2px dashed var(--border);border-radius:8px;padding:9px 8px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center;font-size:11px;font-weight:400;text-transform:none;letter-spacing:normal;color:var(--muted) }
+ .mf .ne-dropzone:hover, .mf .ne-dropzone.drag { border-color:var(--navy);background:rgba(59,130,246,.05) }
+ .ne-dropzone svg { flex-shrink:0 }
+ .ne-dropzone span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
+
  /* Abas de atalho (quick-view) */
  .ent-qv-btn { padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-full);font-size:12px;font-weight:500;background:var(--surface);color:var(--muted);cursor:pointer;transition:all .12s }
  .ent-qv-btn:hover { color:var(--text);border-color:var(--navy) }

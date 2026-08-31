@@ -64,6 +64,7 @@ async function openNovaEntrega() {
  var prod = document.getElementById('ne-produzido'); if (prod) prod.checked = false;
  var doc = document.getElementById('ne-doc'); if (doc) doc.value = '';
  var op = document.getElementById('ne-op'); if (op) op.value = '';
+ _neFileLabelReset('ne-doc-lbl'); _neFileLabelReset('ne-op-lbl');
  var etapaSel = document.getElementById('ne-etapa');
  if (etapaSel) {
   etapaSel.innerHTML = '<option value="">Selecione...</option>'
@@ -76,6 +77,34 @@ async function openNovaEntrega() {
 function closeNovaEntrega() {
  document.getElementById('modal-nova-entrega').classList.remove('open');
  document.body.style.overflow = '';
+}
+
+// ── Dropzones de anexo do modal (Documento da entrega / Ordem de Produção) ──
+// Upload só acontece no "Criar entrega" (_submitNovaEntregaReal já lê
+// ne-doc/ne-op.files) — a entrega ainda não existe nesse ponto, então não dá
+// pra gravar o anexo antes. Aqui só cuida do feedback visual (nome do
+// arquivo escolhido) e do arrastar-e-soltar, mesmo padrão do dropzone que já
+// funciona no painel de detalhe (_spEntDetDropzone).
+function _neFileLabelReset(labelId) {
+ var lbl = document.getElementById(labelId);
+ if (lbl) lbl.textContent = 'Clique ou arraste para anexar';
+}
+function _neFileLabelUpdate(input, labelId) {
+ var lbl = document.getElementById(labelId);
+ if (!lbl) return;
+ var files = input.files || [];
+ if (!files.length) { _neFileLabelReset(labelId); return; }
+ lbl.textContent = files.length === 1 ? files[0].name : files.length + ' arquivos selecionados';
+}
+function _neFileChange(input, labelId) { _neFileLabelUpdate(input, labelId); }
+function _neFileDrop(event, inputId, labelId) {
+ event.preventDefault();
+ var dz = event.currentTarget; dz.classList.remove('drag');
+ var files = event.dataTransfer && event.dataTransfer.files;
+ var input = document.getElementById(inputId);
+ if (!files || !files.length || !input) return;
+ input.files = files; // funciona pra <input type="file"> normal (não-multiple pega só o 1º)
+ _neFileLabelUpdate(input, labelId);
 }
 // Guarda de clique duplo (_ccUmaVez, concurrency.js): dois cliques rápidos no
 // botão "Criar" disparavam dois INSERTs e criavam DUAS entregas iguais — não

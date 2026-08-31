@@ -2054,11 +2054,25 @@
    <div class="modal-grid col2" style="gap:16px">
     <div class="mf" style="margin:0">
      <label>Documento da entrega</label>
-     <input type="file" id="ne-doc" multiple>
+     <label class="ne-dropzone" for="ne-doc"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="_neFileDrop(event,'ne-doc','ne-doc-lbl')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>
+      <span id="ne-doc-lbl">Clique ou arraste para anexar</span>
+     </label>
+     <input type="file" id="ne-doc" multiple style="display:none" onchange="_neFileChange(this,'ne-doc-lbl')">
     </div>
     <div class="mf" style="margin:0">
      <label>Ordem de Produção</label>
-     <input type="file" id="ne-op">
+     <label class="ne-dropzone" for="ne-op"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="_neFileDrop(event,'ne-op','ne-op-lbl')">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>
+      <span id="ne-op-lbl">Clique ou arraste para anexar</span>
+     </label>
+     <input type="file" id="ne-op" style="display:none" onchange="_neFileChange(this,'ne-op-lbl')">
     </div>
    </div>
 
@@ -2075,7 +2089,7 @@
  <!-- ENTREGAS -->
  <div id="page-entregas" class="page">
 
-<link rel="stylesheet" href="styles/entregas.css?v=mldsv345">
+<link rel="stylesheet" href="styles/entregas.css?v=mldsv356">
 
  <!-- Título Notion -->
  <div class="ph" style="padding:8px 0 0;margin-bottom:14px">
@@ -2866,7 +2880,7 @@
 <script src="scripts/lib/atividades-vinculos.js?v=mldsv345"></script>
 <script src="scripts/modules/obras.js?v=mldsv355"></script>
 <script src="scripts/modules/projetos.js?v=mldsv355"></script>
-<script src="scripts/modules/entregas.js?v=mldsv354"></script>
+<script src="scripts/modules/entregas.js?v=mldsv356"></script>
 <script src="scripts/modules/instalacoes.js?v=mldsv345"></script>
 <script src="scripts/modules/empresas.js?v=mldsv354"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv345"></script>
