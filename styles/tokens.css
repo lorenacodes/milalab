@@ -51,6 +51,30 @@
   /* tipografia — escala fixa, 10 papéis */
   --fs-caption:11px; --fs-small:12px; --fs-body:13px; --fs-body-lg:14px;
   --fs-h4:16px; --fs-h3:18px; --fs-h2:22px; --fs-h1:26px; --fs-display:32px; --fs-hero:40px;
+
+  /* movimento — microinterações. A duração cresce com o "peso" do elemento
+     que se move (um botão reage mais rápido que uma gaveta lateral). Ver
+     styles/main.css para onde cada token é usado — a ideia é o sistema
+     inteiro compartilhar a MESMA sensação de resposta, em vez de cada tela
+     ter sua própria duração/curva. */
+  --dur-fast:120ms;   /* hover, press, chip, checkbox */
+  --dur-base:180ms;   /* padrão: cor, borda, fade de conteúdo */
+  --dur-slow:240ms;   /* modais, gavetas, elementos maiores */
+  --ease-standard:cubic-bezier(.4,0,.2,1); /* já era a curva mais usada no app — vira o padrão */
+  --ease-out:cubic-bezier(0,0,.2,1);       /* entrada */
+  --ease-in:cubic-bezier(.4,0,1,1);        /* saída */
+}
+
+/* Respeita a preferência do sistema por menos movimento — reduz TODAS as
+   transições/animações a praticamente zero sem esconder nem quebrar nada
+   (o estado final continua sendo aplicado, só sem a transição visual). */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+    scroll-behavior:auto !important;
+  }
 }
 
 body.light{

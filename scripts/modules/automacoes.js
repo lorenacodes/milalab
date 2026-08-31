@@ -787,14 +787,14 @@ function _spAutomacaoRender(a) {
   + (a.ativo
      ? '<div class="sp-stitle">Testar</div>'
        + '<div class="aut-hint">Simula a automação com um registro real, sem criar nada de verdade.</div>'
-       + '<button type="button" class="btn btn-ghost aut-add" onclick="_autTestarEdicao()">'
+       + '<button type="button" class="btn btn-ghost aut-add" onclick="_autTestarEdicao(this)">'
        + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="vertical-align:-2px;margin-right:5px"><path d="M9 18V6l8 6-8 6z"/></svg>'
        + 'Testar automação</button>'
        + '<div id="aut-teste-edicao" style="display:none"></div>'
      : '')
   + '<div id="aut-sujo-bar" class="aut-sujo-bar" style="display:none">'
   + '<span>Você tem alterações não salvas.</span>'
-  + '<button type="button" class="btn btn-primary" onclick="_autSalvar()">Salvar alterações</button>'
+  + '<button type="button" class="btn btn-primary" onclick="_autSalvar(this)">Salvar alterações</button>'
   + '<button type="button" class="btn btn-ghost" onclick="_spAutomacaoById(document.getElementById(\'sp-aut-id\').value)">Descartar</button>'
   + '</div>'
   + '</div>'
@@ -809,8 +809,8 @@ function _spAutomacaoRender(a) {
   + '</div>';
 
  _autModalSet('Automação', a.nome || 'Sem nome', html,
-  '<button class="btn btn-ghost" onclick="_autDuplicar()">Duplicar</button>'
-  + '<button class="btn btn-ghost" onclick="_autExcluir()" style="color:var(--red)">Excluir</button>'
+  '<button class="btn btn-ghost" onclick="_autDuplicar(this)">Duplicar</button>'
+  + '<button class="btn btn-ghost" onclick="_autExcluir(this)" style="color:var(--red)">Excluir</button>'
   + '<button class="btn btn-ghost" onclick="_autModalFechar()">Fechar</button>');
 
  // Baseline da trava otimista (§ teste 10: dois usuários editando a mesma
@@ -998,7 +998,7 @@ function _autRedesenharConds(tabela, conds) {
 }
 
 // ── Gravação ─────────────────────────────────────────────────────────────────
-async function _autSalvar() {
+async function _autSalvar(btn) {
  var id = (document.getElementById('sp-aut-id') || {}).value;
  if (!id || !_sb) return;
  var nome = ((document.getElementById('aut-nome') || {}).value || '').trim();
@@ -1025,10 +1025,16 @@ async function _autSalvar() {
   acao: acao,
   atualizado_por: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.email) || null,
  };
+ // Estado de carregamento só a partir daqui — as validações acima são
+ // síncronas, não faz sentido mostrar "Salvando..." pra um erro instantâneo.
+ if (typeof _btnBusy === 'function') _btnBusy(btn, 'Salvando...');
  var r = await _ccSaveComFeedback('automacoes', id, payload, {
   onRecarregar: function () { _spAutomacaoById(id); },
  });
- if (!r || r.conflito || r.erro || r.excluido) return;
+ // Sucesso re-renderiza o painel inteiro (onRecarregar), então o próprio
+ // botão já some do DOM — _btnIdle só importa mesmo pros caminhos de erro/
+ // conflito abaixo, onde o formulário continua na tela do mesmo jeito.
+ if (!r || r.conflito || r.erro || r.excluido) { if (typeof _btnIdle === 'function') _btnIdle(btn); return; }
  var bar = document.getElementById('aut-sujo-bar');
  if (bar) bar.style.display = 'none';
  if (r.row) { _autPatchNaLista(r.row); _autAtiva = r.row; }
@@ -1371,7 +1377,10 @@ async function _autWizTestar() {
  var falta = _autWizPendencia(w, 4);
  if (falta) { _showToast(falta, 'erro'); return; }
  var box = document.getElementById('autw-teste');
+ var btn = document.getElementById('autw-btn-testar');
+ if (typeof _btnBusy === 'function') _btnBusy(btn, 'Testando...');
  var r = await _autExecutarTeste(w.tabela_alvo, w.condicoes, w.acao, box);
+ if (typeof _btnIdle === 'function') _btnIdle(btn);
  if (!r || !r.ok) { w.teste = null; _autWizPintar(); return; }
  w.teste = r;
  w.assinatura = _autWizAssinatura(w);
@@ -1382,14 +1391,16 @@ async function _autWizTestar() {
 // obrigatório pra salvar (uma automação em produção continua editável e
 // salvável sem forçar um novo teste a cada alteração pequena), mas fica
 // disponível pra quem quer confirmar antes de salvar (itens 9/10/12).
-async function _autTestarEdicao() {
+async function _autTestarEdicao(btn) {
  var tabela = (document.getElementById('aut-tabela') || {}).value;
  var condicoes = _autLerCondicoes();
  var acao = _autLerAcao();
  var box = document.getElementById('aut-teste-edicao');
  if (!box) return;
  box.style.display = 'block';
+ if (typeof _btnBusy === 'function') _btnBusy(btn, 'Testando...');
  await _autExecutarTeste(tabela, condicoes, acao, box);
+ if (typeof _btnIdle === 'function') _btnIdle(btn);
 }
 
 function _autWizNomeUsuario(email) {
@@ -1459,9 +1470,14 @@ async function _autWizCriar() {
  // _ccUmaVez: enquanto o insert está em voo o segundo clique é IGNORADO (não
  // enfileirado) e o botão fica desabilitado — dois cliques rápidos não podem
  // virar duas automações.
+ // _ccUmaVez já desabilita/restaura o botão sozinho (captura o texto ORIGINAL
+ // antes de rodar `fn`, via textContent, e devolve no finally) — só troca o
+ // innerHTML aqui por um spinner + "Criando..." pro feedback visual; quando
+ // _ccUmaVez restaurar com `el.textContent = txtOriginal`, o spinner some
+ // junto (textContent limpa qualquer HTML) sem precisar de código extra.
  await _ccUmaVez('criar-automacao', async function () {
   var btn = document.getElementById('autw-btn-criar');
-  if (btn) btn.textContent = 'Criando...';
+  if (btn) btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin .6s linear infinite;vertical-align:-2px;margin-right:5px"><path d="M12 2a10 10 0 0 1 10 10"/></svg>Criando...';
   var res = await _sb.from('automacoes').insert({
    nome: String(w.nome).trim(),
    descricao: String(w.descricao || '').trim() || null,
@@ -1493,10 +1509,11 @@ function _autWizFechar() {
  _autModalFechar();
 }
 
-async function _autDuplicar() {
+async function _autDuplicar(btn) {
  var id = (document.getElementById('sp-aut-id') || {}).value;
  var a = _autData.find(function (x) { return String(x.id) === String(id); }) || _autAtiva;
  if (!a || !_sb) return;
+ if (typeof _btnBusy === 'function') _btnBusy(btn, 'Duplicando...');
  var res = await _sb.from('automacoes').insert({
   nome: (a.nome || 'Automação') + ' (cópia)',
   descricao: a.descricao,
@@ -1509,6 +1526,7 @@ async function _autDuplicar() {
  if (res.error || !res.data) {
   console.error('[Automações] erro ao duplicar:', res.error);
   _showToast('Não foi possível duplicar a automação agora. Tente de novo em alguns instantes.', 'erro');
+  if (typeof _btnIdle === 'function') _btnIdle(btn);
   return;
  }
  _autData.push(res.data); _autRender();
@@ -1516,7 +1534,7 @@ async function _autDuplicar() {
  _spAutomacaoById(res.data.id);
 }
 
-async function _autExcluir() {
+async function _autExcluir(btn) {
  var id = (document.getElementById('sp-aut-id') || {}).value;
  var a = _autData.find(function (x) { return String(x.id) === String(id); }) || _autAtiva;
  if (!a || !_sb) return;
@@ -1525,10 +1543,12 @@ async function _autExcluir() {
   ? '\n\nO histórico das ' + r.total_execucoes + ' execuções também será apagado. As tarefas já criadas continuam onde estão.'
   : '';
  if (!confirm('Excluir a automação "' + (a.nome || '') + '"?' + aviso)) return;
+ if (typeof _btnBusy === 'function') _btnBusy(btn, 'Excluindo...');
  var res = await _sb.from('automacoes').delete().eq('id', id);
  if (res.error) {
   console.error('[Automações] erro ao excluir:', res.error);
   _showToast('Não foi possível excluir esta automação agora. Tente de novo em alguns instantes.', 'erro');
+  if (typeof _btnIdle === 'function') _btnIdle(btn);
   return;
  }
  var i = _autData.findIndex(function (x) { return String(x.id) === String(id); });
