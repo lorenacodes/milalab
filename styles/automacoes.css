@@ -29,9 +29,12 @@
  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px;
  padding: 14px 18px; border-bottom: 1px solid var(--border);
 }
-.autm-header-text { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.autm-tag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); flex-shrink: 0; }
-.autm-title { font-size: var(--fs-h4, 15px); font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.autm-header-text { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* Mesma badge navy da tag do painel lateral (.sp-htag, main.css) — o modal
+   central precisa parecer a MESMA linguagem visual do resto do sistema, não
+   um componente à parte. */
+.autm-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; padding: 3px 8px; border-radius: var(--r-full); background: var(--navy-solid); color: #fff; flex-shrink: 0; }
+.autm-title { font-size: 14px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .autm-close {
  flex-shrink: 0; background: none; border: 0; color: var(--muted); cursor: pointer;
  font-size: 20px; line-height: 1; padding: 2px 6px; border-radius: 6px; transition: background .12s, color .12s;
@@ -376,14 +379,28 @@
 
 .autw-nav { display: flex; gap: var(--sp-2); margin-top: var(--sp-5); flex-wrap: wrap; }
 
-/* ── Topo do painel de detalhe: nome + status + frase ─────────────────────── */
-.aut-head { margin-bottom: var(--sp-4); }
-.aut-head-top { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: 6px; }
-.aut-head-nome { font-size: var(--fs-h4, 15px); font-weight: 700; color: var(--text); }
-.aut-head-frase {
- font-size: var(--fs-small); color: var(--text); line-height: 1.55;
- border-left: 3px solid var(--navy); padding: 4px var(--sp-3);
+/* ── Topo do painel de detalhe: status + frase ─────────────────────────────
+   O nome já está no cabeçalho do modal (.autm-title) — repeti-lo aqui de
+   novo, grande, era a mesma informação competindo com ela mesma (achado
+   real). Este card só precisa dizer "está valendo?" e "o que ela faz",
+   em uma leitura só — é o resumo que a pessoa lê antes de entrar em
+   detalhe técnico nenhum. */
+.aut-summary-card {
+ margin-bottom: var(--sp-5); padding: var(--sp-4); border-radius: var(--r-md, 8px);
+ background: color-mix(in srgb, var(--green) 7%, var(--surface2, rgba(127,127,127,.05)));
+ border: 1px solid color-mix(in srgb, var(--green) 20%, var(--border));
 }
+.aut-summary-card-off {
+ background: var(--surface2, rgba(127,127,127,.05)); border-color: var(--border);
+}
+.aut-summary-status {
+ display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
+ text-transform: uppercase; letter-spacing: .05em; color: var(--green); margin-bottom: 8px;
+}
+.aut-summary-card-off .aut-summary-status { color: var(--muted); }
+.aut-status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.aut-status-dot-on { background: var(--green); }
+.aut-summary-frase { font-size: var(--fs-body, 13px); color: var(--text); line-height: 1.55; font-weight: 500; }
 
 /* ── Histórico de execuções em tabela simples ─────────────────────────────── */
 .aut-exec-tb { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
