@@ -941,8 +941,19 @@ function _taskAutoSaveStatus(state, msg) {
  }
 }
 
+// Ctrl+Z (scripts/lib/undo-manager.js): snapshot do valor de CADA campo
+// antes da primeira mudança de uma janela de patch ainda não enviada — não
+// do valor a cada chamada (senão, digitar "Residência Multifamiliar" letra a
+// letra guardaria "antes" de cada tecla em vez de uma edição lógica só, ver
+// pedido original). Zerado a cada flush bem-sucedido (_taskAutoSaveFlush),
+// junto com _taskAutoSavePending — a janela seguinte começa do zero.
+var _taskAutoSaveBefore = null;
 function _taskAutoSaveQueue(patch, immediate) {
  if (!_taskEditId) return; // modo criação: sem linha no banco ainda, nada a auto-salvar
+ if (!_taskAutoSavePending) _taskAutoSaveBefore = {};
+ Object.keys(patch).forEach(function(k) {
+  if (!(k in _taskAutoSaveBefore)) _taskAutoSaveBefore[k] = window._drwCurrentTask ? window._drwCurrentTask[k] : undefined;
+ });
  _taskAutoSavePending = Object.assign(_taskAutoSavePending || {}, patch);
  clearTimeout(_taskAutoSaveTimer);
  _taskAutoSaveStatus('saving', 'Salvando…');
@@ -965,8 +976,8 @@ var _TASK_CAMPOS_OBRIG = {
 };
 function _taskAutoSaveFlush() {
  if (!_taskEditId || !_taskAutoSavePending) return;
- var id = _taskEditId, patch = _taskAutoSavePending;
- _taskAutoSavePending = null;
+ var id = _taskEditId, patch = _taskAutoSavePending, before = _taskAutoSaveBefore;
+ _taskAutoSavePending = null; _taskAutoSaveBefore = null;
  var bloqueados = [];
  Object.keys(_TASK_CAMPOS_OBRIG).forEach(function(campo) {
   if (!(campo in patch)) return;
@@ -1015,11 +1026,52 @@ function _taskAutoSaveFlush() {
    return;
   }
   _taskAutoSaveStatus('saved', 'Alterações salvas');
-  _taskApplyPatchEverywhere(id, r.row || patch);
+  var applied = r.row || patch;
+  _taskApplyPatchEverywhere(id, applied);
+  // Mantém window._drwCurrentTask em dia a cada flush — sem isso, uma 2ª
+  // edição na mesma sessão do drawer capturaria o "antes" errado em
+  // _taskAutoSaveQueue (o valor de quando o drawer abriu, não o da edição
+  // anterior), gerando um undo que não bate com o que o usuário via na tela.
+  if (window._drwCurrentTask && String(window._drwCurrentTask.id) === String(id)) Object.assign(window._drwCurrentTask, applied);
+  // Ctrl+Z (undo-manager.js) — uma entrada por flush (não por campo): os
+  // campos tocados dentro da MESMA janela de debounce viram uma única
+  // "edição lógica", igual ao pedido original. Só entra na pilha se algo
+  // realmente mudou (evita empurrar uma edição no-op no histórico curto).
+  if (typeof _umPush === 'function' && typeof _umActiveScope !== 'undefined' && _umActiveScope && before) {
+   var changedKeys = Object.keys(patch).filter(function(k) { return String(patch[k]) !== String(before[k]); });
+   if (changedKeys.length) {
+    var beforeVals = {}, afterVals = {};
+    changedKeys.forEach(function(k) { beforeVals[k] = before[k]; afterVals[k] = patch[k]; });
+    var labels = changedKeys.map(function(k) { return _ATIVIDADE_CAMPO_LABEL[k]; }).filter(Boolean);
+    var label = labels.length === 1 ? labels[0] : (labels.length ? labels.length + ' campos' : null);
+    _umPush(_umActiveScope, { label: label, before: beforeVals, after: afterVals, apply: function(v) { return _taskUndoApply(id, v); } });
+   }
+  }
  }).catch(function(e) {
   if (_taskEditId && String(_taskEditId) !== String(id)) return;
   console.error('[auto-save]', e);
   _taskAutoSaveStatus('error', 'Não foi possível salvar. Sua alteração continua na tela.');
+ });
+}
+
+// Reaproveitado pelo Ctrl+Z/Ctrl+Shift+Z (undo-manager.js) — mesma escrita
+// que o flush normal já faz (_ccSave + _taskApplyPatchEverywhere), só que
+// fora do fluxo de debounce (chamada direta, valores já resolvidos). Se o
+// drawer ainda estiver aberto na MESMA atividade, reabre pra quem está com
+// o painel na tela ver o valor restaurado sem precisar fechar e abrir de novo.
+function _taskUndoApply(id, values) {
+ return _ccSave('atividades', id, values).then(function(r) {
+  if (!r || r.erro) throw (r && r.erro) || new Error('Falha ao salvar');
+  if (r.excluido) throw new Error('Atividade excluída por outro usuário');
+  if (r.conflito) {
+   _showToast(_ccMsgConflito('atividades', r.campos), 'erro');
+   if (r.atual) _taskApplyPatchEverywhere(id, r.atual);
+   throw new Error('Conflito de edição concorrente');
+  }
+  var applied = r.row || values;
+  _taskApplyPatchEverywhere(id, applied);
+  if (window._drwCurrentTask && String(window._drwCurrentTask.id) === String(id)) Object.assign(window._drwCurrentTask, applied);
+  if (_taskEditId && String(_taskEditId) === String(id)) _taskDrawerOpen(id);
  });
 }
 
