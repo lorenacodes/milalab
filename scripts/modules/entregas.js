@@ -420,35 +420,49 @@ function _entToggleAtrasadas() {
 //  - "2 semanas"           → Faturamento entre hoje e hoje+14 dias
 //  - "Todas as entregas"   → limpa o filtro (mantém agrupamento/ordenação)
 function _entFmtDateISO(d) { return d.toISOString().slice(0,10); }
+// Definições EXATAS da referência (Airtable, conferidas campo a campo pela
+// dona do sistema — cada filtro rápido replica ali as mesmas condições, não
+// uma aproximação). O campo 'status' do filtro-builder guarda a etapa CRUA
+// (getValue: ds.etapaRaw, ver _entFbFields acima — ex.: "Entrega realizada",
+// "Produção"), então os valores abaixo são exatamente o texto da etapa, não
+// a chave do balde interno ("entregue"/"producao"/...) — comparar com a
+// chave do balde foi o bug original (nunca batia com etapa nenhuma).
 function _entQuickPreset(name, btn) {
  var inst = _fbInstances.entregas;
  var conds = [];
- // BUG real (achado real, confirmado contra o banco): o campo 'status' do
- // filtro guarda a etapa CRUA (getValue: ds.etapaRaw, ver _entFbFields acima
- // — ex.: "Entrega realizada", "Produção"), não a chave do balde
- // ("entregue"/"producao"/...). "A realizar" comparava com 'entregue', que
- // nunca bate com etapa nenhuma — não excluía nada, todas as entregas
- // passavam, inclusive as já entregues. Pior: "A programar"/"Entregas esse
- // ano"/"2 semanas" nunca excluíam por status NENHUMA vez (só filtravam por
- // data) — conferido contra o banco: 6 entregas já realizadas sem data de
- // faturamento apareciam em "A programar", e 366 já realizadas com data
- // deste ano apareciam em "Entregas esse ano". Todo filtro de PENDÊNCIA
- // (tudo, exceto "Todas as entregas", que existe justamente pra mostrar
- // tudo) precisa excluir "Entrega realizada" — não só o "A realizar".
- var naoRealizada = { id:'qv0', field:'status', operator:'neq', value:'Entrega realizada' };
  if (name === 'a-realizar') {
-  conds = [naoRealizada];
+  // Tudo que ainda precisa de ação até a entrega chegar no cliente — as
+  // 5 etapas entre as duas pontas (Aprovação de projeto, que ainda nem
+  // começou a fase de produção/entrega, e Entrega realizada, já concluída,
+  // ficam de fora).
+  conds = [{ id:'qv1', field:'status', operator:'anyof',
+   value: ['Programar entrega', 'Liberar produção', 'Produção', 'Pedido produzido', 'Em transporte'] }];
  } else if (name === 'a-programar') {
-  conds = [naoRealizada, { id:'qv1', field:'dataFat', operator:'empty', value:'' }];
+  // Só isso — nenhuma condição de etapa. Data de faturamento vazia é o
+  // critério inteiro (uma entrega realizada, na prática, sempre tem essa
+  // data preenchida; se não tiver, é dado incompleto, não motivo pra um
+  // filtro de status aqui).
+  conds = [{ id:'qv1', field:'dataFat', operator:'empty', value:'' }];
  } else if (name === 'ano') {
   var y = new Date().getFullYear();
-  conds = [naoRealizada, { id:'qv1', field:'dataFat', operator:'between', value:[y+'-01-01', y+'-12-31'] }];
+  conds = [
+   { id:'qv1', field:'status', operator:'anyof', value: ['Em transporte', 'Entrega realizada'] },
+   // "a partir de 1/1/{ano}, sem limite superior" — o tipo 'date' do
+   // filtro-builder só tem eq/before/after/between (nenhum ">=" pronto);
+   // 'between' com uma data bem distante no futuro reproduz exatamente
+   // "on or after" sem precisar mexer no filtro-builder compartilhado.
+   { id:'qv2', field:'dataFat', operator:'between', value: [y + '-01-01', '2099-12-31'] },
+  ];
  } else if (name === '2semanas') {
-  var hoje = new Date(); hoje.setHours(0,0,0,0);
-  var fim = new Date(hoje); fim.setDate(fim.getDate()+14);
-  conds = [naoRealizada, { id:'qv1', field:'dataFat', operator:'between', value:[_entFmtDateISO(hoje), _entFmtDateISO(fim)] }];
+  // Janela de 2 semanas CENTRADA em hoje (uma semana atrás até uma semana à
+  // frente) — não "hoje até hoje+14".
+  var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  var ini = new Date(hoje); ini.setDate(ini.getDate() - 7);
+  var fim = new Date(hoje); fim.setDate(fim.getDate() + 7);
+  conds = [{ id:'qv1', field:'dataFat', operator:'between', value: [_entFmtDateISO(ini), _entFmtDateISO(fim)] }];
  } // 'todas' → conds fica [] (mostra tudo, inclusive já realizadas — é o propósito desta aba)
  inst.state.conditions = conds;
+ inst.state.logic = 'AND'; // os filtros rápidos sempre combinam condições com E, nunca OU
  document.querySelectorAll('.ent-qv-btn').forEach(function(b){ b.classList.remove('active'); });
  if (btn) btn.classList.add('active');
  _fbRender('entregas');
