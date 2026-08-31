@@ -12,7 +12,7 @@
  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='4' y='4' width='92' height='92' rx='22' fill='%23050866'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%239DA3B0'/%3E%3Cstop offset='45%25' stop-color='%23F5F6F8'/%3E%3Cstop offset='100%25' stop-color='%238E94A3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M50 20 L78 35 V65 L50 80 L22 65 V35 Z' fill='none' stroke='url(%23g)' stroke-width='6' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='50' r='10' fill='url(%23g)'/%3E%3C/svg%3E">
  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles/tokens.css?v=mldsv345">
-<link rel="stylesheet" href="styles/main.css?v=mldsv349">
+<link rel="stylesheet" href="styles/main.css?v=mldsv350">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="scripts/lib/supabase-client.js?v=mldsv345"></script>
 <script src="scripts/lib/concurrency.js?v=mldsv345"></script>
@@ -2088,8 +2088,14 @@
       Entrega" NÃO entra aqui: Obras/Projetos não têm botão de criação
       dentro da barra — o botão global do topbar (rota 'entregas' em
       scripts/app.js, já aponta pra openNovaEntrega()) é o único gatilho,
-      igual às outras duas abas. -->
- <div id="entregas-toolbar-fixed" class="obras-toolbar-fixed">
+      igual às outras duas abas.
+      Duas linhas dentro da MESMA barra fixa (.tb-2row, ver styles/main.css)
+      — pedido explícito: os atalhos de filtro rápido (A realizar/A
+      programar/Entregas esse ano/2 semanas/Todas as entregas) subiram pro
+      cabeçalho fixo em vez de ficar soltos abaixo do título, rolando junto
+      com o conteúdo. -->
+ <div id="entregas-toolbar-fixed" class="obras-toolbar-fixed tb-2row">
+ <div class="tb-row1">
  <div class="obras-toolbar-filters">
   <div class="fb-wrap" id="fb-wrap-entregas" style="position:relative;display:inline-block">
    <button type="button" class="gestor-sel" id="fb-btn-entregas" onclick="_fbToggle('entregas')">Filtro<span class="fb-badge" id="fb-badge-entregas" style="display:none"></span></button>
@@ -2149,13 +2155,17 @@
  <!-- Abas de atalho (quick-view), estilo Airtable — atalhos pra combinações
       de filtro pré-definidas (ver _entQuickPreset em entregas.js pra
       definição exata de cada uma). Não são páginas separadas: só escrevem
-      no mesmo filtro-builder da Tabela/Kanban/Calendário. -->
- <div style="display:flex;gap:6px;padding:10px 0;flex-wrap:wrap;border-bottom:1px solid var(--border)">
+      no mesmo filtro-builder da Tabela/Kanban/Calendário. Segunda linha da
+      MESMA barra fixa (.tb-row2) — antes era um <div> solto abaixo do
+      título, rolando com o resto da página; agora fica pinado junto com
+      Filtro/Agrupar/Ordenar. -->
+ <div class="tb-row2">
   <button type="button" class="ent-qv-btn" onclick="_entQuickPreset('a-realizar',this)">A realizar</button>
   <button type="button" class="ent-qv-btn" onclick="_entQuickPreset('a-programar',this)">A programar</button>
   <button type="button" class="ent-qv-btn" onclick="_entQuickPreset('ano',this)">Entregas esse ano</button>
   <button type="button" class="ent-qv-btn" onclick="_entQuickPreset('2semanas',this)">2 semanas</button>
   <button type="button" class="ent-qv-btn active" onclick="_entQuickPreset('todas',this)">Todas as entregas</button>
+ </div>
  </div>
 
  <!-- ── VISTA TABELA ── -->

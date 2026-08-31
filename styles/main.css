@@ -232,9 +232,13 @@ body.light .dash-panel{
  #page-projetos{overflow-x:hidden}
  #page-projetos .ph{margin-top:44px}
  /* Entregas reaproveita o mesmo padrão de barra fixa de Obras/Projetos —
-    ver comentário completo em .obras-toolbar-fixed acima. */
+    ver comentário completo em .obras-toolbar-fixed acima. 90px (não 44px
+    como Obras/Projetos) porque a barra de Entregas tem DUAS linhas
+    (.tb-2row/.tb-row1/.tb-row2 — filtros + atalhos de filtro rápido, ver
+    index.html) — medido: 46px a linha 1 + 43px a linha 2 + 1px da borda
+    entre elas. */
  #page-entregas{overflow-x:hidden}
- #page-entregas .ph{margin-top:44px}
+ #page-entregas .ph{margin-top:90px}
  /* Barra fixa única de Obras (Filtro/Agrupar/Ordenar/Período/Visualizações/
     Pesquisa + Kanban/Tabela/Nova Obra, na mesma linha) — position:fixed em
     vez de sticky de propósito: sticky só resolve o eixo vertical, então se
@@ -266,6 +270,16 @@ body.light .dash-panel{
  body.light .obras-toolbar-fixed{background:var(--surface);border-bottom-color:rgba(255,255,255,.65)}
  .obras-toolbar-filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;min-width:0}
  .obras-fixed-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+ /* Variante de 2 linhas dentro da MESMA barra fixa — pedido explícito pra
+    Entregas: os atalhos de filtro rápido (A realizar/A programar/...)
+    subiram do meio do conteúdo (rolava com a página) pro cabeçalho fixo,
+    como uma segunda linha da mesma barra de Filtro/Agrupar/Ordenar em vez
+    de um <div> solto embaixo do título. flex-direction:column por cima do
+    .obras-toolbar-fixed original (que é row) — cada linha vira sua própria
+    div interna com o padding horizontal que a barra tinha antes. */
+ .obras-toolbar-fixed.tb-2row{flex-direction:column;align-items:stretch;gap:0;padding:0}
+ .tb-row1{display:flex;align-items:center;gap:12px;padding:8px 24px}
+ .tb-row2{display:flex;align-items:center;gap:6px;padding:8px 24px;flex-wrap:wrap;border-top:1px solid var(--border)}
  /* Título "Obras" + subtítulo descem pra abaixo da barra fixa (44px =
     altura da barra + respiro, recalculado pro novo top:52px acima) — sem
     isso eles renderizam ATRÁS/sob a barra, já que ambos começam no mesmo
