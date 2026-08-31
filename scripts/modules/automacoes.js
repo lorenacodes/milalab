@@ -188,25 +188,51 @@ function _autSujeito(tabela, artigo) {
  return artigo === 'def' ? 'o projeto' : 'um projeto';
 }
 
+// Uma condição na forma curta de leitura. A diferença pro texto do editor é a
+// igualdade: "Tipo de Obra: Solar" em vez de "Tipo de Obra é igual a Solar" —
+// no card o que importa é o valor, não o operador. Operadores que NÃO são
+// igualdade continuam escritos por extenso, senão "não contém" viraria
+// "contém" e a frase mentiria.
+function _autCondCurta(tabela, c) {
+ var meta = _autCampoMeta(tabela, c.campo);
+ var ops  = _AUT_OPERADORES[meta.tipo] || _AUT_OPERADORES.texto;
+ var rot  = (ops.find(function (o) { return o[0] === c.operador; }) || [c.operador, c.operador])[1];
+ if (_AUT_OPS_SEM_VALOR[c.operador]) return meta.label + ' ' + rot;
+ var vals = _autValorArr(c.valor).filter(function (v) { return String(v).trim() !== ''; });
+ if (!vals.length) return meta.label + ' ' + rot;
+ if (c.operador === 'igual' || c.operador === 'em') return meta.label + ': ' + vals.join(' ou ');
+ return meta.label + ' ' + rot + ' ' + vals.join(' ou ');
+}
+
 // "Quando um projeto entrar em Pré-projeto"
+// "Quando uma obra entrar em Orçamento · Tipo de Obra: Solar"
+//
+// Quase toda automação de produção tem uma condição de ETAPA mais um ou dois
+// recortes (tipo de obra, produto). Se a etapa não liderasse a frase, o card
+// voltaria a dizer "tiver Etapa do Projeto é igual a X E Tipo de Projeto é
+// igual a Y" — exatamente a "lista técnica" que o dono pediu pra sair daqui.
+// Então: a etapa vira o verbo ("entrar em X") e o resto vira qualificador.
 function _autGatilhoFrase(a) {
  var conds = (a.condicoes || []).filter(function (c) { return c && c.campo; });
  var sujeito = _autSujeito(a.tabela_alvo);
  if (!conds.length) return 'Quando ' + sujeito + ' for criado ou alterado';
 
- // Caso dominante (as 22 automações de produção): uma única condição de
- // igualdade sobre a etapa. Vira a frase natural que o dono pediu.
- if (conds.length === 1) {
-  var c = conds[0];
-  var meta = _autCampoMeta(a.tabela_alvo, c.campo);
-  var vals = _autValorArr(c.valor).filter(function (v) { return String(v).trim() !== ''; });
-  if (meta.etapa && (c.operador === 'igual' || c.operador === 'em') && vals.length) {
-   return 'Quando ' + sujeito + ' entrar em ' + vals.join(' ou ');
-  }
+ var iEtapa = -1;
+ for (var i = 0; i < conds.length; i++) {
+  var meta = _autCampoMeta(a.tabela_alvo, conds[i].campo);
+  var vals = _autValorArr(conds[i].valor).filter(function (v) { return String(v).trim() !== ''; });
+  if (meta.etapa && (conds[i].operador === 'igual' || conds[i].operador === 'em') && vals.length) { iEtapa = i; break; }
  }
- // Demais formatos (número, data, várias condições): reaproveita o resumo já
- // existente em vez de manter uma segunda gramática que ia divergir.
- return 'Quando ' + sujeito + ' tiver ' + _autCondResumoTexto(a.tabela_alvo, conds);
+
+ var resto = conds.filter(function (_c, j) { return j !== iEtapa; })
+  .map(function (c) { return _autCondCurta(a.tabela_alvo, c); });
+
+ if (iEtapa === -1) {
+  return 'Quando ' + sujeito + ' tiver ' + resto.join(' · ');
+ }
+ var etapas = _autValorArr(conds[iEtapa].valor).filter(function (v) { return String(v).trim() !== ''; });
+ return 'Quando ' + sujeito + ' entrar em ' + etapas.join(' ou ')
+  + (resto.length ? ' · ' + resto.join(' · ') : '');
 }
 
 // 'Criar tarefa "Pré-projeto"'
