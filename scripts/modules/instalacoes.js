@@ -1,24 +1,186 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// INSTALAÇÕES — stub de criação, renderer do painel lateral, loader da lista.
+// INSTALAÇÕES — criação, renderer do painel lateral, loader da lista.
 // ═══════════════════════════════════════════════════════════════════════════════
-function openNovaInstalacao() { alert('Modal "Nova Instalação" será implementado em breve.'); }
+// Tipos de serviço — mesma lista usada no formulário rápido de dentro de
+// Obra (obras.js) e no detalhamento (_spInstalacaoRender abaixo). Hoisted
+// aqui pra virar a fonte única também das opções de FILTRO (pedido
+// explícito: filtro de Tipo exigia digitação, tinha que ser single-select).
+var _INST_TIPO_OPCOES = ['Instalação','Montagem fábrica','Treinamento piloto','Assistência técnica'];
+var _INST_STATUS_OPCOES = ['A programar','Programado','Emitir boleto de medição','Em execução','Finalizado'];
+
+// ── NOVA INSTALAÇÃO (topo da aba Instalações) ────────────────────────────────
+// Pedido explícito: botão "Nova Instalação" da aba cheia era só um alert() —
+// a única forma de criar uma instalação de verdade era passando por dentro
+// de uma Obra (_spToggleNovaInstalacao/_spCriarInstalacao, obras.js). Este
+// formulário é o mesmo padrão (single-select Tipo/Status, datas, Equipe
+// multi-select obrigatória, Dias previstos calculado), com uma diferença: a
+// Obra não vem pré-definida (não se está dentro de um painel de Obra), então
+// tem um campo próprio de busca+vínculo de 1 ou mais Obras (mesma relação
+// N:N obras_instalacoes usada em todo o resto do módulo).
+var _instNovoObraSel = [];
+var _instNovoEquipeSel = [];
+var _instNovoEquipesCache = null;
+function openNovaInstalacao() {
+ var box = document.getElementById('inst-novo-form');
+ if (!box) return;
+ var abrir = box.style.display === 'none';
+ box.style.display = abrir ? 'block' : 'none';
+ if (!abrir) return;
+ _instNovoObraSel = [];
+ _instNovoEquipeSel = [];
+ document.getElementById('inst-novo-obra-chips').innerHTML = '<div class="sp-empty">Nenhuma obra vinculada ainda.</div>';
+ _srchSelRegister('instNovoTipo', { options: _INST_TIPO_OPCOES, placeholder: 'Selecione...' });
+ _srchSelRegister('instNovoStatus', { options: _INST_STATUS_OPCOES, placeholder: 'Selecione...' });
+ var tipoBox = document.getElementById('inst-novo-tipo-box');
+ if (tipoBox) tipoBox.innerHTML = _srchSelMarkup('instNovoTipo', 'inst-novo-tipo', '');
+ var statusBox = document.getElementById('inst-novo-status-box');
+ if (statusBox) statusBox.innerHTML = _srchSelMarkup('instNovoStatus', 'inst-novo-status', 'A programar');
+ document.getElementById('inst-novo-inicio').value = '';
+ document.getElementById('inst-novo-fim').value = '';
+ document.getElementById('inst-novo-diasprog').value = '—';
+ document.getElementById('inst-novo-detalhes').value = '';
+ if (typeof _garantirObraIdMap === 'function') _garantirObraIdMap();
+ (async function() {
+  if (!_instNovoEquipesCache) {
+   var res = await _sb.from('equipe_instalacao').select('id,nome').order('nome');
+   _instNovoEquipesCache = res.data || [];
+  }
+  var dd = document.getElementById('inst-novo-equipe-dd');
+  if (dd) dd.innerHTML = _msRenderDropdown('instNovoEquipe', _instNovoEquipesCache.map(function(e){return e.nome;}), _instNovoEquipeSel, '_instNovoEquipeToggle', 'Selecione a(s) equipe(s)...');
+ })();
+}
+function _instNovoEquipeToggle(campo, valor, checked) {
+ _instNovoEquipeSel = _msToggle(_instNovoEquipeSel, valor, checked);
+ var dd = document.getElementById('inst-novo-equipe-dd');
+ if (dd) dd.innerHTML = _msRenderDropdown('instNovoEquipe', (_instNovoEquipesCache||[]).map(function(e){return e.nome;}), _instNovoEquipeSel, '_instNovoEquipeToggle', 'Selecione a(s) equipe(s)...');
+ if (typeof _noReabrirDropdown === 'function') _noReabrirDropdown('inst-novo-equipe-dd');
+}
+// Calcula "Nº dias programados" ao vivo (mesma fórmula do detalhamento) —
+// chamado pelo onchange das datas.
+function _instNovoRecalcDias() {
+ var ini = document.getElementById('inst-novo-inicio').value;
+ var fim = document.getElementById('inst-novo-fim').value;
+ var el = document.getElementById('inst-novo-diasprog');
+ if (!el) return;
+ el.value = (ini && fim) ? Math.round((new Date(fim) - new Date(ini)) / 86400000) : '—';
+}
+function _instNovoObraBuscar(q) {
+ var box = document.getElementById('inst-novo-obra-resultados');
+ if (!box) return;
+ var qn = (q || '').trim().toLowerCase();
+ if (!qn) { box.innerHTML = ''; return; }
+ var jaSel = _instNovoObraSel.map(function(o){ return o.id; });
+ var mapa = _obraIdMap || {};
+ var matches = Object.keys(mapa).filter(function(id) {
+  return jaSel.indexOf(id) === -1 && (mapa[id].nome || '').toLowerCase().indexOf(qn) !== -1;
+ }).slice(0, 8);
+ box.innerHTML = matches.length
+  ? matches.map(function(id) {
+     return '<div style="cursor:pointer;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:12px" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'" onclick="_instNovoObraAdd(\'' + id + '\')">' + (mapa[id].nome || '—').replace(/</g,'&lt;') + '</div>';
+    }).join('')
+  : '<div class="sp-empty">Nenhuma obra encontrada.</div>';
+}
+function _instNovoObraAdd(id) {
+ if (_instNovoObraSel.some(function(o){ return o.id === id; })) return;
+ _instNovoObraSel.push({ id: id, nome: (_obraIdMap[id] || {}).nome || '—' });
+ var busca = document.getElementById('inst-novo-obra-busca');
+ if (busca) busca.value = '';
+ document.getElementById('inst-novo-obra-resultados').innerHTML = '';
+ _instNovoObraChipsRender();
+}
+function _instNovoObraRemove(id) {
+ _instNovoObraSel = _instNovoObraSel.filter(function(o){ return o.id !== id; });
+ _instNovoObraChipsRender();
+}
+function _instNovoObraChipsRender() {
+ var wrap = document.getElementById('inst-novo-obra-chips');
+ if (!wrap) return;
+ wrap.innerHTML = _instNovoObraSel.length
+  ? _instNovoObraSel.map(function(o){ return _spRelChipHTML('obras', o.id, o.nome, null, '_instNovoObraRemove(\'' + o.id + '\')'); }).join('')
+  : '<div class="sp-empty">Nenhuma obra vinculada ainda.</div>';
+}
+async function _instCriarNova() {
+ var tipo = document.getElementById('inst-novo-tipo')?.value || '';
+ var status = document.getElementById('inst-novo-status')?.value || '';
+ var inicio = document.getElementById('inst-novo-inicio')?.value || '';
+ var fim = document.getElementById('inst-novo-fim')?.value || '';
+ var faltando = [];
+ if (!tipo) faltando.push('Tipo de Serviço');
+ if (!status) faltando.push('Status');
+ if (!inicio) faltando.push('Data início');
+ if (!fim) faltando.push('Data fim');
+ if (!_instNovoEquipeSel.length) faltando.push('Equipe de Instalação');
+ if (faltando.length) { _showToast('Preencha: ' + faltando.join(', '), 'aviso'); return; }
+ var payload = {
+  tipo_servico: tipo, funil: status, data_inicio: inicio, data_fim: fim,
+  detalhes: document.getElementById('inst-novo-detalhes')?.value?.trim() || null,
+ };
+ var insRes = await _sb.from('instalacoes').insert(payload).select('id').single();
+ if (insRes.error || !insRes.data) {
+  console.error('[Instalações] erro ao criar:', insRes.error);
+  _showToast('Não foi possível criar a instalação. Nada foi salvo — confira os campos e tente de novo.', 'erro');
+  return;
+ }
+ var novaId = insRes.data.id;
+ if (_instNovoObraSel.length) {
+  var obraLinks = _instNovoObraSel.map(function(o){ return { obra_id: o.id, instalacao_id: novaId }; });
+  var obraLinkRes = await _sb.from('obras_instalacoes').insert(obraLinks);
+  if (obraLinkRes.error) console.error('[Instalações] erro ao vincular obra(s):', obraLinkRes.error);
+ }
+ if (_instNovoEquipeSel.length) {
+  var equipeIds = (_instNovoEquipesCache || []).filter(function(e){ return _instNovoEquipeSel.indexOf(e.nome) !== -1; }).map(function(e){ return e.id; });
+  var equipeLinks = equipeIds.map(function(eid){ return { instalacao_id: novaId, equipe_id: eid }; });
+  if (equipeLinks.length) {
+   var equipeLinkRes = await _sb.from('instalacoes_equipe').insert(equipeLinks);
+   if (equipeLinkRes.error) console.error('[Instalações] erro ao vincular equipe(s):', equipeLinkRes.error);
+  }
+ }
+ _showToast('Instalação criada!', 'ok');
+ openNovaInstalacao(); // fecha o form
+ if (typeof _dbLoadInstalacoes === 'function') await _dbLoadInstalacoes();
+ _spInstalacaoById(novaId);
+}
 
 // Filtro/Ordenação — mesmos componentes reutilizáveis do Gestor de Tarefas/
 // Obras/Empresas (filtro-builder/sort-builder/smart-search), substituindo os
 // 4 chips fixos de status (Todas/Programadas/Em andamento/Concluídas) por um
 // Filtro de condições de verdade. _fbEvaluate/_sbCompare recebem tr.dataset
-// direto — ver data-* adicionados no template de _dbLoadInstalacoes.
+// direto — ver data-* adicionados no template de _instRowHTML.
 var _instFbFields = [
  // Vocabulário real (mesmo campo do Airtable original, confirmado por
  // print da usuária) — a lista antiga (Programado/Planejado/Em andamento/
  // Finalizado/Cancelado) tinha 3 valores que nunca existiram nos dados
  // reais e faltava "Emitir boleto de medição", que existe.
- { key: 'funil',   label: 'Status',  type: 'select', options: ['A programar','Programado','Emitir boleto de medição','Em execução','Finalizado'] },
- { key: 'tipo',    label: 'Tipo',    type: 'text' },
- { key: 'obra',    label: 'Obra',    type: 'text' },
- { key: 'cliente', label: 'Cliente', type: 'text' },
+ { key: 'funil',   label: 'Status',  type: 'select', options: _INST_STATUS_OPCOES },
+ // Tipo/Obra/Cliente exigiam digitação livre (pedido explícito: os 3
+ // deveriam ser single-select) — Tipo tem vocabulário fechado
+ // (_INST_TIPO_OPCOES); Obra/Cliente têm lista aberta mas finita, então a
+ // opção vem dinâmica dos dados já carregados (mesmo padrão do filtro de
+ // Obra em projetos.js: options como function, recalculada toda vez que o
+ // popover abre).
+ { key: 'tipo',    label: 'Tipo',    type: 'select', options: _INST_TIPO_OPCOES },
+ { key: 'obra',    label: 'Obra',    type: 'select', options: function(){ return _instOpcoesUnicas('obra'); } },
+ { key: 'cliente', label: 'Cliente', type: 'select', options: function(){ return _instOpcoesUnicas('cliente'); } },
+ { key: 'nome',    label: 'Nome da Instalação', type: 'text' },
+ { key: 'equipe',  label: 'Equipe de Instalação', type: 'select', options: function(){ return (_instEquipesCacheFiltro || []).map(function(e){ return e.nome; }); } },
+ { key: 'inicio',  label: 'Data de início', type: 'date' },
+ { key: 'fim',     label: 'Data de fim',    type: 'date' },
+ { key: 'diasprog', label: 'Nº dias programados', type: 'number', getValue: function(ds) { return parseFloat(ds.diasprog) || 0; } },
+ { key: 'diasexec', label: 'Nº dias executados',  type: 'number', getValue: function(ds) { return parseFloat(ds.diasexec) || 0; } },
+ { key: 'cidade',  label: 'Cidade (de Obras)', type: 'select', options: function(){ return _instOpcoesUnicas('cidade'); } },
+ { key: 'estado',  label: 'Estado (de Obras)', type: 'select', options: function(){ return _instOpcoesUnicas('estado'); } },
+ { key: 'valortotal', label: 'Despesa Total', type: 'number', getValue: function(ds) { return parseFloat(ds.valortotal) || 0; } },
 ];
 _fbInit('instalacoes', _instFbFields, _instApplyFilters);
+
+// Opções únicas pra filtro select dinâmico (Obra/Cliente/Cidade/Estado) — lê
+// direto do <tr data-*> já renderizado na tabela (mesmo espírito das
+// options() dinâmicas de projetos.js), sem precisar de outra fonte/consulta.
+function _instOpcoesUnicas(campo) {
+ var vals = Array.prototype.slice.call(document.querySelectorAll('#inst-tbody tr[data-id]'))
+  .map(function(tr){ return tr.dataset[campo]; }).filter(Boolean);
+ return Array.from(new Set(vals)).sort(function(a,b){ return a.localeCompare(b); });
+}
 
 // Cor do Status (Funil) — hoisted pra fora de _instRowHTML (antes recriado a
 // cada linha) pra também ser reaproveitado pelo cabeçalho de grupo quando a
@@ -27,9 +189,10 @@ _fbInit('instalacoes', _instFbFields, _instApplyFilters);
 var _INST_FUNIL_CLS = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
 
 var _instSbFields = [
+ { key: 'nome',      label: 'Nome da Instalação',   type: 'text' },
  { key: 'obra',      label: 'Obra',    type: 'text' },
  { key: 'cliente',   label: 'Cliente', type: 'text' },
- { key: 'tipo',      label: 'Tipo',    type: 'text' },
+ { key: 'tipo',      label: 'Categoria do Serviço', type: 'text' },
  { key: 'inicio',    label: 'Início',  type: 'date' },
  { key: 'fim',       label: 'Fim',     type: 'date' },
  { key: 'dias',      label: 'Dias',    type: 'number', getValue: function(ds) { return parseFloat(ds.dias) || 0; } },
@@ -51,6 +214,16 @@ _gbInit('instalacoes', _instGbFields, _instApplyFilters, 3);
 // e o autosave redesenharem só a <tr> alterada.
 var _instArr = [];
 var _instGroupCollapsed = {};
+// Cache de equipes pro FILTRO (Equipe de Instalação) — cache próprio, feito
+// pra não colidir com _instEquipesCache (obras.js, form de dentro da Obra) e
+// _instEquipesCacheDet (detalhamento aqui mesmo); carregado junto com a
+// lista principal, sem bloquear o primeiro render da tabela.
+var _instEquipesCacheFiltro = null;
+async function _instCarregarEquipesCacheFiltro() {
+ if (_instEquipesCacheFiltro || !_sb) return;
+ var res = await _sb.from('equipe_instalacao').select('id,nome').order('nome');
+ _instEquipesCacheFiltro = res.data || [];
+}
 function _instToggleGroup(key) {
  _instGroupCollapsed[key] = !_instGroupCollapsed[key];
  _instApplyFilters();
@@ -83,6 +256,117 @@ function _instRenderGroupNode(node, path, tbody, forceHidden) {
   tbody.appendChild(hd);
   _instRenderGroupNode(child, nodePath, tbody, forceHidden || isCollapsed);
  });
+}
+
+// ── VISTAS: Tabela / Kanban / Calendário ─────────────────────────────────────
+// Mesmo esquema visual do Kanban/Calendário de Entregas (kanban-obras/
+// kanban-col, .ent-cal* — classes genéricas, não amarradas a Entregas por
+// nada além do nome). Trabalha em cima das <tr> já filtradas/ordenadas no
+// DOM (mesmo dataset usado pelo filtro), não precisa de outra fonte.
+var _INST_KC_ID = {
+ 'A programar': 'inst-kc-a-programar',
+ 'Programado': 'inst-kc-programado',
+ 'Emitir boleto de medição': 'inst-kc-boleto',
+ 'Em execução': 'inst-kc-execucao',
+ 'Finalizado': 'inst-kc-finalizado',
+};
+function setInstView(v) {
+ document.getElementById('inst-view-tabela').style.display = v === 'tabela' ? '' : 'none';
+ document.getElementById('inst-view-kanban').style.display = v === 'kanban' ? '' : 'none';
+ document.getElementById('inst-view-calendario').style.display = v === 'calendario' ? '' : 'none';
+ document.getElementById('inst-btn-tabela').className = 'vt-btn' + (v === 'tabela' ? ' active' : '');
+ document.getElementById('inst-btn-kanban').className = 'vt-btn' + (v === 'kanban' ? ' active' : '');
+ document.getElementById('inst-btn-calendario').className = 'vt-btn' + (v === 'calendario' ? ' active' : '');
+ if (v === 'kanban') _instRenderKanban();
+ if (v === 'calendario') renderInstCal();
+}
+function _instRenderKanbanIfVisible() {
+ var el = document.getElementById('inst-view-kanban');
+ if (el && el.style.display !== 'none') _instRenderKanban();
+}
+function _instRenderCalIfVisible() {
+ var el = document.getElementById('inst-view-calendario');
+ if (el && el.style.display !== 'none') renderInstCal();
+}
+function _instVisibleRows() {
+ return Array.prototype.slice.call(document.querySelectorAll('#inst-tbody tr[data-id]')).filter(function(tr){ return tr.style.display !== 'none'; });
+}
+function _instFmtDateBR(iso) { var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+function _instCardHTML(tr) {
+ var ds = tr.dataset;
+ var cls = _INST_FUNIL_CLS[ds.funil] || 'bm';
+ return '<div class="obra-card" data-id="' + ds.id + '" onclick="_spInstalacaoById(\'' + ds.id + '\')">'
+  + '<div class="oc-title">' + (ds.nome || 'Instalação').replace(/</g,'&lt;') + '</div>'
+  + (ds.cliente ? '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + ds.cliente.replace(/</g,'&lt;') + '</div>' : '')
+  + '<div class="oc-tags">' + (ds.tipo ? '<span class="badge bg" style="font-size:10px">' + ds.tipo + '</span>' : '') + (ds.equipe ? '<span class="badge bm" style="font-size:10px">' + ds.equipe + '</span>' : '') + '</div>'
+  + (ds.inicio ? '<div class="oc-date">Início ' + _instFmtDateBR(ds.inicio) + '</div>' : '')
+  + '</div>';
+}
+function _instRenderKanban() {
+ var rows = _instVisibleRows();
+ var buckets = {}; Object.keys(_INST_KC_ID).forEach(function(k){ buckets[k] = []; });
+ rows.forEach(function(tr){ var f = tr.dataset.funil; if (buckets[f]) buckets[f].push(tr); });
+ Object.keys(_INST_KC_ID).forEach(function(status) {
+  var col = document.getElementById(_INST_KC_ID[status]);
+  if (!col) return;
+  var body = col.querySelector('.kc-body'); var count = col.querySelector('.kc-count');
+  if (body) body.innerHTML = buckets[status].map(_instCardHTML).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 2px">Nenhuma instalação</div>';
+  if (count) count.textContent = buckets[status].length;
+ });
+}
+
+// ── CALENDÁRIO — grid mensal, 1 evento por instalação na Data início (único
+// campo de data que sempre existe antes da instalação acontecer; Data fim é
+// mostrada no título ao passar o mouse). _ptMonths/_ptDows já existem
+// globais (entregas.js, carregado antes) — mesmo vocabulário, não duplica.
+var _instCalYear = new Date().getFullYear();
+var _instCalMonth = new Date().getMonth();
+function instCalNav(dir) {
+ _instCalMonth += dir;
+ if (_instCalMonth > 11) { _instCalMonth = 0; _instCalYear++; }
+ if (_instCalMonth < 0) { _instCalMonth = 11; _instCalYear--; }
+ renderInstCal();
+}
+function _instEventColor(funil) {
+ if (funil === 'A programar') return '#8b5cf6';
+ if (funil === 'Programado' || funil === 'Emitir boleto de medição') return '#B8790A';
+ if (funil === 'Em execução') return '#8B8B94';
+ if (funil === 'Finalizado') return '#1F8A4C';
+ return '#8B8B94';
+}
+function renderInstCal() {
+ var label = document.getElementById('inst-cal-label');
+ if (label) label.textContent = _ptMonths[_instCalMonth] + ' ' + _instCalYear;
+ var grid = document.getElementById('inst-cal-grid');
+ if (!grid) return;
+ var rows = _instVisibleRows();
+ var byDate = {};
+ rows.forEach(function(tr){ var d = tr.dataset.inicio; if (!d) return; (byDate[d] = byDate[d] || []).push(tr); });
+ var html = '';
+ _ptDows.forEach(function(d){ html += '<div class="ent-cal-dow">' + d + '</div>'; });
+ var firstDay = new Date(_instCalYear, _instCalMonth, 1).getDay();
+ var daysInMonth = new Date(_instCalYear, _instCalMonth + 1, 0).getDate();
+ var prevDays = new Date(_instCalYear, _instCalMonth, 0).getDate();
+ var today = new Date();
+ var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+ for (var i = firstDay - 1; i >= 0; i--) html += '<div class="ent-cal-day other-month"><div class="ent-cal-daynum">' + (prevDays - i) + '</div></div>';
+ for (var d = 1; d <= daysInMonth; d++) {
+  var dateStr = _instCalYear + '-' + String(_instCalMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+  var isToday = dateStr === todayStr;
+  var dayEvents = byDate[dateStr] || [];
+  html += '<div class="ent-cal-day' + (isToday ? ' today' : '') + '"><div class="ent-cal-daynum">' + d + '</div>';
+  dayEvents.forEach(function(tr) {
+   var cor = _instEventColor(tr.dataset.funil);
+   var lbl = tr.dataset.nome || 'Instalação';
+   var short = lbl.length > 28 ? lbl.substring(0, 28) + '…' : lbl;
+   html += '<div class="ent-cal-event" style="background:' + cor + '22;color:' + cor + '" title="' + lbl.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();_spInstalacaoById(\'' + tr.dataset.id + '\')">' + short + '</div>';
+  });
+  html += '</div>';
+ }
+ var trailing = (firstDay + daysInMonth) % 7;
+ var nextDays = trailing ? 7 - trailing : 0;
+ for (var n = 1; n <= nextDays; n++) html += '<div class="ent-cal-day other-month"><div class="ent-cal-daynum">' + n + '</div></div>';
+ grid.innerHTML = html;
 }
 
 function _instApplyFilters() {
@@ -119,6 +403,8 @@ function _instApplyFilters() {
   if (activeConds || buscaNorm) { countEl.textContent = visivel + (visivel === 1 ? ' resultado' : ' resultados'); countEl.style.display = 'inline'; }
   else { countEl.style.display = 'none'; }
  }
+ _instRenderKanbanIfVisible();
+ _instRenderCalIfVisible();
 }
 
 // Reescrito (pedido explícito, congruente com o Airtable) — a versão
@@ -143,7 +429,7 @@ var _instAtiva = null; // instalação atualmente aberta no painel (autosave lê
 var _INSTALACAO_CAMPO_LABEL = {
  tipo_servico: 'Tipo de Serviço', funil: 'Status', data_inicio: 'Data início',
  data_fim: 'Data fim', dias_executados: 'Nº dias executados', detalhes: 'Detalhes',
- numero: 'Número', obra_id: null,
+ valor_total_gasto: 'Despesa Total', numero: 'Número', obra_id: null,
 };
 if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('instalacoes', _INSTALACAO_CAMPO_LABEL);
 var _instDetEquipeSel = [];
@@ -232,6 +518,15 @@ function _spInstalacaoRender(inst) {
    <div class="sp-field"><div class="sp-label">Estado (das Obras)</div><input class="sp-inp" value="${estados.length ? estados.join(', ') : '—'}" readonly></div>
   </div>
   <div class="sp-field"><div class="sp-label">Detalhes</div><textarea class="sp-inp" id="sp-inst-detalhes" rows="1" style="resize:none;overflow:hidden;min-height:34px" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';_instScheduleAutoSave()">${inst.detalhes || ''}</textarea></div>
+  <div class="sp-field"><div class="sp-label">Despesa Total</div><input class="sp-inp" id="sp-inst-valortotal" type="number" step="0.01" min="0" placeholder="0,00" value="${inst.valor_total_gasto != null ? inst.valor_total_gasto : ''}" onchange="_instScheduleAutoSave()"></div>
+
+  <div class="sp-stitle">Despesas (anexo)</div>
+  ${_instAnexoInputHTML('Despesa', 'sp-inst-desp-file')}
+  <div id="sp-inst-anexos-despesa-lista" style="margin-top:6px"><div class="sp-empty">Carregando...</div></div>
+
+  <div class="sp-stitle">Detalhe da Montagem (anexo)</div>
+  ${_instAnexoInputHTML('Detalhe da Montagem', 'sp-inst-mont-file')}
+  <div id="sp-inst-anexos-montagem-lista" style="margin-top:6px"><div class="sp-empty">Carregando...</div></div>
 
   <div class="sp-stitle">Equipe de Instalação <span class="req">*</span></div>
   <div id="sp-inst-equipe-dd" class="no-msel-wide"><div style="font-size:12px;color:var(--muted);padding:8px 0">Carregando...</div></div>
@@ -273,6 +568,61 @@ function _spInstalacaoRender(inst) {
   var dd = document.getElementById('sp-inst-equipe-dd');
   if (dd) dd.innerHTML = _instDetEquipeDropdownHTML();
  });
+ _instCarregarAnexos(inst.id);
+}
+
+// ── Despesas / Detalhe da Montagem (anexo) ────────────────────────────────────
+// 2 campos de anexo do Airtable que faltavam por completo (não existia nem
+// upload nem listagem) — mesma relação N:N documentos_instalacoes já criada
+// no banco, mas nunca usada por nenhum código até agora. Reaproveita o bucket
+// documentos_obras e o modal de visualização (_spAbrirDocStorage) já usados
+// pelo resto do sistema — o "tipo" (Despesa/Detalhe da Montagem) é o que
+// separa as 2 listas na tela.
+function _instAnexoInputHTML(tipo, inputId) {
+ return '<label style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;border:2px dashed var(--border);border-radius:8px;padding:10px;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.04)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'\'">'
+  + 'Clique para anexar'
+  + '<input type="file" id="' + inputId + '" style="display:none" onchange="_instAnexoUpload(this,\'' + tipo + '\')">'
+  + '</label>';
+}
+async function _instAnexoUpload(inputEl, tipo) {
+ var file = inputEl.files && inputEl.files[0];
+ if (!file || !_instAtiva) return;
+ var ok = await _instUploadDocumento(file, _instAtiva.id, tipo);
+ inputEl.value = '';
+ if (!ok) { _showToast('Não foi possível enviar o anexo.', 'erro'); return; }
+ _showToast('Anexo enviado!', 'ok');
+ _instCarregarAnexos(_instAtiva.id);
+}
+async function _instUploadDocumento(file, instalacaoId, tipo) {
+ var path = 'instalacoes/' + instalacaoId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.\-]/g,'_');
+ var up = await _sb.storage.from('documentos_obras').upload(path, file, { upsert: false });
+ if (up.error) { console.error('[Instalações] erro ao enviar anexo:', up.error); return false; }
+ var ins = await _sb.from('documentos').insert({
+  nome_arquivo: file.name, tipo: tipo, categoria: 'Técnico', caminho_storage: path,
+  tamanho_bytes: file.size, mime_type: file.type, status: 'Ativo', versao: 1, origem: 'upload_manual',
+ }).select('id').single();
+ if (ins.error || !ins.data) { console.error('[Instalações] erro ao registrar anexo:', ins.error); return false; }
+ var link = await _sb.from('documentos_instalacoes').insert({ documento_id: ins.data.id, instalacao_id: instalacaoId });
+ if (link.error) { console.error('[Instalações] erro ao vincular anexo à instalação:', link.error); return false; }
+ return true;
+}
+async function _instCarregarAnexos(id) {
+ var res = await _sb.from('documentos_instalacoes').select('documento:documento_id(id,nome_arquivo,tipo,caminho_storage)').eq('instalacao_id', id);
+ if (!_instAtiva || String(_instAtiva.id) !== String(id)) return; // painel já mudou de instalação
+ var docs = (res.data || []).map(function(x){ return x.documento; }).filter(Boolean);
+ _instRenderAnexoLista('sp-inst-anexos-despesa-lista', docs.filter(function(d){ return d.tipo === 'Despesa'; }));
+ _instRenderAnexoLista('sp-inst-anexos-montagem-lista', docs.filter(function(d){ return d.tipo === 'Detalhe da Montagem'; }));
+}
+function _instRenderAnexoLista(elId, docs) {
+ var el = document.getElementById(elId);
+ if (!el) return;
+ el.innerHTML = docs.length
+  ? docs.map(function(d) {
+     var pathSafe = (d.caminho_storage || '').replace(/'/g,"\\'");
+     var nomeSafe = (d.nome_arquivo || 'Arquivo').replace(/'/g,"\\'");
+     return '<div onclick="_spAbrirDocStorage(\'' + pathSafe + '\',\'' + nomeSafe + '\',\'documentos_obras\',\'' + d.id + '\',null,null)" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:5px;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' + (d.nome_arquivo || 'Arquivo').replace(/</g,'&lt;') + '</div>';
+    }).join('')
+  : '<div class="sp-empty">Nenhum anexo ainda.</div>';
 }
 
 async function _instCarregarEquipesCacheDet() {
@@ -357,6 +707,7 @@ async function _spSalvarInstalacaoFull() {
   data_inicio: elInicio?.value || null,
   data_fim: elFim?.value || null,
   dias_executados: document.getElementById('sp-inst-dias-exec')?.value !== '' ? Number(document.getElementById('sp-inst-dias-exec')?.value) : null,
+  valor_total_gasto: document.getElementById('sp-inst-valortotal')?.value !== '' ? Number(document.getElementById('sp-inst-valortotal')?.value) : null,
   detalhes: document.getElementById('sp-inst-detalhes')?.value?.trim() || null,
   // updated_at NÃO é mais mandado daqui: quem mantém essa coluna é o trigger
   // trg_instalacoes_updated_at (set_updated_at) no banco, e é exatamente ela
@@ -406,6 +757,8 @@ async function _spExcluirInstalacao(id, nome) {
 async function _dbLoadInstalacoes() {
  var tbody = document.getElementById('inst-tbody');
  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Carregando...</td></tr>';
+ _instCarregarEquipesCacheFiltro();
+ if (typeof _garantirObraIdMap === 'function') _garantirObraIdMap();
  try {
   var allData = []; var from = 0;
   while (true) {
@@ -418,7 +771,7 @@ async function _dbLoadInstalacoes() {
    // updated_at é obrigatório aqui: é a coluna que _ccSave usa como trava
    // otimista (concurrency.js) e que alimenta o baseline do painel.
    var res = await _sb.from('instalacoes')
-    .select('id, numero, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, updated_at, obras_instalacoes(obra:obra_id(nome, empresas_obras(empresa:empresa_id(nome)))), instalacoes_equipe(equipe:equipe_id(nome))')
+    .select('id, numero, detalhes, tipo_servico, funil, data_inicio, data_fim, dias_executados, valor_total_gasto, updated_at, obras_instalacoes(obra:obra_id(nome, cidade, estado, empresas_obras(empresa:empresa_id(nome)))), instalacoes_equipe(equipe:equipe_id(nome))')
     .order('data_inicio', { ascending: false })
     .range(from, from + 999);
    if (res.error) throw new Error(res.error.message);
@@ -456,6 +809,8 @@ function _instRowHTML(inst) {
  var obraNome = obrasLigadas.length ? obrasLigadas.map(function(o){ return o.nome; }).join(', ') : '—';
  var clienteNome = '—';
  try { clienteNome = obrasLigadas[0].empresas_obras[0].empresa.nome || '—'; } catch(e) {}
+ var cidadeObra = Array.from(new Set(obrasLigadas.map(function(o){ return o.cidade; }).filter(Boolean))).join(', ');
+ var estadoObra = Array.from(new Set(obrasLigadas.map(function(o){ return o.estado; }).filter(Boolean))).join(', ');
  var tipo = inst.tipo_servico || '—';
  var equipeNomes = (inst.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean).join(', ') || '—';
  var funil = inst.funil || '—';
@@ -464,12 +819,16 @@ function _instRowHTML(inst) {
   if (!d) return '<span style="color:var(--border)">—</span>';
   var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2);
  };
- var dias = inst.dias_executados != null ? inst.dias_executados : (inst.data_inicio && inst.data_fim ? Math.round((new Date(inst.data_fim)-new Date(inst.data_inicio))/86400000) : '—');
+ var diasProgramados = (inst.data_inicio && inst.data_fim) ? Math.round((new Date(inst.data_fim)-new Date(inst.data_inicio))/86400000) : null;
+ var dias = inst.dias_executados != null ? inst.dias_executados : (diasProgramados != null ? diasProgramados : '—');
  // Nome/"Instalação" segue a fórmula pedida explicitamente (igual ao
  // Airtable): "{ID sequencial} - {Categoria do Serviço} - {Obra}".
  var nomeInst = (inst.numero != null ? inst.numero : '?') + ' - ' + (tipo !== '—' ? tipo : 'Instalação') + ' - ' + (obraNome !== '—' ? obraNome : '(sem obra)');
  return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'instalacoes\',this)" data-id="'+inst.id+'" data-funil="'+funil+'"'
   +' data-tipo="'+(tipo!=='—'?tipo:'')+'" data-obra="'+(obraNome!=='—'?obraNome.replace(/"/g,'&quot;'):'')+'" data-cliente="'+(clienteNome!=='—'?clienteNome.replace(/"/g,'&quot;'):'')+'"'
+  +' data-nome="'+nomeInst.replace(/"/g,'&quot;')+'" data-equipe="'+(equipeNomes!=='—'?equipeNomes.replace(/"/g,'&quot;'):'')+'"'
+  +' data-cidade="'+cidadeObra.replace(/"/g,'&quot;')+'" data-estado="'+estadoObra.replace(/"/g,'&quot;')+'"'
+  +' data-diasprog="'+(diasProgramados!=null?diasProgramados:'')+'" data-diasexec="'+(inst.dias_executados!=null?inst.dias_executados:'')+'" data-valortotal="'+(inst.valor_total_gasto!=null?inst.valor_total_gasto:'')+'"'
   +' data-inicio="'+(inst.data_inicio||'')+'" data-fim="'+(inst.data_fim||'')+'" data-dias="'+(typeof dias==='number'?dias:0)+'">'
   + '<td style="font-weight:500">' + nomeInst + '</td>'
   + '<td style="color:var(--muted);font-size:12px">' + clienteNome + '</td>'
