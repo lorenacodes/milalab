@@ -902,6 +902,7 @@ async function _spSaveContato() {
  // Mesma correção de concorrência do painel de Empresa (ver _spSaveEmpresa):
  // só os campos que ESTE usuário mexeu vão pro banco, e a trava por updated_at
  // recusa a gravação quando dois usuários editam o MESMO campo do contato.
+ var _umBaselineAntes = (typeof _ccGetBaseline === 'function' ? _ccGetBaseline('contatos', id) : null) || {};
  var r = await _ccSaveComFeedback('contatos', id, payload, {
   toastOk: false,
   onRecarregar: function (atual) {
@@ -914,6 +915,32 @@ async function _spSaveContato() {
  var titleEl = document.getElementById('sp-title');
  if (titleEl) titleEl.textContent = payload.nome_completo;
  _cttPatchNaLista(r.row || payload, id);
+ // Ctrl+Z (undo-manager.js) — mesmo padrão de _spSaveEmpresa.
+ if (typeof _umPush === 'function' && typeof _umActiveScope !== 'undefined' && _umActiveScope && r.campos && r.campos.length) {
+  var _umBefore = {}, _umAfter = {};
+  r.campos.forEach(function(k) { _umBefore[k] = _umBaselineAntes[k]; _umAfter[k] = r.row[k]; });
+  var _umNomes = r.campos.map(function(c) { return typeof _ccLabel === 'function' ? _ccLabel('contatos', c) : c; }).filter(Boolean);
+  _umPush(_umActiveScope, {
+   label: _umNomes.length === 1 ? _umNomes[0] : (_umNomes.length ? _umNomes.length + ' campos' : null),
+   before: _umBefore, after: _umAfter,
+   apply: function(v) { return _cttUndoApply(id, v); },
+  });
+ }
+}
+
+// Reaproveitado pelo Ctrl+Z/Ctrl+Shift+Z — mesmo padrão de _empUndoApply.
+function _cttUndoApply(id, values) {
+ return _ccSave('contatos', id, values).then(function(r) {
+  if (!r || r.erro) throw (r && r.erro) || new Error('Falha ao salvar');
+  if (r.excluido) throw new Error('Contato excluído por outro usuário');
+  if (r.conflito) {
+   _showToast(_ccMsgConflito('contatos', r.campos), 'erro');
+   throw new Error('Conflito de edição concorrente');
+  }
+  if (r.semMudanca) return;
+  _cttPatchNaLista(r.row, id);
+  if (String(_spCttCurrentId) === String(id)) _spContatoById(id);
+ });
 }
 
 // Mesma função de _empPatchNaLista, pro lado dos Contatos. Preserva
@@ -1332,6 +1359,41 @@ async function _spSaveEmpresa() {
  // cada autosave (a cada pausa de digitação) — só a linha/registro editado
  // muda; _dbLoadEmpresas() completo fica só pra criação/exclusão de fato.
  _empPatchNaLista(r.row || payload, id);
+ // Ctrl+Z (undo-manager.js) — filtra ultima_modificacao do diff: ela muda
+ // sozinha a cada save (timestamp), então SEMPRE aparece em r.campos mesmo
+ // sem edição de conteúdo nenhuma — undo/redo dela não faz sentido nenhum
+ // pro usuário, só viraria ruído no rótulo do toast.
+ if (typeof _umPush === 'function' && typeof _umActiveScope !== 'undefined' && _umActiveScope && r.campos && r.campos.length) {
+  var _umCampos = r.campos.filter(function(k) { return k !== 'ultima_modificacao'; });
+  if (_umCampos.length) {
+   var _umBefore = {}, _umAfter = {};
+   _umCampos.forEach(function(k) { _umBefore[k] = baseline ? baseline[k] : undefined; _umAfter[k] = r.row[k]; });
+   var _umNomes = _umCampos.map(function(c) { return typeof _ccLabel === 'function' ? _ccLabel('empresas', c) : c; }).filter(Boolean);
+   _umPush(_umActiveScope, {
+    label: _umNomes.length === 1 ? _umNomes[0] : (_umNomes.length ? _umNomes.length + ' campos' : null),
+    before: _umBefore, after: _umAfter,
+    apply: function(v) { return _empUndoApply(id, v); },
+   });
+  }
+ }
+}
+
+// Reaproveitado pelo Ctrl+Z/Ctrl+Shift+Z — mesmo padrão de _obraUndoApply/
+// _projUndoApply: _ccSave direto (autosave de Empresa já era silencioso,
+// toastOk:false — o toast aqui é só o do próprio undo-manager), atualiza a
+// linha e repopula o painel de detalhe se ainda estiver aberto NESTA empresa.
+function _empUndoApply(id, values) {
+ return _ccSave('empresas', id, values).then(function(r) {
+  if (!r || r.erro) throw (r && r.erro) || new Error('Falha ao salvar');
+  if (r.excluido) throw new Error('Empresa excluída por outro usuário');
+  if (r.conflito) {
+   _showToast(_ccMsgConflito('empresas', r.campos), 'erro');
+   throw new Error('Conflito de edição concorrente');
+  }
+  if (r.semMudanca) return;
+  _empPatchNaLista(r.row, id);
+  if (String(_spEmpCurrentId) === String(id)) _spEmpresaById(id);
+ });
 }
 
 // Aplica uma linha vinda do banco (save próprio ou evento de tempo real) no

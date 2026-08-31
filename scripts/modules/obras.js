@@ -2389,6 +2389,11 @@ async function _spSaveObraFull() {
  // formulário a cada tecla, então salvar o Nome também regravava a Cidade
  // com o valor velho que estava na tela — desfazendo, sem aviso, o que outro
  // usuário tivesse acabado de mudar na mesma obra.
+ // Baseline ANTES do save (concurrency.js já mantém um por tabela+id) —
+ // captura o valor de cada campo como estava antes desta edição, pra
+ // montar a entrada de Ctrl+Z logo abaixo sem duplicar rastreamento de
+ // "valor anterior" que o próprio _ccSave já faz internamente.
+ var _umBaselineAntes = (typeof _ccGetBaseline === 'function' ? _ccGetBaseline('obras', id) : null) || {};
  var r = await _ccSaveComFeedback('obras', id, payload, {
   onRecarregar: function () { _spObraById(id); },
  });
@@ -2399,6 +2404,42 @@ async function _spSaveObraFull() {
  // linha da tabela e o card do Kanban desta obra, o que também preserva
  // filtro/agrupamento/scroll de quem estiver com a grade aberta.
  _obraPatchNaLista(r.row);
+ // Ctrl+Z (undo-manager.js) — UMA entrada por autosave (não por campo): os
+ // campos tocados na mesma janela de debounce (700ms) são uma edição
+ // lógica só. r.campos vem do próprio _ccSave (diff real contra o
+ // baseline), então só entra na pilha o que de fato mudou — mesmo o
+ // payload trazendo o formulário inteiro.
+ if (typeof _umPush === 'function' && typeof _umActiveScope !== 'undefined' && _umActiveScope && r.campos && r.campos.length) {
+  var _umBefore = {}, _umAfter = {};
+  r.campos.forEach(function(k) { _umBefore[k] = _umBaselineAntes[k]; _umAfter[k] = r.row[k]; });
+  var _umNomes = r.campos.map(function(c) { return typeof _ccLabel === 'function' ? _ccLabel('obras', c) : c; }).filter(Boolean);
+  _umPush(_umActiveScope, {
+   label: _umNomes.length === 1 ? _umNomes[0] : (_umNomes.length ? _umNomes.length + ' campos' : null),
+   before: _umBefore, after: _umAfter,
+   apply: function(v) { return _obraUndoApply(id, v); },
+  });
+ }
+}
+
+// Reaproveitado pelo Ctrl+Z/Ctrl+Shift+Z — mesma escrita do autosave normal
+// (_ccSave direto, sem o toast "Alteração salva" próprio: o undo-manager já
+// mostra o dele), atualizando tabela/Kanban e, se o painel de detalhe ainda
+// estiver aberto NESTA obra, repopulando os campos visíveis.
+function _obraUndoApply(id, values) {
+ return _ccSave('obras', id, values).then(function(r) {
+  if (!r || r.erro) throw (r && r.erro) || new Error('Falha ao salvar');
+  if (r.excluido) throw new Error('Obra excluída por outro usuário');
+  if (r.conflito) {
+   _showToast(_ccMsgConflito('obras', r.campos), 'erro');
+   throw new Error('Conflito de edição concorrente');
+  }
+  if (r.semMudanca) return;
+  _obraPatchNaLista(r.row);
+  if (_obraAtiva && String(_obraAtiva.id) === String(id)) {
+   _obraAtiva = Object.assign({}, _obraAtiva, r.row);
+   _spObraById(id);
+  }
+ });
 }
 
 // ── Atualização pontual de UMA obra na Tabela e no Kanban ────────────────────

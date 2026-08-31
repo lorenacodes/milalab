@@ -140,7 +140,11 @@ async function _ieCommit(td, skipRefresh, dir) {
     label: found.fcfg.label || null,
     before: before, after: val,
     apply: function(v) {
-     return Promise.resolve(found.fcfg.onSave(id, v)).then(function() {
+     // toastOk:false — o undo-manager já mostra seu próprio toast ("valor
+     // anterior restaurado"/"alteração refeita"); sem isso o onSave normal
+     // dispararia TAMBÉM o "Alteração salva" de sempre, dois toasts
+     // empilhados pra uma única ação do usuário.
+     return Promise.resolve(found.fcfg.onSave(id, v, { toastOk: false })).then(function() {
       if (found.st.refresh) found.st.refresh();
      });
     },

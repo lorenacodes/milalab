@@ -373,34 +373,34 @@ function _entFindById(id) { return (_entregasArr || []).find(function(x){ return
 _ieRegister('entregas', {
  etapa: {
   type: 'select', label: 'Etapa', options: function(){ return Object.keys(_entEtapaBucket); }, getRow: _entFindById,
-  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { etapa: val || null }); },
+  onSave: function(id, val, opts) { return _spEntDetSalvarCampo(id, { etapa: val || null }, opts); },
  },
  transporte: {
   type: 'select', label: 'Transporte', options: function(){ return _obraTransporteCache || []; }, getRow: _entFindById,
-  onSave: function(id, val) {
+  onSave: function(id, val, opts) {
    if (val && (_obraTransporteCache||[]).indexOf(val) === -1) _obraTransporteCache.push(val);
-   return _spEntDetSalvarCampo(id, { transporte: val || null });
+   return _spEntDetSalvarCampo(id, { transporte: val || null }, opts);
   },
  },
  data_faturamento: {
   type: 'date', label: 'Faturamento', getRow: _entFindById,
-  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { data_faturamento: val || null }); },
+  onSave: function(id, val, opts) { return _spEntDetSalvarCampo(id, { data_faturamento: val || null }, opts); },
  },
  quantidade: {
   type: 'number', label: 'Quantidade', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
-  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { quantidade: val }); },
+  onSave: function(id, val, opts) { return _spEntDetSalvarCampo(id, { quantidade: val }, opts); },
  },
  peso_kg: {
   type: 'number', label: 'Peso', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
-  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { peso_kg: val }); },
+  onSave: function(id, val, opts) { return _spEntDetSalvarCampo(id, { peso_kg: val }, opts); },
  },
  maior_peca_mm: {
   type: 'number', label: 'Maior peça', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
-  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { maior_peca_mm: val }); },
+  onSave: function(id, val, opts) { return _spEntDetSalvarCampo(id, { maior_peca_mm: val }, opts); },
  },
  valor: {
   type: 'number', label: 'Valor', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
-  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { valor: val }); },
+  onSave: function(id, val, opts) { return _spEntDetSalvarCampo(id, { valor: val }, opts); },
  },
 }, _entRefreshAfterInlineEdit);
 
@@ -1527,7 +1527,11 @@ async function _entProjSalvar() {
 // Entrega nunca teve esse fluxo; ver header do arquivo). Atualiza também o
 // cache local (_entregasArr) para a Tabela/Kanban/Calendário refletirem sem
 // precisar recarregar tudo do banco.
-async function _spEntDetSalvarCampo(entregaId, patch) {
+// opts.toastOk === false: usado pelo Ctrl+Z (undo-manager.js, ver
+// _ieCommit em inline-edit.js) — o próprio undo-manager já mostra seu
+// toast ("valor anterior restaurado"), então o "Alteração salva" normal
+// aqui viraria um segundo toast empilhado por cima do primeiro.
+async function _spEntDetSalvarCampo(entregaId, patch, opts) {
  if (!_sb || !entregaId) return;
  // Trava otimista + diff (concurrency.js). Aqui o payload já era pequeno (1
  // campo por chamada), então o risco de sobrescrever campo alheio era baixo —
@@ -1535,6 +1539,7 @@ async function _spEntDetSalvarCampo(entregaId, patch) {
  // usuários mudando o Status da mesma entrega, o último ganhava em silêncio.
  var r = await _ccSaveComFeedback('entregas', entregaId, patch, {
   onRecarregar: function () { _spEntregaById(entregaId); },
+  toastOk: !(opts && opts.toastOk === false),
  });
  if (!r || !r.ok) return;
  _entPatchNaLista(r.row);

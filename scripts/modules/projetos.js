@@ -1047,6 +1047,7 @@ async function _spSaveProjetoFull() {
  // painel a cada 700ms de digitação — inclusive os que este usuário não
  // tocou, desfazendo em silêncio o que outro usuário tivesse acabado de
  // salvar no mesmo projeto.
+ var _umBaselineAntes = (typeof _ccGetBaseline === 'function' ? _ccGetBaseline('projetos', id) : null) || {};
  var r = await _ccSaveComFeedback('projetos', id, payload, {
   onRecarregar: function () { _spProjetoById(id); },
  });
@@ -1057,6 +1058,37 @@ async function _spSaveProjetoFull() {
  // sem essa conversão, reabrir este projeto sem recarregar a página
  // quebraria o split(', ') que popula o multiselect de Responsável.
  _projPatchNaLista(r.row);
+ // Ctrl+Z (undo-manager.js) — mesmo padrão de Obras/_spSaveObraFull: uma
+ // entrada por autosave, só com os campos que r.campos (diff real do
+ // _ccSave) confirma terem mudado.
+ if (typeof _umPush === 'function' && typeof _umActiveScope !== 'undefined' && _umActiveScope && r.campos && r.campos.length) {
+  var _umBefore = {}, _umAfter = {};
+  r.campos.forEach(function(k) { _umBefore[k] = _umBaselineAntes[k]; _umAfter[k] = r.row[k]; });
+  var _umNomes = r.campos.map(function(c) { return typeof _ccLabel === 'function' ? _ccLabel('projetos', c) : c; }).filter(Boolean);
+  _umPush(_umActiveScope, {
+   label: _umNomes.length === 1 ? _umNomes[0] : (_umNomes.length ? _umNomes.length + ' campos' : null),
+   before: _umBefore, after: _umAfter,
+   apply: function(v) { return _projUndoApply(id, v); },
+  });
+ }
+}
+
+// Reaproveitado pelo Ctrl+Z/Ctrl+Shift+Z — mesmo padrão de _obraUndoApply
+// (obras.js): _ccSave direto (sem o toast "Alteração salva" próprio, o
+// undo-manager já mostra o dele), atualiza a linha/Kanban e repopula o
+// painel de detalhe se ele ainda estiver aberto NESTE projeto.
+function _projUndoApply(id, values) {
+ return _ccSave('projetos', id, values).then(function(r) {
+  if (!r || r.erro) throw (r && r.erro) || new Error('Falha ao salvar');
+  if (r.excluido) throw new Error('Projeto excluído por outro usuário');
+  if (r.conflito) {
+   _showToast(_ccMsgConflito('projetos', r.campos), 'erro');
+   throw new Error('Conflito de edição concorrente');
+  }
+  if (r.semMudanca) return;
+  _projPatchNaLista(r.row);
+  if (_spProjAtivo && String(_spProjAtivo.id) === String(id)) _spProjetoById(id);
+ });
 }
 
 // ── Atualização pontual de UM projeto na Tabela/Kanban ───────────────────────
