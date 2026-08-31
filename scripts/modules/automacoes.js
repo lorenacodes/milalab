@@ -662,7 +662,7 @@ function _autAcaoHTML(ac) {
  var resp = _autValorArr(ac.responsaveis);
  var usuarios = (typeof _usuariosCache !== 'undefined' && _usuariosCache) ? _usuariosCache : [];
  return '<div class="aut-acao">'
-  + '<div class="sp-field"><div class="sp-label">Nome da tarefa</div><input class="sp-inp" id="aut-ac-titulo" value="' + _autEsc(ac.titulo || '') + '" oninput="_autMarcarSujo();_autAtualizarResumoAcao()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Nome da tarefa</div><input class="sp-inp" id="aut-ac-titulo" placeholder="Ex.: Revisão do projeto" value="' + _autEsc(ac.titulo || '') + '" oninput="_autMarcarSujo();_autAtualizarResumoAcao()"></div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Tipo</div><select class="sp-inp" id="aut-ac-tipo" onchange="_autMarcarSujo()">' + _autOptsHTML(_AUT_TIPOS_TAREFA, ac.tipo_tarefa || 'Tarefa') + '</select></div>'
   + '<div class="sp-field"><div class="sp-label">Área</div><select class="sp-inp" id="aut-ac-area" onchange="_autMarcarSujo();_autAtualizarResumoAcao()">' + _autOptsHTML(_AUT_AREAS, ac.area || '', '— sem área —') + '</select></div>'
@@ -778,9 +778,14 @@ function _spAutomacaoRender(a) {
 
   + '</div>'
   // Teste (dry-run) também disponível na edição (itens 9/10/12) — não é
-  // obrigatório pra salvar, é uma ferramenta pra conferir antes.
-  + '<button type="button" class="btn btn-ghost aut-add" onclick="_autTestarEdicao()">Testar automação</button>'
-  + '<div id="aut-teste-edicao" style="display:none"></div>'
+  // obrigatório pra salvar, é uma ferramenta pra conferir antes. Só aparece
+  // depois que a automação já foi criada E ativada (pedido explícito do
+  // dono): enquanto está inativa, testar de novo não agrega — quem quer
+  // testar antes de existir usa o assistente de criação, que já exige teste.
+  + (a.ativo
+     ? '<button type="button" class="btn btn-ghost aut-add" onclick="_autTestarEdicao()">Testar automação</button>'
+       + '<div id="aut-teste-edicao" style="display:none"></div>'
+     : '')
   + '<div id="aut-sujo-bar" class="aut-sujo-bar" style="display:none">'
   + '<span>Você tem alterações não salvas.</span>'
   + '<button type="button" class="btn btn-primary" onclick="_autSalvar()">Salvar alterações</button>'
@@ -805,6 +810,12 @@ function _spAutomacaoRender(a) {
  if (typeof _ccSetBaseline === 'function') _ccSetBaseline('automacoes', a.id, Object.assign({}, a));
  if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
  if (typeof _sptInitScrollSpy === 'function') _sptInitScrollSpy();
+ // As 3 abas são rolagem contínua (.spt-panel é sempre visível — "Alterações"
+ // já carregava assim, ver _histCarregar logo abaixo); "Histórico de
+ // execuções" só carregava no clique da própria aba, então ficava preso em
+ // "Carregando..." visível pra sempre embaixo de "Testar automação" pra quem
+ // nunca clicasse nela (achado real, mal formatado no widget central).
+ _autCarregarExecucoes();
  if (typeof _histCarregar === 'function') _histCarregar('sp-aut-hist', 'automacoes', a.id);
 }
 
@@ -1622,9 +1633,10 @@ function _autContarExecucao(e, ehUpdate) {
  if (a) _autPatchNaLista(a);
  // Se o usuário está justamente com o histórico dessa automação aberto,
  // recarrega a lista de execuções pra a nova aparecer sem F5.
- if (String((_autAtiva || {}).id) === String(e.automacao_id)) {
-  var painel = document.getElementById('spt-aut-exec');
-  if (painel && painel.classList.contains('active')) _autCarregarExecucoes();
+ // .spt-panel é sempre visível (rolagem contínua, não esconde por aba) —
+ // não faz sentido mais checar uma classe .active que ninguém liga nele.
+ if (String((_autAtiva || {}).id) === String(e.automacao_id) && document.getElementById('spt-aut-exec')) {
+  _autCarregarExecucoes();
  }
 }
 

@@ -43,6 +43,26 @@
  padding: 12px 18px; border-top: 1px solid var(--border);
 }
 .autm-footer:empty { display: none; }
+/* Dentro do widget de automação os campos de texto/número/data SEMPRE mostram
+   a caixa (o padrão global de .sp-inp — styles/main.css — é borda só no
+   hover/foco, pensado pro painel lateral denso). Sem placeholder, um campo
+   vazio assim fica com aparência de "não existe" (achado real: "Nome da
+   tarefa" some por completo) — e no widget central, mais em destaque, isso
+   fica ainda mais visível. Não mexe no componente global, só decora aqui
+   dentro; <select> não precisa (o navegador já desenha a caixa dele).
+   Reaproveitado no fluxo NOVO (#autm-body) e teria o mesmo efeito nos
+   `<input>`/`<textarea>` de dentro de .aut-acao/.aut-cond fora do modal, se
+   algum dia voltarem a existir num contexto sem esta regra. */
+#autm-body input.sp-inp,
+#autm-body textarea.sp-inp {
+ border-color: var(--border);
+ background: var(--surface2, rgba(127,127,127,.06));
+}
+#autm-body input.sp-inp:focus,
+#autm-body textarea.sp-inp:focus {
+ border-color: var(--navy);
+ background: var(--surface);
+}
 @media (max-width: 640px) {
  #aut-modal { width: 96vw; max-height: 94vh; }
  .autm-body { padding: var(--sp-4, 14px); }
