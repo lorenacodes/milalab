@@ -64,7 +64,7 @@ async function openNovaEntrega() {
  var prod = document.getElementById('ne-produzido'); if (prod) prod.checked = false;
  var doc = document.getElementById('ne-doc'); if (doc) doc.value = '';
  var op = document.getElementById('ne-op'); if (op) op.value = '';
- _neFileLabelReset('ne-doc-lbl'); _neFileLabelReset('ne-op-lbl');
+ _neFilesResetAll();
  var etapaSel = document.getElementById('ne-etapa');
  if (etapaSel) {
   etapaSel.innerHTML = '<option value="">Selecione...</option>'
@@ -82,29 +82,53 @@ function closeNovaEntrega() {
 // ── Dropzones de anexo do modal (Documento da entrega / Ordem de Produção) ──
 // Upload só acontece no "Criar entrega" (_submitNovaEntregaReal já lê
 // ne-doc/ne-op.files) — a entrega ainda não existe nesse ponto, então não dá
-// pra gravar o anexo antes. Aqui só cuida do feedback visual (nome do
-// arquivo escolhido) e do arrastar-e-soltar, mesmo padrão do dropzone que já
-// funciona no painel de detalhe (_spEntDetDropzone).
+// pra gravar o anexo antes.
+//
+// Acumula em JS (_neFilesAcc) em vez de confiar só no FileList nativo do
+// <input>: selecionar de novo (clicar de novo, ou soltar outro arquivo)
+// REPLACES o FileList inteiro — comportamento padrão do browser, não bug —
+// então sem isso a 2ª seleção "sumia" com a 1ª (reportado: "se você adiciona
+// mais parece que só tem um mesmo assim"). ne-doc aceita vários (soma a
+// cada seleção); ne-op é campo de 1 arquivo só, então substitui mesmo.
+var _neFilesAcc = { 'ne-doc': [], 'ne-op': [] };
 function _neFileLabelReset(labelId) {
  var lbl = document.getElementById(labelId);
  if (lbl) lbl.textContent = 'Clique ou arraste para anexar';
 }
-function _neFileLabelUpdate(input, labelId) {
+function _neFilesResetAll() {
+ _neFilesAcc = { 'ne-doc': [], 'ne-op': [] };
+ _neFileLabelReset('ne-doc-lbl'); _neFileLabelReset('ne-op-lbl');
+}
+// DataTransfer é o único jeito de montar um FileList de verdade pra atribuir
+// de volta a input.files (não dá pra criar um FileList na mão) — é o que
+// _submitNovaEntregaReal continua lendo pra fazer o upload de cada arquivo.
+function _neFilesApply(inputId, labelId) {
+ var input = document.getElementById(inputId);
+ var files = _neFilesAcc[inputId];
+ if (!input) return;
+ var dt = new DataTransfer();
+ files.forEach(function(f) { dt.items.add(f); });
+ input.files = dt.files;
  var lbl = document.getElementById(labelId);
  if (!lbl) return;
- var files = input.files || [];
  if (!files.length) { _neFileLabelReset(labelId); return; }
  lbl.textContent = files.length === 1 ? files[0].name : files.length + ' arquivos selecionados';
 }
-function _neFileChange(input, labelId) { _neFileLabelUpdate(input, labelId); }
+function _neFilesAdd(inputId, labelId, newFiles) {
+ var multiple = inputId === 'ne-doc';
+ var incoming = Array.prototype.slice.call(newFiles || []);
+ _neFilesAcc[inputId] = multiple ? _neFilesAcc[inputId].concat(incoming) : incoming.slice(0, 1);
+ _neFilesApply(inputId, labelId);
+}
+function _neFileChange(input, labelId) {
+ _neFilesAdd(input.id, labelId, input.files);
+}
 function _neFileDrop(event, inputId, labelId) {
  event.preventDefault();
  var dz = event.currentTarget; dz.classList.remove('drag');
  var files = event.dataTransfer && event.dataTransfer.files;
- var input = document.getElementById(inputId);
- if (!files || !files.length || !input) return;
- input.files = files; // funciona pra <input type="file"> normal (não-multiple pega só o 1º)
- _neFileLabelUpdate(input, labelId);
+ if (!files || !files.length) return;
+ _neFilesAdd(inputId, labelId, files);
 }
 // Guarda de clique duplo (_ccUmaVez, concurrency.js): dois cliques rápidos no
 // botão "Criar" disparavam dois INSERTs e criavam DUAS entregas iguais — não
