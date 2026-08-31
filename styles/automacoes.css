@@ -1,0 +1,98 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   AUTOMAÇÕES — lista de cards + editor QUANDO/E/ENTÃO no painel de detalhe.
+   Usa só os tokens do design system (styles/tokens.css); nenhuma cor solta,
+   pra a aba acompanhar o tema claro/escuro como o resto do sistema.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.aut-empty,
+.aut-empty-cond { padding: 28px 12px; text-align: center; color: var(--muted); font-size: 12px; }
+.aut-empty-cond { padding: 14px; border: 1px dashed var(--border); border-radius: 8px; }
+
+.aut-group-title {
+ font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+ color: var(--muted); margin: 18px 0 8px;
+}
+.aut-group-title span {
+ display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px;
+ background: var(--surface-2, rgba(127,127,127,.12)); font-size: 10px;
+}
+.aut-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+
+.aut-card {
+ border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+ background: var(--card, var(--bg)); cursor: pointer; transition: border-color .12s, box-shadow .12s;
+}
+.aut-card:hover { border-color: var(--navy); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.aut-card-off { opacity: .62; }
+.aut-card-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.aut-card-nome { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.aut-card-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.aut-card-foot {
+ display: flex; justify-content: space-between; gap: 8px; margin-top: 10px;
+ padding-top: 8px; border-top: 1px solid var(--border); font-size: 10px; color: var(--muted);
+}
+
+.aut-badge {
+ font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 9px;
+ border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+}
+.aut-badge-on  { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+.aut-badge-off { color: var(--muted); }
+.aut-badge-err { color: var(--red);   border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+
+.aut-chip {
+ font-size: 11px; padding: 4px 10px; border-radius: 14px; cursor: pointer;
+ border: 1px solid var(--border); background: transparent; color: var(--muted);
+}
+.aut-chip.active { color: var(--text); border-color: var(--navy); font-weight: 600; }
+
+/* ── Painel de detalhe ───────────────────────────────────────────────────── */
+.aut-resumo {
+ font-size: 12px; line-height: 1.6; color: var(--text); padding: 10px 12px;
+ border-left: 3px solid var(--navy); background: var(--surface-2, rgba(127,127,127,.07));
+ border-radius: 0 8px 8px 0; margin-bottom: 12px;
+}
+.aut-hint { font-size: 11px; color: var(--muted); line-height: 1.5; margin: 4px 0 10px; }
+/* text-transform/letter-spacing explícitos: main.css deixa TODO <label> do
+   painel em CAIXA ALTA (é o visual dos rótulos de campo .sp-label). Aqui o
+   texto é uma frase inteira ("Vincular a Obra do registro que disparou"), e em
+   caixa alta ela fica ilegível e ocupa duas linhas. */
+.aut-toggle { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; cursor: pointer; margin-bottom: 4px; text-transform: none; letter-spacing: 0; }
+.aut-check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text); margin: 6px 0; cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+.aut-cond { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+.aut-cond-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.aut-cond-lig { font-size: 10px; font-weight: 700; letter-spacing: .06em; color: var(--navy); }
+.aut-cond-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.aut-cond-val { margin-top: 8px; }
+.aut-cond-novalue { font-size: 11px; color: var(--muted); font-style: italic; }
+.aut-x { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 4px; }
+.aut-x:hover { color: var(--red); }
+
+/* Valores de campo lista/multi como chips clicáveis — nunca digitação livre
+   onde o campo original é uma lista de opções (exigência da especificação). */
+.aut-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.aut-vchip {
+ font-size: 11px; padding: 3px 9px; border-radius: 12px; cursor: pointer;
+ border: 1px solid var(--border); background: transparent; color: var(--muted);
+}
+.aut-vchip.active { color: #fff; background: var(--navy); border-color: var(--navy); font-weight: 600; }
+.aut-vchip-orfao { border-style: dashed; background: var(--yellow); color: var(--text); border-color: var(--yellow); }
+
+.aut-add { margin-top: 2px; }
+.aut-acao { border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+
+.aut-sujo-bar {
+ position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px;
+ margin-top: 14px; padding: 10px 12px; border-radius: 8px;
+ border: 1px solid var(--navy); background: var(--card, var(--bg));
+ font-size: 12px; color: var(--text); z-index: 2;
+}
+.aut-sujo-bar span { flex: 1; }
+
+.aut-exec { border: 1px solid var(--border); border-left-width: 3px; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; }
+.aut-exec-ok  { border-left-color: var(--green); }
+.aut-exec-err { border-left-color: var(--red); }
+.aut-exec-hd { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.aut-exec-hd b { color: var(--text); font-weight: 600; }
+.aut-exec-msg { font-size: 12px; color: var(--text); line-height: 1.5; }

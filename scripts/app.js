@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // Auto-reload para forçar todos os usuários a pegarem o código novo quando a versão muda
 (function(){
- var SYS_VERSION = '3.64';
+ var SYS_VERSION = '3.65';
  if (localStorage.getItem('_sys_version') !== SYS_VERSION) {
   localStorage.setItem('_sys_version', SYS_VERSION);
   window.location.reload(true);
@@ -24,6 +24,7 @@ var routes = {
  'tarefas': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Tarefas</span>`, nav: 'tarefas', btn: { label: '+ Nova Tarefa', fn: 'openNovaTarefa' } },
  'admin': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Administração</span>`, nav: 'admin', btn: null },
  'melhorias': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Iniciativas de Inovação</span>`, nav: 'melhorias', btn: null },
+ 'automacoes': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Automações</span>`, nav: 'automacoes', btn: { label: '+ Nova automação', fn: '_autNova' } },
  'gestor': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Gestor de Tarefas</span>`, nav: 'gestor', btn: null },
  'exec-dash': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Dashboard Executivo</span>`, nav: 'exec-dash', btn: null },
 };
@@ -83,6 +84,9 @@ function go(id) {
  }
  if (id === 'melhorias') {
   if (typeof _pageLoadMelhorias === 'function') _pageLoadMelhorias();
+ }
+ if (id === 'automacoes') {
+  if (typeof _pageLoadAutomacoes === 'function') _pageLoadAutomacoes();
  }
  if (id === 'gestor') {
   if (typeof _gestorLoad === 'function') _gestorLoad();

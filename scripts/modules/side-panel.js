@@ -193,6 +193,9 @@ function _spRender(section, row) {
  // Melhorias: a origem do clique aqui é um <div class="melh-card">, não uma
  // <tr> — `tds` chega vazio e o renderer busca tudo por id (ver melhorias.js).
  else if (section === 'melhorias') _spMelhorias(row, tds);
+ // Automações: mesma situação de Melhorias — o clique vem de um
+ // <div class="aut-card">, então o renderer busca a automação por id.
+ else if (section === 'automacoes') _spAutomacoes(row, tds);
 }
 
 // ── Renderer: Empresas ──────────────────────────────────────────────────
