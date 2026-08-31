@@ -5,8 +5,10 @@
    é intencional (pedido explícito da usuária) e não o azul-petróleo do mock. */
 :root{
   /* marca */
-  --indigo-900:#141838; --indigo-800:#1B2050; --indigo-700:#293375; --indigo-600:#3D4FD1;
-  --indigo-500:#5768E0; --indigo-100:#EBEDFB;
+  /* Escala da marca — rebrand azul: 900/800 = azul-marinho de identidade,
+     600 = azul de acao, 500 = ciano de destaque (usado no tema escuro). */
+  --indigo-900:#02043D; --indigo-800:#050866; --indigo-700:#0A2A9E; --indigo-600:#004AE8;
+  --indigo-500:#0183FF; --indigo-100:#E3EBFF;
   --violet-500:#8B6FE8; --teal-400:#3FBFB4;
 
   /* neutros do documento (utilitários — o app usa --bg/--surface/--text
@@ -32,7 +34,7 @@
   --alert-success-text:#175E36; --alert-success-border:#C5E8D1;
   --alert-warning-text:#7A4F06; --alert-warning-border:#F3DDAF;
   --alert-error-text:#8F2822;   --alert-error-border:#F4C7C3;
-  --alert-confirm-text:#1B2050; --alert-confirm-border:#CDD3F5;
+  --alert-confirm-text:#050866; --alert-confirm-border:#C3D3FA;
 
   /* elevação */
   --shadow-1:0 1px 2px rgba(21,22,31,.05);
@@ -56,7 +58,7 @@ body.light{
   --alert-success-text:#175E36; --alert-success-border:#C5E8D1;
   --alert-warning-text:#7A4F06; --alert-warning-border:#F3DDAF;
   --alert-error-text:#8F2822;   --alert-error-border:#F4C7C3;
-  --alert-confirm-text:#1B2050; --alert-confirm-border:#CDD3F5;
+  --alert-confirm-text:#050866; --alert-confirm-border:#C3D3FA;
 }
 
 /* Tema escuro: mesmos textos de aviso ficam claros o bastante p/ contraste em fundo preto */
@@ -65,7 +67,7 @@ body.light{
   --alert-success-text-dark:#8FE3B4; --alert-success-border-dark:rgba(31,138,76,.35);
   --alert-warning-text-dark:#F3C978; --alert-warning-border-dark:rgba(184,121,10,.4);
   --alert-error-text-dark:#F5A39D; --alert-error-border-dark:rgba(214,67,60,.4);
-  --alert-confirm-text-dark:#C3C9F7; --alert-confirm-border-dark:rgba(139,111,232,.4);
+  --alert-confirm-text-dark:#AFD3FF; --alert-confirm-border-dark:rgba(1,131,255,.4);
 }
 body:not(.light){
   --alert-info-text:var(--alert-info-text-dark);       --alert-info-border:var(--alert-info-border-dark);

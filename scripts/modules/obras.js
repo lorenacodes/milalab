@@ -1382,7 +1382,7 @@ async function _spDocHistorico(obraId, produto) {
  var res = await _sb.from('propostas').select('*').eq('obra_id', obraId).eq('produto', produto).order('versao', { ascending: true });
  if (res.error || !res.data) { _showToast('Erro ao carregar histórico', 'erro'); return; }
  var rows = res.data;
- var sColors = { 'Gerada':'#6b6b82','Enviada':'#3D4FD1','Em negociação':'#9a7000','Aceita':'#1F8A4C','Recusada':'#d32f2f' };
+ var sColors = { 'Gerada':'#6b6b82','Enviada':'#004AE8','Em negociação':'#9a7000','Aceita':'#1F8A4C','Recusada':'#d32f2f' };
  var inner = rows.map(function(p) {
   var dt    = new Date(p.created_at);
   var dtFmt = dt.toLocaleDateString('pt-BR') + ' às ' + dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});

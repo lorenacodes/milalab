@@ -846,7 +846,7 @@ var _SETOR_CORES = {
  'Produção':   '#B8790A',
  'Equipe P&D': '#ec4899',
  'Logística':  '#06b6d4',
- 'Dados':      '#3D4FD1',
+ 'Dados':      '#004AE8',
  'Marketing':  '#f97316',
  'Compras':    '#64748b',
  'Processos':  '#64748b',
@@ -1546,7 +1546,7 @@ function _gestorRenderMetricas() {
   rs.forEach(function(r){ if(!userMap[r])userMap[r]={total:0,done:0,late:0,prog:0}; userMap[r].total++; if(_gIsDone(a.status))userMap[r].done++; else if(_gIsLate(a))userMap[r].late++; else if(a.status==='Em progresso'||a.status==='Em andamento')userMap[r].prog++; });
  });
  var topUsers=Object.keys(userMap).sort(function(a,b){return userMap[b].total-userMap[a].total;}).slice(0,8);
- var avColors=['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#cf222e','#6366f1'];
+ var avColors=['#004AE8','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#cf222e','#6366f1'];
 
  // Tipo map
  var tipoMap={};
@@ -1591,10 +1591,10 @@ function _gestorRenderMetricas() {
  //  cinza   #7D8199 = neutro / a fazer / sem dado
  //  vermelho#D6433C = atraso / critico (excecao)
  //  ambar   #B8790A = bloqueio / atencao (excecao)
- //  navy    #3D4FD1 = marca / indicador neutro principal
+ //  navy    #0183FF = marca / indicador neutro principal
  // Cor so e usada para sinalizar status, prioridade ou excecao — nunca decorativa.
  // ==========================================================================
- var COL = {ok:'#1F8A4C', prog:'#2E5FD9', neutral:'#7D8199', crit:'#D6433C', warn:'#B8790A', brand:'#3D4FD1'};
+ var COL = {ok:'#1F8A4C', prog:'#2E5FD9', neutral:'#7D8199', crit:'#D6433C', warn:'#B8790A', brand:'#0183FF'};
 
  // ── NIVEL 1 — KPIs ESTRATEGICOS ──────────────────────────────────────────
  // Origem: _gestorFiltered (mesma base da grade/listagem). Recalculado a cada filtro.

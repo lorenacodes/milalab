@@ -19,7 +19,7 @@
  /* Abas de atalho (quick-view) */
  .ent-qv-btn { padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-full);font-size:12px;font-weight:500;background:var(--surface);color:var(--muted);cursor:pointer;transition:all .12s }
  .ent-qv-btn:hover { color:var(--text);border-color:var(--navy) }
- .ent-qv-btn.active { background:var(--navy);color:#fff;border-color:var(--navy) }
+ .ent-qv-btn.active { background:var(--navy-solid);color:#fff;border-color:var(--navy-solid) }
 
  /* Kanban de Entregas — reaproveita .obra-card/.oc-title/.oc-tags/.oc-date
     (mesma linguagem visual do Kanban de Obras), só acrescenta o selo de

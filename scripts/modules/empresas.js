@@ -1006,7 +1006,7 @@ function _empInitRealtime() {
  });
 }
 
-var _empColorPalette = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
+var _empColorPalette = ['#004AE8','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f','#0f766e','#9c27b0'];
 function _empColor(name) {
  var c = 0; for (var j = 0; j < (name||'').length; j++) c += name.charCodeAt(j);
  return _empColorPalette[c % _empColorPalette.length];
@@ -1575,7 +1575,7 @@ function _renderFornecedores() {
 
  tbody.innerHTML = lista.map(function(f, idx) {
   var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
-  var bgColors = ['#6366f1','#2E5FD9','#059669','#d97706','#dc2626'];
+  var bgColors = ['#004AE8','#2E5FD9','#059669','#d97706','#dc2626'];
   var bg = bgColors[idx % bgColors.length];
   var setoresF = f.setores || [];
   var cids = f.cidades || [];

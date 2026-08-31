@@ -131,7 +131,7 @@
  font-size: 11px; padding: 3px 9px; border-radius: 12px; cursor: pointer;
  border: 1px solid var(--border); background: transparent; color: var(--muted);
 }
-.aut-vchip.active { color: #fff; background: var(--navy); border-color: var(--navy); font-weight: 600; }
+.aut-vchip.active { color: #fff; background: var(--navy-solid); border-color: var(--navy-solid); font-weight: 600; }
 .aut-vchip-orfao { border-style: dashed; background: var(--yellow); color: var(--text); border-color: var(--yellow); }
 
 .aut-add { margin-top: 2px; }
@@ -157,7 +157,7 @@
  display: flex; align-items: center; justify-content: center;
  color: #fff; font-size: 16px; font-weight: 700; line-height: 1;
 }
-.aut-flow-icon-trigger { background: var(--navy); }
+.aut-flow-icon-trigger { background: var(--navy-solid); }
 .aut-flow-icon-action  { background: var(--green); }
 .aut-flow-card-text { flex: 1; min-width: 0; }
 .aut-flow-card-title { font-size: 12px; font-weight: 600; color: var(--text); }
@@ -241,7 +241,7 @@
  background: var(--border); color: var(--text); font-size: 10px;
 }
 .autw-step-on { border-color: var(--navy); color: var(--text); }
-.autw-step-on .autw-step-n { background: var(--navy); color: var(--white, #fff); }
+.autw-step-on .autw-step-n { background: var(--navy-solid); color: var(--white, #fff); }
 .autw-step-ok .autw-step-n { background: var(--green); color: var(--white, #fff); }
 
 .autw-tit { font-size: var(--fs-body); font-weight: 700; color: var(--text); margin-bottom: var(--sp-3); }

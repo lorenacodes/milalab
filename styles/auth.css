@@ -16,7 +16,7 @@
 /* ── Painel esquerdo: branding ─────────────────────────────────── */
 .auth-left {
   width:44%;flex-shrink:0;
-  background:#141838;
+  background:#050866;
   display:flex;flex-direction:column;justify-content:space-between;
   padding:48px 44px;
   position:relative;overflow:hidden;
@@ -25,7 +25,7 @@
 .auth-left::before {
   content:'';
   position:absolute;inset:0;
-  background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%233D4FD1' fill-opacity='0.10'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%230183FF' fill-opacity='0.10'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   pointer-events:none;
 }
 .auth-left::after {
@@ -33,7 +33,7 @@
   position:absolute;
   bottom:-80px;right:-80px;
   width:360px;height:360px;
-  background:radial-gradient(circle,rgba(139,111,232,.28) 0%,transparent 70%);
+  background:radial-gradient(circle,rgba(1,131,255,.28) 0%,transparent 70%);
   pointer-events:none;
 }
 /* Hairline de prata no topo do painel escuro — mesmo padrão do brand-hero */
@@ -99,7 +99,7 @@
 .auth-form-header { margin-bottom:32px; }
 .auth-form-eyebrow {
   font-size:11px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;
-  color:#3D4FD1;margin-bottom:8px;
+  color:#004AE8;margin-bottom:8px;
 }
 .auth-form-title {
   font-family:'Inter',sans-serif;
@@ -118,11 +118,11 @@
   font-size:13px;font-weight:500;color:#374151;
 }
 .auth-field-link {
-  font-size:12px;color:#3D4FD1;background:none;border:none;
+  font-size:12px;color:#004AE8;background:none;border:none;
   cursor:pointer;font-family:inherit;padding:0;
   text-decoration:underline;text-underline-offset:2px;
 }
-.auth-field-link:hover { color:#293375; }
+.auth-field-link:hover { color:#050866; }
 .auth-input-wrap { position:relative; }
 .auth-inp {
   width:100%;box-sizing:border-box;
@@ -134,8 +134,8 @@
   transition:border-color .18s,box-shadow .18s;
 }
 .auth-inp:focus {
-  border-color:#3D4FD1;
-  box-shadow:0 0 0 3px #EBEDFB;
+  border-color:#004AE8;
+  box-shadow:0 0 0 3px #E3EBFF;
 }
 .auth-inp.error { border-color:#D6433C;box-shadow:0 0 0 3px #FCEAE8; }
 .auth-inp.success { border-color:#1F8A4C;box-shadow:0 0 0 3px #E6F5EB; }
@@ -152,14 +152,14 @@
 /* Botão primário */
 .auth-btn {
   width:100%;padding:13px 20px;
-  background:#3D4FD1;color:#fff;
+  background:#050866;color:#fff;
   border:none;border-radius:var(--r-lg);
   font-size:14px;font-weight:600;font-family:inherit;
   cursor:pointer;transition:all .18s;
-  box-shadow:0 2px 8px rgba(61,79,209,.25);
+  box-shadow:0 2px 8px rgba(5,8,102,.25);
   display:flex;align-items:center;justify-content:center;gap:8px;
 }
-.auth-btn:hover { background:#293375;box-shadow:0 4px 16px rgba(61,79,209,.35);transform:translateY(-1px); }
+.auth-btn:hover { background:#004AE8;box-shadow:0 4px 16px rgba(0,74,232,.35);transform:translateY(-1px); }
 .auth-btn:active { transform:translateY(0); }
 .auth-btn:disabled { opacity:.6;cursor:not-allowed;transform:none; }
 
@@ -191,7 +191,7 @@
   cursor:pointer;font-family:inherit;padding:4px 6px;
   text-decoration:none;transition:color .15s;border-radius:var(--r-sm);
 }
-.auth-sec-link:hover { color:#3D4FD1;background:#EBEDFB; }
+.auth-sec-link:hover { color:#004AE8;background:#E3EBFF; }
 
 /* Força da senha */
 .pwd-strength-bars { display:flex;gap:3px;margin-top:8px; }

@@ -191,7 +191,7 @@ async function _dashAppendColabAlerts() {
    ? ('subtarefa "' + r.subtask_titulo + '" (' + (r.atividade_titulo || 'atividade') + ')')
    : ('"' + (r.atividade_titulo || 'Atividade') + '"');
   var msg = (r.solicitante_nome || r.solicitante_email || 'Alguém') + ' solicitou sua colaboração em ' + alvo + (r.motivo ? ' — ' + r.motivo : '');
-  _alertDrawerItens.push({ tipo:'colab', cor:'#3D4FD1', msg: msg, id: r.atividade_id });
+  _alertDrawerItens.push({ tipo:'colab', cor:'#0183FF', msg: msg, id: r.atividade_id });
  });
  var badge = document.getElementById('alert-bell-badge');
  var bellBtn = document.getElementById('alert-bell-btn');
@@ -410,7 +410,7 @@ function _remStartRealtime() {
 
 // ── Render de card ────────────────────────────────────────────────────────
 function _remAvatarColor(name) {
- var colors = ['#3D4FD1','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f'];
+ var colors = ['#004AE8','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f'];
  var i = 0;
  if (name) for (var j = 0; j < name.length; j++) i += name.charCodeAt(j);
  return colors[i % colors.length];
@@ -2794,9 +2794,9 @@ function _dashRenderFeed(atividades) {
     + '<span style="font-size:9px;color:var(--muted);margin-right:1px">Resp.:</span>'
     + respList.map(function(r) {
      var short = r.indexOf('@') > -1 ? r.split('@')[0] : r.split(' ')[0];
-     return '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:' + (isMultiResp ? 'rgba(99,102,241,.1)' : 'var(--surface2)') + ';color:' + (isMultiResp ? '#3D4FD1' : 'var(--muted)') + ';font-weight:600" title="' + r + '">' + short + '</span>';
+     return '<span style="font-size:9px;padding:1px 6px;border-radius:3px;background:' + (isMultiResp ? 'var(--navy-dim)' : 'var(--surface2)') + ';color:' + (isMultiResp ? 'var(--navy)' : 'var(--muted)') + ';font-weight:600" title="' + r + '">' + short + '</span>';
     }).join('')
-    + (isMultiResp ? '<span style="font-size:9px;color:#3D4FD1;font-weight:600"> · compartilhada</span>' : '')
+    + (isMultiResp ? '<span style="font-size:9px;color:var(--navy);font-weight:600"> · compartilhada</span>' : '')
     + '</div>';
   }
 
@@ -3304,7 +3304,7 @@ function _dashRenderChartSemanas(dados) {
  var _tSumA = buckets.slice(0, _tmid).reduce(function(s,b){ return s + b.count; }, 0);
  var _tSumB = buckets.slice(_tmid).reduce(function(s,b){ return s + b.count; }, 0);
  var trendDir   = (_tSumB > _tSumA) ? 'up' : (_tSumB < _tSumA) ? 'down' : 'neutral';
- var trendColor = trendDir === 'up' ? '#1F8A4C' : trendDir === 'down' ? '#D6433C' : '#3D4FD1';
+ var trendColor = trendDir === 'up' ? '#1F8A4C' : trendDir === 'down' ? '#D6433C' : '#0183FF';
 
  // ── MODO LINHA ────────────────────────────────────────────────────────────
  if (tipo === 'line') {
@@ -3355,7 +3355,7 @@ function _dashRenderChartSemanas(dados) {
   if (avgVal > 0 && avgVal < maxVal) {
    var avgY = (padT + (1 - avgVal / maxVal) * useH).toFixed(1);
    avgSvg = '<line x1="' + padL + '" y1="' + avgY + '" x2="' + (100 - padR) + '" y2="' + avgY
-    + '" stroke="#3D4FD1" stroke-opacity=".45" stroke-width="0.6" stroke-dasharray="2.5 2"/>';
+    + '" stroke="#0183FF" stroke-opacity=".45" stroke-width="0.6" stroke-dasharray="2.5 2"/>';
   }
 
   // Dots HTML: apenas pontos com valor > 0, máximo e último destacados
@@ -3365,7 +3365,7 @@ function _dashRenderChartSemanas(dados) {
    if (pt.count === 0 && !isLast) return ''; // omite zeros (exceto último)
    var isPeak = pt.isMax && pt.count > 0;
    var dotSz  = isPeak ? 8 : isLast ? 7 : 5;
-   var dotClr = isPeak ? '#1F8A4C' : isLast ? 'var(--navy)' : '#3D4FD1';
+   var dotClr = isPeak ? '#1F8A4C' : isLast ? 'var(--navy)' : '#0183FF';
    var lblClr = isPeak ? '#1F8A4C' : 'var(--navy)';
    var showLbl = pt.count > 0 && (isPeak || isLast || n <= 7);
    var dot = '<div style="position:absolute;left:' + pt.x + '%;top:' + pt.y + '%;transform:translate(-50%,-50%);'
@@ -3383,7 +3383,7 @@ function _dashRenderChartSemanas(dados) {
 
   // "Média" label no fim da linha de média (posicionado como div absoluto)
   var avgLabel = (avgVal > 0 && avgVal < maxVal)
-   ? '<div style="position:absolute;right:' + padR + '%;top:' + (padT + (1 - avgVal / maxVal) * useH - 8) + '%;font-size:7px;color:#3D4FD1;opacity:.7;white-space:nowrap;pointer-events:none">med</div>'
+   ? '<div style="position:absolute;right:' + padR + '%;top:' + (padT + (1 - avgVal / maxVal) * useH - 8) + '%;font-size:7px;color:var(--navy);opacity:.7;white-space:nowrap;pointer-events:none">med</div>'
    : '';
 
   // Dots: pico em trendColor, último em navy, demais em trendColor mais claro
@@ -3631,7 +3631,7 @@ function _dashRenderChartStatus(dados) {
  // Itens do donut (excluindo zeros)
  var items = [
   { label: 'Concluídas',   count: cats.concluidas, hex: '#1F8A4C', cssVar: 'var(--green)' },
-  { label: 'Em andamento', count: cats.andamento,  hex: '#3D4FD1', cssVar: 'var(--navy)'  },
+  { label: 'Em andamento', count: cats.andamento,  hex: '#0183FF', cssVar: 'var(--navy)'  },
   { label: 'A fazer',      count: cats.afazer,     hex: '#8b949e', cssVar: 'var(--muted)' },
   { label: 'Atrasadas',    count: cats.atrasadas,  hex: '#D6433C', cssVar: 'var(--red)'   },
   { label: 'Bloqueadas',   count: cats.bloqueadas, hex: '#B8790A', cssVar: 'var(--yellow)'}
@@ -3761,7 +3761,7 @@ function _dashRenderChartStatus(dados) {
  var atencaoHtml = '<div class="hp-section-lbl">Requer Atenção</div>'
   + _hpRow('#D6433C', 'Atrasadas', cats.atrasadas, 'atr', true)
   + _hpRow('#B8790A', 'Vencem em até 3 dias', proximas, 'prox3', proximas > 0)
-  + _hpRow('#3D4FD1', 'Colaborações pendentes', colabPend, null, colabPend > 0)
+  + _hpRow('#0183FF', 'Colaborações pendentes', colabPend, null, colabPend > 0)
   + _hpRow('#8b949e', 'Sem atualização há +7d', semAtualizacao, null, false)
   + _hpRow('#8b949e', 'Sem prazo definido', semPrazo, 'abertas', false);
 
@@ -3777,7 +3777,7 @@ function _dashRenderChartStatus(dados) {
 
  // ── Seção: Execução ──────────────────────────────────────────────────────
  var pctBar = Math.min(100, pctDone);
- var barColor = pctDone >= 75 ? '#1F8A4C' : pctDone >= 50 ? '#3D4FD1' : '#B8790A';
+ var barColor = pctDone >= 75 ? '#1F8A4C' : pctDone >= 50 ? '#0183FF' : '#B8790A';
 
  var execHtml = '<hr class="hp-divider">'
   + '<div class="hp-section-lbl">Execução do Período</div>'

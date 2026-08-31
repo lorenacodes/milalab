@@ -96,7 +96,7 @@ function _execNum(v) { return (Number(v)||0).toLocaleString('pt-BR'); }
 function _execPct(v) { return (Number(v)||0).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%'; }
 
 // ── Componentes visuais reutilizados ────────────────────────────────────────
-var _execCOL = {ok:'#1F8A4C', prog:'#2E5FD9', neutral:'#7D8199', crit:'#D6433C', warn:'#B8790A', brand:'#3D4FD1'};
+var _execCOL = {ok:'#1F8A4C', prog:'#2E5FD9', neutral:'#7D8199', crit:'#D6433C', warn:'#B8790A', brand:'#0183FF'};
 function _execCard(content, extra) { return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;'+(extra||'')+'">'+content+'</div>'; }
 function _execSecHdr(lbl, clr, sub) {
  clr = clr || 'var(--navy)';
@@ -916,7 +916,7 @@ var _execGeocodesBR = {
 var _execMapTipoColor = {
  'Telhados':'#28B548',
  'Steel Frame':'#8B5CF6',
- 'Modular':'#3D4FD1',
+ 'Modular':'#004AE8',
  'Solar':'#F59E0B',
  'Solo':'#F59E0B',
  'Carport':'#F59E0B',
@@ -951,7 +951,7 @@ function _execSecMapaObras(ctx) {
  return '<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden">'
   +'<div style="padding:14px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">'
   +'<div style="display:flex;align-items:center;gap:10px">'
-  +'<div style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#3D4FD1,#3D4FD1);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+  +'<div style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#004AE8,#0183FF);display:flex;align-items:center;justify-content:center;flex-shrink:0">'
   +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="3"/><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/></svg>'
   +'</div>'
   +'<div><div style="font-size:13px;font-weight:600;color:var(--text)">Distribuição Geográfica de Obras</div>'
