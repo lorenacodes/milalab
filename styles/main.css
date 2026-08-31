@@ -895,8 +895,19 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
    ao entrar em edição, o que "pulava" o layout — removido). O contorno vira
    uma sombra sutil por DENTRO da célula (inset), então nunca vaza pra célula
    vizinha nem depende de border-radius brigando com as bordas da tabela. */
-td.ie-cell{cursor:pointer;position:relative;transition:background .15s ease}
-td.ie-cell:hover{background:var(--surface2)!important}
+/* O hover de "background" sozinho não dava pra confiar: existe uma regra
+   global (tbody[data-sp] tr:hover td{background:...!important}, mais acima
+   neste arquivo) que tinge a linha inteira de azul e vence qualquer
+   background que a célula tentasse aplicar por conta própria — resultado,
+   a pessoa não via NENHUM sinal de que aquela célula específica era
+   editável (só o hover genérico de linha, igual em qualquer tabela do
+   sistema). box-shadow é uma propriedade diferente da que aquela regra
+   mexe, então nunca é sobrescrito — o anel fica visível mesmo com a linha
+   toda tingida de azul por baixo. Um ícone foi cogitado, mas descartado:
+   colunas numéricas (Quantidade/Peso/Valor) são alinhadas à direita e o
+   ícone ficaria em cima do próprio valor. */
+td.ie-cell{cursor:pointer;position:relative;transition:box-shadow .15s ease}
+td.ie-cell:hover{box-shadow:inset 0 0 0 1px var(--navy),inset 0 0 0 3px var(--navy-dim)}
 td.ie-cell.ie-editing{background:var(--surface)!important;box-shadow:inset 0 0 0 1px var(--navy-dim),inset 0 1px 4px rgba(0,0,0,.06);border-radius:var(--r-sm)}
 td.ie-cell .ie-input{width:100%;height:100%;box-sizing:border-box;border:none;background:transparent;color:var(--text);font-size:12px;font-family:inherit;padding:0;margin:0;outline:none;display:block}
 /* Select — mesmo chevron discreto já usado em .mf select no resto do sistema,
