@@ -8,37 +8,92 @@
 .aut-empty-cond { padding: 28px 12px; text-align: center; color: var(--muted); font-size: 12px; }
 .aut-empty-cond { padding: 14px; border: 1px dashed var(--border); border-radius: 8px; }
 
+/* ── Resumo compacto do topo ─────────────────────────────────────────────────
+   Substitui os 4 KPI-cards grandes: os mesmos números numa linha de texto. */
+.aut-summary {
+ display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+ font-size: var(--fs-small); color: var(--muted); margin-bottom: var(--sp-4);
+}
+.aut-summary b { color: var(--text); font-weight: 600; }
+.aut-summary i { color: var(--border); font-style: normal; margin: 0 2px; }
+.aut-resumo-err b { color: var(--red); }
+.aut-resumo-filtro { color: var(--green); font-weight: 600; }
+
+/* ── Grupos (Projetos / Obras) ───────────────────────────────────────────────
+   Rótulo leve, nunca um card: agrupar não pode competir com o conteúdo. */
 .aut-group-title {
- font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
- color: var(--muted); margin: 18px 0 8px;
+ font-size: var(--fs-caption); font-weight: 600; letter-spacing: .04em;
+ text-transform: uppercase; color: var(--muted);
+ margin: var(--sp-6) 0 var(--sp-3); display: flex; align-items: center; gap: 6px;
 }
-.aut-group-title span {
- display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 8px;
- background: var(--surface-2, rgba(127,127,127,.12)); font-size: 10px;
-}
-.aut-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.aut-group-title span { font-weight: 400; opacity: .7; letter-spacing: 0; }
+.aut-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--sp-3); }
 
+/* ── Card da lista ───────────────────────────────────────────────────────────
+   Mesma linguagem de .obra-card (surface, --r-md, shadow-1, hover verde) — a
+   aba não tem paleta própria. A diferença é só o miolo: gatilho e ação em duas
+   linhas curtas, muito espaço em branco, uma única cor de destaque (o badge). */
 .aut-card {
- border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
- background: var(--card, var(--bg)); cursor: pointer; transition: border-color .12s, box-shadow .12s;
+ background: var(--surface); border: 1px solid var(--border);
+ border-radius: var(--r-md); padding: var(--sp-4); box-shadow: var(--shadow-1);
+ cursor: pointer; transition: box-shadow .15s, border-color .15s;
+ display: flex; flex-direction: column; gap: var(--sp-3);
 }
-.aut-card:hover { border-color: var(--navy); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-.aut-card-off { opacity: .62; }
-.aut-card-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
-.aut-card-nome { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text); }
-.aut-card-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
-.aut-card-foot {
- display: flex; justify-content: space-between; gap: 8px; margin-top: 10px;
- padding-top: 8px; border-top: 1px solid var(--border); font-size: 10px; color: var(--muted);
+.aut-card:hover { border-color: var(--green); box-shadow: var(--shadow-2); }
+.aut-card-off { opacity: .6; }
+
+.aut-card-hd { display: flex; align-items: center; gap: var(--sp-2); }
+.aut-card-nome {
+ flex: 1; min-width: 0; font-size: var(--fs-body); font-weight: 600;
+ color: var(--text); line-height: 1.35;
+ overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-.aut-badge {
- font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 9px;
- border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+/* Regra em duas linhas: gatilho em cima, ação embaixo, ligadas por uma linha
+   vertical discreta entre os dois ícones — eco do fluxo GATILHO → AÇÕES do
+   editor no painel, sem o peso dele. */
+.aut-rule { display: flex; flex-direction: column; gap: var(--sp-2); }
+.aut-rule-row { display: flex; align-items: flex-start; gap: var(--sp-2); position: relative; }
+.aut-rule-row:first-child::after {
+ content: ''; position: absolute; left: 8px; top: 18px; bottom: -10px;
+ width: 1px; background: var(--border);
 }
-.aut-badge-on  { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
-.aut-badge-off { color: var(--muted); }
-.aut-badge-err { color: var(--red);   border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.aut-rule-ic {
+ flex-shrink: 0; width: 17px; height: 17px; border-radius: var(--r-full);
+ display: flex; align-items: center; justify-content: center;
+ border: 1px solid var(--border); background: var(--surface);
+ color: var(--muted); position: relative; z-index: 1; margin-top: 1px;
+}
+.aut-rule-ic-t { color: var(--navy); }
+.aut-rule-ic-a { color: var(--green); }
+.aut-rule-tx {
+ flex: 1; min-width: 0; font-size: var(--fs-small); color: var(--text);
+ line-height: 1.45;
+ /* Duas linhas no máximo: uma automação com muitas condições não pode esticar
+    o card e quebrar o alinhamento da grade. O texto completo está no painel. */
+ display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+ overflow: hidden;
+}
+.aut-rule-row:last-child .aut-rule-tx { color: var(--muted); }
+
+/* margin-top:auto encosta a meta no rodapé do card. Como a grade estica todos
+   os cards da linha à mesma altura, sem isto o "Executada 12 vezes" flutuava
+   numa altura diferente em cada card, conforme o gatilho ocupasse 1 ou 2
+   linhas — exatamente o desalinhamento que deixa a lista com cara de bagunça. */
+.aut-card-meta { font-size: var(--fs-caption); color: var(--muted); margin-top: auto; }
+
+/* Pill badge de status. Sem borda: a cor de fundo suave já separa do card, e
+   uma borda a mais em cada card vira ruído numa grade de 22. */
+.aut-pill {
+ font-size: 10px; font-weight: 600; padding: 2px 9px; border-radius: var(--r-full);
+ white-space: nowrap; flex-shrink: 0; letter-spacing: .01em;
+}
+.aut-pill-on  { color: var(--green); background: color-mix(in srgb, var(--green) 13%, transparent); }
+.aut-pill-off { color: var(--muted); background: color-mix(in srgb, var(--muted) 14%, transparent); }
+.aut-dot-err {
+ width: 7px; height: 7px; border-radius: var(--r-full); background: var(--red);
+ flex-shrink: 0; cursor: help;
+}
 
 .aut-chip {
  font-size: 11px; padding: 4px 10px; border-radius: 14px; cursor: pointer;

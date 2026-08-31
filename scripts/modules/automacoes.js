@@ -62,7 +62,12 @@ var _AUT_TIPOS_TAREFA  = ['Tarefa','Evento','Rotina','P&D','Visita de campo'];
 // operadores aparecem (§5).
 var _AUT_CAMPOS = {
  projetos: [
-  { campo: 'etapa_projeto',  label: 'Etapa do Projeto', tipo: 'select', opcoes: _AUT_ETAPAS_PROJETO },
+  // `etapa: true` marca os campos que representam a ETAPA/estágio do registro.
+  // É só o que _autGatilhoFrase precisa pra escrever "Quando um projeto entrar
+  // em Pré-projeto" em vez do genérico "tiver Etapa do Projeto é igual a
+  // Pré-projeto" — a informação fica no catálogo de campos, não hardcoded por
+  // automação (o dono pediu a frase gerada a partir dos dados reais).
+  { campo: 'etapa_projeto',  label: 'Etapa do Projeto', tipo: 'select', etapa: true, opcoes: _AUT_ETAPAS_PROJETO },
   { campo: 'tipo_orcamento', label: 'Tipo de Projeto',  tipo: 'select', opcoes: _AUT_TIPOS_PROJETO },
   { campo: 'produto',        label: 'Produto',          tipo: 'multi' },
   { campo: 'complexidade',   label: 'Complexidade',     tipo: 'select', opcoes: ['Baixa','Média','Alta'] },
@@ -72,9 +77,9 @@ var _AUT_CAMPOS = {
   { campo: 'liberado_execucao', label: 'Liberado para execução', tipo: 'select', opcoes: ['true','false'] },
  ],
  obras: [
-  { campo: 'etapa_negocio',  label: 'Etapa do Negócio', tipo: 'select', opcoes: _AUT_ETAPAS_OBRA },
+  { campo: 'etapa_negocio',  label: 'Etapa do Negócio', tipo: 'select', etapa: true, opcoes: _AUT_ETAPAS_OBRA },
   { campo: 'tipo_obra',      label: 'Tipo de Obra',     tipo: 'multi',  opcoes: _AUT_TIPOS_OBRA },
-  { campo: 'etapa_projeto',  label: 'Etapa do Projeto (na Obra)', tipo: 'texto' },
+  { campo: 'etapa_projeto',  label: 'Etapa do Projeto (na Obra)', tipo: 'texto', etapa: true },
   { campo: 'canal_vendas',   label: 'Canal de vendas',  tipo: 'texto' },
   { campo: 'cidade',         label: 'Cidade',           tipo: 'texto' },
   { campo: 'estado',         label: 'Estado (UF)',      tipo: 'texto' },
@@ -168,6 +173,51 @@ function _autFrase(a) {
  return quando + ', ' + (acoes.length ? acoes.join(' e ') : 'não fazer nada') + '.';
 }
 
+// ── Frases curtas do CARD da lista ──────────────────────────────────────────
+// O card da lista mostra UMA frase de gatilho e UMA de ação — o dono precisa
+// entender a automação em ~2 segundos, sem ler parágrafo. Tudo o que sai daqui
+// vem dos dados reais da automação (condicoes/acao), nunca de texto fixo por
+// automação: renomear uma etapa no cadastro muda a frase sozinha.
+//
+// A diferença pro _autCondResumoTexto (que o EDITOR usa nos cards recolhidos)
+// é o registro: lá o texto é técnico e completo porque fica ao lado dos
+// seletores que o usuário está editando; aqui é uma frase de leitura.
+
+function _autSujeito(tabela, artigo) {
+ if (tabela === 'obras') return artigo === 'def' ? 'a obra' : 'uma obra';
+ return artigo === 'def' ? 'o projeto' : 'um projeto';
+}
+
+// "Quando um projeto entrar em Pré-projeto"
+function _autGatilhoFrase(a) {
+ var conds = (a.condicoes || []).filter(function (c) { return c && c.campo; });
+ var sujeito = _autSujeito(a.tabela_alvo);
+ if (!conds.length) return 'Quando ' + sujeito + ' for criado ou alterado';
+
+ // Caso dominante (as 22 automações de produção): uma única condição de
+ // igualdade sobre a etapa. Vira a frase natural que o dono pediu.
+ if (conds.length === 1) {
+  var c = conds[0];
+  var meta = _autCampoMeta(a.tabela_alvo, c.campo);
+  var vals = _autValorArr(c.valor).filter(function (v) { return String(v).trim() !== ''; });
+  if (meta.etapa && (c.operador === 'igual' || c.operador === 'em') && vals.length) {
+   return 'Quando ' + sujeito + ' entrar em ' + vals.join(' ou ');
+  }
+ }
+ // Demais formatos (número, data, várias condições): reaproveita o resumo já
+ // existente em vez de manter uma segunda gramática que ia divergir.
+ return 'Quando ' + sujeito + ' tiver ' + _autCondResumoTexto(a.tabela_alvo, conds);
+}
+
+// 'Criar tarefa "Pré-projeto"'
+function _autAcaoFrase(a) {
+ var acoes = _autAcoes(a).filter(function (ac) { return ac && (ac.titulo || ac.tipo); });
+ if (!acoes.length) return 'Nenhuma ação configurada';
+ if (acoes.length > 1) return 'Criar ' + acoes.length + ' tarefas';
+ var t = (acoes[0].titulo || '').trim();
+ return t ? 'Criar tarefa "' + t + '"' : 'Criar tarefa (sem nome definido)';
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CARGA DA PÁGINA
 // ═══════════════════════════════════════════════════════════════════════════
@@ -226,7 +276,12 @@ function _autPassaFiltro(a) {
  }
  var q = _autFiltroTexto();
  if (!q) return true;
- return ((a.nome || '') + ' ' + (a.descricao || '') + ' ' + _autFrase(a)).toLowerCase().indexOf(q) !== -1;
+ // Busca sobre o que o card REALMENTE mostra (gatilho + ação) além do nome e
+ // da descrição. Buscar só em _autFrase deixaria o usuário digitar uma frase
+ // que está na tela e não achar nada.
+ return ((a.nome || '') + ' ' + (a.descricao || '') + ' '
+   + _autGatilhoFrase(a) + ' ' + _autAcaoFrase(a) + ' ' + _autFrase(a))
+  .toLowerCase().indexOf(q) !== -1;
 }
 
 function _autRender() {
@@ -236,20 +291,34 @@ function _autRender() {
 
  var ativas = _autData.filter(function (a) { return a.ativo; }).length;
  var comErro = _autData.filter(function (a) { var r = _autResumo[a.id]; return r && r.ultimo_status === 'erro'; }).length;
- var set = function (id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
- set('aut-kpi-total', _autData.length);
- set('aut-kpi-ativas', ativas);
- set('aut-kpi-inativas', _autData.length - ativas);
- set('aut-kpi-erros', comErro);
+ var n = _autData.length;
 
  var dados = _autData.filter(_autPassaFiltro);
  if (label) label.textContent = dados.length + ' automaç' + (dados.length === 1 ? 'ão' : 'ões');
+
+ // Resumo compacto em UMA linha de texto no lugar dos 4 KPI-cards grandes —
+ // o dono não quer um quarto da tela gasto pra dizer "22 · 22 · 0 · 0". Os
+ // números continuam todos ali, só param de ocupar espaço vertical.
+ var resumoEl = document.getElementById('aut-resumo-linha');
+ if (resumoEl) {
+  resumoEl.innerHTML = n
+   ? '<b>' + n + '</b> automaç' + (n === 1 ? 'ão' : 'ões')
+     + '<i>·</i><b>' + ativas + '</b> ativa' + (ativas === 1 ? '' : 's')
+     + '<i>·</i><b>' + (n - ativas) + '</b> inativa' + ((n - ativas) === 1 ? '' : 's')
+     + '<i>·</i><span class="' + (comErro ? 'aut-resumo-err' : '') + '"><b>' + comErro + '</b> com erro</span>'
+     // Só aparece quando um filtro/busca está escondendo alguma coisa — sem
+     // isso o usuário filtra, vê 3 cards e continua lendo "22" no topo.
+     + (dados.length !== n ? '<i>·</i><span class="aut-resumo-filtro">mostrando ' + dados.length + '</span>' : '')
+   : '';
+ }
 
  if (!dados.length) {
   list.innerHTML = '<div class="aut-empty">Nenhuma automação encontrada.</div>';
   return;
  }
- // Agrupado por registro observado, como a lista lateral do Airtable.
+ // Agrupado por registro observado. O título do grupo é só texto pequeno +
+ // contagem: agrupar não pode virar outro card grande competindo com os cards
+ // de verdade.
  var grupos = { projetos: [], obras: [] };
  dados.forEach(function (a) { (grupos[a.tabela_alvo] || (grupos[a.tabela_alvo] = [])).push(a); });
  var html = '';
@@ -259,7 +328,12 @@ function _autRender() {
   html += '<div class="aut-group-title">' + g[1] + ' <span>' + arr.length + '</span></div>'
        + '<div class="aut-group">' + arr.map(_autCardHTML).join('') + '</div>';
  });
+ // Um evento de tempo real (outro usuário ativou uma automação, ou uma acabou
+ // de rodar) redesenha a lista inteira. Sem restaurar o scroll, quem estava
+ // lendo o fim da lista era jogado pro topo sozinho.
+ var y = window.scrollY;
  list.innerHTML = html;
+ if (window.scrollY !== y) window.scrollTo(0, y);
 }
 
 function _autFmtQuando(iso) {
@@ -269,21 +343,54 @@ function _autFmtQuando(iso) {
  return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
+// ── Card da lista ───────────────────────────────────────────────────────────
+// Redesenhado a pedido do dono: o card antigo empilhava nome + condição
+// inteira + explicação + ação + responsável + prazo + prioridade + última
+// execução + contagem + status + categoria, e o resultado "parecia uma lista
+// técnica". Agora mostra SÓ o que responde "o que essa automação faz?":
+//
+//   Nome
+//   ⚡ gatilho numa frase   →   ✚ ação numa frase
+//   Executada 12 vezes                            [Ativa]
+//
+// Todo o resto (condições completas, responsável, prazo, prioridade, vínculos,
+// histórico) continua a um clique de distância no painel de detalhe — não foi
+// removido do sistema, só do card.
 function _autCardHTML(a) {
  var r = _autResumo[a.id] || {};
- var badge = a.ativo
-  ? '<span class="aut-badge aut-badge-on">Ativa</span>'
-  : '<span class="aut-badge aut-badge-off">Inativa</span>';
- var erro = (r.ultimo_status === 'erro')
-  ? '<span class="aut-badge aut-badge-err" title="A última execução falhou">Última execução com erro</span>' : '';
  var total = Number(r.total_execucoes || 0);
+ var badge = a.ativo
+  ? '<span class="aut-pill aut-pill-on">Ativa</span>'
+  : '<span class="aut-pill aut-pill-off">Inativa</span>';
+ // Erro da última execução é um ponto discreto, não mais um segundo badge com
+ // frase inteira roubando a atenção do nome da automação.
+ var erro = (r.ultimo_status === 'erro')
+  ? '<span class="aut-dot-err" title="A última execução desta automação falhou. Abra para ver o histórico."></span>' : '';
+ var exec = total
+  ? 'Executada ' + total + (total === 1 ? ' vez' : ' vezes')
+  : 'Nunca executada';
+
  return '<div class="aut-card' + (a.ativo ? '' : ' aut-card-off') + '" data-id="' + _autEsc(a.id) + '" onclick="_spOpen(\'automacoes\', this)">'
-  + '<div class="aut-card-top"><div class="aut-card-nome">' + _autEsc(a.nome || 'Sem nome') + '</div>' + badge + erro + '</div>'
-  + '<div class="aut-card-desc">' + _autEsc(a.descricao || _autFrase(a)) + '</div>'
-  + '<div class="aut-card-foot">'
-  + '<span>Última execução: ' + _autEsc(_autFmtQuando(r.ultima_execucao)) + '</span>'
-  + '<span>' + total + ' execuç' + (total === 1 ? 'ão' : 'ões') + '</span>'
-  + '</div></div>';
+  + '<div class="aut-card-hd">'
+  + '<span class="aut-card-nome">' + _autEsc(a.nome || 'Sem nome') + '</span>'
+  + erro + badge
+  + '</div>'
+  + '<div class="aut-rule">'
+  + '<div class="aut-rule-row">'
+  + '<span class="aut-rule-ic aut-rule-ic-t" aria-hidden="true">'
+  + '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>'
+  + '</span>'
+  + '<span class="aut-rule-tx">' + _autEsc(_autGatilhoFrase(a)) + '</span>'
+  + '</div>'
+  + '<div class="aut-rule-row">'
+  + '<span class="aut-rule-ic aut-rule-ic-a" aria-hidden="true">'
+  + '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'
+  + '</span>'
+  + '<span class="aut-rule-tx">' + _autEsc(_autAcaoFrase(a)) + '</span>'
+  + '</div>'
+  + '</div>'
+  + '<div class="aut-card-meta">' + exec + '</div>'
+  + '</div>';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
