@@ -82,6 +82,67 @@
 .aut-add { margin-top: 2px; }
 .aut-acao { border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
 
+/* ── Fluxo GATILHO → AÇÕES em linha do tempo, estilo Trigger/Actions do
+   Airtable: cards recolhidos por padrão (só a frase-resumo), uma linha
+   vertical conectando os dois, clique expande o editor de verdade por
+   baixo. Pedido explícito do dono: interface de criação "mais simples". ── */
+.aut-flow { margin-top: 4px; }
+.aut-flow-label {
+ font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+ color: var(--muted); margin: 0 0 6px 2px;
+}
+.aut-flow-card {
+ display: flex; align-items: center; gap: 10px; padding: 12px;
+ border: 1px solid var(--border); border-radius: 10px; background: var(--card, var(--bg));
+ cursor: pointer; transition: border-color .12s, box-shadow .12s;
+}
+.aut-flow-card:hover { border-color: var(--navy); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.aut-flow-icon {
+ flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px;
+ display: flex; align-items: center; justify-content: center;
+ color: #fff; font-size: 16px; font-weight: 700; line-height: 1;
+}
+.aut-flow-icon-trigger { background: var(--navy); }
+.aut-flow-icon-action  { background: var(--green); }
+.aut-flow-card-text { flex: 1; min-width: 0; }
+.aut-flow-card-title { font-size: 12px; font-weight: 600; color: var(--text); }
+.aut-flow-card-sub {
+ font-size: 11px; color: var(--muted); margin-top: 2px;
+ overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.aut-flow-chevron { flex-shrink: 0; color: var(--muted); font-size: 11px; }
+
+/* Linha vertical + selo de check conectando o card de Gatilho ao de Ações,
+   igual à referência (TRIGGER em cima, linha, ACTIONS embaixo). */
+.aut-flow-connector { display: flex; justify-content: flex-start; padding-left: 14px; margin: 2px 0; }
+.aut-flow-connector::before {
+ content: ''; display: block; width: 1px; height: 18px; background: var(--border); margin-right: 15px;
+}
+.aut-flow-dot {
+ width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+ display: flex; align-items: center; justify-content: center;
+ border: 1px solid var(--border); background: var(--card, var(--bg));
+ color: var(--green); font-size: 10px; margin-left: -30px;
+}
+
+.aut-flow-detail {
+ padding: 12px 2px 4px; border-left: 2px solid var(--border); margin: 0 0 0 15px; padding-left: 16px;
+}
+.aut-flow-detail.aut-collapsed { display: none; }
+
+/* Card "Ações" por fora contém o recap da condição + o sub-card "Criar
+   tarefa" aninhado (mesma estrutura visual do Airtable: condição por cima,
+   ação aninhada por baixo, dentro da mesma caixa). */
+.aut-flow-actions-outer { flex-direction: column; align-items: stretch; cursor: default; gap: 8px; }
+.aut-flow-actions-outer:hover { border-color: var(--border); box-shadow: none; }
+.aut-flow-actions-recap { font-size: 11px; color: var(--muted); font-weight: 600; }
+.aut-flow-nested {
+ display: flex; align-items: center; gap: 10px; padding: 10px;
+ border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2, rgba(127,127,127,.06));
+ cursor: pointer; transition: border-color .12s;
+}
+.aut-flow-nested:hover { border-color: var(--navy); }
+
 .aut-sujo-bar {
  position: sticky; bottom: 0; display: flex; align-items: center; gap: 8px;
  margin-top: 14px; padding: 10px 12px; border-radius: 8px;

@@ -133,6 +133,21 @@ function _autValorArr(v) {
  return Array.isArray(v) ? v.slice() : [v];
 }
 
+// ── Resumo curto das condições, usado nos cards recolhidos do fluxo
+// GATILHO → AÇÕES (visual em linha do tempo, pedido do dono: "algo mais
+// simples pro usuário", como o Trigger/Actions conectados por uma linha do
+// Airtable) — mesma lógica de _autFrase, só que sem a parte da ação. ────────
+function _autCondResumoTexto(tabela, conds) {
+ var partes = (conds || []).map(function (c) {
+  var meta = _autCampoMeta(tabela, c.campo);
+  var ops  = _AUT_OPERADORES[meta.tipo] || _AUT_OPERADORES.texto;
+  var rot  = (ops.find(function (o) { return o[0] === c.operador; }) || [c.operador, c.operador])[1];
+  if (_AUT_OPS_SEM_VALOR[c.operador]) return meta.label + ' ' + rot;
+  return meta.label + ' ' + rot + ' ' + _autValorArr(c.valor).join(' ou ');
+ });
+ return partes.length ? partes.join(' E ') : 'Qualquer criação ou alteração';
+}
+
 // ── Frase "QUANDO ... E ... ENTÃO ..." em português ──────────────────────────
 // É o que o card e o topo do painel mostram, pro usuário entender a automação
 // sem abrir nada e sem ver nome de coluna (§2/§3/§20).
@@ -341,10 +356,10 @@ function _autAcaoHTML(ac) {
  var resp = _autValorArr(ac.responsaveis);
  var usuarios = (typeof _usuariosCache !== 'undefined' && _usuariosCache) ? _usuariosCache : [];
  return '<div class="aut-acao">'
-  + '<div class="sp-field"><div class="sp-label">Nome da tarefa</div><input class="sp-inp" id="aut-ac-titulo" value="' + _autEsc(ac.titulo || '') + '" oninput="_autMarcarSujo()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Nome da tarefa</div><input class="sp-inp" id="aut-ac-titulo" value="' + _autEsc(ac.titulo || '') + '" oninput="_autMarcarSujo();_autAtualizarResumoAcao()"></div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Tipo</div><select class="sp-inp" id="aut-ac-tipo" onchange="_autMarcarSujo()">' + _autOptsHTML(_AUT_TIPOS_TAREFA, ac.tipo_tarefa || 'Tarefa') + '</select></div>'
-  + '<div class="sp-field"><div class="sp-label">Área</div><select class="sp-inp" id="aut-ac-area" onchange="_autMarcarSujo()">' + _autOptsHTML(_AUT_AREAS, ac.area || '', '— sem área —') + '</select></div>'
+  + '<div class="sp-field"><div class="sp-label">Área</div><select class="sp-inp" id="aut-ac-area" onchange="_autMarcarSujo();_autAtualizarResumoAcao()">' + _autOptsHTML(_AUT_AREAS, ac.area || '', '— sem área —') + '</select></div>'
   + '</div>'
   + '<div class="sp-field"><div class="sp-label">Responsáveis</div><div class="aut-chips" id="aut-ac-resp">'
   + usuarios.map(function (u) {
@@ -383,6 +398,11 @@ function _spAutomacaoRender(a) {
  _autAtiva = JSON.parse(JSON.stringify(a));   // cópia editável em memória
  var ac = _autPrimeiraAcao(_autAtiva);
  var conds = _autAtiva.condicoes || [];
+ // Automação ainda não configurada (sem nome de tarefa definido) abre com os
+ // dois cards do fluxo já expandidos — não faz sentido pedir pro usuário
+ // clicar pra descobrir que precisa preencher algo. Uma já pronta abre
+ // recolhida, só com o resumo, igual ao Trigger/Actions do Airtable.
+ var colapsado = ac.titulo ? ' aut-collapsed' : '';
 
  var html = ''
   + '<input type="hidden" id="sp-aut-id" value="' + _autEsc(a.id) + '">'
@@ -400,17 +420,47 @@ function _spAutomacaoRender(a) {
   + '<div class="sp-field"><div class="sp-label">Nome</div><input class="sp-inp" id="aut-nome" value="' + _autEsc(a.nome || '') + '" oninput="_autMarcarSujo()"></div>'
   + '<div class="sp-field"><div class="sp-label">Descrição</div><textarea class="sp-inp" rows="2" id="aut-desc" oninput="_autMarcarSujo()">' + _autEsc(a.descricao || '') + '</textarea></div>'
 
-  + '<div class="sp-stitle">QUANDO — o gatilho</div>'
+  + '<div class="aut-flow">'
+
+  + '<div class="aut-flow-label">GATILHO</div>'
+  + '<div class="aut-flow-card" onclick="_autToggleFlow(\'gatilho\')">'
+  + '<div class="aut-flow-icon aut-flow-icon-trigger">'
+  + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>'
+  + '</div>'
+  + '<div class="aut-flow-card-text">'
+  + '<div class="aut-flow-card-title">Quando um registro corresponder às condições</div>'
+  + '<div class="aut-flow-card-sub" id="aut-flow-gatilho-resumo">' + _autEsc(_autCondResumoTexto(_autAtiva.tabela_alvo, conds)) + '</div>'
+  + '</div>'
+  + '<div class="aut-flow-chevron" id="aut-flow-chevron-gatilho">' + (colapsado ? '&#9662;' : '&#9652;') + '</div>'
+  + '</div>'
+  + '<div class="aut-flow-detail' + colapsado + '" id="aut-flow-detail-gatilho">'
   + '<div class="sp-field"><div class="sp-label">Observar alterações em</div>'
   + '<select class="sp-inp" id="aut-tabela" onchange="_autTrocarTabela()">' + _autOptsHTML([['projetos','Projetos'],['obras','Obras']], a.tabela_alvo) + '</select></div>'
   + '<div class="aut-hint">A automação roda quando o registro <b>entra</b> na condição — inclusive quando ele é criado já atendendo. Se ele já estava na condição e outro campo mudou, nada acontece de novo.</div>'
   + '<div id="aut-conds">' + (conds.length ? conds.map(function (c, i) { return _autCondHTML(_autAtiva.tabela_alvo, c, i); }).join('')
       : '<div class="aut-empty-cond">Sem condições: a automação roda em qualquer criação ou alteração do registro.</div>') + '</div>'
   + '<button type="button" class="btn btn-ghost aut-add" onclick="_autAdicionarCond()">+ Adicionar condição</button>'
+  + '</div>'
 
-  + '<div class="sp-stitle">ENTÃO — o que fazer</div>'
-  + '<div class="aut-hint">Hoje a única ação disponível é criar uma tarefa. Os campos abaixo são preenchidos na hora em que a automação rodar, usando os dados do registro que disparou.</div>'
+  + '<div class="aut-flow-connector"><span class="aut-flow-dot">&#10003;</span></div>'
+
+  + '<div class="aut-flow-label">AÇÕES</div>'
+  + '<div class="aut-flow-card aut-flow-actions-outer">'
+  + '<div class="aut-flow-actions-recap">Se ' + _autEsc(_autCondResumoTexto(_autAtiva.tabela_alvo, conds)) + '</div>'
+  + '<div class="aut-flow-nested" onclick="_autToggleFlow(\'acao\')">'
+  + '<div class="aut-flow-icon aut-flow-icon-action">+</div>'
+  + '<div class="aut-flow-card-text">'
+  + '<div class="aut-flow-card-title">Criar tarefa</div>'
+  + '<div class="aut-flow-card-sub" id="aut-flow-acao-resumo">' + _autEsc(ac.titulo ? 'Tarefa: "' + ac.titulo + '"' + (ac.area ? ' · ' + ac.area : '') : 'Configure o nome da tarefa') + '</div>'
+  + '</div>'
+  + '<div class="aut-flow-chevron" id="aut-flow-chevron-acao">' + (colapsado ? '&#9662;' : '&#9652;') + '</div>'
+  + '</div>'
+  + '</div>'
+  + '<div class="aut-flow-detail' + colapsado + '" id="aut-flow-detail-acao">'
   + _autAcaoHTML(ac)
+  + '</div>'
+
+  + '</div>'
   + '<div id="aut-sujo-bar" class="aut-sujo-bar" style="display:none">'
   + '<span>Você tem alterações não salvas.</span>'
   + '<button type="button" class="btn btn-primary" onclick="_autSalvar()">Salvar alterações</button>'
@@ -446,6 +496,25 @@ function _spAutomacaoRender(a) {
 function _autMarcarSujo() {
  var b = document.getElementById('aut-sujo-bar');
  if (b) b.style.display = 'flex';
+}
+// Cards do fluxo GATILHO/AÇÕES nascem recolhidos (só a frase-resumo visível,
+// igual ao Trigger/Actions do Airtable) — clicar expande o editor de verdade
+// por baixo, sem precisar redesenhar nada.
+function _autToggleFlow(qual) {
+ var det = document.getElementById('aut-flow-detail-' + qual);
+ var chev = document.getElementById('aut-flow-chevron-' + qual);
+ if (!det) return;
+ det.classList.toggle('aut-collapsed');
+ if (chev) chev.innerHTML = det.classList.contains('aut-collapsed') ? '&#9662;' : '&#9652;';
+}
+// Mantém o subtítulo do card recolhido "Criar tarefa" em dia enquanto o
+// usuário digita o nome da tarefa/troca a área lá dentro.
+function _autAtualizarResumoAcao() {
+ var el = document.getElementById('aut-flow-acao-resumo');
+ if (!el) return;
+ var titulo = ((document.getElementById('aut-ac-titulo') || {}).value || '').trim();
+ var area   = ((document.getElementById('aut-ac-area') || {}).value || '').trim();
+ el.textContent = titulo ? 'Tarefa: "' + titulo + '"' + (area ? ' · ' + area : '') : 'Configure o nome da tarefa';
 }
 function _autToggleChip(btn) { btn.classList.toggle('active'); _autMarcarSujo(); }
 function _autToggleValor(i, btn) { btn.classList.toggle('active'); _autMarcarSujo(); }
@@ -540,6 +609,12 @@ function _autRedesenharConds(tabela, conds) {
  box.innerHTML = conds.length
   ? conds.map(function (c, i) { return _autCondHTML(tabela, c, i); }).join('')
   : '<div class="aut-empty-cond">Sem condições: a automação roda em qualquer criação ou alteração do registro.</div>';
+ // Os dois cards recolhidos do fluxo (§ Gatilho e o recap dentro de Ações)
+ // mostram a mesma frase — atualiza os dois pra não ficar com texto velho
+ // enquanto o usuário edita as condições por baixo.
+ var resumo = _autCondResumoTexto(tabela, conds);
+ var g = document.getElementById('aut-flow-gatilho-resumo'); if (g) g.textContent = resumo;
+ var r = document.querySelector('.aut-flow-actions-recap'); if (r) r.textContent = 'Se ' + resumo;
 }
 
 // ── Gravação ─────────────────────────────────────────────────────────────────
