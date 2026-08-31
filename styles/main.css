@@ -885,6 +885,16 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
 .gb-dir-sel{flex:0 0 50px;min-width:0;padding:5px 4px;font-size:11px}
 .gb-add-link{display:block;width:100%;text-align:left;padding:5px 2px;margin-top:2px;font-size:11.5px;font-weight:600;color:var(--navy);background:none;border:none;cursor:pointer;font-family:inherit}
 .gb-add-link:hover{text-decoration:underline}
+
+/* Inline Edit — célula editável estilo Airtable/Excel (scripts/lib/inline-edit.js).
+   Primeira aplicação: tabela de Entregas. */
+td.ie-cell{cursor:pointer;position:relative}
+td.ie-cell:hover{background:rgba(61,79,209,.05);box-shadow:inset 0 0 0 1px rgba(61,79,209,.18)}
+td.ie-cell.ie-editing{padding:2px 4px!important;box-shadow:inset 0 0 0 2px var(--navy)}
+td.ie-cell .ie-input{width:100%;box-sizing:border-box;border:none;background:var(--surface);color:var(--text);font-size:12px;font-family:inherit;padding:5px 6px;border-radius:var(--r-xs);outline:none}
+td.ie-cell.ie-saving{opacity:.55}
+td.ie-cell.ie-error{box-shadow:inset 0 0 0 2px var(--red)}
+.ie-empty{color:var(--muted)}
 /* Grid */
 .gestor-grid-wrap{overflow-x:auto;overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;scrollbar-width:auto;scrollbar-color:var(--muted) var(--surface2)}
 .gestor-grid-wrap::-webkit-scrollbar{height:14px;width:14px}

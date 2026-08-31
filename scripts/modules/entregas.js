@@ -356,6 +356,65 @@ _gbInit('entregas', [
  { key: 'valor',       label: 'Valor' },
 ], _entApplyFilters, 3);
 
+// Edição inline (scripts/lib/inline-edit.js) — clique na célula edita direto
+// na tabela, sem precisar abrir o painel de detalhamento (que continua
+// existindo pra anexos/histórico/campos menos usados). onSave de cada campo
+// reaproveita _spEntDetSalvarCampo, a MESMA função que o painel lateral já
+// usa (trigger de auditoria/updated_at do banco cuida do resto — não duplica
+// nada aqui). getRow busca o valor atual em _entregasArr pelo id, não em
+// dataset — assim o editor sempre abre com o dado real, mesmo depois de
+// reordenar/filtrar.
+function _entFindById(id) { return (_entregasArr || []).find(function(x){ return String(x.id) === String(id); }); }
+_ieRegister('entregas', {
+ etapa: {
+  type: 'select', options: function(){ return Object.keys(_entEtapaBucket); }, getRow: _entFindById,
+  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { etapa: val || null }); },
+ },
+ transporte: {
+  type: 'select', options: function(){ return _obraTransporteCache || []; }, getRow: _entFindById,
+  onSave: function(id, val) {
+   if (val && (_obraTransporteCache||[]).indexOf(val) === -1) _obraTransporteCache.push(val);
+   return _spEntDetSalvarCampo(id, { transporte: val || null });
+  },
+ },
+ data_faturamento: {
+  type: 'date', getRow: _entFindById,
+  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { data_faturamento: val || null }); },
+ },
+ quantidade: {
+  type: 'number', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
+  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { quantidade: val }); },
+ },
+ peso_kg: {
+  type: 'number', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
+  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { peso_kg: val }); },
+ },
+ maior_peca_mm: {
+  type: 'number', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
+  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { maior_peca_mm: val }); },
+ },
+ valor: {
+  type: 'number', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
+  onSave: function(id, val) { return _spEntDetSalvarCampo(id, { valor: val }); },
+ },
+}, _entRefreshAfterInlineEdit);
+
+// _entApplyFilters, no modo SEM agrupamento, só reordena/mostra-esconde as
+// <tr> que já existem no DOM usando o dataset delas (achado real: não
+// reconstrói a partir de _entregasArr a menos que esteja saindo do modo
+// agrupado) — depois de uma edição inline isso deixaria a célula editada
+// (e o filtro, que lê o dataset) presos no valor antigo. Esta função força
+// a reconstrução das linhas a partir de _entregasArr (já com o valor novo,
+// gravado via Object.assign dentro de _spEntDetSalvarCampo) antes de deixar
+// _entApplyFilters cuidar do resto (filtro/ordenação/badges/Kanban/Calendário).
+function _entRefreshAfterInlineEdit() {
+ var groupLevels = (_gbInstances.entregas && _gbInstances.entregas.state.levels) || [];
+ if (groupLevels.length) { _entRenderGrouped(groupLevels); return; }
+ var tbody = document.getElementById('ent-tbody');
+ if (tbody) tbody.innerHTML = (_entregasArr || []).map(_entRowHTML).join('');
+ _entApplyFilters();
+}
+
 function _entFmtBRL(v) { return v != null ? 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '—'; }
 
 // Pseudo-dataset: mesmos campos/mesma normalização que um <tr data-*> real
@@ -549,12 +608,23 @@ function _entRenderGroupNode(node, path, rowsArr) {
   // de grupo usa a MESMA regra de cor (_entTransporteBadgeCls) que a
   // coluna Transporte da tabela, pra não haver duas fontes de verdade.
   var _entGrupoCls = node.field === 'transporte' ? _entTransporteBadgeCls(k) : null;
+  // Somas do grupo (Quantidade/Peso/Valor) — pedido explícito, mesma coisa
+  // que o Airtable mostra no cabeçalho de cada grupo ("Sum 69" etc.).
+  // _gtTreeSum já soma recursivamente, então um grupo pai mostra a soma de
+  // TODOS os filhos, não só do nível dele.
+  var sQtd = _gtTreeSum(child, function(e){ return e.quantidade; });
+  var sPeso = _gtTreeSum(child, function(e){ return e.peso_kg; });
+  var sValor = _gtTreeSum(child, function(e){ return e.valor; });
+  var sumsHTML = '<span style="margin-left:10px;font-size:10.5px;color:var(--muted);font-weight:400">'
+   + 'Qtd ' + sQtd.toLocaleString('pt-BR') + ' · Peso ' + sPeso.toLocaleString('pt-BR') + 'kg · ' + _entFmtBRL(sValor)
+   + '</span>';
   rowsArr.push(
    '<tr class="' + _gtGroupClass(path.length) + '" onclick="_entToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
    + '<td colspan="10" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + _gtGroupLabelHTML(k, _entGrupoCls)
    + _gtCountBadgeHTML(total, 'entrega' + (total !== 1 ? 's' : ''))
+   + sumsHTML
    + '</td></tr>'
   );
   if (!isCollapsed) _entRenderGroupNode(child, path.concat(k), rowsArr);
@@ -1664,24 +1734,32 @@ function _entRowHTML(e) {
   var attrName = k.replace(/([A-Z])/g, '-$1').toLowerCase();
   return ' data-' + attrName + '="' + String(ds[k]).replace(/"/g,'&quot;') + '"';
  }).join('');
+ var etapaCls = atrasado ? BADGE_ETAPA_ENTREGA_BUCKET_CLS.atrasado : (BADGE_ETAPA_ENTREGA_BUCKET_CLS[bucket] || 'bm');
+ var etapaDisplay = '<span class="badge ' + etapaCls + '">' + statusTxt + '</span>' + (atrasado ? ' <span class="ent-late-tag">Atrasado</span>' : '');
+ var dataFatDisplay = '<span class="ent-date' + (atrasado ? ' overdue' : '') + '">' + (e.data_faturamento ? new Date(e.data_faturamento+'T00:00:00').toLocaleDateString('pt-BR') : '<span class="ie-empty">—</span>') + '</span>';
+ var transpDisplay = e.transporte ? '<span class="badge ' + _entTransporteBadgeCls(e.transporte) + '" style="font-size:10px">' + e.transporte.replace(/</g,'&lt;') + '</span>' : null;
  return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))_spOpen(\'entregas\',this)"'
   + ' data-id="' + e.id + '" data-atrasado="' + (atrasado ? '1' : '0') + '"' + attrs + '>'
   + '<td><div style="font-weight:600;font-size:13px">' + (e.nome_entrega || 'Entrega sem nome') + '</div>'
   + '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + (obraNome ? (empNome ? empNome + ' — ' : '') + obraNome : 'Obra não vinculada') + '</div></td>'
   + '<td style="font-size:12px;color:var(--muted)">' + (cidadeUf || '—') + '</td>'
-  + '<td><span class="ent-date' + (atrasado ? ' overdue' : '') + '">' + (e.data_faturamento ? new Date(e.data_faturamento+'T00:00:00').toLocaleDateString('pt-BR') : '—') + '</span></td>'
-  + '<td>' + (e.transporte ? '<span class="badge ' + _entTransporteBadgeCls(e.transporte) + '">' + e.transporte + '</span>' : '<span style="font-size:12px;color:var(--muted)">—</span>') + '</td>'
-  + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.quantidade != null ? Number(e.quantidade).toLocaleString('pt-BR') : '—') + '</td>'
-  + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') : '—') + '</td>'
-  + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.maior_peca_mm != null ? Number(e.maior_peca_mm).toLocaleString('pt-BR') : '—') + '</td>'
-  + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.valor != null ? _entFmtBRL(e.valor) : '—') + '</td>'
-  + '<td><span class="badge ' + (atrasado ? BADGE_ETAPA_ENTREGA_BUCKET_CLS.atrasado : (BADGE_ETAPA_ENTREGA_BUCKET_CLS[bucket] || 'bm')) + '">' + statusTxt + '</span>' + (atrasado ? ' <span class="ent-late-tag">Atrasado</span>' : '') + '</td>'
+  + _ieCellHTML('entregas', e.id, 'data_faturamento', e.data_faturamento, dataFatDisplay)
+  + _ieCellHTML('entregas', e.id, 'transporte', e.transporte, transpDisplay)
+  + _ieCellHTML('entregas', e.id, 'quantidade', e.quantidade, e.quantidade != null ? Number(e.quantidade).toLocaleString('pt-BR') : null, 'right')
+  + _ieCellHTML('entregas', e.id, 'peso_kg', e.peso_kg, e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') : null, 'right')
+  + _ieCellHTML('entregas', e.id, 'maior_peca_mm', e.maior_peca_mm, e.maior_peca_mm != null ? Number(e.maior_peca_mm).toLocaleString('pt-BR') : null, 'right')
+  + _ieCellHTML('entregas', e.id, 'valor', e.valor, e.valor != null ? _entFmtBRL(e.valor) : null, 'right')
+  + _ieCellHTML('entregas', e.id, 'etapa', e.etapa, etapaDisplay)
   + '<td><button class="btn btn-ghost btn-sm">Ver →</button></td>'
   + '</tr>';
 }
 
 // ── Load Entregas ─────────────────────────────────────────────────────────────
 async function _dbLoadEntregas() {
+ // Dispara cedo (fire-and-forget, memoizado em _obraCarregarTransportes) pra
+ // já ter a lista de transportes pronta quando a pessoa clicar numa célula
+ // de Transporte pra editar — sem isso, o 1º clique abriria o select vazio.
+ _obraCarregarTransportes().catch(function(){});
  // Paginado em blocos de 1000 — sem isso, o Supabase corta silenciosamente
  // em 1000 linhas (achado real: com 1495 entregas, a tela e o contador do
  // menu mostravam só 1000, escondendo 495 entregas de verdade).

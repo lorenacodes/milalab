@@ -86,6 +86,21 @@ function _gtTreeCount(node, predicate) {
  return sum;
 }
 
+// Soma recursiva de um campo numérico (pedido explícito: cabeçalho de grupo
+// mostrando "Sum" de Quantidade/Peso/Valor, igual ao Airtable) — mesmo
+// espírito de _gtTreeCount acima, só que soma em vez de contar. getValue(item)
+// deve devolver um number ou null/undefined (tratado como 0).
+function _gtTreeSum(node, getValue) {
+ if (node.leaf) {
+  var s = 0;
+  node.items.forEach(function(it) { var v = getValue(it); if (v != null && !isNaN(v)) s += Number(v); });
+  return s;
+ }
+ var sum = 0;
+ node.order.forEach(function(k){ sum += _gtTreeSum(node.children[k], getValue); });
+ return sum;
+}
+
 // ── Markup compartilhado do cabeçalho de grupo ──────────────────────────────
 // Pedido explícito: hierarquia entre níveis (principal → sub → registros)
 // era ilegível com 2+ agrupamentos — cada módulo (Obras/Instalações/
@@ -121,5 +136,5 @@ function _gtGroupLabelHTML(value, cls) {
 
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _gtCapitalize, _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtGroupClass, _gtCountBadgeHTML, _gtGroupLabelHTML };
+ module.exports = { _gtCapitalize, _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtTreeSum, _gtGroupClass, _gtCountBadgeHTML, _gtGroupLabelHTML };
 }

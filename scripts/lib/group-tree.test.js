@@ -1,7 +1,7 @@
 // node --test scripts/lib/group-tree.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtGroupClass, _gtCountBadgeHTML, _gtGroupLabelHTML } = require('./group-tree.js');
+const { _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtTreeSum, _gtGroupClass, _gtCountBadgeHTML, _gtGroupLabelHTML } = require('./group-tree.js');
 
 // Data-base fixa (não usar "hoje" de verdade — o teste tem que dar o mesmo
 // resultado em qualquer dia em que rodar).
@@ -174,4 +174,21 @@ test('_gtGroupLabelHTML: com classe de cor, vira pill (.badge .bX)', () => {
 test('_gtGroupLabelHTML: valor vazio/nulo cai no travessão, igual ao resto do sistema', () => {
  assert.equal(_gtGroupLabelHTML('', null), '<strong>—</strong>');
  assert.equal(_gtGroupLabelHTML(null, 'bm'), '<span class="badge bm gb-group-badge">—</span>');
+});
+
+test('_gtTreeSum: soma um campo numérico recursivamente, ignorando null/undefined', () => {
+ const items = [
+  { id: 1, area: 'TI', valor: 100 }, { id: 2, area: 'TI', valor: 50 },
+  { id: 3, area: 'RH', valor: null }, { id: 4, area: 'RH', valor: 20 },
+ ];
+ const tree = _gtBuildTree(items, [{ field: 'area' }], keyForSimples, null, 0);
+ const getValor = function(it) { return it.valor; };
+ assert.equal(_gtTreeSum(tree.children['TI'], getValor), 150);
+ assert.equal(_gtTreeSum(tree.children['RH'], getValor), 20);
+ assert.equal(_gtTreeSum(tree, getValor), 170); // raiz soma todos os filhos
+});
+
+test('_gtTreeSum: nó folha sem agrupamento nenhum soma direto os items', () => {
+ const leaf = { leaf: true, items: [{ valor: 5 }, { valor: 7 }, { valor: null }] };
+ assert.equal(_gtTreeSum(leaf, function(it){ return it.valor; }), 12);
 });
