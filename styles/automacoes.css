@@ -4,6 +4,51 @@
    pra a aba acompanhar o tema claro/escuro como o resto do sistema.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* ── Widget central (modal) ───────────────────────────────────────────────
+   Substitui o painel lateral só para Automações: Nova/Editar/Ver usam este
+   MESMO modal. Backdrop discreto (igual ao #sp-overlay), diálogo centralizado
+   nos dois eixos, cabeçalho e rodapé fixos, corpo com scroll interno próprio
+   — header/footer nunca se movem enquanto o formulário rola. */
+#aut-modal-overlay {
+ position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,.32);
+ opacity: 0; pointer-events: none; transition: opacity .18s;
+}
+#aut-modal-overlay.aut-modal-open { opacity: 1; pointer-events: all; }
+#aut-modal {
+ position: fixed; top: 50%; left: 50%; z-index: 901;
+ width: min(720px, 92vw); max-height: 88vh;
+ display: flex; flex-direction: column;
+ background: var(--surface); border-radius: var(--r-lg, 12px);
+ box-shadow: var(--shadow-2, 0 12px 48px rgba(0,0,0,.22));
+ opacity: 0; pointer-events: none;
+ transform: translate(-50%, -50%) scale(.97);
+ transition: opacity .18s, transform .18s cubic-bezier(.4,0,.2,1);
+}
+#aut-modal.aut-modal-open { opacity: 1; pointer-events: all; transform: translate(-50%, -50%) scale(1); }
+.autm-header {
+ flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+ padding: 14px 18px; border-bottom: 1px solid var(--border);
+}
+.autm-header-text { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.autm-tag { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); flex-shrink: 0; }
+.autm-title { font-size: var(--fs-h4, 15px); font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.autm-close {
+ flex-shrink: 0; background: none; border: 0; color: var(--muted); cursor: pointer;
+ font-size: 20px; line-height: 1; padding: 2px 6px; border-radius: 6px; transition: background .12s, color .12s;
+}
+.autm-close:hover { background: var(--surface-2, rgba(127,127,127,.1)); color: var(--text); }
+.autm-body { flex: 1 1 auto; overflow-y: auto; padding: var(--sp-5, 20px); }
+.autm-footer {
+ flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
+ padding: 12px 18px; border-top: 1px solid var(--border);
+}
+.autm-footer:empty { display: none; }
+@media (max-width: 640px) {
+ #aut-modal { width: 96vw; max-height: 94vh; }
+ .autm-body { padding: var(--sp-4, 14px); }
+ .autm-header, .autm-footer { padding: 12px 14px; }
+}
+
 .aut-empty,
 .aut-empty-cond { padding: 28px 12px; text-align: center; color: var(--muted); font-size: 12px; }
 .aut-empty-cond { padding: 14px; border: 1px dashed var(--border); border-radius: 8px; }
