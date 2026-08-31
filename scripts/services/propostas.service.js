@@ -197,7 +197,7 @@ function _buildPropostaHTML(p, info) {
   + '</div>'
   // Hero: imagem com overlay + título
   + '<div class="prop-cover-hero">'
-  + (fotoCapa ? '<img class="prop-cover-hero-img" src="' + fotoCapa + '" alt="' + p.produto + '">' : '<div style="height:234px;background:#1B1B8F;border-radius:8px"></div>')
+  + (fotoCapa ? '<img class="prop-cover-hero-img" src="' + fotoCapa + '" alt="' + p.produto + '">' : '<div style="height:234px;background:#050866;border-radius:8px"></div>')
   + '<div class="prop-cover-hero-overlay">'
   + '<div class="prop-cover-hero-title">PROPOSTA COMERCIAL</div>'
   + '<div class="prop-cover-hero-sub">' + info.tituloSecao + '</div>'
