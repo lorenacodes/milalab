@@ -47,11 +47,16 @@ function _vwRender(instanceId) {
    + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">' + v.nome.replace(/</g,'&lt;') + '</span>'
    + '<button type="button" class="gv-item-act" title="Renomear" onclick="event.stopPropagation();_vwRename(\'' + instanceId + '\',\'' + v.id + '\')">&#9998;</button>'
    + '<button type="button" class="gv-item-act" title="Duplicar" onclick="event.stopPropagation();_vwDuplicate(\'' + instanceId + '\',\'' + v.id + '\')">&#10697;</button>'
-   + '<button type="button" class="gv-item-act" title="Compartilhar (em breve)" disabled>&#8599;</button>'
    + '<button type="button" class="gv-item-del" title="Excluir visualização" onclick="event.stopPropagation();_vwDelete(\'' + instanceId + '\',\'' + v.id + '\')">&times;</button>'
    + '</div>';
  }).join('');
- pop.innerHTML = '<div class="gv-hint">Salve combinações de filtros, pesquisa, agrupamento, ordenação e período para reutilizar depois.</div>'
+ // Sem botão "Compartilhar": toda visualização salva JÁ fica visível pra
+ // todo mundo (gestor_views não filtra por criado_por nem tem RLS por
+ // usuário — é assim desde sempre, ver comentário no topo do arquivo). O
+ // botão "Compartilhar (em breve)" que existia aqui dizia o contrário
+ // (dava a entender que era preciso um passo a mais pra outros verem),
+ // então virou o hint explicando o que já acontece.
+ pop.innerHTML = '<div class="gv-hint">Salve combinações de filtros, pesquisa, agrupamento, ordenação e período — visível para toda a equipe assim que salva.</div>'
   + (items || '<div class="gv-empty">Nenhuma visualização salva ainda</div>')
   + '<button type="button" class="gv-save-btn" onclick="_vwSaveCurrent(\'' + instanceId + '\')">+ Nova visualização</button>';
  pop.style.display = 'block';

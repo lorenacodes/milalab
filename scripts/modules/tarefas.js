@@ -278,11 +278,12 @@ function _gviewsRender() {
    + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">' + v.nome.replace(/</g,'&lt;') + '</span>'
    + '<button type="button" class="gv-item-act" title="Renomear" onclick="event.stopPropagation();_gviewsRename(\'' + v.id + '\')">&#9998;</button>'
    + '<button type="button" class="gv-item-act" title="Duplicar" onclick="event.stopPropagation();_gviewsDuplicate(\'' + v.id + '\')">&#10697;</button>'
-   + '<button type="button" class="gv-item-act" title="Compartilhar (em breve)" disabled>&#8599;</button>'
    + '<button type="button" class="gv-item-del" title="Excluir visualização" onclick="event.stopPropagation();_gviewsDelete(\'' + v.id + '\')">&times;</button>'
    + '</div>';
  }).join('');
- pop.innerHTML = '<div class="gv-hint">Salve combinações de filtros, pesquisa, agrupamento, ordenação e período para reutilizar depois.</div>'
+ // Sem botão "Compartilhar": toda visualização salva JÁ fica visível pra
+ // todo mundo (mesmo motivo do comentário equivalente em saved-views.js).
+ pop.innerHTML = '<div class="gv-hint">Salve combinações de filtros, pesquisa, agrupamento, ordenação e período — visível para toda a equipe assim que salva.</div>'
   + (items || '<div class="gv-empty">Nenhuma visualização salva ainda</div>')
   + '<button type="button" class="gv-save-btn" onclick="_gviewsSaveCurrent()">+ Nova visualização</button>';
  pop.style.display = 'block';
