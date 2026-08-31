@@ -275,6 +275,11 @@
 /* Marca no canto superior esquerdo, direto sobre a foto */
 .authv2-topbrand { position:absolute;top:40px;left:56px;display:flex;align-items:center;gap:10px;z-index:2 }
 .authv2-topbrand span { font-weight:800;font-size:19px;color:#F6F7F8;letter-spacing:-.3px }
+/* Logo padrão (a mesma do menu lateral pós-login) — já é pensada pra
+   fundo escuro (o menu lateral é dark navy), então vai direto sobre a
+   foto, sem chip nenhum atrás (pedido explícito: nada de fundo branco). */
+.authv2-logo-chip { display:inline-flex;align-items:center }
+.authv2-logo-chip img { display:block }
 
 /* Texto de marca + os "pontos de atenção" (pills de módulo), canto
    inferior esquerdo — mesmo conteúdo que já existia no painel azul
