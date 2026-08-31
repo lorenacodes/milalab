@@ -662,7 +662,7 @@ function _autAcaoHTML(ac) {
  var resp = _autValorArr(ac.responsaveis);
  var usuarios = (typeof _usuariosCache !== 'undefined' && _usuariosCache) ? _usuariosCache : [];
  return '<div class="aut-acao">'
-  + '<div class="sp-field"><div class="sp-label">Nome da tarefa</div><input class="sp-inp" id="aut-ac-titulo" value="' + _autEsc(ac.titulo || '') + '" oninput="_autMarcarSujo();_autAtualizarResumoAcao()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Nome da tarefa</div><input class="sp-inp" id="aut-ac-titulo" placeholder="Ex.: Revisão do projeto" value="' + _autEsc(ac.titulo || '') + '" oninput="_autMarcarSujo();_autAtualizarResumoAcao()"></div>'
   + '<div class="sp-g2">'
   + '<div class="sp-field"><div class="sp-label">Tipo</div><select class="sp-inp" id="aut-ac-tipo" onchange="_autMarcarSujo()">' + _autOptsHTML(_AUT_TIPOS_TAREFA, ac.tipo_tarefa || 'Tarefa') + '</select></div>'
   + '<div class="sp-field"><div class="sp-label">Área</div><select class="sp-inp" id="aut-ac-area" onchange="_autMarcarSujo();_autAtualizarResumoAcao()">' + _autOptsHTML(_AUT_AREAS, ac.area || '', '— sem área —') + '</select></div>'
