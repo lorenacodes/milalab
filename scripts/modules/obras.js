@@ -607,7 +607,11 @@ function _setupObrasKanbanDnD() {
 }
 
 // ── Atualiza etapa_negocio (fonte única) e sincroniza Kanban + Tabela + Painel ──
-async function updateObraEtapa(id, novaEtapa, origem) {
+// opts.skipUndo/opts.silent: usados pelo próprio Ctrl+Z (undo-manager.js) ao
+// reaplicar esta função pra desfazer/refazer um arrasto — sem eles, desfazer
+// um drag empurraria OUTRA entrada de undo pra pilha (loop) e duplicaria o
+// toast ("Etapa atualizada" do save normal + o do próprio undo-manager).
+async function updateObraEtapa(id, novaEtapa, origem, opts) {
  if (!id || !novaEtapa || !_etapaKcId[novaEtapa]) return;
  const card = document.querySelector('.obra-card[data-id="' + id + '"]');
  const row  = document.querySelector('#obras-tbody tr[data-id="' + id + '"]');
@@ -616,14 +620,30 @@ async function updateObraEtapa(id, novaEtapa, origem) {
 
  _aplicarEtapaObraUI(id, novaEtapa);
 
- const res = await _sb.from('obras').update({ etapa_negocio: novaEtapa, updated_at: new Date().toISOString() }).eq('id', id);
- if (res.error) {
-  _showToast('Erro ao atualizar etapa: ' + _supaErrPt(res.error.message), 'erro');
+ // Trava otimista + diff (concurrency.js) — antes era um `.update()` cru,
+ // sem nenhuma checagem de versão nem baseline (diferente do resto do
+ // autosave de Obras, que já passou por essa correção). Também é o que dá
+ // acesso ao diff (r.campos) que o Ctrl+Z abaixo usa.
+ var r = await _ccSave('obras', id, { etapa_negocio: novaEtapa });
+ if (!r || r.erro || r.excluido) {
+  _showToast('Erro ao atualizar etapa' + (r && r.erro ? ': ' + _supaErrPt(r.erro.message) : ''), 'erro');
   if (etapaAnterior) _aplicarEtapaObraUI(id, etapaAnterior);
   return;
  }
+ if (r.conflito) {
+  _showToast(_ccMsgConflito('obras', r.campos), 'erro');
+  _aplicarEtapaObraUI(id, (r.atual && r.atual.etapa_negocio) || etapaAnterior);
+  return;
+ }
  if (_obraAtiva && _obraAtiva.id === id) _obraAtiva.etapa_negocio = novaEtapa;
- _showToast('Etapa atualizada para "' + novaEtapa + '"', 'ok');
+ if (!(opts && opts.silent)) _showToast('Etapa atualizada para "' + novaEtapa + '"', 'ok');
+ if (!r.semMudanca && typeof _umPush === 'function' && typeof _umActiveScope !== 'undefined' && _umActiveScope && !(opts && opts.skipUndo)) {
+  _umPush(_umActiveScope, {
+   label: 'Etapa',
+   before: etapaAnterior, after: novaEtapa,
+   apply: function(v) { return updateObraEtapa(id, v, 'undo', { skipUndo: true, silent: true }); },
+  });
+ }
 }
 
 // ── Aplica a etapa em todas as views (Kanban, Tabela, Painel lateral) ──────────

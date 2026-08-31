@@ -518,17 +518,27 @@ function _setupProjetosKanbanDnD() {
 // ── Persiste a nova etapa no Supabase, com UI otimista + rollback em erro
 // (mesmo padrão de updateObraEtapa, obras.js) — move o card pra coluna
 // certa antes mesmo da resposta do banco, desfaz se der erro.
-async function updateProjetoEtapa(id, novaEtapa) {
+// opts.skipUndo/opts.silent: usados pelo próprio Ctrl+Z (undo-manager.js,
+// ver comentário equivalente em updateObraEtapa, obras.js) ao reaplicar esta
+// função pra desfazer/refazer um arrasto.
+async function updateProjetoEtapa(id, novaEtapa, opts) {
  if (!id || !novaEtapa || !_sb) return;
  var card = document.querySelector('.proj-kn-card[data-id="' + id + '"]');
  var etapaAnterior = card && card.dataset.etapa;
  if (etapaAnterior === novaEtapa) return;
  _moverCardProjetoParaColuna(id, novaEtapa);
 
- var res = await _sb.from('projetos').update({ etapa_projeto: novaEtapa, updated_at: new Date().toISOString() }).eq('id', id);
- if (res.error) {
-  _showToast('Erro ao atualizar etapa: ' + _supaErrPt(res.error.message), 'erro');
+ // Trava otimista + diff (concurrency.js) — antes era um `.update()` cru,
+ // sem baseline nenhuma (diferente do resto do autosave de Projetos).
+ var r = await _ccSave('projetos', id, { etapa_projeto: novaEtapa });
+ if (!r || r.erro || r.excluido) {
+  _showToast('Erro ao atualizar etapa' + (r && r.erro ? ': ' + _supaErrPt(r.erro.message) : ''), 'erro');
   if (etapaAnterior) _moverCardProjetoParaColuna(id, etapaAnterior);
+  return;
+ }
+ if (r.conflito) {
+  _showToast(_ccMsgConflito('projetos', r.campos), 'erro');
+  _moverCardProjetoParaColuna(id, (r.atual && r.atual.etapa_projeto) || etapaAnterior);
   return;
  }
  if (_spProjAtivo && String(_spProjAtivo.id) === String(id)) {
@@ -539,7 +549,14 @@ async function updateProjetoEtapa(id, novaEtapa) {
  if (cacheIdx !== -1) _projetosArr[cacheIdx].etapa_projeto = novaEtapa;
  var row = document.querySelector('#proj-tbody tr[data-id="' + id + '"]');
  if (row) row.dataset.etapa = novaEtapa;
- _showToast('Etapa atualizada para "' + novaEtapa + '"', 'ok');
+ if (!(opts && opts.silent)) _showToast('Etapa atualizada para "' + novaEtapa + '"', 'ok');
+ if (!r.semMudanca && typeof _umPush === 'function' && typeof _umActiveScope !== 'undefined' && _umActiveScope && !(opts && opts.skipUndo)) {
+  _umPush(_umActiveScope, {
+   label: 'Etapa',
+   before: etapaAnterior, after: novaEtapa,
+   apply: function(v) { return updateProjetoEtapa(id, v, { skipUndo: true, silent: true }); },
+  });
+ }
 }
 function _moverCardProjetoParaColuna(id, etapa) {
  var card = document.querySelector('.proj-kn-card[data-id="' + id + '"]');
