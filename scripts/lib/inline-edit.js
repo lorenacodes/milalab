@@ -53,10 +53,12 @@ function _ieActivate(td) {
  td.classList.add('ie-editing');
  td.innerHTML = _ieEditorHTML(found.fcfg, current);
  _ieActiveTd = td;
+ var tr = td.closest('tr'); if (tr) tr.classList.add('ie-row-active');
  var input = td.querySelector('.ie-input');
  if (!input) return;
  input.focus();
  if (input.select) input.select();
+ if (input.scrollIntoView) input.scrollIntoView({ block: 'nearest', inline: 'nearest' });
  if (found.fcfg.type === 'select') {
   input.addEventListener('change', function() { _ieCommit(td, false, null); });
  }
@@ -90,7 +92,14 @@ function _ieEditorHTML(fcfg, current) {
 }
 
 function _ieKeydown(e, td) {
- if (e.key === 'Escape') { e.preventDefault(); document.removeEventListener('mousedown', _ieOutsideClick, true); _ieActiveTd = null; var found = _ieFieldCfg(td); if (found && found.st.refresh) found.st.refresh(); return; }
+ if (e.key === 'Escape') {
+  e.preventDefault();
+  document.removeEventListener('mousedown', _ieOutsideClick, true);
+  var trEsc = td.closest('tr'); if (trEsc) trEsc.classList.remove('ie-row-active');
+  _ieActiveTd = null;
+  var found = _ieFieldCfg(td); if (found && found.st.refresh) found.st.refresh();
+  return;
+ }
  if (e.key === 'Enter')  { e.preventDefault(); _ieCommit(td, false, 'down'); return; }
  if (e.key === 'Tab')    { e.preventDefault(); _ieCommit(td, false, e.shiftKey ? 'left' : 'right'); return; }
 }
@@ -102,6 +111,7 @@ function _ieKeydown(e, td) {
 async function _ieCommit(td, skipRefresh, dir) {
  document.removeEventListener('mousedown', _ieOutsideClick, true);
  var found = _ieFieldCfg(td);
+ var tr = td.closest('tr'); if (tr) tr.classList.remove('ie-row-active');
  _ieActiveTd = null;
  if (!found) return;
  var rowIndex = td.parentElement.rowIndex, cellIndex = td.cellIndex, table = td.closest('table');
@@ -113,7 +123,10 @@ async function _ieCommit(td, skipRefresh, dir) {
  try {
   await found.fcfg.onSave(td.dataset.ieId, val);
   td.classList.remove('ie-saving');
-  if (!skipRefresh && found.st.refresh) found.st.refresh();
+  if (!skipRefresh && found.st.refresh) {
+   found.st.refresh();
+   _ieFlashSuccess(table, rowIndex, cellIndex);
+  }
  } catch (err) {
   td.classList.remove('ie-saving');
   td.classList.add('ie-error');
@@ -122,6 +135,17 @@ async function _ieCommit(td, skipRefresh, dir) {
   return;
  }
  if (dir && table) _ieNavigate(table, rowIndex, cellIndex, dir);
+}
+
+// Confirmação visual sutil pós-salvamento — roda DEPOIS do refresh (por isso
+// relocaliza a célula por posição, igual _ieNavigate), pra piscar na célula
+// já com o valor novo em vez da que está prestes a ser descartada.
+function _ieFlashSuccess(table, rowIndex, cellIndex) {
+ if (!table || !table.rows[rowIndex]) return;
+ var cell = table.rows[rowIndex].cells[cellIndex];
+ if (!cell || !cell.classList.contains('ie-cell')) return;
+ cell.classList.add('ie-success');
+ setTimeout(function() { cell.classList.remove('ie-success'); }, 700);
 }
 
 // Roda DEPOIS do refresh (a tabela já foi reconstruída via innerHTML — a

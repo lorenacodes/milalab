@@ -888,12 +888,36 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
 
 /* Inline Edit — célula editável estilo Airtable/Excel (scripts/lib/inline-edit.js).
    Primeira aplicação: tabela de Entregas. */
-td.ie-cell{cursor:pointer;position:relative}
-td.ie-cell:hover{background:rgba(61,79,209,.05);box-shadow:inset 0 0 0 1px rgba(61,79,209,.18)}
-td.ie-cell.ie-editing{padding:2px 4px!important;box-shadow:inset 0 0 0 2px var(--navy)}
-td.ie-cell .ie-input{width:100%;box-sizing:border-box;border:none;background:var(--surface);color:var(--text);font-size:12px;font-family:inherit;padding:5px 6px;border-radius:var(--r-xs);outline:none}
-td.ie-cell.ie-saving{opacity:.55}
-td.ie-cell.ie-error{box-shadow:inset 0 0 0 2px var(--red)}
+/* Edição inline (Entregas e reaproveitável em outras tabelas) — a célula em
+   edição precisa parecer parte natural da grade, não um <input> de formulário
+   solto em cima da tabela: SEM borda grossa, SEM outline padrão do browser,
+   SEM mudar o padding/altura da célula (antes o padding trocava pra 2px 4px
+   ao entrar em edição, o que "pulava" o layout — removido). O contorno vira
+   uma sombra sutil por DENTRO da célula (inset), então nunca vaza pra célula
+   vizinha nem depende de border-radius brigando com as bordas da tabela. */
+td.ie-cell{cursor:pointer;position:relative;transition:background .15s ease}
+td.ie-cell:hover{background:var(--surface2)!important}
+td.ie-cell.ie-editing{background:var(--surface)!important;box-shadow:inset 0 0 0 1px var(--navy-dim),inset 0 1px 4px rgba(0,0,0,.06);border-radius:var(--r-sm)}
+td.ie-cell .ie-input{width:100%;height:100%;box-sizing:border-box;border:none;background:transparent;color:var(--text);font-size:12px;font-family:inherit;padding:0;margin:0;outline:none;display:block}
+/* Select — mesmo chevron discreto já usado em .mf select no resto do sistema,
+   em vez do dropdown padrão do browser (setinha quadrada, borda pesada). */
+td.ie-cell .ie-select{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 16 16' fill='none' stroke='%238B949E' stroke-width='2'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 0 center;padding-right:16px}
+/* Data — o seletor do calendário é controlado pelo SO/browser (não dá pra
+   trocar por um datepicker próprio sem reescrever o campo do zero); o ícone
+   nativo pelo menos fica discreto em repouso e realça no hover/foco. */
+td.ie-cell input[type="date"].ie-input::-webkit-calendar-picker-indicator{opacity:.4;cursor:pointer;transition:opacity .15s}
+td.ie-cell input[type="date"].ie-input:hover::-webkit-calendar-picker-indicator,
+td.ie-cell input[type="date"].ie-input:focus::-webkit-calendar-picker-indicator{opacity:.9}
+td.ie-cell.ie-saving{opacity:.5;pointer-events:none}
+/* Confirmação sutil de salvamento — pisca um verde bem discreto antes do
+   refresh (ver _ieCommit em inline-edit.js), some sozinha quando a linha é
+   redesenhada com o valor novo. */
+td.ie-cell.ie-success{background:var(--green-dim)!important;box-shadow:inset 0 0 0 1px rgba(31,138,76,.4)}
+td.ie-cell.ie-error{box-shadow:inset 0 0 0 1px var(--red),inset 0 1px 4px rgba(214,67,60,.08)}
+/* Realce leve na linha inteira enquanto uma célula dela está em edição —
+   ajuda a "achar" a linha sem competir visualmente com a célula ativa. */
+tr.ie-row-active td{background:var(--surface2)}
+tr.ie-row-active td.ie-editing{background:var(--surface)!important}
 .ie-empty{color:var(--muted)}
 /* Grid */
 .gestor-grid-wrap{overflow-x:auto;overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch;scrollbar-width:auto;scrollbar-color:var(--muted) var(--surface2)}
