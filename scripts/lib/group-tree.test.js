@@ -1,7 +1,7 @@
 // node --test scripts/lib/group-tree.test.js
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtGroupClass, _gtCountBadgeHTML } = require('./group-tree.js');
+const { _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtGroupClass, _gtCountBadgeHTML, _gtGroupLabelHTML } = require('./group-tree.js');
 
 // Data-base fixa (não usar "hoje" de verdade — o teste tem que dar o mesmo
 // resultado em qualquer dia em que rodar).
@@ -158,4 +158,20 @@ test('_gtGroupClass: nível além do teto visual (3+) trava em gb-lvl-2', () => 
 test('_gtCountBadgeHTML: número sozinho ou com rótulo', () => {
  assert.equal(_gtCountBadgeHTML(5), '<span class="gb-count-badge">5</span>');
  assert.equal(_gtCountBadgeHTML(5, 'entregas'), '<span class="gb-count-badge">5 entregas</span>');
+});
+
+// ── _gtGroupLabelHTML — rótulo do grupo vira pill quando o campo tem cor
+// conhecida naquele módulo, texto puro quando não tem. ──
+test('_gtGroupLabelHTML: sem classe de cor, continua <strong> como antes', () => {
+ assert.equal(_gtGroupLabelHTML('Frete Terceirizado', null), '<strong>Frete Terceirizado</strong>');
+ assert.equal(_gtGroupLabelHTML('Frete Terceirizado', undefined), '<strong>Frete Terceirizado</strong>');
+});
+
+test('_gtGroupLabelHTML: com classe de cor, vira pill (.badge .bX)', () => {
+ assert.equal(_gtGroupLabelHTML('Frete Terceirizado', 'bg'), '<span class="badge bg gb-group-badge">Frete Terceirizado</span>');
+});
+
+test('_gtGroupLabelHTML: valor vazio/nulo cai no travessão, igual ao resto do sistema', () => {
+ assert.equal(_gtGroupLabelHTML('', null), '<strong>—</strong>');
+ assert.equal(_gtGroupLabelHTML(null, 'bm'), '<span class="badge bm gb-group-badge">—</span>');
 });

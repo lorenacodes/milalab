@@ -60,6 +60,15 @@ var BADGE_ETAPA_ENTREGA_BUCKET_CLS = {
  aguardando: 'by', producao: 'bb', transporte: 'bp', entregue: 'bg', atrasado: 'br'
 };
 
+// Status de Tarefa (Gestor de Tarefas) — mesma cor conceitual já usada em
+// dashboard.js (_SEL_TASK_STATUS_COR, cor "crua" pro <select> do drawer de
+// tarefa), aqui na forma de classe .bX pro Pill Badge (usado no cabeçalho de
+// grupo quando a tabela é agrupada por Status).
+var BADGE_STATUS_TAREFA = {
+ 'Backlog':'bm', 'A fazer':'bn', 'Em progresso':'by',
+ 'Aguardando feedback':'bp', 'Feito':'bg', 'Obsoleto':'br'
+};
+
 // Fallback cinza neutro (.bm) pra valor não mapeado — usado tanto pelos
 // campos que devem ser SEMPRE cinza (Canal de Vendas, Cidade, Estado, Produto)
 // quanto como defensivo pros campos com cor própria.

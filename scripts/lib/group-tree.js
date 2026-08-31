@@ -104,7 +104,22 @@ function _gtCountBadgeHTML(count, label) {
  return '<span class="gb-count-badge">' + count + (label ? ' ' + label : '') + '</span>';
 }
 
+// Rótulo do cabeçalho de grupo — vira pill colorida (mesmo componente
+// .badge/.bX de badge-colors.js) quando o campo agrupado já tem uma cor
+// conhecida naquele módulo (ex.: Etapa, Tipo, Transporte); sem cor
+// conhecida, continua o <strong> de texto puro de sempre. Cada módulo
+// decide POR SI SÓ se um campo tem cor (olhando node.field do nó sendo
+// desenhado) — esta função só sabe desenhar as duas variantes, nunca
+// decide sozinha se um campo "merece" cor. Sem escapar aqui: o texto do
+// grupo já vem de valores de sistema (etapa/tipo/transporte...), nunca de
+// entrada livre de usuário — mesma suposição que _gtCountBadgeHTML já fazia.
+function _gtGroupLabelHTML(value, cls) {
+ var label = value || '—';
+ if (!cls) return '<strong>' + label + '</strong>';
+ return '<span class="badge ' + cls + ' gb-group-badge">' + label + '</span>';
+}
+
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _gtCapitalize, _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtGroupClass, _gtCountBadgeHTML };
+ module.exports = { _gtCapitalize, _gtDateBucket, _gtBuildTree, _gtTreeCount, _gtGroupClass, _gtCountBadgeHTML, _gtGroupLabelHTML };
 }

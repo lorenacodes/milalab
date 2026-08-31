@@ -22,6 +22,9 @@
  --blue: #2E5FD9; --blue-dim: rgba(46,95,217,0.20);
  --purple: #8B6FE8; --purple-dim: rgba(139,111,232,0.20);
  --orange: #C2661C; --orange-dim: rgba(194,102,28,0.20); --sidebar-w: 224px;
+ /* Rosa — cor de badge nova (nenhuma das 7 existentes cobria "rosa"), pedida
+    especificamente pro Transporte "Mila" (ver .bk / badge-colors.js). */
+ --pink: #E0479E; --pink-dim: rgba(224,71,158,0.20);
  }
  body.light {
  /* Modo claro — mesmos tons de marca/status do tema escuro (MilaLab Design System);
@@ -40,6 +43,7 @@
  --red: #D6433C; --red-dim: #FCEAE8;
  --blue: #2E5FD9; --blue-dim: #E9EEFC;
  --purple: #8B6FE8; --purple-dim: rgba(139,111,232,.12);
+ --pink: #C22E85; --pink-dim: rgba(194,46,133,.12);
  }
  body.light tr:hover td{background:rgba(0,0,0,0.03)}
  *{box-sizing:border-box;margin:0;padding:0}
@@ -200,6 +204,7 @@ body.light .dash-panel{
  .bp{background:rgba(137,87,229,.12);color:var(--purple)}
  .bm{background:rgba(139,148,158,.12);color:var(--muted)}
  .bo{background:var(--orange-dim);color:var(--orange)}
+ .bk{background:var(--pink-dim);color:var(--pink)}
  /* KPI */
  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
  .kpi-card{background:var(--surface);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-lg);padding:16px 20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
@@ -868,7 +873,10 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
    no botão via .fb-pop/_tsSmartPosition. Antes reaproveitava .fb-pop na
    largura cheia (560px, pensada pro Filtro com condição/operador/valor) —
    .gb-pop estreita isso pro Agrupar, que só precisa de campo + ordem. */
-.fb-pop.gb-pop{width:236px;padding:10px}
+/* Largura subiu de 236px pra 300px — 236 deixava o <select> de campo com
+   pouco mais de 70px de sobra depois do rótulo/ordenação/remover, cortando
+   nomes de campo comuns ("Faturamento" virava "Fatu", achado real). */
+.fb-pop.gb-pop{width:300px;padding:10px}
 .gb-hd{margin-bottom:8px}
 .gb-row{margin-bottom:6px;gap:6px}
 .gb-row .fb-lead-wrap{width:58px}
@@ -953,7 +961,10 @@ body.light .gestor-group-hd{background:var(--surface2);border-bottom-color:rgba(
    já existente em cada um) — só a CLASSE muda por módulo, reaproveitando a
    mesma cascata CSS em todos (Obras/Instalações/Entregas/Empresas/
    Contatos/Gestor de Tarefas). */
-.gestor-group-hd.gb-lvl-0 td{border-left-width:4px}
+/* Mais respiro vertical só no nível 0 — é o que precisa parecer "separador
+   de seção" (pedido explícito); níveis 1/2 continuam compactos, são
+   subdivisões dentro da seção, não outra seção. */
+.gestor-group-hd.gb-lvl-0 td{border-left-width:4px;padding-top:10px;padding-bottom:10px}
 .gestor-group-hd.gb-lvl-0 strong{font-size:11.5px;font-weight:700}
 .gestor-group-hd.gb-lvl-1{background:var(--surface)}
 .gestor-group-hd.gb-lvl-1 td{border-left-width:3px;border-left-color:var(--muted)}

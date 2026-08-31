@@ -151,6 +151,21 @@ var _entEtapaBucket = {
 function _entBucketFor(etapa) { return _entEtapaBucket[etapa] || 'aguardando'; }
 var _entBucketCor   = { aguardando:'#B8790A', producao:'#2E5FD9', transporte:'#8b5cf6', entregue:'#1F8A4C', atrasado:'#D6433C' };
 var _entBucketLabel = { aguardando:'Aguardando produção', producao:'Em produção', transporte:'Em transporte', entregue:'Entregue' };
+
+// Cor do Transporte — pedido explícito (pill obrigatória, referência visual
+// Airtable): Mila (frota própria, "Mila - 01", "Mila - 05", "Mila - definir
+// caminhão"...) sempre a MESMA cor, mesmo com o número/observação variando —
+// por isso é uma regra sobre o PREFIXO do texto, não um mapa fechado de
+// valores exatos como os outros badges do sistema (Frete Terceirizado e
+// Retirada, esses sim, valores fixos).
+function _entTransporteBadgeCls(v) {
+ if (!v) return 'bm';
+ var s = String(v).trim().toLowerCase();
+ if (s.indexOf('mila') === 0) return 'bk';               // rosa
+ if (s === 'frete terceirizado') return 'bg';              // verde
+ if (s === 'retirada') return 'bb';                        // azul
+ return 'bm';                                              // cinza — qualquer outro valor
+}
 // "Atrasado" — mesmo esquema do Gestor de Tarefas (_gIsLate): calculado, não
 // é um valor de `etapa`. Vencida = data_faturamento no passado + ainda não
 // entregue. Sobrepõe a cor do status (ponto vermelho), sem esconder o rótulo.
@@ -503,11 +518,15 @@ function _entRenderGroupNode(node, path, rowsArr) {
   var isCollapsed = !!_entGroupCollapsed[nodePath];
   var total = _gtTreeCount(child);
   var indent = 12 + path.length * 20; // indentação por nível — antes fixa em 12px, ilegível com 2+ níveis
+  // Transporte tem cor própria (item obrigatório do pedido) — o cabeçalho
+  // de grupo usa a MESMA regra de cor (_entTransporteBadgeCls) que a
+  // coluna Transporte da tabela, pra não haver duas fontes de verdade.
+  var _entGrupoCls = node.field === 'transporte' ? _entTransporteBadgeCls(k) : null;
   rowsArr.push(
    '<tr class="' + _gtGroupClass(path.length) + '" onclick="_entToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
    + '<td colspan="10" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
-   + '<strong>' + k + '</strong>'
+   + _gtGroupLabelHTML(k, _entGrupoCls)
    + _gtCountBadgeHTML(total, 'entrega' + (total !== 1 ? 's' : ''))
    + '</td></tr>'
   );
@@ -595,7 +614,7 @@ function _entCardHTML(e) {
   + (obraNome ? '<div style="font-size:11px;color:var(--muted);margin-top:3px">' + obraNome + '</div>' : '')
   + '<div class="oc-tags">'
   + (e.etapa ? '<span class="badge ' + etapaCls + '" style="font-size:10px">' + e.etapa + '</span>' : '')
-  + (e.transporte ? '<span class="badge bg" style="font-size:10px">' + e.transporte + '</span>' : '')
+  + (e.transporte ? '<span class="badge ' + _entTransporteBadgeCls(e.transporte) + '" style="font-size:10px">' + e.transporte + '</span>' : '')
   + '</div>'
   + (dt ? '<div class="oc-date">Faturamento ' + dt + '</div>' : '')
   + '</div>';
@@ -1624,7 +1643,7 @@ function _entRowHTML(e) {
   + '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + (obraNome ? (empNome ? empNome + ' — ' : '') + obraNome : 'Obra não vinculada') + '</div></td>'
   + '<td style="font-size:12px;color:var(--muted)">' + (cidadeUf || '—') + '</td>'
   + '<td><span class="ent-date' + (atrasado ? ' overdue' : '') + '">' + (e.data_faturamento ? new Date(e.data_faturamento+'T00:00:00').toLocaleDateString('pt-BR') : '—') + '</span></td>'
-  + '<td style="font-size:12px;color:var(--muted)">' + (e.transporte || '—') + '</td>'
+  + '<td>' + (e.transporte ? '<span class="badge ' + _entTransporteBadgeCls(e.transporte) + '">' + e.transporte + '</span>' : '<span style="font-size:12px;color:var(--muted)">—</span>') + '</td>'
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.quantidade != null ? Number(e.quantidade).toLocaleString('pt-BR') : '—') + '</td>'
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.peso_kg != null ? Number(e.peso_kg).toLocaleString('pt-BR') : '—') + '</td>'
   + '<td style="text-align:right;font-size:12px;color:var(--muted)">' + (e.maior_peca_mm != null ? Number(e.maior_peca_mm).toLocaleString('pt-BR') : '—') + '</td>'

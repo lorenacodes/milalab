@@ -1411,9 +1411,12 @@ function _projRenderGroupNode(node, path, tbody, forceHidden) {
   hd.style.position = 'static';
   hd.onclick = function(){ _projToggleGroup(pathKey); };
   hd.style.display = (forceHidden || !visCount) ? 'none' : '';
+  // Etapa já tem cor em badge-colors.js (mesma da tabela/Kanban) — o
+  // cabeçalho de grupo usa a mesma cor em vez de texto puro.
+  var _projGrupoCls = node.field === 'etapa' ? _badgeCls(BADGE_ETAPA_PROJETO, k) : null;
   hd.innerHTML = '<td colspan="10" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
-   + '<strong>' + (k || '—') + '</strong>'
+   + _gtGroupLabelHTML(k, _projGrupoCls)
    + _gtCountBadgeHTML(visCount)
    + '</td>';
   tbody.appendChild(hd);
