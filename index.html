@@ -3351,87 +3351,79 @@
 <!-- SISTEMA DE AUTENTICAÇÃO MILATEC v3.04 — Identidade Visual Grupo Mila      -->
 <!-- ═══════════════════════════════════════════════════════════════════════════ -->
 
-<link rel="stylesheet" href="styles/auth.css?v=mldsv347">
+<link rel="stylesheet" href="styles/auth.css?v=mldsv358">
 
 <!-- ═══════════════════════════════════════════════════════════════
      TELA 1 — LOGIN
      Fluxo limpo: só login. Outros fluxos via links secundários.
 ═══════════════════════════════════════════════════════════════════ -->
-<div id="login-screen" class="auth-screen">
-  <!-- Painel esquerdo: branding -->
-  <div class="auth-left"><div class="auth-silver-hairline"></div>
-    <div class="auth-brand-logo">
-      <svg width="32" height="32" viewBox="0 0 100 100" style="flex-shrink:0"><rect x="4" y="4" width="92" height="92" rx="22" fill="#050866"/><defs><linearGradient id="mlSilverStrokeAuth" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9DA3B0"/><stop offset="45%" stop-color="#F5F6F8"/><stop offset="100%" stop-color="#8E94A3"/></linearGradient></defs><path d="M50 20 L78 35 V65 L50 80 L22 65 V35 Z" fill="none" stroke="url(#mlSilverStrokeAuth)" stroke-width="4" stroke-linejoin="round"/><circle cx="50" cy="50" r="9" fill="url(#mlSilverStrokeAuth)"/></svg><span style="font-family:'Inter',sans-serif;font-weight:800;font-size:20px;letter-spacing:-.3px;color:#F6F7F8">MilaLab</span>
-    </div>
-    <div class="auth-brand-content">
-      <div class="auth-brand-title">
-        Gestão inteligente de<br><span>obras e projetos</span><br>estruturais
-      </div>
-      <p class="auth-brand-desc">
-        Plataforma integrada para controle de clientes, obras, projetos, entregas e instalações da MilaLab.
-      </p>
-      <div class="auth-modules">
-        <span class="auth-module-pill" style="border-color:rgba(234,179,8,.4);color:rgba(234,179,8,.8)">Solar</span>
-        <span class="auth-module-pill" style="border-color:rgba(6,182,212,.4);color:rgba(6,182,212,.8)">Modular</span>
-        <span class="auth-module-pill" style="border-color:rgba(0,163,74,.4);color:rgba(0,163,74,.8)">Telhados</span>
-        <span class="auth-module-pill" style="border-color:rgba(168,85,247,.4);color:rgba(168,85,247,.8)">Steel Frame</span>
-        <span class="auth-module-pill" style="border-color:rgba(251,146,60,.4);color:rgba(251,146,60,.8)">LSF + A36</span>
-      </div>
-    </div>
-    <div class="auth-brand-footer">MilaLab &copy; 2026 &mdash; Acesso restrito</div>
+<div id="login-screen" class="authv2-screen">
+  <div class="authv2-overlay"></div>
+
+  <!-- Marca no canto superior esquerdo, direto sobre a foto da fábrica -->
+  <div class="authv2-topbrand">
+    <svg width="28" height="28" viewBox="0 0 100 100" style="flex-shrink:0"><rect x="4" y="4" width="92" height="92" rx="22" fill="#050866"/><defs><linearGradient id="mlSilverStrokeAuthTop" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#9DA3B0"/><stop offset="45%" stop-color="#F5F6F8"/><stop offset="100%" stop-color="#8E94A3"/></linearGradient></defs><path d="M50 20 L78 35 V65 L50 80 L22 65 V35 Z" fill="none" stroke="url(#mlSilverStrokeAuthTop)" stroke-width="4" stroke-linejoin="round"/><circle cx="50" cy="50" r="9" fill="url(#mlSilverStrokeAuthTop)"/></svg>
+    <span>MilaLab</span>
   </div>
 
-  <!-- Painel direito: formulário -->
-  <div class="auth-right">
-    <div class="auth-form-wrap">
-      <div class="auth-form-header">
-        <div class="auth-form-eyebrow">Sistema Interno</div>
-        <h1 class="auth-form-title">Entrar na sua conta</h1>
-        <p class="auth-form-subtitle">Use seu e-mail corporativo (@milatec.ind.br ou @mila.ind.br)</p>
-      </div>
+  <!-- Texto de marca + pills de módulo, canto inferior esquerdo -->
+  <div class="authv2-bottombrand">
+    <h2>Gestão inteligente de <span>obras e projetos</span> estruturais</h2>
+    <p>Plataforma integrada para controle de clientes, obras, projetos, entregas e instalações da MilaLab.</p>
+    <div class="authv2-pills">
+      <span class="auth-module-pill" style="border-color:rgba(234,179,8,.4);color:rgba(234,179,8,.85)">Solar</span>
+      <span class="auth-module-pill" style="border-color:rgba(6,182,212,.4);color:rgba(6,182,212,.85)">Modular</span>
+      <span class="auth-module-pill" style="border-color:rgba(0,163,74,.4);color:rgba(0,163,74,.85)">Telhados</span>
+      <span class="auth-module-pill" style="border-color:rgba(168,85,247,.4);color:rgba(168,85,247,.85)">Steel Frame</span>
+      <span class="auth-module-pill" style="border-color:rgba(251,146,60,.4);color:rgba(251,146,60,.85)">LSF + A36</span>
+    </div>
+  </div>
 
-      <div id="login-err" class="auth-alert err"></div>
+  <!-- Cartão de vidro fosco (glassmorphism) -->
+  <div class="authv2-card">
+    <div class="authv2-eyebrow">Sistema Interno</div>
+    <h1 class="authv2-title">Acesse o sistema</h1>
+    <p class="authv2-subtitle">Use seu e-mail corporativo (@milatec.ind.br ou @mila.ind.br)</p>
 
-      <div class="auth-field">
-        <div class="auth-field-label"><span>E-mail</span></div>
-        <div class="auth-input-wrap">
-          <input id="login-email" class="auth-inp" type="email" placeholder="seu@milatec.ind.br"
-            autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
-        </div>
-      </div>
+    <div id="login-err" class="auth-alert err"></div>
 
-      <div class="auth-field">
-        <div class="auth-field-label">
-          <span>Senha</span>
-          <button class="auth-field-link" type="button" onclick="_loginShowForgot()">Esqueci minha senha</button>
-        </div>
-        <div class="auth-input-wrap">
-          <input id="login-pass" class="auth-inp auth-inp-pwd" type="password" placeholder="••••••••"
-            autocomplete="current-password" onkeydown="if(event.key==='Enter')_loginSubmit()">
-          <button class="auth-pwd-toggle" type="button" onclick="_togglePwd('login-pass',this)" tabindex="-1">
-            <svg id="eye-login" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <button id="login-btn" class="auth-btn" onclick="_loginSubmit()">
-        <span id="login-btn-txt">Entrar</span>
-        <div class="spinner" id="login-spinner"></div>
-      </button>
-
-      <div class="auth-sep"><span>ou</span></div>
-
-      <button id="login-google-btn" class="auth-btn-google" type="button" onclick="_loginWithGoogle()">
-        <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.87-3.04.87-2.34 0-4.32-1.58-5.03-3.71H.94v2.33A9 9 0 009 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 013.68 9c0-.6.1-1.18.29-1.72V4.95H.94A9 9 0 000 9c0 1.45.35 2.83.94 4.05l3.03-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.59-2.59C13.46.89 11.43 0 9 0A9 9 0 00.94 4.95l3.03 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
-        <span id="login-google-btn-txt">Entrar com Google</span>
-      </button>
-
-      <div class="auth-links" style="margin-top:12px">
-        <span style="font-size:11px;color:var(--auth-muted)">Problemas de acesso? Fale com a equipe de TI.</span>
+    <div class="authv2-field">
+      <div class="authv2-field-label"><span>E-mail</span></div>
+      <div class="authv2-input-wrap">
+        <input id="login-email" class="authv2-inp" type="email" placeholder="seu@milatec.ind.br"
+          autocomplete="email" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
       </div>
     </div>
+
+    <div class="authv2-field">
+      <div class="authv2-field-label">
+        <span>Senha</span>
+        <button class="authv2-field-link" type="button" onclick="_loginShowForgot()">Esqueci minha senha</button>
+      </div>
+      <div class="authv2-input-wrap">
+        <input id="login-pass" class="authv2-inp authv2-inp-pwd" type="password" placeholder="••••••••"
+          autocomplete="current-password" onkeydown="if(event.key==='Enter')_loginSubmit()">
+        <button class="authv2-pwd-toggle" type="button" onclick="_togglePwd('login-pass',this)" tabindex="-1">
+          <svg id="eye-login" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <button id="login-btn" class="authv2-btn" onclick="_loginSubmit()">
+      <span id="login-btn-txt">Entrar</span>
+      <div class="spinner" id="login-spinner"></div>
+    </button>
+
+    <div class="authv2-sep"><span>ou</span></div>
+
+    <button id="login-google-btn" class="authv2-btn-google" type="button" onclick="_loginWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 01-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.87-3.04.87-2.34 0-4.32-1.58-5.03-3.71H.94v2.33A9 9 0 009 18z"/><path fill="#FBBC05" d="M3.97 10.72A5.4 5.4 0 013.68 9c0-.6.1-1.18.29-1.72V4.95H.94A9 9 0 000 9c0 1.45.35 2.83.94 4.05l3.03-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.59-2.59C13.46.89 11.43 0 9 0A9 9 0 00.94 4.95l3.03 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+      <span id="login-google-btn-txt">Entrar com Google</span>
+    </button>
+
+    <div class="authv2-links">Problemas de acesso? Fale com a equipe de TI.</div>
   </div>
 </div>
 
