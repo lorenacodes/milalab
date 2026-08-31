@@ -34,6 +34,10 @@ var _currentRoute = 'dashboard';
 function go(id) {
  // Salva rota anterior ANTES de atualizar — necessário para checar se voltamos ao dashboard
  var _prevRoute = _currentRoute;
+ // Ctrl+Z (scripts/lib/undo-manager.js): troca de aba descarta o histórico
+ // de "desfazer" da aba anterior — genérico aqui no router central pra
+ // valer em qualquer módulo que passar a usar _umPush, não só Entregas.
+ if (typeof _umSetActiveScope === 'function') _umSetActiveScope(id);
  document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.display='none'; });
  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
  const el = document.getElementById('page-' + id);

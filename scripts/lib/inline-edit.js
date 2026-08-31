@@ -50,6 +50,11 @@ function _ieActivate(td) {
  var id = td.dataset.ieId;
  var row = found.fcfg.getRow ? found.fcfg.getRow(id) : null;
  var current = row ? row[td.dataset.ieField] : null;
+ // Guardado no próprio nó (não num Map/estado à parte) — o <td> é descartado
+ // no próximo refresh de qualquer jeito, então não sobrevive além do tempo
+ // que precisa. Usado em _ieCommit pra montar a entrada de undo (Ctrl+Z,
+ // ver scripts/lib/undo-manager.js) com o valor de ANTES da edição.
+ td._ieBefore = current;
  td.classList.add('ie-editing');
  td.innerHTML = _ieEditorHTML(found.fcfg, current);
  _ieActiveTd = td;
@@ -118,11 +123,29 @@ async function _ieCommit(td, skipRefresh, dir) {
  var input = td.querySelector('.ie-input');
  var raw = input ? input.value : '';
  var val = found.fcfg.parse ? found.fcfg.parse(raw) : (raw === '' ? null : raw);
+ var before = td._ieBefore;
+ var id = td.dataset.ieId;
  td.classList.remove('ie-editing');
  td.classList.add('ie-saving');
  try {
-  await found.fcfg.onSave(td.dataset.ieId, val);
+  await found.fcfg.onSave(id, val);
   td.classList.remove('ie-saving');
+  // Undo (Ctrl+Z) — só entra na pilha se o valor realmente mudou (edição
+  // "sem efeito" não deveria consumir uma posição do histórico curto).
+  // apply() é a MESMA função de salvar de sempre (found.fcfg.onSave) — o
+  // undo-manager não duplica lógica de persistência, só chama de novo com
+  // o valor de antes/depois. Ver scripts/lib/undo-manager.js.
+  if (typeof _umPush === 'function' && String(val) !== String(before)) {
+   _umPush(found.scope, {
+    label: found.fcfg.label || null,
+    before: before, after: val,
+    apply: function(v) {
+     return Promise.resolve(found.fcfg.onSave(id, v)).then(function() {
+      if (found.st.refresh) found.st.refresh();
+     });
+    },
+   });
+  }
   if (!skipRefresh && found.st.refresh) {
    found.st.refresh();
    _ieFlashSuccess(table, rowIndex, cellIndex);

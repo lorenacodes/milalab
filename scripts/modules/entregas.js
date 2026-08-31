@@ -372,34 +372,34 @@ _gbInit('entregas', [
 function _entFindById(id) { return (_entregasArr || []).find(function(x){ return String(x.id) === String(id); }); }
 _ieRegister('entregas', {
  etapa: {
-  type: 'select', options: function(){ return Object.keys(_entEtapaBucket); }, getRow: _entFindById,
+  type: 'select', label: 'Etapa', options: function(){ return Object.keys(_entEtapaBucket); }, getRow: _entFindById,
   onSave: function(id, val) { return _spEntDetSalvarCampo(id, { etapa: val || null }); },
  },
  transporte: {
-  type: 'select', options: function(){ return _obraTransporteCache || []; }, getRow: _entFindById,
+  type: 'select', label: 'Transporte', options: function(){ return _obraTransporteCache || []; }, getRow: _entFindById,
   onSave: function(id, val) {
    if (val && (_obraTransporteCache||[]).indexOf(val) === -1) _obraTransporteCache.push(val);
    return _spEntDetSalvarCampo(id, { transporte: val || null });
   },
  },
  data_faturamento: {
-  type: 'date', getRow: _entFindById,
+  type: 'date', label: 'Faturamento', getRow: _entFindById,
   onSave: function(id, val) { return _spEntDetSalvarCampo(id, { data_faturamento: val || null }); },
  },
  quantidade: {
-  type: 'number', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
+  type: 'number', label: 'Quantidade', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
   onSave: function(id, val) { return _spEntDetSalvarCampo(id, { quantidade: val }); },
  },
  peso_kg: {
-  type: 'number', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
+  type: 'number', label: 'Peso', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
   onSave: function(id, val) { return _spEntDetSalvarCampo(id, { peso_kg: val }); },
  },
  maior_peca_mm: {
-  type: 'number', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
+  type: 'number', label: 'Maior peça', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
   onSave: function(id, val) { return _spEntDetSalvarCampo(id, { maior_peca_mm: val }); },
  },
  valor: {
-  type: 'number', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
+  type: 'number', label: 'Valor', getRow: _entFindById, parse: function(raw){ return raw === '' ? null : Number(raw); },
   onSave: function(id, val) { return _spEntDetSalvarCampo(id, { valor: val }); },
  },
 }, _entRefreshAfterInlineEdit);
