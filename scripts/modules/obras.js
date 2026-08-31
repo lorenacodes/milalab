@@ -3594,9 +3594,15 @@ function _obrasRenderGroupNode(node, path, tbody, forceHidden) {
   hd.style.position = 'static'; // sticky faria sentido só dentro de um scroll interno (não é o caso de Obras)
   hd.onclick = function(){ _obrasToggleGroup(pathKey); };
   hd.style.display = (forceHidden || !visCount) ? 'none' : '';
+  // Etapa/Tipo já têm cor definida em badge-colors.js (usada na tabela/
+  // Kanban) — o cabeçalho de grupo agora usa a MESMA cor em vez de texto
+  // puro. Campos sem mapa de cor (Empresa/Estado/Cidade/Nome...) continuam
+  // como <strong>, _gtGroupLabelHTML decide isso pela ausência de classe.
+  var _obrasGrupoCls = node.field === 'etapa' ? _badgeCls(BADGE_ETAPA_NEGOCIO, k)
+   : node.field === 'tipo' ? _badgeCls(BADGE_TIPO_OBRA, k) : null;
   hd.innerHTML = '<td colspan="11" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
-   + '<strong>' + (k || '—') + '</strong>'
+   + _gtGroupLabelHTML(k, _obrasGrupoCls)
    + _gtCountBadgeHTML(visCount)
    + '</td>';
   tbody.appendChild(hd);

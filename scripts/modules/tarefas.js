@@ -1026,11 +1026,15 @@ function _gestorRenderGroupNode(node, path, rowNumRef, hoje, rowsArr) {
    ? '<span style="background:rgba(207,34,46,.12);color:#D6433C;border-radius:4px;padding:1px 6px;font-size:9px;font-weight:700;margin-left:6px">' + nLate + ' atrasadas</span>'
    : '';
   var doneBadge = _gtCountBadgeHTML(nDone + '/' + total, 'concluídas');
+  // Status já tem cor definida (BADGE_STATUS_TAREFA, badge-colors.js — mesma
+  // usada pra colorir o <select> de status no drawer de tarefa) — o
+  // cabeçalho de grupo usa a mesma cor em vez de texto puro.
+  var _gestorGrupoCls = node.field === 'status' ? _badgeCls(BADGE_STATUS_TAREFA, k) : null;
   rowsArr.push(
    '<tr class="' + _gtGroupClass(path.length) + '" onclick="_gestorToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
    + '<td colspan="8" style="padding-left:' + (12 + indent) + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
-   + '<strong>' + k + '</strong>' + doneBadge + badge
+   + _gtGroupLabelHTML(k, _gestorGrupoCls) + doneBadge + badge
    + '</td></tr>'
   );
   if (!isCollapsed) _gestorRenderGroupNode(child, path.concat(k), rowNumRef, hoje, rowsArr);

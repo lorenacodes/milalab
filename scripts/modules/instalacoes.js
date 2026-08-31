@@ -20,6 +20,12 @@ var _instFbFields = [
 ];
 _fbInit('instalacoes', _instFbFields, _instApplyFilters);
 
+// Cor do Status (Funil) — hoisted pra fora de _instRowHTML (antes recriado a
+// cada linha) pra também ser reaproveitado pelo cabeçalho de grupo quando a
+// tabela é agrupada por Status (_instRenderGroupNode). Mesmos valores/cores
+// de sempre, só um lugar só agora.
+var _INST_FUNIL_CLS = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
+
 var _instSbFields = [
  { key: 'obra',      label: 'Obra',    type: 'text' },
  { key: 'cliente',   label: 'Cliente', type: 'text' },
@@ -71,7 +77,7 @@ function _instRenderGroupNode(node, path, tbody, forceHidden) {
   hd.style.display = (forceHidden || !visCount) ? 'none' : '';
   hd.innerHTML = '<td colspan="9" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
-   + '<strong>' + (k || '—') + '</strong>'
+   + _gtGroupLabelHTML(k, node.field === 'funil' ? (_INST_FUNIL_CLS[k] || 'bm') : null)
    + _gtCountBadgeHTML(visCount)
    + '</td>';
   tbody.appendChild(hd);
@@ -446,7 +452,6 @@ async function _dbLoadInstalacoes() {
 // _obraRowHTML/_entRowHTML), em vez de recarregar a lista inteira e derrubar o
 // filtro/agrupamento/scroll de quem está olhando.
 function _instRowHTML(inst) {
- var funilCls = { 'Finalizado':'bg', 'Em execução':'bm', 'Emitir boleto de medição':'by', 'Programado':'by', 'A programar':'bp' };
  var obrasLigadas = (inst.obras_instalacoes || []).map(function(x){ return x.obra; }).filter(Boolean);
  var obraNome = obrasLigadas.length ? obrasLigadas.map(function(o){ return o.nome; }).join(', ') : '—';
  var clienteNome = '—';
@@ -454,7 +459,7 @@ function _instRowHTML(inst) {
  var tipo = inst.tipo_servico || '—';
  var equipeNomes = (inst.instalacoes_equipe || []).map(function(x){ return x.equipe && x.equipe.nome; }).filter(Boolean).join(', ') || '—';
  var funil = inst.funil || '—';
- var cls = funilCls[funil] || 'bm';
+ var cls = _INST_FUNIL_CLS[funil] || 'bm';
  var fmtDate = function(d) {
   if (!d) return '<span style="color:var(--border)">—</span>';
   var p = d.split('-'); return p[2]+'/'+p[1]+'/'+p[0].slice(2);
