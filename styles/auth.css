@@ -163,6 +163,19 @@
 .auth-btn:active { transform:translateY(0); }
 .auth-btn:disabled { opacity:.6;cursor:not-allowed;transform:none; }
 
+/* Botão Google (login com conta corporativa via OAuth) */
+.auth-btn-google {
+  width:100%;padding:12px 20px;
+  background:#fff;color:#3c4043;
+  border:1px solid #dadce0;border-radius:var(--r-lg);
+  font-size:14px;font-weight:600;font-family:inherit;
+  cursor:pointer;transition:all .18s;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+}
+.auth-btn-google:hover { background:#f8f9fa;box-shadow:0 2px 6px rgba(60,64,67,.15); }
+.auth-btn-google:active { background:#f1f3f4; }
+.auth-btn-google:disabled { opacity:.6;cursor:not-allowed; }
+
 /* Alert */
 .auth-alert {
   display:none;padding:11px 14px;border-radius:var(--r-md);

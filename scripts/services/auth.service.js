@@ -77,9 +77,27 @@ async function _checkSession() {
             || urlParams.get('type') === 'recovery'
             || hashParams.get('type') === 'recovery';
  var isInvite = urlParams.get('type') === 'invite' || hashParams.get('type') === 'invite';
+ // Volta do redirect do Google quando o hook do servidor
+ // (hook_restrict_signup_by_email_domain, ver migração no Supabase) rejeita o
+ // domínio — o Supabase manda de volta com #error=...&error_description=...
+ // em vez de criar sessão nenhuma.
+ var oauthErrorDesc = hashParams.get('error_description');
+ if (oauthErrorDesc) history.replaceState({}, '', window.location.pathname);
 
  var sr = await _sb.auth.getSession();
  if (sr.data && sr.data.session && sr.data.session.user) {
+  var sessUser = sr.data.session.user;
+  // Defesa em profundidade: o bloqueio de verdade é o Auth Hook no servidor
+  // (hook_restrict_signup_by_email_domain), que impede a CRIAÇÃO da conta —
+  // esta checagem aqui só cobre uma sessão que já existia antes do hook ser
+  // ligado, ou o hook estar desabilitado/mal configurado no Dashboard.
+  // Nunca é a única barreira de segurança, só uma rede extra.
+  if (!_isAllowedEmailDomain(sessUser.email || '')) {
+   await _sb.auth.signOut();
+   var lsBlk = document.getElementById('login-screen'); if (lsBlk) lsBlk.style.display = 'flex';
+   _authAlert('login-err', 'Este email não tem permissão para acessar o sistema.');
+   return;
+  }
   if (isInvite) {
    // Convite por e-mail — usuário precisa definir senha
    _cpwdUser = sr.data.session.user;
@@ -100,9 +118,34 @@ async function _checkSession() {
   if (ls) ls.style.display = 'flex';
   var cs2 = document.getElementById('change-pwd-screen');
   if (cs2) cs2.style.display = 'none';
+  if (oauthErrorDesc) {
+   var lower = oauthErrorDesc.toLowerCase();
+   _authAlert('login-err', lower.indexOf('permiss') !== -1
+    ? 'Este email não tem permissão para acessar o sistema.'
+    : oauthErrorDesc);
+  }
  }
 }
 document.addEventListener('DOMContentLoaded', _checkSession);
+
+// ── Login com Google (Supabase Auth OAuth) ────────────────────────────────────
+// Restrição de domínio é feita no servidor (Auth Hook antes de criar a conta —
+// ver migração google_oauth_domain_restriction_and_auto_profile) + revalidada
+// em _checkSession acima quando a sessão volta. Aqui só dispara o redirect.
+async function _loginWithGoogle() {
+ _authAlert('login-err', '');
+ _authBtnLoad('login-google-btn', 'login-google-btn-txt', null, true, 'Redirecionando...');
+ var redirectUrl = window.location.origin + window.location.pathname;
+ var res = await _sb.auth.signInWithOAuth({
+  provider: 'google',
+  options: { redirectTo: redirectUrl }
+ });
+ if (res.error) {
+  _authBtnLoad('login-google-btn', 'login-google-btn-txt', null, false, 'Entrar com Google');
+  _authAlert('login-err', _supaErrPt(res.error.message));
+ }
+ // Sucesso: o navegador já está sendo redirecionado para o Google, nada mais a fazer aqui.
+}
 
 function _logout() {
  // Recarrega a página inteira após o signOut: a SPA mantém dezenas de caches
