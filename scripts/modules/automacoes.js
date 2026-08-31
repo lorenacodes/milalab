@@ -244,6 +244,33 @@ function _autAcaoFrase(a) {
  return t ? 'Criar tarefa "' + t + '"' : 'Criar tarefa (sem nome definido)';
 }
 
+// ── A frase da automação inteira, em português corrido ──────────────────────
+// "Quando um projeto entrar em Projeto Executivo · Produto: Peças Avulsas,
+//  criar a tarefa "Projeto executivo" na área Projetos para Igor com prazo de
+//  3 dias."
+//
+// É montada dos DADOS (condicoes/acao), reusando _autGatilhoFrase — nada de
+// frase fixa por automação: renomear uma etapa no cadastro muda a frase
+// sozinha. Serve o topo do painel de detalhe E o resumo final do rascunho,
+// então os dois nunca descrevem a mesma automação de jeitos diferentes.
+function _autFraseLegivel(a) {
+ var ac = _autPrimeiraAcao(a);
+ var titulo = String(ac.titulo || '').trim();
+ var partes = titulo ? 'criar a tarefa "' + titulo + '"' : 'criar uma tarefa (ainda sem nome)';
+ if (ac.area) partes += ' na área ' + ac.area;
+ var resp = _autValorArr(ac.responsaveis).map(function (e) {
+  return typeof _autWizNomeUsuario === 'function' ? _autWizNomeUsuario(e) : e;
+ });
+ if (resp.length) partes += ' para ' + resp.join(', ');
+ var df = ac.data_fim || {};
+ if (df.base && df.base !== 'nenhum') {
+  var d = Number(df.dias || 0);
+  partes += d > 0 ? ' com prazo de ' + d + (d === 1 ? ' dia' : ' dias')
+                  : ' com prazo para o mesmo dia';
+ }
+ return _autGatilhoFrase(a) + ', ' + partes + '.';
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CARGA DA PÁGINA
 // ═══════════════════════════════════════════════════════════════════════════
@@ -528,6 +555,7 @@ function _autAcaoHTML(ac) {
 }
 
 function _spAutomacaoRender(a) {
+ _autWiz = null;   // abrir uma automação existente descarta qualquer rascunho
  _autAtiva = JSON.parse(JSON.stringify(a));   // cópia editável em memória
  var ac = _autPrimeiraAcao(_autAtiva);
  var conds = _autAtiva.condicoes || [];
@@ -546,7 +574,16 @@ function _spAutomacaoRender(a) {
   + '</div>'
 
   + '<div class="spt-panel" id="spt-aut-config">'
-  + '<div class="aut-resumo">' + _autEsc(_autFrase(_autAtiva)) + '</div>'
+  // Topo do detalhe: nome + status + a frase gerada dos dados. Antes o painel
+  // abria direto na frase técnica, sem dizer se a automação estava valendo —
+  // o status só aparecia no interruptor mais abaixo.
+  + '<div class="aut-head">'
+  + '<div class="aut-head-top">'
+  + '<span class="aut-head-nome">' + _autEsc(a.nome || 'Sem nome') + '</span>'
+  + (a.ativo ? '<span class="aut-pill aut-pill-on">Ativa</span>' : '<span class="aut-pill aut-pill-off">Inativa</span>')
+  + '</div>'
+  + '<div class="aut-head-frase">' + _autEsc(_autFraseLegivel(_autAtiva)) + '</div>'
+  + '</div>'
   + '<label class="aut-toggle"><input type="checkbox" id="aut-ativo" ' + (a.ativo ? 'checked' : '') + ' onchange="_autSalvarAtivo()">'
   + '<span>Automação ativa</span></label>'
   + '<div class="aut-hint">Automação inativa não é executada nem processa eventos. Ao reativar, ela volta a valer só para as próximas mudanças — nada é processado retroativamente.</div>'
@@ -627,6 +664,11 @@ function _spAutomacaoRender(a) {
 // pior que nos outros módulos — uma automação meio editada (condição nova sem
 // valor ainda) já estaria valendo em produção pra todo mundo.
 function _autMarcarSujo() {
+ // Mesmo editor de campos servindo dois donos: no painel de uma automação que
+ // existe, editar acende a barra "alterações não salvas"; no rascunho da
+ // automação nova não há nada pra salvar ainda — o que a edição faz é
+ // atualizar o objeto em memória e a validação ao vivo.
+ if (_autWiz) { _autWizSync(); return; }
  var b = document.getElementById('aut-sujo-bar');
  if (b) b.style.display = 'flex';
 }
@@ -791,22 +833,407 @@ async function _autSalvarAtivo() {
  if (r.row) _autPatchNaLista(r.row);
 }
 
-async function _autNova() {
+// ═══════════════════════════════════════════════════════════════════════════
+// NOVA AUTOMAÇÃO — rascunho SÓ EM MEMÓRIA (nada no banco até confirmar)
+// ═══════════════════════════════════════════════════════════════════════════
+// Antes, "+ Nova automação" fazia um INSERT de verdade no primeiro clique: a
+// automação já nascia no banco, já aparecia na lista de todo mundo, já contava
+// no resumo e já gerava histórico — mesmo que o usuário só tivesse aberto o
+// formulário por curiosidade e fechado em seguida. Sobraram 3 linhas
+// "Nova automação" vazias em produção só por causa disso.
+//
+// A regra passa a ser a do dono, e ela é de ARQUITETURA, não de aparência:
+//
+//   abrir formulário  ≠ criar registro
+//   testar            ≠ executar
+//   salvar rascunho   ≠ criar automação ativa
+//   criar automação   = validação + teste aprovado + confirmação explícita
+//
+// Então o rascunho inteiro vive em _autWiz (um objeto JavaScript). O único
+// ponto deste fluxo que fala `insert` é _autWizCriar, no fim, atrás da
+// confirmação. Fechar o painel joga o objeto fora e o banco nunca soube que
+// ele existiu.
+//
+// O EDITOR de campos NÃO foi reescrito: os passos reaproveitam _autCondHTML,
+// _autAcaoHTML, _autLerCondicoes e _autLerAcao usando os MESMOS ids de
+// elemento do painel de edição (aut-tabela, aut-conds, aut-ac-*). A diferença
+// é só o destino do que foi lido — memória em vez de banco.
+var _autWiz = null;
+
+function _autWizDefault() {
+ return {
+  passo: 1,
+  nome: '',
+  descricao: '',
+  tabela_alvo: 'projetos',
+  condicoes: [{ campo: 'etapa_projeto', operador: 'igual', valor: [] }],
+  acao: [{ tipo: 'criar_tarefa', titulo: '', tipo_tarefa: 'Tarefa', area: 'Projetos',
+           responsaveis: [], prioridade: 'Média', status: 'A fazer', visibilidade: 'equipe',
+           data_inicio: { base: 'hoje', dias: 0 }, data_fim: { base: 'hoje', dias: 3 },
+           vincular_obra: true, vincular_projeto: true, vincular_melhoria: false }],
+  teste: null,        // resultado do último dry-run aprovado
+  assinatura: '',     // configuração exata que foi testada (ver _autWizAssinatura)
+  confirmando: false, // true = mostrando o resumo final antes de gravar
+ };
+}
+
+// Impressão digital da configuração. Se o usuário mexer em QUALQUER campo
+// depois de testar, a assinatura muda, o teste aprovado é descartado e o botão
+// "Criar automação" volta a ficar bloqueado — senão daria pra testar uma
+// configuração e gravar outra.
+function _autWizAssinatura(w) {
+ return JSON.stringify([w.nome, w.tabela_alvo, w.condicoes, w.acao]);
+}
+
+// ── Critérios de validação — UMA lista só ───────────────────────────────────
+// A mesma função alimenta o checklist ✓/⚠ ao vivo, o bloqueio de "Continuar"
+// entre os passos e a habilitação do botão final. Duas listas de regras
+// divergentes seriam exatamente o jeito de o formulário dizer "tudo certo" e o
+// botão continuar bloqueado sem explicação.
+function _autWizChecklist(w) {
+ var ac = (w.acao || [])[0] || {};
+ return [
+  { passo: 1, ok: !!String(w.nome || '').trim(),    texto: 'Nome da automação preenchido',
+    falta: 'Preencha o nome da automação para continuar.' },
+  { passo: 2, ok: !!w.tabela_alvo,                  texto: 'Registro observado escolhido',
+    falta: 'Escolha qual registro a automação deve observar.' },
+  { passo: 2, ok: _autWizCondsOk(w),                texto: 'Condições do gatilho completas',
+    falta: 'Complete a condição: escolha o campo, a condição e o valor.' },
+  { passo: 3, ok: !!String(ac.titulo || '').trim(), texto: 'Tarefa que será criada configurada',
+    falta: 'Informe o nome da tarefa que a automação deve criar.' },
+ ];
+}
+
+// Uma automação sem nenhuma condição é aceita pelo motor (roda em qualquer
+// alteração), mas não é o que alguém quer criar sem perceber — no fluxo novo
+// exigimos pelo menos uma condição completa.
+function _autWizCondsOk(w) {
+ var conds = w.condicoes || [];
+ if (!conds.length) return false;
+ return conds.every(function (c) {
+  if (!c || !c.campo || !c.operador) return false;
+  if (_AUT_OPS_SEM_VALOR[c.operador]) return true;
+  return _autValorArr(c.valor).some(function (v) { return String(v).trim() !== ''; });
+ });
+}
+function _autWizPendencia(w, ateOPasso) {
+ var f = _autWizChecklist(w).filter(function (i) { return !i.ok && i.passo <= ateOPasso; })[0];
+ return f ? f.falta : null;
+}
+function _autWizValido(w) { return _autWizChecklist(w).every(function (i) { return i.ok; }); }
+
+// ── Abertura: NENHUMA escrita no banco ──────────────────────────────────────
+function _autNova() {
+ _autWiz = _autWizDefault();
+ _autWizRender();
+}
+
+function _autWizRender() {
+ var w = _autWiz;
+ if (!w) return;
+ var ac = w.acao[0];
+
+ var html = ''
+  + '<div id="aut-wiz">'
+  + '<div class="autw-aviso">Nada é gravado enquanto você preenche. A automação só passa a existir quando você clicar em <b>Criar automação</b> no último passo.</div>'
+  + '<div class="autw-steps" id="autw-steps"></div>'
+
+  // ── Passo 1 — Informações básicas ─────────────────────────────────────
+  + '<div class="autw-passo" data-p="1">'
+  + '<div class="autw-tit">Informações básicas</div>'
+  + '<div class="sp-field"><div class="sp-label">Nome da automação <b class="autw-req">*</b></div>'
+  + '<input class="sp-inp" id="aut-nome" placeholder="Ex.: Pré-projeto" value="' + _autEsc(w.nome) + '" oninput="_autMarcarSujo()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Descrição</div>'
+  + '<textarea class="sp-inp" rows="2" id="aut-desc" placeholder="Para que serve esta automação (opcional)" oninput="_autMarcarSujo()">' + _autEsc(w.descricao) + '</textarea></div>'
+  + '</div>'
+
+  // ── Passo 2 — Quando isso acontecer ───────────────────────────────────
+  + '<div class="autw-passo" data-p="2">'
+  + '<div class="autw-tit">Quando isso acontecer</div>'
+  + '<div class="sp-field"><div class="sp-label">Observar alterações em <b class="autw-req">*</b></div>'
+  + '<select class="sp-inp" id="aut-tabela" onchange="_autTrocarTabela()">' + _autOptsHTML([['projetos','Projetos'],['obras','Obras']], w.tabela_alvo) + '</select></div>'
+  + '<div class="aut-hint">A automação roda quando o registro <b>entra</b> na condição — inclusive quando ele é criado já atendendo. Se ele já estava na condição e outro campo mudou, nada acontece de novo.</div>'
+  + '<div id="aut-conds">' + w.condicoes.map(function (c, i) { return _autCondHTML(w.tabela_alvo, c, i); }).join('') + '</div>'
+  + '<button type="button" class="btn btn-ghost aut-add" onclick="_autAdicionarCond()">+ Adicionar condição</button>'
+  + '</div>'
+
+  // ── Passo 3 — O que fazer ─────────────────────────────────────────────
+  // Mesmo _autAcaoHTML do painel de edição: NENHUM campo foi removido, só o
+  // "Nome da tarefa" foi promovido pra fora e o resto ficou atrás de
+  // "Campos adicionais" (área, responsável, prioridade, status, privacidade,
+  // datas e vínculos continuam todos lá dentro, e _autLerAcao lê todos).
+  + '<div class="autw-passo" data-p="3">'
+  + '<div class="autw-tit">O que fazer</div>'
+  + '<div class="autw-acao-wrap">' + _autAcaoHTML(ac) + '</div>'
+  + '</div>'
+
+  // ── Passo 4 — Revisar e testar ────────────────────────────────────────
+  + '<div class="autw-passo" data-p="4">'
+  + '<div class="autw-tit">Revisar e testar</div>'
+  + '<div class="autw-frase" id="autw-frase"></div>'
+  + '<div class="autw-check" id="autw-check"></div>'
+  + '<button type="button" class="btn btn-ghost" id="autw-btn-testar" onclick="_autWizTestar()">Testar automação</button>'
+  + '<div id="autw-teste"></div>'
+  + '<div id="autw-confirmacao"></div>'
+  + '</div>'
+
+  + '<div class="autw-nav" id="autw-nav"></div>'
+  + '</div>';
+
+ _spSet('Nova automação', 'Nova automação', html,
+  '<button class="btn btn-ghost" onclick="_autWizFechar()">Cancelar</button>');
+
+ document.getElementById('sp-overlay').classList.add('sp-open');
+ document.getElementById('sp-drawer').classList.add('sp-open');
+ _autWizAcaoRecolher();
+ _autWizPintar();
+}
+
+// "Campos adicionais": tudo o que _autAcaoHTML desenha depois do nome da
+// tarefa some atrás de um botão recolhível. Feito movendo os nós no DOM (e não
+// duplicando o HTML da ação) exatamente pra garantir que nenhum campo se
+// perdeu — eles continuam no formulário, só não competem com o que importa.
+function _autWizAcaoRecolher() {
+ var wrap = document.querySelector('#aut-wiz .autw-acao-wrap .aut-acao');
+ if (!wrap) return;
+ var filhos = Array.prototype.slice.call(wrap.children);
+ var extra = document.createElement('div');
+ extra.className = 'autw-extra autw-collapsed';
+ extra.id = 'autw-extra';
+ filhos.slice(1).forEach(function (el) { extra.appendChild(el); });
+ var btn = document.createElement('button');
+ btn.type = 'button';
+ btn.className = 'autw-extra-btn';
+ btn.id = 'autw-extra-btn';
+ btn.textContent = 'Campos adicionais (área, responsável, prazo, vínculos) ▾';
+ btn.onclick = _autWizToggleExtra;
+ wrap.appendChild(btn);
+ wrap.appendChild(extra);
+}
+function _autWizToggleExtra() {
+ var e = document.getElementById('autw-extra'), b = document.getElementById('autw-extra-btn');
+ if (!e) return;
+ e.classList.toggle('autw-collapsed');
+ var aberto = !e.classList.contains('autw-collapsed');
+ if (b) b.textContent = 'Campos adicionais (área, responsável, prazo, vínculos) ' + (aberto ? '▴' : '▾');
+}
+
+// Lê o formulário inteiro pro rascunho em memória. É chamada a cada tecla (via
+// _autMarcarSujo), então é ela que mantém _autWiz sempre igual à tela — e é por
+// isso que trocar de passo não perde nada do que foi digitado.
+function _autWizSync() {
+ var w = _autWiz;
+ if (!w) return;
+ if (!document.getElementById('aut-wiz')) { _autWiz = null; return; }
+ w.nome      = ((document.getElementById('aut-nome') || {}).value || '');
+ w.descricao = ((document.getElementById('aut-desc') || {}).value || '');
+ w.tabela_alvo = (document.getElementById('aut-tabela') || {}).value || w.tabela_alvo;
+ w.condicoes = _autLerCondicoes();
+ w.acao      = _autLerAcao();
+ // Mexeu depois de testar? O teste aprovado deixa de valer.
+ if (w.teste && w.assinatura !== _autWizAssinatura(w)) {
+  w.teste = null; w.confirmando = false;
+  var box = document.getElementById('autw-teste');
+  if (box) box.innerHTML = '<div class="autw-res">A configuração mudou depois do último teste. Teste de novo antes de criar.</div>';
+ }
+ _autWizPintar();
+}
+
+// Redesenha só as partes reativas (passo visível, checklist, frase, botões) —
+// nunca os campos, pra não interromper quem está digitando.
+function _autWizPintar() {
+ var w = _autWiz;
+ if (!w || !document.getElementById('aut-wiz')) return;
+ var itens = _autWizChecklist(w);
+
+ var nomes = ['Informações básicas', 'Quando isso acontecer', 'O que fazer', 'Revisar e testar'];
+ var steps = document.getElementById('autw-steps');
+ if (steps) steps.innerHTML = nomes.map(function (n, i) {
+  var p = i + 1;
+  var cls = p === w.passo ? ' autw-step-on' : (p < w.passo ? ' autw-step-ok' : '');
+  return '<button type="button" class="autw-step' + cls + '" onclick="_autWizIr(' + p + ')">'
+   + '<span class="autw-step-n">' + p + '</span>' + _autEsc(n) + '</button>';
+ }).join('');
+
+ document.querySelectorAll('#aut-wiz .autw-passo').forEach(function (el) {
+  el.style.display = String(w.passo) === el.dataset.p ? 'block' : 'none';
+ });
+
+ var chk = document.getElementById('autw-check');
+ if (chk) chk.innerHTML = itens.map(function (i) {
+  return '<div class="autw-item' + (i.ok ? ' autw-item-ok' : '') + '">'
+   + '<span>' + (i.ok ? '&#10003;' : '&#9888;') + '</span>'
+   + _autEsc(i.ok ? i.texto : i.falta) + '</div>';
+ }).join('');
+
+ var fr = document.getElementById('autw-frase');
+ if (fr) fr.textContent = _autFraseLegivel(w);
+
+ var nav = document.getElementById('autw-nav');
+ if (nav) {
+  nav.innerHTML = (w.passo > 1 ? '<button type="button" class="btn btn-ghost" onclick="_autWizIr(' + (w.passo - 1) + ')">Voltar</button>' : '')
+   + (w.passo < 4
+      ? '<button type="button" class="btn btn-primary" onclick="_autWizIr(' + (w.passo + 1) + ')">Continuar</button>'
+      : (w.confirmando ? '' : '<button type="button" class="btn btn-primary" onclick="_autWizAbrirConfirmacao()">Criar automação</button>'));
+ }
+
+ var bt = document.getElementById('autw-btn-testar');
+ if (bt) bt.style.display = w.confirmando ? 'none' : '';
+
+ if (w.confirmando) _autWizPintarConfirmacao();
+ else { var c = document.getElementById('autw-confirmacao'); if (c) c.innerHTML = ''; }
+}
+
+function _autWizIr(p) {
+ var w = _autWiz;
+ if (!w) return;
+ _autWizSync();
+ if (p > w.passo) {
+  // Só bloqueia o que ficou pendente ATÉ o passo que está sendo deixado —
+  // ninguém deve ser impedido de avançar do passo 1 por causa de um campo
+  // que só aparece no passo 3.
+  var falta = _autWizPendencia(w, p - 1);
+  if (falta) { _showToast(falta, 'erro'); return; }
+ }
+ w.passo = p;
+ w.confirmando = false;
+ _autWizPintar();
+}
+
+// ── Teste: dry-run no banco, nunca uma execução ─────────────────────────────
+// Chama automacao_testar, que avalia as condições com automacao_condicoes_ok e
+// monta a tarefa com automacao_montar_tarefa — as MESMAS funções que o trigger
+// de verdade usa (automacao_criar_tarefa foi refatorada pra consumir a mesma
+// montagem). Nada é inserido: as duas são `stable`, o Postgres nem permitiria
+// uma escrita ali dentro. Nenhuma tarefa é criada nem apagada.
+async function _autWizTestar() {
+ var w = _autWiz;
+ if (!w) return;
+ _autWizSync();
+ var falta = _autWizPendencia(w, 4);
+ if (falta) { _showToast(falta, 'erro'); return; }
+ var box = document.getElementById('autw-teste');
+ if (box) box.innerHTML = '<div class="autw-res">Simulando com os dados reais do sistema...</div>';
+ if (!_sb) { if (box) box.innerHTML = '<div class="autw-res autw-res-err">Sem conexão com o banco. Não é possível testar agora.</div>'; return; }
+
+ var res = await _sb.rpc('automacao_testar', {
+  p_tabela: w.tabela_alvo, p_condicoes: w.condicoes, p_acao: w.acao,
+ });
+ if (res.error) {
+  console.error('[Automações] erro no teste:', res.error);
+  if (box) box.innerHTML = '<div class="autw-res autw-res-err">Não foi possível simular agora. Tente de novo em alguns instantes.</div>';
+  return;
+ }
+ var r = res.data || {};
+ if (!r.ok) {
+  w.teste = null;
+  if (box) box.innerHTML = '<div class="autw-res autw-res-err">'
+   + (r.motivo === 'acao_incompleta'
+      ? 'Falta o nome da tarefa que a automação deve criar.'
+      : 'A configuração da automação ainda não está completa.')
+   + '</div>';
+  _autWizPintar();
+  return;
+ }
+
+ // Aprovado nos dois casos: com registro de exemplo, ou sem registro real hoje
+ // que atenda às condições (que não é erro — só não há o que simular agora).
+ w.teste = r;
+ w.assinatura = _autWizAssinatura(w);
+
+ if (box) box.innerHTML = r.encontrado
+  ? '<div class="autw-res autw-res-ok">'
+    + '<div class="autw-res-tit">&#10003; Automação válida</div>'
+    + '<div class="autw-res-lin"><b>Registro utilizado no teste:</b> ' + _autEsc((r.registro || {}).nome) + '</div>'
+    + '<div class="autw-res-lin"><b>A automação teria criado:</b></div>'
+    + _autWizTarefaHTML(r.tarefa || {})
+    + '<div class="autw-res-nota">Isso é apenas uma simulação. Nenhuma tarefa foi criada.</div>'
+    + '</div>'
+  : '<div class="autw-res autw-res-ok">'
+    + '<div class="autw-res-tit">&#10003; Automação válida</div>'
+    + '<div class="autw-res-lin">Não existe hoje nenhum registro que atenda a essas condições, então não deu para mostrar um exemplo real. A configuração está correta e a automação vai funcionar quando um registro entrar nessas condições.</div>'
+    + '<div class="autw-res-nota">Isso é apenas uma simulação. Nenhuma tarefa foi criada.</div>'
+    + '</div>';
+ _autWizPintar();
+}
+
+function _autWizNomeUsuario(email) {
+ var us = (typeof _usuariosCache !== 'undefined' && _usuariosCache) ? _usuariosCache : [];
+ var u = us.find(function (x) { return x.email === email; });
+ return (u && (u.nome_display || u.nome)) || email;
+}
+function _autWizData(d) {
+ if (!d) return 'sem data';
+ var p = String(d).split('-');
+ return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : String(d);
+}
+function _autWizTarefaHTML(t) {
+ var resp = (t.responsavel || []).map(_autWizNomeUsuario).join(', ');
+ var linha = function (r, v) { return '<div class="autw-prev-l"><span>' + r + '</span><b>' + _autEsc(v) + '</b></div>'; };
+ return '<div class="autw-prev">'
+  + linha('Tarefa', t.titulo || '—')
+  + linha('Área', t.area || 'sem área')
+  + linha('Responsável', resp || 'sem responsável')
+  + linha('Início', _autWizData(t.data_inicio))
+  + linha('Prazo', _autWizData(t.data_prazo))
+  + linha('Prioridade', t.prioridade || '—')
+  + linha('Status inicial', t.status || '—')
+  + '</div>';
+}
+
+// ── Confirmação final ───────────────────────────────────────────────────────
+function _autWizAbrirConfirmacao() {
+ var w = _autWiz;
+ if (!w) return;
+ _autWizSync();
+ var falta = _autWizPendencia(w, 4);
+ if (falta) { _showToast(falta, 'erro'); return; }
+ // Teste obrigatório: "criar automação = somente após validação + teste
+ // aprovado + confirmação do usuário".
+ if (!w.teste) { _showToast('Clique em "Testar automação" antes de criar — é o teste que garante que ela vai funcionar.', 'erro'); return; }
+ w.confirmando = true;
+ _autWizPintar();
+}
+function _autWizPintarConfirmacao() {
+ var w = _autWiz;
+ var c = document.getElementById('autw-confirmacao');
+ if (!c || !w) return;
+ c.innerHTML = '<div class="autw-conf">'
+  + '<div class="autw-conf-tit">Confirmar criação</div>'
+  + '<div class="autw-conf-frase">' + _autEsc(_autFraseLegivel(w)) + '</div>'
+  + '<div class="autw-conf-nota">A automação será criada <b>inativa</b>. Ela só passa a criar tarefas depois que você ativar.</div>'
+  + '<div class="autw-conf-btns">'
+  + '<button type="button" class="btn btn-ghost" onclick="_autWizVoltarEditar()">Voltar para editar</button>'
+  + '<button type="button" class="btn btn-primary" id="autw-btn-criar" onclick="_autWizCriar()">Criar automação</button>'
+  + '</div></div>';
+}
+function _autWizVoltarEditar() {
+ if (!_autWiz) return;
+ _autWiz.confirmando = false;
+ _autWiz.passo = 1;
+ _autWizPintar();
+}
+
+// ── O ÚNICO ponto deste fluxo que grava uma automação ───────────────────────
+async function _autWizCriar() {
+ var w = _autWiz;
+ if (!w) return;
  if (!_sb) { _showToast('Sem conexão com o banco. Não é possível criar uma automação agora.', 'erro'); return; }
- // _ccUmaVez: dois cliques rápidos no botão criavam duas automações iguais
- // (mesmo problema já corrigido nos outros "+ Novo" do sistema).
- await _ccUmaVez('nova-automacao', async function () {
+ if (!_autWizValido(w) || !w.teste) { _showToast('Complete e teste a automação antes de criar.', 'erro'); return; }
+
+ // _ccUmaVez: enquanto o insert está em voo o segundo clique é IGNORADO (não
+ // enfileirado) e o botão fica desabilitado — dois cliques rápidos não podem
+ // virar duas automações.
+ await _ccUmaVez('criar-automacao', async function () {
+  var btn = document.getElementById('autw-btn-criar');
+  if (btn) btn.textContent = 'Criando...';
   var res = await _sb.from('automacoes').insert({
-   nome: 'Nova automação',
-   descricao: null,
-   tabela_alvo: 'projetos',
-   ativo: false,   // nasce INATIVA de propósito: ninguém quer uma automação
-                   // meio configurada já criando tarefa em produção.
-   condicoes: [{ campo: 'etapa_projeto', operador: 'igual', valor: [] }],
-   acao: [{ tipo: 'criar_tarefa', titulo: '', tipo_tarefa: 'Tarefa', area: 'Projetos',
-            responsaveis: [], prioridade: 'Média', status: 'A fazer', visibilidade: 'equipe',
-            data_inicio: { base: 'hoje', dias: 0 }, data_fim: { base: 'hoje', dias: 3 },
-            vincular_obra: true, vincular_projeto: true, vincular_melhoria: false }],
+   nome: String(w.nome).trim(),
+   descricao: String(w.descricao || '').trim() || null,
+   tabela_alvo: w.tabela_alvo,
+   ativo: false,   // nasce INATIVA de propósito: quem cria decide quando ligar.
+   condicoes: w.condicoes,
+   acao: w.acao,
    criado_por: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.email) || null,
   }).select().maybeSingle();
   if (res.error || !res.data) {
@@ -814,11 +1241,21 @@ async function _autNova() {
    _showToast('Não foi possível criar a automação agora. Confira sua conexão e tente de novo.', 'erro');
    return;
   }
-  _autData.push(res.data);
+  _autWiz = null;
+  // O evento de tempo real pode chegar antes desta linha — por isso o guard,
+  // igual ao de _autInitRealtime.
+  if (!_autData.some(function (x) { return String(x.id) === String(res.data.id); })) _autData.push(res.data);
   _autRender();
-  _showToast('Automação criada. Configure o gatilho e a tarefa, e ative quando estiver pronta.', 'ok');
+  _showToast('Automação criada (inativa). Ative quando quiser que ela comece a valer.', 'ok');
   _spAutomacaoById(res.data.id);
- }, 'topbar-action-btn');
+ }, 'autw-btn-criar');
+}
+
+function _autWizFechar() {
+ // Descarta o rascunho inteiro. Não há nada no banco pra limpar — é esse o
+ // ponto do fluxo novo.
+ _autWiz = null;
+ closePanel();
 }
 
 async function _autDuplicar() {
@@ -888,23 +1325,29 @@ async function _autCarregarExecucoes() {
   box.innerHTML = '<div class="aut-empty">Esta automação ainda não foi executada nenhuma vez.</div>';
   return;
  }
- box.innerHTML = linhas.map(function (e) {
-  var quando = _autFmtQuando(e.started_at);
-  var origem = e.source_nome ? _autEsc(e.source_nome) : (e.source_table === 'obras' ? 'Obra' : 'Projeto');
-  if (e.status === 'sucesso') {
-   var t = e.tarefa ? _autEsc(e.tarefa.titulo) + (e.tarefa.status ? ' · ' + _autEsc(e.tarefa.status) : '') : 'tarefa criada';
-   return '<div class="aut-exec aut-exec-ok"><div class="aut-exec-hd"><b>' + origem + '</b><span>' + quando + '</span></div>'
-    + '<div class="aut-exec-msg">Criou a tarefa: ' + t + '</div></div>';
-  }
-  if (e.status === 'erro') {
-   // §23: só a mensagem em português aparece aqui. O detalhe técnico
-   // (sqlerrm/sqlstate) foi pro log do banco via RAISE WARNING.
-   return '<div class="aut-exec aut-exec-err"><div class="aut-exec-hd"><b>' + origem + '</b><span>' + quando + '</span></div>'
-    + '<div class="aut-exec-msg">' + _autEsc(e.erro || 'A automação não conseguiu concluir esta execução.') + '</div></div>';
-  }
-  return '<div class="aut-exec"><div class="aut-exec-hd"><b>' + origem + '</b><span>' + quando + '</span></div>'
-   + '<div class="aut-exec-msg">Execução em andamento.</div></div>';
- }).join('');
+ // Tabela simples Data / Resultado / Registro / Tarefa. Os mesmos dados de
+ // antes (inclusive a mensagem de erro em português — o detalhe técnico
+ // continua só no log do banco, §23), só que alinhados em colunas em vez de um
+ // card por execução: dá pra correr o olho por 100 linhas.
+ box.innerHTML = '<table class="aut-exec-tb"><thead><tr>'
+  + '<th>Data</th><th>Resultado</th><th>Registro</th><th>Tarefa</th>'
+  + '</tr></thead><tbody>'
+  + linhas.map(function (e) {
+   var origem = e.source_nome ? _autEsc(e.source_nome) : (e.source_table === 'obras' ? 'Obra' : 'Projeto');
+   var res, tarefa;
+   if (e.status === 'sucesso') {
+    res = '<span class="aut-res-ok">Criou a tarefa</span>';
+    tarefa = e.tarefa ? _autEsc(e.tarefa.titulo) + (e.tarefa.status ? ' <i>· ' + _autEsc(e.tarefa.status) + '</i>' : '') : 'tarefa criada';
+   } else if (e.status === 'erro') {
+    res = '<span class="aut-res-err">Falhou</span>';
+    tarefa = _autEsc(e.erro || 'A automação não conseguiu concluir esta execução.');
+   } else {
+    res = '<span class="aut-res-and">Em andamento</span>';
+    tarefa = '—';
+   }
+   return '<tr><td>' + _autFmtQuando(e.started_at) + '</td><td>' + res + '</td><td>' + origem + '</td><td>' + tarefa + '</td></tr>';
+  }).join('')
+  + '</tbody></table>';
 }
 
 // ── Tempo real (§24) ─────────────────────────────────────────────────────────
