@@ -324,8 +324,24 @@
 }
 .authv2-inp::placeholder { color:rgba(255,255,255,.4) }
 .authv2-inp:hover { background:rgba(255,255,255,.13) }
+/* Autofill do navegador (Chrome/Edge) força um fundo claro sólido no
+   campo, ignorando o glass escuro — some com o contraste do texto E do
+   olho de mostrar/ocultar senha (branco sobre esse fundo claro vira
+   invisível). box-shadow inset simula nosso próprio fundo por cima do
+   que o navegador pintaria; o delay gigante na transition é o truque
+   padrão pra atrasar o navegador reafirmar a cor dele. */
+.authv2-inp:-webkit-autofill,
+.authv2-inp:-webkit-autofill:hover,
+.authv2-inp:-webkit-autofill:focus {
+  -webkit-text-fill-color:#fff;
+  -webkit-box-shadow:0 0 0 1000px rgba(255,255,255,.10) inset;
+  box-shadow:0 0 0 1000px rgba(255,255,255,.10) inset;
+  caret-color:#fff;
+  transition:background-color 5000s ease-in-out 0s;
+}
 .authv2-inp:focus { border-color:#7FD4FF;background:rgba(255,255,255,.14);box-shadow:0 0 0 3px rgba(127,212,255,.18) }
 .authv2-inp.error { border-color:#ff8a8a }
+.authv2-inp.success { border-color:#5EEAD4 }
 .authv2-inp-pwd { padding-right:40px }
 .authv2-pwd-toggle { position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:rgba(255,255,255,.55);padding:4px;display:flex;transition:color .15s }
 .authv2-pwd-toggle:hover { color:#fff }
@@ -355,6 +371,21 @@
 .authv2-btn-google:disabled { opacity:.6;cursor:not-allowed }
 
 .authv2-links { text-align:center;margin-top:18px;font-size:11px;color:rgba(255,255,255,.45) }
+
+.authv2-sec-link { font-size:12.5px;color:rgba(255,255,255,.55);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 6px;transition:color .15s }
+.authv2-sec-link:hover { color:#fff }
+
+/* Telas de troca/recuperação de senha (#change-pwd-screen/#forgot-pwd-screen)
+   reaproveitam .authv2-* — pedido explícito: "a página de redefinição de
+   senha deve dialogar com a página de login". A cor "vazia" da barra de
+   força (_cpwdStrength, auth.service.js) já foi ajustada lá pra um cinza
+   semitransparente que funciona nos dois fundos (claro no perfil dentro
+   do app, escuro aqui) — nada pra sobrescrever via CSS aqui (um
+   !important pegaria TODAS as cores da barra, não só o estado vazio, e
+   quebraria a indicação de força fraca/forte). Só o texto dos requisitos
+   (.pwd-req-item) mesmo, que não é setado via JS. */
+.authv2-card .pwd-req-item { color:rgba(255,255,255,.5) }
+.authv2-card .pwd-req-item.met { color:#5EEAD4 }
 
 @media(max-width:860px){
   .authv2-screen { justify-content:center;padding:24px }

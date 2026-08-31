@@ -411,6 +411,12 @@ async function _changePwdSubmit() {
 }
 
 // ── Indicador de força de senha (novos IDs de barra) ──────────────────────────
+// Cor "vazia" (rgba(148,163,184,.4), cinza-azulado semitransparente) em vez
+// do #e5e7eb sólido de antes — essa função roda tanto na troca de senha
+// voluntária (perfil, dentro do app, fundo claro) quanto nas telas de auth
+// (#change-pwd-screen, fundo escuro via .authv2-card) — um cinza opaco claro
+// sumia quase por completo no vidro fosco escuro; semitransparente funciona
+// nos dois sem precisar de dois branches.
 function _cpwdStrength(val) {
  var met = _cpwdReqs.filter(function(r){ return r.test(val); }).length;
  _cpwdScore = met;
@@ -418,12 +424,12 @@ function _cpwdStrength(val) {
  var labels=['','Muito fraca','Fraca','Média','Forte','Muito forte'];
  var lColors=['','#D6433C','#f97316','#ca8a04','#16a34a','#15803d'];
  var fills=[[],[['#D6433C'],['','','','']],[['#f97316','#f97316'],['','','']],[['#eab308','#eab308','#eab308'],['','']],[['#1F8A4C','#1F8A4C','#1F8A4C','#1F8A4C'],['']],[['#16a34a','#16a34a','#16a34a','#16a34a','#16a34a'],[]]];
- var bClrs = val.length === 0 ? ['#e5e7eb','#e5e7eb','#e5e7eb','#e5e7eb','#e5e7eb'] : [
-  met>=1?colors[Math.min(met,5)]:'#e5e7eb',
-  met>=2?colors[Math.min(met,5)]:'#e5e7eb',
-  met>=3?colors[Math.min(met,5)]:'#e5e7eb',
-  met>=4?colors[Math.min(met,5)]:'#e5e7eb',
-  met>=5?colors[Math.min(met,5)]:'#e5e7eb',
+ var bClrs = val.length === 0 ? ['rgba(148,163,184,.4)','rgba(148,163,184,.4)','rgba(148,163,184,.4)','rgba(148,163,184,.4)','rgba(148,163,184,.4)'] : [
+  met>=1?colors[Math.min(met,5)]:'rgba(148,163,184,.4)',
+  met>=2?colors[Math.min(met,5)]:'rgba(148,163,184,.4)',
+  met>=3?colors[Math.min(met,5)]:'rgba(148,163,184,.4)',
+  met>=4?colors[Math.min(met,5)]:'rgba(148,163,184,.4)',
+  met>=5?colors[Math.min(met,5)]:'rgba(148,163,184,.4)',
  ];
  for(var i=1;i<=5;i++){var b=document.getElementById('cbar-'+i);if(b)b.style.background=bClrs[i-1];}
  var lbl=document.getElementById('cpwd-strength-label');
@@ -433,7 +439,15 @@ function _cpwdStrength(val) {
   var ok=r.test(val);
   return '<div class="pwd-req-item'+(ok?' met':'')+'"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">'+(ok?'<polyline points="2,8 6,12 14,4"/>':'<circle cx="8" cy="8" r="6"/>')+'</svg>'+r.label+'</div>';
  }).join('');}
+ // Antes sobrescrevia inp.className inteiro (perdia authv2-inp/authv2-inp-pwd
+ // vindas do HTML — o campo "voltava" pro estilo claro antigo assim que a
+ // pessoa começava a digitar, mesmo dentro do cartão de vidro escuro).
+ // classList.toggle só mexe no modificador success/error, preserva as
+ // classes base de onde quer que a tela esteja usando este campo.
  var inp=document.getElementById('cpwd-new');
- if(inp&&val.length>0){inp.className='auth-inp auth-inp-pwd'+(met>=3?' success':' error');}
+ if(inp&&val.length>0){
+  inp.classList.toggle('success', met>=3);
+  inp.classList.toggle('error', met<3);
+ }
 }
 
