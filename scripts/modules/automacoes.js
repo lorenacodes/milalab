@@ -69,12 +69,18 @@ var _AUT_CAMPOS = {
   // automação (o dono pediu a frase gerada a partir dos dados reais).
   { campo: 'etapa_projeto',  label: 'Etapa do Projeto', tipo: 'select', etapa: true, opcoes: _AUT_ETAPAS_PROJETO },
   { campo: 'tipo_orcamento', label: 'Tipo de Projeto',  tipo: 'select', opcoes: _AUT_TIPOS_PROJETO },
-  { campo: 'produto',        label: 'Produto',          tipo: 'multi' },
+  // Sem `opcoes` de propósito: as opções REAIS de Produto vêm da tabela
+  // `produtos` (fonte 'produtos', ver _AUT_FONTES) — antes disso a condição
+  // "Produto" não tinha nenhum jeito de informar o valor (bug relatado).
+  { campo: 'produto',        label: 'Produto',          tipo: 'multi', fonte: 'produtos' },
   { campo: 'complexidade',   label: 'Complexidade',     tipo: 'select', opcoes: ['Baixa','Média','Alta'] },
   { campo: 'nome',           label: 'Nome do Projeto',  tipo: 'texto' },
   { campo: 'quantidade',     label: 'Quantidade',       tipo: 'numero' },
   { campo: 'valor_unitario', label: 'Valor unitário',   tipo: 'numero' },
-  { campo: 'liberado_execucao', label: 'Liberado para execução', tipo: 'select', opcoes: ['true','false'] },
+  { campo: 'liberado_execucao', label: 'Liberado para execução', tipo: 'booleano' },
+  // Campo relacionado/referência: projetos.obra_id é coluna real (FK), não
+  // uma junction table — o motor lê `to_jsonb(NEW)->>'obra_id'` normalmente.
+  { campo: 'obra_id',        label: 'Obra vinculada',   tipo: 'relacao', fonte: 'obras' },
  ],
  obras: [
   { campo: 'etapa_negocio',  label: 'Etapa do Negócio', tipo: 'select', etapa: true, opcoes: _AUT_ETAPAS_OBRA },
@@ -89,6 +95,61 @@ var _AUT_CAMPOS = {
  ],
 };
 
+// ── Fontes de dados reais para campos cujas opções não são uma lista fixa ────
+// Genérico por design (pedido §6): um campo novo do tipo select/multi/relacao
+// só precisa apontar `fonte: '<chave>'` aqui — nada de `if campo === 'x'`
+// espalhado pelo construtor de condições. Cada fonte sabe (a) devolver as
+// opções já cacheadas, de forma síncrona (pro render não travar esperando
+// rede) e (b) garantir que o cache foi carregado pelo menos uma vez.
+var _AUT_OBRAS_CACHE = []; // cache: [{id, nome}], usado pela fonte 'obras'
+var _AUT_FONTES = {
+ // _produtosArr (wizard-nova-obra.js) já é carregado por várias telas do
+ // sistema — aqui só reaproveita o mesmo cache global, sem duplicar consulta.
+ produtos: {
+  opcoes: function () { return ((typeof _produtosArr !== 'undefined' && _produtosArr) || []).map(function (p) { return p.nome; }); },
+  garantirCarregado: async function () {
+   if (typeof _produtosArr !== 'undefined' && _produtosArr && _produtosArr.length) return;
+   if (!_sb) return;
+   var r = await _sb.from('produtos').select('id,nome,categoria').order('nome');
+   window._produtosArr = r.data || [];
+  },
+ },
+ // Fonte de RELAÇÃO: o valor guardado na condição é o id do registro, nunca o
+ // nome — o nome só existe pra exibição (mesmo padrão de projetos.js:18-24 /
+ // entregas.js:41-47, campo "Obra" com id oculto + nome buscável).
+ obras: {
+  relacao: true,
+  garantirCarregado: async function () {
+   if (_AUT_OBRAS_CACHE.length || !_sb) return;
+   var r = await _sb.from('obras').select('id,nome').order('nome').limit(1000);
+   _AUT_OBRAS_CACHE = r.data || [];
+  },
+  opcoesNome: function () { return _AUT_OBRAS_CACHE.map(function (o) { return o.nome || '(sem nome)'; }); },
+  idPorNome: function (nome) { var o = _AUT_OBRAS_CACHE.filter(function (x) { return (x.nome || '(sem nome)') === nome; })[0]; return o ? o.id : ''; },
+  nomePorId: function (id) { var o = _AUT_OBRAS_CACHE.filter(function (x) { return String(x.id) === String(id); })[0]; return o ? (o.nome || '(sem nome)') : id; },
+ },
+};
+// Opções finais de um campo: estáticas (meta.opcoes) quando existem, senão
+// resolvidas pela fonte declarada. É o único lugar que decide isso — quem
+// desenha o componente de valor ou a frase do card não precisa saber a
+// diferença entre os dois casos.
+function _autOpcoesDoCampo(meta) {
+ if (meta.opcoes) return meta.opcoes;
+ var fonte = _AUT_FONTES[meta.fonte];
+ if (!fonte) return [];
+ return fonte.opcoes ? fonte.opcoes() : (fonte.opcoesNome ? fonte.opcoesNome() : []);
+}
+// Garante que toda `fonte` referenciada pelos campos de uma tabela já foi
+// carregada pelo menos uma vez — chamado ao abrir o modal (nova/editar) e ao
+// trocar a tabela observada, antes de montar o HTML das condições.
+async function _autGarantirFontesCarregadas(tabela) {
+ var fontesUsadas = {};
+ (_AUT_CAMPOS[tabela] || []).forEach(function (m) { if (m.fonte) fontesUsadas[m.fonte] = 1; });
+ await Promise.all(Object.keys(fontesUsadas).map(function (f) {
+  return _AUT_FONTES[f] && _AUT_FONTES[f].garantirCarregado ? _AUT_FONTES[f].garantirCarregado() : Promise.resolve();
+ }));
+}
+
 // Operadores por tipo de campo, com o rótulo que o usuário lê. As chaves são
 // exatamente as que automacao_cond_ok entende no banco — mudar aqui sem mudar
 // lá faria a condição nunca casar, então as duas listas andam juntas.
@@ -98,6 +159,11 @@ var _AUT_OPERADORES = {
  texto:  [ ['igual','é igual a'], ['diferente','não é igual a'], ['contem','contém'], ['nao_contem','não contém'], ['vazio','está vazio'], ['nao_vazio','não está vazio'] ],
  numero: [ ['igual','é igual a'], ['maior','é maior que'], ['menor','é menor que'], ['maior_igual','é maior ou igual a'], ['menor_igual','é menor ou igual a'], ['vazio','está vazio'], ['nao_vazio','não está vazio'] ],
  data:   [ ['e_hoje','é hoje'], ['antes_de','é antes de'], ['depois_de','é depois de'], ['igual_data','é igual a'], ['vazio','está vazio'], ['nao_vazio','não está vazio'] ],
+ // Booleano: nunca "maior que"/"contém" — só existe/não existe uma condição.
+ booleano: [ ['igual','é'], ['vazio','está vazio'], ['nao_vazio','não está vazio'] ],
+ // Relação: mesma semântica do select (é/não é um registro específico), só
+ // muda o componente de valor (busca por nome, guarda o id).
+ relacao: [ ['igual','é'], ['diferente','não é'], ['vazio','está vazio'], ['nao_vazio','não está vazio'] ],
 };
 // Operadores que não usam campo de valor nenhum.
 var _AUT_OPS_SEM_VALOR = { vazio: 1, nao_vazio: 1, e_hoje: 1 };
@@ -114,6 +180,32 @@ var _AUTOMACAO_CAMPO_LABEL = {
  tabela_alvo: 'Registro observado', condicoes: 'Condições', acao: 'Ação',
 };
 if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('automacoes', _AUTOMACAO_CAMPO_LABEL);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WIDGET CENTRAL (modal) — único componente pra Nova/Editar/Ver automação.
+// Substitui o painel lateral genérico (#sp-overlay/#sp-drawer, side-panel.js)
+// só para Automações; as outras entidades continuam no painel lateral normal.
+// Mesmo padrão de abrir/fechar/backdrop/Esc do painel lateral, só que
+// centralizado na tela em vez de encostado na borda direita.
+// ═══════════════════════════════════════════════════════════════════════════
+function _autModalSet(tag, title, bodyHTML, footerHTML) {
+ document.getElementById('autm-tag').textContent = tag;
+ document.getElementById('autm-title').textContent = title;
+ document.getElementById('autm-body').innerHTML = bodyHTML;
+ document.getElementById('autm-footer').innerHTML = footerHTML || '';
+}
+function _autModalAbrir() {
+ document.getElementById('aut-modal-overlay').classList.add('aut-modal-open');
+ document.getElementById('aut-modal').classList.add('aut-modal-open');
+ document.addEventListener('keydown', _autModalEsc, { once: true });
+}
+function _autModalFechar() {
+ document.getElementById('aut-modal-overlay').classList.remove('aut-modal-open');
+ document.getElementById('aut-modal').classList.remove('aut-modal-open');
+ _autAtiva = null;
+}
+function _autModalEsc(e) { if (e.key === 'Escape') _autModalFechar(); }
+function _autModalBackdropClick(e) { if (e.target === e.currentTarget) _autModalFechar(); }
 
 function _autEsc(s) {
  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -138,6 +230,15 @@ function _autValorArr(v) {
  return Array.isArray(v) ? v.slice() : [v];
 }
 
+// Valores para EXIBIÇÃO (frases/cards): campo tipo 'relacao' guarda IDs, não
+// nomes — sem isso as frases mostrariam um uuid em vez do nome da Obra.
+// Todo outro tipo devolve o próprio valor, sem tradução nenhuma.
+function _autValoresLegiveis(meta, valorArr) {
+ var fonte = meta.tipo === 'relacao' && _AUT_FONTES[meta.fonte];
+ if (!fonte || !fonte.nomePorId) return valorArr;
+ return valorArr.map(function (id) { return fonte.nomePorId(id); });
+}
+
 // ── Resumo curto das condições, usado nos cards recolhidos do fluxo
 // GATILHO → AÇÕES (visual em linha do tempo, pedido do dono: "algo mais
 // simples pro usuário", como o Trigger/Actions conectados por uma linha do
@@ -148,7 +249,7 @@ function _autCondResumoTexto(tabela, conds) {
   var ops  = _AUT_OPERADORES[meta.tipo] || _AUT_OPERADORES.texto;
   var rot  = (ops.find(function (o) { return o[0] === c.operador; }) || [c.operador, c.operador])[1];
   if (_AUT_OPS_SEM_VALOR[c.operador]) return meta.label + ' ' + rot;
-  return meta.label + ' ' + rot + ' ' + _autValorArr(c.valor).join(' ou ');
+  return meta.label + ' ' + rot + ' ' + _autValoresLegiveis(meta, _autValorArr(c.valor)).join(' ou ');
  });
  return partes.length ? partes.join(' E ') : 'Qualquer criação ou alteração';
 }
@@ -163,7 +264,7 @@ function _autFrase(a) {
   var ops  = _AUT_OPERADORES[meta.tipo] || _AUT_OPERADORES.texto;
   var rot  = (ops.find(function (o) { return o[0] === c.operador; }) || [c.operador, c.operador])[1];
   if (_AUT_OPS_SEM_VALOR[c.operador]) return meta.label + ' ' + rot;
-  return meta.label + ' ' + rot + ' ' + _autValorArr(c.valor).join(' ou ');
+  return meta.label + ' ' + rot + ' ' + _autValoresLegiveis(meta, _autValorArr(c.valor)).join(' ou ');
  });
  var quando = conds.length ? 'Quando ' + tabela + ' tiver ' + conds.join(' E ') : 'Quando ' + tabela + ' for criado ou alterado';
  var acoes = _autAcoes(a).map(function (ac) {
@@ -198,7 +299,7 @@ function _autCondCurta(tabela, c) {
  var ops  = _AUT_OPERADORES[meta.tipo] || _AUT_OPERADORES.texto;
  var rot  = (ops.find(function (o) { return o[0] === c.operador; }) || [c.operador, c.operador])[1];
  if (_AUT_OPS_SEM_VALOR[c.operador]) return meta.label + ' ' + rot;
- var vals = _autValorArr(c.valor).filter(function (v) { return String(v).trim() !== ''; });
+ var vals = _autValoresLegiveis(meta, _autValorArr(c.valor).filter(function (v) { return String(v).trim() !== ''; }));
  if (!vals.length) return meta.label + ' ' + rot;
  if (c.operador === 'igual' || c.operador === 'em') return meta.label + ': ' + vals.join(' ou ');
  return meta.label + ' ' + rot + ' ' + vals.join(' ou ');
@@ -423,7 +524,7 @@ function _autCardHTML(a) {
   ? 'Executada ' + total + (total === 1 ? ' vez' : ' vezes')
   : 'Nunca executada';
 
- return '<div class="aut-card' + (a.ativo ? '' : ' aut-card-off') + '" data-id="' + _autEsc(a.id) + '" onclick="_spOpen(\'automacoes\', this)">'
+ return '<div class="aut-card' + (a.ativo ? '' : ' aut-card-off') + '" data-id="' + _autEsc(a.id) + '" onclick="_spAutomacaoById(this.dataset.id)">'
   + '<div class="aut-card-hd">'
   + '<span class="aut-card-nome">' + _autEsc(a.nome || 'Sem nome') + '</span>'
   + erro + badge
@@ -449,23 +550,22 @@ function _autCardHTML(a) {
 // ═══════════════════════════════════════════════════════════════════════════
 // PAINEL DE DETALHE — abas Configuração / Histórico de execuções
 // ═══════════════════════════════════════════════════════════════════════════
-function _spAutomacoes(row) { _spAutomacaoById(row.dataset.id); }
-
 async function _spAutomacaoById(id) {
  if (!id) return;
- _spSet('Automação', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
- document.getElementById('sp-overlay').classList.add('sp-open');
- document.getElementById('sp-drawer').classList.add('sp-open');
- if (typeof _spTrackDirectOpen === 'function') _spTrackDirectOpen('automacoes', id);
+ _autModalSet('Automação', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
+ _autModalAbrir();
  if (!_sb) return;
  var res = await _sb.from('automacoes').select('*').eq('id', id).maybeSingle();
  if (res.error || !res.data) {
   console.error('[Automações] erro ao abrir ' + id, res.error);
-  _spSet('Automação', 'Não encontrada',
+  _autModalSet('Automação', 'Não encontrada',
    '<div style="padding:20px;color:var(--muted)">Esta automação não existe mais — provavelmente foi excluída por outro usuário.</div>',
-   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+   '<button class="btn btn-ghost" onclick="_autModalFechar()">Fechar</button>');
   return;
  }
+ // Garante que as fontes de dados reais (Produto, Obra...) dos campos dessa
+ // tabela já foram carregadas antes de montar o construtor de condições.
+ await _autGarantirFontesCarregadas(res.data.tabela_alvo);
  _spAutomacaoRender(res.data);
 }
 
@@ -477,9 +577,29 @@ function _autOptsHTML(opcoes, sel, vazio) {
  }).join('');
 }
 
+// Lista de opções de um campo select/multi, incluindo valores já salvos que
+// não constam mais no catálogo (dado legado ou opção removida) — nunca somem
+// em silêncio da tela de edição.
+function _autOpcoesComLegado(meta, vals) {
+ var opcoes = _autOpcoesDoCampo(meta).slice();
+ vals.forEach(function (v) { if (opcoes.indexOf(v) === -1) opcoes = opcoes.concat([v]); });
+ return opcoes;
+}
+// Acima de 8 opções (ou vindo de uma fonte real, ex.: Produto — a lista pode
+// crescer a qualquer momento), chips soltos viram ilegíveis: usa o dropdown
+// com busca já usado em Produto do formulário de Projeto (multiselect-ui.js).
+var _AUT_CHIPS_LIMITE = 8;
+// Decide só a partir do CATÁLOGO do campo (nunca dos valores já selecionados
+// nem de legado) — assim o render e a leitura do formulário (_autLerCondicoes)
+// sempre concordam sobre qual componente está na tela pra aquele campo.
+function _autUsaDropdownBusca(meta) {
+ return !!meta.fonte || _autOpcoesDoCampo(meta).length > _AUT_CHIPS_LIMITE;
+}
+
 // Uma linha de condição. O componente da coluna "valor" segue o TIPO do campo
-// original (§4): lista de opções vira chips clicáveis (nunca digitação livre),
-// número vira campo numérico, data vira date picker.
+// original (§3/§4): lista de opções vira chips ou dropdown com busca (nunca
+// digitação livre), número vira campo numérico, data vira date picker,
+// booleano vira Sim/Não, campo relacionado vira busca por nome com id oculto.
 function _autCondHTML(tabela, c, i) {
  var meta = _autCampoMeta(tabela, c.campo);
  var ops  = _AUT_OPERADORES[meta.tipo] || _AUT_OPERADORES.texto;
@@ -487,15 +607,41 @@ function _autCondHTML(tabela, c, i) {
  var valorHTML;
  if (_AUT_OPS_SEM_VALOR[c.operador]) {
   valorHTML = '<div class="aut-cond-novalue">sem valor</div>';
+ } else if (meta.tipo === 'booleano') {
+  valorHTML = '<div class="aut-chips" id="aut-cond-vals-' + i + '">'
+   + [['true','Sim'],['false','Não']].map(function (o) {
+     var on = vals.some(function (v) { return String(v) === o[0]; });
+     return '<button type="button" class="aut-vchip' + (on ? ' active' : '') + '" data-v="' + o[0] + '" onclick="_autToggleValorUnico(' + i + ',this)">' + o[1] + '</button>';
+    }).join('') + '</div>';
+ } else if (meta.tipo === 'relacao') {
+  var fonte = _AUT_FONTES[meta.fonte] || {};
+  var idAtual = vals[0] || '';
+  var kind = 'autCondRel' + i;
+  // O _srchSel busca/mostra por NOME (é o que o componente sabe fazer); o id
+  // de verdade — o que a condição precisa salvar — fica num hidden irmão,
+  // resolvido aqui no onSelect via a própria fonte (idPorNome).
+  _srchSelRegister(kind, {
+   options: fonte.opcoesNome ? fonte.opcoesNome() : [],
+   placeholder: 'Buscar ' + meta.label.toLowerCase() + '...',
+   onSelect: function (nome) {
+    var id = fonte.idPorNome ? fonte.idPorNome(nome) : '';
+    var h = document.getElementById('aut-cond-val-id-' + i);
+    if (h) h.value = id;
+    _autMarcarSujo();
+   },
+  });
+  valorHTML = _srchSelMarkup(kind, 'aut-cond-val-nome-' + i, fonte.nomePorId ? fonte.nomePorId(idAtual) : idAtual)
+   + '<input type="hidden" id="aut-cond-val-id-' + i + '" value="' + _autEsc(idAtual) + '">';
  } else if (meta.tipo === 'select' || meta.tipo === 'multi') {
-  var opcoes = meta.opcoes || [];
-  // Valores já configurados que não estão na lista padrão continuam visíveis
-  // (dado legado ou opção nova ainda não catalogada) — nunca somem em silêncio.
-  vals.forEach(function (v) { if (opcoes.indexOf(v) === -1) opcoes = opcoes.concat([v]); });
-  valorHTML = '<div class="aut-chips" id="aut-cond-vals-' + i + '">' + opcoes.map(function (o) {
-   var on = vals.some(function (v) { return String(v).trim().toLowerCase() === String(o).trim().toLowerCase(); });
-   return '<button type="button" class="aut-vchip' + (on ? ' active' : '') + '" data-v="' + _autEsc(o) + '" onclick="_autToggleValor(' + i + ',this)">' + _autEsc(o) + '</button>';
-  }).join('') + '</div>';
+  var opcoes = _autOpcoesComLegado(meta, vals);
+  if (_autUsaDropdownBusca(meta)) {
+   valorHTML = '<div class="no-msel-wide" id="aut-cond-vals-' + i + '">' + _msRenderDropdown(i, opcoes, vals, '_autCondMultiOnChange', 'Selecione...') + '</div>';
+  } else {
+   valorHTML = '<div class="aut-chips" id="aut-cond-vals-' + i + '">' + opcoes.map(function (o) {
+    var on = vals.some(function (v) { return String(v).trim().toLowerCase() === String(o).trim().toLowerCase(); });
+    return '<button type="button" class="aut-vchip' + (on ? ' active' : '') + '" data-v="' + _autEsc(o) + '" onclick="_autToggleValor(' + i + ',this)">' + _autEsc(o) + '</button>';
+   }).join('') + '</div>';
+  }
  } else {
   var tipoInp = meta.tipo === 'numero' ? 'number' : (meta.tipo === 'data' ? 'date' : 'text');
   valorHTML = '<input class="sp-inp" type="' + tipoInp + '" id="aut-cond-val-' + i + '" value="' + _autEsc(vals[0] || '') + '" oninput="_autMarcarSujo()">';
@@ -631,6 +777,10 @@ function _spAutomacaoRender(a) {
   + '</div>'
 
   + '</div>'
+  // Teste (dry-run) também disponível na edição (itens 9/10/12) — não é
+  // obrigatório pra salvar, é uma ferramenta pra conferir antes.
+  + '<button type="button" class="btn btn-ghost aut-add" onclick="_autTestarEdicao()">Testar automação</button>'
+  + '<div id="aut-teste-edicao" style="display:none"></div>'
   + '<div id="aut-sujo-bar" class="aut-sujo-bar" style="display:none">'
   + '<span>Você tem alterações não salvas.</span>'
   + '<button type="button" class="btn btn-primary" onclick="_autSalvar()">Salvar alterações</button>'
@@ -644,10 +794,10 @@ function _spAutomacaoRender(a) {
   + (typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-aut-hist') : '')
   + '</div>';
 
- _spSet('Automação', a.nome || 'Sem nome', html,
+ _autModalSet('Automação', a.nome || 'Sem nome', html,
   '<button class="btn btn-ghost" onclick="_autDuplicar()">Duplicar</button>'
   + '<button class="btn btn-ghost" onclick="_autExcluir()" style="color:var(--red)">Excluir</button>'
-  + '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
+  + '<button class="btn btn-ghost" onclick="_autModalFechar()">Fechar</button>');
 
  // Baseline da trava otimista (§ teste 10: dois usuários editando a mesma
  // automação não podem se sobrescrever em silêncio) — o registro exatamente
@@ -693,6 +843,33 @@ function _autAtualizarResumoAcao() {
 }
 function _autToggleChip(btn) { btn.classList.toggle('active'); _autMarcarSujo(); }
 function _autToggleValor(i, btn) { btn.classList.toggle('active'); _autMarcarSujo(); }
+// Igual a _autToggleValor, mas EXCLUSIVO (só um ativo por vez) — usado pelo
+// par Sim/Não de campos booleano, onde as duas opções nunca coexistem.
+function _autToggleValorUnico(i, btn) {
+ var ativo = btn.classList.contains('active');
+ var box = btn.closest('.aut-chips');
+ if (box) Array.prototype.forEach.call(box.querySelectorAll('.aut-vchip'), function (b) { b.classList.remove('active'); });
+ if (!ativo) btn.classList.add('active');
+ _autMarcarSujo();
+}
+// Dropdown com busca (Produto e qualquer campo select/multi vindo de uma
+// fonte real ou com mais de 8 opções, ver _autUsaDropdownBusca) — reconstrói
+// o próprio HTML a cada clique (mesmo padrão de _projProdutoToggle,
+// projetos.js) e reabre o painel em seguida (_noReabrirDropdown,
+// wizard-nova-obra.js), senão marcar 2 itens seguidos fecharia o dropdown
+// no meio da seleção.
+function _autCondMultiOnChange(i) {
+ var box = document.getElementById('aut-cond-vals-' + i);
+ if (!box) return;
+ var tabela = (document.getElementById('aut-tabela') || {}).value;
+ var campoSel = (document.getElementById('aut-cond-campo-' + i) || {}).value;
+ var meta = _autCampoMeta(tabela, campoSel);
+ var atual = Array.prototype.map.call(box.querySelectorAll('input[type=checkbox]:checked'), function (cb) { return cb.value; });
+ var opcoes = _autOpcoesComLegado(meta, atual);
+ box.innerHTML = _msRenderDropdown(i, opcoes, atual, '_autCondMultiOnChange', 'Selecione...');
+ if (typeof _noReabrirDropdown === 'function') _noReabrirDropdown('aut-cond-vals-' + i);
+ _autMarcarSujo();
+}
 
 function _autLerCondicoes() {
  var tabela = document.getElementById('aut-tabela').value;
@@ -705,10 +882,16 @@ function _autLerCondicoes() {
   var cond = { campo: campo, operador: op };
   if (!_AUT_OPS_SEM_VALOR[op]) {
    var meta = _autCampoMeta(tabela, campo);
-   if (meta.tipo === 'select' || meta.tipo === 'multi') {
+   if (meta.tipo === 'relacao') {
+    cond.valor = ((document.getElementById('aut-cond-val-id-' + i) || {}).value) || '';
+   } else if (meta.tipo === 'booleano') {
     cond.valor = Array.prototype.map.call(
      document.querySelectorAll('#aut-cond-vals-' + i + ' .aut-vchip.active'),
      function (b) { return b.dataset.v; });
+   } else if (meta.tipo === 'select' || meta.tipo === 'multi') {
+    cond.valor = _autUsaDropdownBusca(meta)
+     ? Array.prototype.map.call(document.querySelectorAll('#aut-cond-vals-' + i + ' input[type=checkbox]:checked'), function (cb) { return cb.value; })
+     : Array.prototype.map.call(document.querySelectorAll('#aut-cond-vals-' + i + ' .aut-vchip.active'), function (b) { return b.dataset.v; });
    } else {
     cond.valor = ((document.getElementById('aut-cond-val-' + i) || {}).value) || '';
    }
@@ -772,10 +955,12 @@ function _autTrocarOperador(i) {
  _autRedesenharConds(tabela, _autLerCondicoes());
  _autMarcarSujo();
 }
-function _autTrocarTabela() {
+async function _autTrocarTabela() {
  // Campos de Projeto não existem em Obra: trocar o alvo zera as condições em
  // vez de deixar uma condição que nunca vai casar com nada.
- _autRedesenharConds(document.getElementById('aut-tabela').value, []);
+ var tabela = document.getElementById('aut-tabela').value;
+ await _autGarantirFontesCarregadas(tabela);
+ _autRedesenharConds(tabela, []);
  _autMarcarSujo();
 }
 function _autRedesenharConds(tabela, conds) {
@@ -800,12 +985,23 @@ async function _autSalvar() {
  if (!nome) { _showToast('Dê um nome para a automação antes de salvar.', 'erro'); return; }
  var acao = _autLerAcao();
  if (!acao[0].titulo) { _showToast('Informe o nome da tarefa que a automação deve criar.', 'erro'); return; }
+ var tabela = (document.getElementById('aut-tabela') || {}).value;
+ var condicoes = _autLerCondicoes();
+ // Nenhuma condição incompleta pode ser salva (Campo + Operador escolhidos e
+ // Valor vazio, ex.: Produto sem nenhum produto marcado) — mesma regra que o
+ // wizard de criação já aplicava, agora também na edição.
+ var faltando = _autPrimeiraCondIncompleta(condicoes, _AUT_OPS_SEM_VALOR);
+ if (faltando) {
+  var labelFaltando = _autCampoMeta(tabela, faltando.campo).label;
+  _showToast('Complete a condição "' + labelFaltando + '": falta escolher o valor.', 'erro');
+  return;
+ }
 
  var payload = {
   nome: nome,
   descricao: ((document.getElementById('aut-desc') || {}).value || '').trim() || null,
-  tabela_alvo: (document.getElementById('aut-tabela') || {}).value,
-  condicoes: _autLerCondicoes(),
+  tabela_alvo: tabela,
+  condicoes: condicoes,
   acao: acao,
   atualizado_por: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.email) || null,
  };
@@ -906,15 +1102,13 @@ function _autWizChecklist(w) {
 
 // Uma automação sem nenhuma condição é aceita pelo motor (roda em qualquer
 // alteração), mas não é o que alguém quer criar sem perceber — no fluxo novo
-// exigimos pelo menos uma condição completa.
+// exigimos pelo menos uma condição completa. A regra de "condição completa"
+// em si vem de scripts/lib/automacao-validacao.js (mesma usada por
+// _autSalvar na edição — as duas NUNCA podem divergir).
 function _autWizCondsOk(w) {
  var conds = w.condicoes || [];
  if (!conds.length) return false;
- return conds.every(function (c) {
-  if (!c || !c.campo || !c.operador) return false;
-  if (_AUT_OPS_SEM_VALOR[c.operador]) return true;
-  return _autValorArr(c.valor).some(function (v) { return String(v).trim() !== ''; });
- });
+ return _autCondicoesTodasCompletas(conds, _AUT_OPS_SEM_VALOR);
 }
 function _autWizPendencia(w, ateOPasso) {
  var f = _autWizChecklist(w).filter(function (i) { return !i.ok && i.passo <= ateOPasso; })[0];
@@ -923,8 +1117,12 @@ function _autWizPendencia(w, ateOPasso) {
 function _autWizValido(w) { return _autWizChecklist(w).every(function (i) { return i.ok; }); }
 
 // ── Abertura: NENHUMA escrita no banco ──────────────────────────────────────
-function _autNova() {
+async function _autNova() {
  _autWiz = _autWizDefault();
+ _autModalSet('Nova automação', 'Nova automação', '<div style="padding:40px;text-align:center;color:var(--muted)">Carregando...</div>', '');
+ _autModalAbrir();
+ await _autGarantirFontesCarregadas(_autWiz.tabela_alvo);
+ if (!_autWiz) return; // fechado antes do carregamento terminar
  _autWizRender();
 }
 
@@ -980,11 +1178,8 @@ function _autWizRender() {
   + '<div class="autw-nav" id="autw-nav"></div>'
   + '</div>';
 
- _spSet('Nova automação', 'Nova automação', html,
+ _autModalSet('Nova automação', 'Nova automação', html,
   '<button class="btn btn-ghost" onclick="_autWizFechar()">Cancelar</button>');
-
- document.getElementById('sp-overlay').classList.add('sp-open');
- document.getElementById('sp-drawer').classList.add('sp-open');
  _autWizAcaoRecolher();
  _autWizPintar();
 }
@@ -1106,42 +1301,34 @@ function _autWizIr(p) {
 // de verdade usa (automacao_criar_tarefa foi refatorada pra consumir a mesma
 // montagem). Nada é inserido: as duas são `stable`, o Postgres nem permitiria
 // uma escrita ali dentro. Nenhuma tarefa é criada nem apagada.
-async function _autWizTestar() {
- var w = _autWiz;
- if (!w) return;
- _autWizSync();
- var falta = _autWizPendencia(w, 4);
- if (falta) { _showToast(falta, 'erro'); return; }
- var box = document.getElementById('autw-teste');
- if (box) box.innerHTML = '<div class="autw-res">Simulando com os dados reais do sistema...</div>';
- if (!_sb) { if (box) box.innerHTML = '<div class="autw-res autw-res-err">Sem conexão com o banco. Não é possível testar agora.</div>'; return; }
+//
+// Compartilhada pelos DOIS fluxos que precisam testar (criação — wizard — e
+// edição de uma automação já existente): a chamada à RPC e a renderização do
+// resultado são as mesmas nos dois; só quem monta tabela/condicoes/acao e o
+// que fazer com o resultado aprovado (w.teste vs. nada) muda por cima.
+async function _autExecutarTeste(tabela, condicoes, acao, boxEl) {
+ if (boxEl) boxEl.innerHTML = '<div class="autw-res">Simulando com os dados reais do sistema...</div>';
+ if (!_sb) { if (boxEl) boxEl.innerHTML = '<div class="autw-res autw-res-err">Sem conexão com o banco. Não é possível testar agora.</div>'; return null; }
 
- var res = await _sb.rpc('automacao_testar', {
-  p_tabela: w.tabela_alvo, p_condicoes: w.condicoes, p_acao: w.acao,
- });
+ var res = await _sb.rpc('automacao_testar', { p_tabela: tabela, p_condicoes: condicoes, p_acao: acao });
  if (res.error) {
   console.error('[Automações] erro no teste:', res.error);
-  if (box) box.innerHTML = '<div class="autw-res autw-res-err">Não foi possível simular agora. Tente de novo em alguns instantes.</div>';
-  return;
+  if (boxEl) boxEl.innerHTML = '<div class="autw-res autw-res-err">Não foi possível simular agora. Tente de novo em alguns instantes.</div>';
+  return null;
  }
  var r = res.data || {};
  if (!r.ok) {
-  w.teste = null;
-  if (box) box.innerHTML = '<div class="autw-res autw-res-err">'
+  if (boxEl) boxEl.innerHTML = '<div class="autw-res autw-res-err">'
    + (r.motivo === 'acao_incompleta'
       ? 'Falta o nome da tarefa que a automação deve criar.'
       : 'A configuração da automação ainda não está completa.')
    + '</div>';
-  _autWizPintar();
-  return;
+  return r;
  }
 
  // Aprovado nos dois casos: com registro de exemplo, ou sem registro real hoje
  // que atenda às condições (que não é erro — só não há o que simular agora).
- w.teste = r;
- w.assinatura = _autWizAssinatura(w);
-
- if (box) box.innerHTML = r.encontrado
+ if (boxEl) boxEl.innerHTML = r.encontrado
   ? '<div class="autw-res autw-res-ok">'
     + '<div class="autw-res-tit">&#10003; Automação válida</div>'
     + '<div class="autw-res-lin"><b>Registro utilizado no teste:</b> ' + _autEsc((r.registro || {}).nome) + '</div>'
@@ -1154,7 +1341,35 @@ async function _autWizTestar() {
     + '<div class="autw-res-lin">Não existe hoje nenhum registro que atenda a essas condições, então não deu para mostrar um exemplo real. A configuração está correta e a automação vai funcionar quando um registro entrar nessas condições.</div>'
     + '<div class="autw-res-nota">Isso é apenas uma simulação. Nenhuma tarefa foi criada.</div>'
     + '</div>';
+ return r;
+}
+
+async function _autWizTestar() {
+ var w = _autWiz;
+ if (!w) return;
+ _autWizSync();
+ var falta = _autWizPendencia(w, 4);
+ if (falta) { _showToast(falta, 'erro'); return; }
+ var box = document.getElementById('autw-teste');
+ var r = await _autExecutarTeste(w.tabela_alvo, w.condicoes, w.acao, box);
+ if (!r || !r.ok) { w.teste = null; _autWizPintar(); return; }
+ w.teste = r;
+ w.assinatura = _autWizAssinatura(w);
  _autWizPintar();
+}
+
+// Mesmo teste, agora sobre a automação já existente sendo editada — não é
+// obrigatório pra salvar (uma automação em produção continua editável e
+// salvável sem forçar um novo teste a cada alteração pequena), mas fica
+// disponível pra quem quer confirmar antes de salvar (itens 9/10/12).
+async function _autTestarEdicao() {
+ var tabela = (document.getElementById('aut-tabela') || {}).value;
+ var condicoes = _autLerCondicoes();
+ var acao = _autLerAcao();
+ var box = document.getElementById('aut-teste-edicao');
+ if (!box) return;
+ box.style.display = 'block';
+ await _autExecutarTeste(tabela, condicoes, acao, box);
 }
 
 function _autWizNomeUsuario(email) {
@@ -1255,7 +1470,7 @@ function _autWizFechar() {
  // Descarta o rascunho inteiro. Não há nada no banco pra limpar — é esse o
  // ponto do fluxo novo.
  _autWiz = null;
- closePanel();
+ _autModalFechar();
 }
 
 async function _autDuplicar() {
@@ -1299,7 +1514,7 @@ async function _autExcluir() {
  var i = _autData.findIndex(function (x) { return String(x.id) === String(id); });
  if (i !== -1) _autData.splice(i, 1);
  _autRender();
- closePanel();
+ _autModalFechar();
  _showToast('Automação excluída.', 'ok');
 }
 
@@ -1370,8 +1585,8 @@ function _autInitRealtime() {
    // Painel aberto nessa automação: NÃO redesenha embaixo de quem pode estar
    // no meio de uma edição — só mostra a faixa com o botão "Atualizar".
    if (String((_autAtiva || {}).id) === String(nova.id)
-    && document.getElementById('sp-drawer')
-    && document.getElementById('sp-drawer').classList.contains('sp-open')
+    && document.getElementById('aut-modal')
+    && document.getElementById('aut-modal').classList.contains('aut-modal-open')
     && typeof _rtAvisoAlteracaoExterna === 'function'
     && !_rtSouEu(nova.atualizado_por)) {
     _rtAvisoAlteracaoExterna(nova.atualizado_por, "_spAutomacaoById('" + nova.id + "')");
@@ -1385,7 +1600,7 @@ function _autInitRealtime() {
    _autRender();
    if (String((_autAtiva || {}).id) === String(id)) {
     _showToast('A automação que você tinha aberta foi excluída por outro usuário.', 'erro');
-    closePanel();
+    _autModalFechar();
    }
   },
  });

@@ -34,6 +34,7 @@
 <script src="scripts/lib/fornecedor-validacao.js?v=mldsv336"></script>
 <script src="scripts/lib/multiselect-ui.js?v=mldsv336"></script>
 <script src="scripts/lib/searchable-select.js?v=mldsv336"></script>
+<script src="scripts/lib/automacao-validacao.js?v=mldsv336"></script>
 <script src="scripts/lib/badge-colors.js?v=mldsv336"></script>
 <script src="scripts/services/usuarios.service.js?v=mldsv336"></script>
 <script src="scripts/services/auth.service.js?v=mldsv336"></script>
@@ -60,6 +61,20 @@
  <div id="prop-viewer-area" class="prop-a4-viewer" style="flex:1;overflow-y:auto;overflow-x:auto">
   <div id="proposta-comercial-content"></div>
  </div>
+</div>
+
+<!-- AUTOMAÇÕES — widget central (modal), único componente para Nova/Editar/Ver -->
+<div id="aut-modal-overlay" onclick="_autModalBackdropClick(event)"></div>
+<div id="aut-modal" role="dialog" aria-modal="true" aria-labelledby="autm-title">
+ <div class="autm-header">
+  <div class="autm-header-text">
+   <span class="autm-tag" id="autm-tag">Automação</span>
+   <span class="autm-title" id="autm-title">Detalhes</span>
+  </div>
+  <button class="autm-close" type="button" onclick="_autModalFechar()" aria-label="Fechar">&times;</button>
+ </div>
+ <div class="autm-body" id="autm-body"></div>
+ <div class="autm-footer" id="autm-footer"></div>
 </div>
 
 <!-- SIDE PANEL -->
