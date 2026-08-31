@@ -805,6 +805,12 @@ function _spAutomacaoRender(a) {
  if (typeof _ccSetBaseline === 'function') _ccSetBaseline('automacoes', a.id, Object.assign({}, a));
  if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
  if (typeof _sptInitScrollSpy === 'function') _sptInitScrollSpy();
+ // As 3 abas são rolagem contínua (.spt-panel é sempre visível — "Alterações"
+ // já carregava assim, ver _histCarregar logo abaixo); "Histórico de
+ // execuções" só carregava no clique da própria aba, então ficava preso em
+ // "Carregando..." visível pra sempre embaixo de "Testar automação" pra quem
+ // nunca clicasse nela (achado real, mal formatado no widget central).
+ _autCarregarExecucoes();
  if (typeof _histCarregar === 'function') _histCarregar('sp-aut-hist', 'automacoes', a.id);
 }
 
@@ -1622,9 +1628,10 @@ function _autContarExecucao(e, ehUpdate) {
  if (a) _autPatchNaLista(a);
  // Se o usuário está justamente com o histórico dessa automação aberto,
  // recarrega a lista de execuções pra a nova aparecer sem F5.
- if (String((_autAtiva || {}).id) === String(e.automacao_id)) {
-  var painel = document.getElementById('spt-aut-exec');
-  if (painel && painel.classList.contains('active')) _autCarregarExecucoes();
+ // .spt-panel é sempre visível (rolagem contínua, não esconde por aba) —
+ // não faz sentido mais checar uma classe .active que ninguém liga nele.
+ if (String((_autAtiva || {}).id) === String(e.automacao_id) && document.getElementById('spt-aut-exec')) {
+  _autCarregarExecucoes();
  }
 }
 
