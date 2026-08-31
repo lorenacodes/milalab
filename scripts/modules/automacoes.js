@@ -778,9 +778,14 @@ function _spAutomacaoRender(a) {
 
   + '</div>'
   // Teste (dry-run) também disponível na edição (itens 9/10/12) — não é
-  // obrigatório pra salvar, é uma ferramenta pra conferir antes.
-  + '<button type="button" class="btn btn-ghost aut-add" onclick="_autTestarEdicao()">Testar automação</button>'
-  + '<div id="aut-teste-edicao" style="display:none"></div>'
+  // obrigatório pra salvar, é uma ferramenta pra conferir antes. Só aparece
+  // depois que a automação já foi criada E ativada (pedido explícito do
+  // dono): enquanto está inativa, testar de novo não agrega — quem quer
+  // testar antes de existir usa o assistente de criação, que já exige teste.
+  + (a.ativo
+     ? '<button type="button" class="btn btn-ghost aut-add" onclick="_autTestarEdicao()">Testar automação</button>'
+       + '<div id="aut-teste-edicao" style="display:none"></div>'
+     : '')
   + '<div id="aut-sujo-bar" class="aut-sujo-bar" style="display:none">'
   + '<span>Você tem alterações não salvas.</span>'
   + '<button type="button" class="btn btn-primary" onclick="_autSalvar()">Salvar alterações</button>'
