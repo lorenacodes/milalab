@@ -304,6 +304,11 @@ var _entSbFields = [
  { key: 'peso',        label: 'Peso (kg)',     type: 'number', getValue: function(ds) { return parseFloat(ds.peso) || 0; } },
  { key: 'maiorPeca',   label: 'Maior peça (mm)', type: 'number', getValue: function(ds) { return parseFloat(ds.maiorPeca) || 0; } },
  { key: 'valor',       label: 'Valor',         type: 'number', getValue: function(ds) { return parseFloat(ds.valor) || 0; } },
+ // Pedido explícito: ordenar pelas entregas com alteração mais recente
+ // primeiro. type:'number' (não 'date') porque o valor é um timestamp com
+ // hora (epoch ms, ver alteradoEmTs em _entPseudoDataset) — 'date' assume
+ // só o dia. Ordenar "desc" traz as alteradas por último no topo.
+ { key: 'alteradoEm',  label: 'Última alteração', type: 'number', getValue: function(ds) { return ds.alteradoEmTs; } },
 ];
 _sbInit('entregas', _entSbFields, _entApplyFilters);
 
@@ -448,6 +453,13 @@ function _entPseudoDataset(e) {
   criadoPor:   (typeof _projAuditNome === 'function' ? _projAuditNome(e.criado_por) : (e.criado_por || '—')).toLowerCase(),
   alteradoPor: (typeof _projAuditNome === 'function' ? _projAuditNome(e.atualizado_por) : (e.atualizado_por || '—')).toLowerCase(),
   horarioCriacao: e.created_at ? String(e.created_at).slice(0, 10) : '',
+  // Timestamp bruto (epoch ms), não string 'YYYY-MM-DD' — updated_at do
+  // Postgres vem com hora (trigger de auditoria já existente, ver
+  // set_entregas_atualizado_por no banco), e o comparador type:'date' do
+  // sort-builder assume só data (concatena 'T00:00:00' na string). 0 pra
+  // "nunca alterado" (não deveria acontecer, updated_at tem default no
+  // banco) em vez de Infinity, pra não aparecer como "mais recente" à toa.
+  alteradoEmTs: e.updated_at ? new Date(e.updated_at).getTime() : 0,
  };
 }
 function _entSearchHaystack(e) {
