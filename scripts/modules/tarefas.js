@@ -450,7 +450,30 @@ async function _gestorLoadKpis() {
 }
 
 // ── Carregar dados ─────────────────────────────────────────────────────────
+// _gestorLoad é chamada de vários gatilhos que podem coincidir quase no mesmo
+// instante (troca pra aba Gestor, criar uma atividade, evento de tempo real
+// de `atividades`) — achado real: duas chamadas concorrentes disputavam as
+// mesmas globais de lookup (_gestorObrasMap/_gestorProjMap/_gestorMelhMap,
+// zeradas e repovoadas por referência a cada chamada), e uma chamada podia
+// terminar lendo os mapas já zerados pela OUTRA que ainda estava carregando —
+// resultado: nome de obra/projeto sumindo da grade até o próximo reload.
+// Wrapper "coalesce + trailing": só uma carga roda de cada vez; uma chamada
+// que chegar enquanto outra está em andamento não dispara uma segunda carga
+// concorrente, só marca que uma recarga é necessária assim que a atual
+// terminar (nenhuma chamada é perdida, mas nunca há duas rodando juntas).
+var _gestorLoadInFlight = false;
+var _gestorLoadPending  = false;
 async function _gestorLoad() {
+ if (_gestorLoadInFlight) { _gestorLoadPending = true; return; }
+ _gestorLoadInFlight = true;
+ try {
+  await _gestorLoadImpl();
+ } finally {
+  _gestorLoadInFlight = false;
+  if (_gestorLoadPending) { _gestorLoadPending = false; _gestorLoad(); }
+ }
+}
+async function _gestorLoadImpl() {
  var lbl  = document.getElementById('gestor-sync-lbl');
  var spin = document.getElementById('gestor-loading-spin');
  if (lbl)  lbl.textContent = 'Carregando dados...';
@@ -566,8 +589,14 @@ async function _gestorLoad() {
 
   // Tempo real: qualquer INSERT/UPDATE/DELETE em atividades (inclusive vindo
   // do sync do Airtable) recarrega a lista sozinho — sem precisar recarregar
-  // a página. _rtWatch já remove a inscrição anterior, então é seguro chamar
-  // de novo toda vez que o usuário reabre o Gestor de Tarefas.
+  // a página. _rtWatch (scripts/lib/realtime-sync.js) deduplica por
+  // referência de função — como _gestorLoad é sempre a MESMA função, chamar
+  // de novo toda vez que o usuário reabre o Gestor de Tarefas não acumula
+  // callbacks duplicados na lista (achado real: sem essa dedupe, cada
+  // reabertura da aba somava mais uma cópia de _gestorLoad; um evento
+  // realtime real disparava N _gestorLoad concorrentes, que corrompiam as
+  // globais de atividades-vinculos.js entre si e faziam o nome da obra
+  // "sumir" da grade até o próximo reload).
   if (typeof _rtWatch === 'function') _rtWatch('atividades', _gestorLoad);
 
  } catch(e) {

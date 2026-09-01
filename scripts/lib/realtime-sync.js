@@ -13,7 +13,12 @@ var _rtCallbacks = {}; // table -> [reloadFn, ...] — vários módulos podem ob
 // atualização em tempo real.
 function _rtWatch(table, reloadFn, debounceMs) {
  if (!_rtCallbacks[table]) _rtCallbacks[table] = [];
- _rtCallbacks[table].push(reloadFn);
+ // Sem isto, um módulo que chama _rtWatch de novo a cada vez que recarrega
+ // (ex.: _gestorLoad se reinscrevendo no próprio fim, achado real) acumulava
+ // N cópias da MESMA função na lista — um evento real disparava N reloads
+ // concorrentes, que corrompiam globais compartilhadas entre si (ver
+ // atividades-vinculos.js) e podiam deixar a tela com dado parcial/vazio.
+ if (_rtCallbacks[table].indexOf(reloadFn) === -1) _rtCallbacks[table].push(reloadFn);
  if (_rtChannels[table]) return _rtChannels[table]; // canal já existe, só somou o callback
  var timer = null;
  var trigger = function () {

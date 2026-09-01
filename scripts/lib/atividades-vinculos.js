@@ -3,28 +3,41 @@
 // atividades_obras/atividades_projetos/atividades_melhorias/atividades_responsaveis.
 // Compartilhado entre Dashboard e Gestor de Tarefas.
 // ═══════════════════════════════════════════════════════════════════════════════
+// Chamadas concorrentes (realtime + troca de aba + criação de atividade,
+// quase simultâneas) compartilham as mesmas globais _avObraMap/_avProjMap/
+// _avMelhMap — achado real: cada chamada zerava essas globais na entrada
+// (_avObraMap = {} etc.) ANTES de paginar de novo, então uma chamada mais
+// lenta apagava o resultado que outra, mais rápida, tinha acabado de gravar,
+// e quem lia os mapas nesse meio-tempo via tudo vazio (nome de obra "sumia"
+// da grade do Gestor de Tarefas até o próximo reload). Duas correções:
+// (1) só escrever nas globais no final, com o mapa já pronto — nunca um
+// estado "zerado" no meio do caminho; (2) uma chamada em andamento é
+// reaproveitada por quem pedir de novo enquanto ela não termina (coalescing
+// via _avLoadInFlight), em vez de cada chamada rodar sua própria paginação
+// em paralelo disputando as mesmas globais.
+var _avLoadInFlight = null;
 async function _loadAtividadeVinculosCache() {
- // Recarrega sempre (não memoiza para sempre): _gestorLoad() chama isto a cada
- // boot, refresh manual e evento realtime de `atividades`, e vínculos podem
- // mudar entre uma chamada e outra (edição no sistema ou sync do Airtable).
- _avObraMap = {}; _avProjMap = {}; _avMelhMap = {};
- async function pageAll(table, col) {
-  var map = {}, pg = 0, sz = 1000;
-  while (true) {
-   var r = await _sb.from(table).select('atividade_id,' + col).range(pg*sz, (pg+1)*sz-1);
-   if (r.error || !r.data || !r.data.length) break;
-   r.data.forEach(function(row){ if (!map[row.atividade_id]) map[row.atividade_id] = row[col]; });
-   if (r.data.length < sz) break;
-   pg++;
+ if (_avLoadInFlight) return _avLoadInFlight;
+ _avLoadInFlight = (async function() {
+  async function pageAll(table, col) {
+   var map = {}, pg = 0, sz = 1000;
+   while (true) {
+    var r = await _sb.from(table).select('atividade_id,' + col).range(pg*sz, (pg+1)*sz-1);
+    if (r.error || !r.data || !r.data.length) break;
+    r.data.forEach(function(row){ if (!map[row.atividade_id]) map[row.atividade_id] = row[col]; });
+    if (r.data.length < sz) break;
+    pg++;
+   }
+   return map;
   }
-  return map;
- }
- var [om, pm, mm] = await Promise.all([
-  pageAll('atividades_obras', 'obra_id'),
-  pageAll('atividades_projetos', 'projeto_id'),
-  pageAll('atividades_melhorias', 'melhoria_id'),
- ]);
- _avObraMap = om; _avProjMap = pm; _avMelhMap = mm;
+  var [om, pm, mm] = await Promise.all([
+   pageAll('atividades_obras', 'obra_id'),
+   pageAll('atividades_projetos', 'projeto_id'),
+   pageAll('atividades_melhorias', 'melhoria_id'),
+  ]);
+  _avObraMap = om; _avProjMap = pm; _avMelhMap = mm;
+ })();
+ try { await _avLoadInFlight; } finally { _avLoadInFlight = null; }
 }
 // Enriquece uma lista de atividades (já buscadas do Supabase) com obra_id/projeto_id/
 // melhoria_id (lidos da junction) e converte responsavel (array) em string de nomes.
