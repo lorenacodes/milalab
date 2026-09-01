@@ -57,6 +57,14 @@ var _AUT_PRIORIDADES   = ['Alta','Média','Baixa'];
 var _AUT_STATUS_TAREFA = ['A fazer','Em progresso','Aguardando feedback','Feito'];
 var _AUT_TIPOS_TAREFA  = ['Tarefa','Evento','Rotina','P&D','Visita de campo'];
 
+// ── Automações de Recorrência (gatilho_tipo='agendado') — vocabulário do
+// agendamento. dia_semana usa a mesma convenção do Postgres extract(dow):
+// 0=domingo...6=sábado (ver calcular_proxima_execucao, migração
+// automacoes_recorrencia_agendada) — os valores aqui têm que bater com isso.
+var _AUT_FREQUENCIAS = [['diario','Todos os dias'],['semanal','Toda semana'],['mensal','Todo mês'],['anual','Todo ano']];
+var _AUT_DIAS_SEMANA = [['0','Domingo'],['1','Segunda'],['2','Terça'],['3','Quarta'],['4','Quinta'],['5','Sexta'],['6','Sábado']];
+var _AUT_DIAS_SEMANA_NOMES = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
+
 // Catálogo de campos por tabela alvo. `tipo` decide o componente da coluna
 // "valor" (§4: nunca texto livre onde o campo original é lista) e quais
 // operadores aparecem (§5).
@@ -313,7 +321,24 @@ function _autCondCurta(tabela, c) {
 // voltaria a dizer "tiver Etapa do Projeto é igual a X E Tipo de Projeto é
 // igual a Y" — exatamente a "lista técnica" que o dono pediu pra sair daqui.
 // Então: a etapa vira o verbo ("entrar em X") e o resto vira qualificador.
+// "Toda segunda-feira às 08:00" / "Todo dia às 08:00" / "Todo mês (dia 5) às
+// 09:00" / "Todo ano às 08:00" — mesma ideia de _autGatilhoFrase, só que pro
+// gatilho por agenda em vez de por condição.
+function _autAgendaFrase(ag) {
+ ag = ag || {};
+ var hor = (ag.horario || '08:00').slice(0, 5);
+ if (ag.frequencia === 'diario') return 'Todo dia às ' + hor;
+ if (ag.frequencia === 'semanal') {
+  var nomeDia = ag.dia_semana != null ? _AUT_DIAS_SEMANA_NOMES[Number(ag.dia_semana)] : null;
+  return (nomeDia ? 'Toda ' + nomeDia : 'Toda semana') + ' às ' + hor;
+ }
+ if (ag.frequencia === 'mensal') return 'Todo mês' + (ag.dia_mes ? ' (dia ' + ag.dia_mes + ')' : '') + ' às ' + hor;
+ if (ag.frequencia === 'anual') return 'Todo ano às ' + hor;
+ return 'Agendamento não configurado';
+}
+
 function _autGatilhoFrase(a) {
+ if (a.gatilho_tipo === 'agendado') return _autAgendaFrase(a.agendamento);
  var conds = (a.condicoes || []).filter(function (c) { return c && c.campo; });
  var sujeito = _autSujeito(a.tabela_alvo);
  if (!conds.length) return 'Quando ' + sujeito + ' for criado ou alterado';
@@ -473,10 +498,13 @@ function _autRender() {
  // Agrupado por registro observado. O título do grupo é só texto pequeno +
  // contagem: agrupar não pode virar outro card grande competindo com os cards
  // de verdade.
- var grupos = { projetos: [], obras: [] };
- dados.forEach(function (a) { (grupos[a.tabela_alvo] || (grupos[a.tabela_alvo] = [])).push(a); });
+ var grupos = { projetos: [], obras: [], agendado: [] };
+ dados.forEach(function (a) {
+  var k = a.gatilho_tipo === 'agendado' ? 'agendado' : a.tabela_alvo;
+  (grupos[k] || (grupos[k] = [])).push(a);
+ });
  var html = '';
- [['projetos', 'Projetos'], ['obras', 'Obras']].forEach(function (g) {
+ [['agendado', 'Recorrência'], ['projetos', 'Projetos'], ['obras', 'Obras']].forEach(function (g) {
   var arr = grupos[g[0]] || [];
   if (!arr.length) return;
   html += '<div class="aut-group-title">' + g[1] + ' <span>' + arr.length + '</span></div>'
@@ -532,7 +560,12 @@ function _autCardHTML(a) {
   + '<div class="aut-rule">'
   + '<div class="aut-rule-row">'
   + '<span class="aut-rule-ic aut-rule-ic-t" aria-hidden="true">'
-  + '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>'
+  + (a.gatilho_tipo === 'agendado'
+     // Indicação visual discreta (pedido explícito, §6): relógio no lugar do
+     // raio só pra essa linha do card — resto do card (badges, layout,
+     // tipografia) é idêntico ao das automações por condição.
+     ? '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+     : '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/></svg>')
   + '</span>'
   + '<span class="aut-rule-tx">' + _autEsc(_autGatilhoFrase(a)) + '</span>'
   + '</div>'
@@ -563,6 +596,7 @@ async function _spAutomacaoById(id) {
    '<button class="btn btn-ghost" onclick="_autModalFechar()">Fechar</button>');
   return;
  }
+ if (res.data.gatilho_tipo === 'agendado') { _spAutomacaoAgendadaRender(res.data); return; }
  // Garante que as fontes de dados reais (Produto, Obra...) dos campos dessa
  // tabela já foram carregadas antes de montar o construtor de condições.
  await _autGarantirFontesCarregadas(res.data.tabela_alvo);
@@ -657,7 +691,16 @@ function _autCondHTML(tabela, c, i) {
   + '</div>';
 }
 
-function _autAcaoHTML(ac) {
+// opts.semVinculos: usado pela Automação de Recorrência (agendada) — não tem
+// "registro que disparou" (não há obra/projeto de origem, o gatilho é o
+// relógio), então os checkboxes de vincular obra/projeto/melhoria não fazem
+// sentido nesse contexto e ficariam confusos (marcados mas sem efeito
+// nenhum). O resto do formulário — nome, tipo, área, responsáveis,
+// prioridade, status, privacidade, datas — é EXATAMENTE o mesmo, mesmos ids,
+// mesma função: _autLerAcao() continua lendo os dois contextos sem saber
+// (nem precisar saber) a diferença.
+function _autAcaoHTML(ac, opts) {
+ opts = opts || {};
  var di = ac.data_inicio || {}, df = ac.data_fim || {};
  var resp = _autValorArr(ac.responsaveis);
  var usuarios = (typeof _usuariosCache !== 'undefined' && _usuariosCache) ? _usuariosCache : [];
@@ -693,11 +736,271 @@ function _autAcaoHTML(ac) {
   + '<div class="sp-field"><div class="sp-label">Data de fim (prazo)</div><select class="sp-inp" id="aut-ac-df-base" onchange="_autMarcarSujo()">' + _autOptsHTML(_AUT_BASES_DATA, df.base || 'hoje') + '</select></div>'
   + '<div class="sp-field"><div class="sp-label">+ dias</div><input class="sp-inp" type="number" id="aut-ac-df-dias" value="' + _autEsc(df.dias == null ? 0 : df.dias) + '" oninput="_autMarcarSujo()"></div>'
   + '</div>'
-  + '<div class="sp-stitle">Vínculos automáticos</div>'
-  + '<label class="aut-check"><input type="checkbox" id="aut-ac-vobra" ' + (ac.vincular_obra === false ? '' : 'checked') + ' onchange="_autMarcarSujo()"> Vincular a Obra do registro que disparou</label>'
-  + '<label class="aut-check"><input type="checkbox" id="aut-ac-vproj" ' + (ac.vincular_projeto === false ? '' : 'checked') + ' onchange="_autMarcarSujo()"> Vincular o Projeto do registro que disparou</label>'
-  + '<label class="aut-check"><input type="checkbox" id="aut-ac-vmelh" ' + (ac.vincular_melhoria ? 'checked' : '') + ' onchange="_autMarcarSujo()"> Vincular a Melhoria associada ao projeto</label>'
+  + (opts.semVinculos ? '' :
+     '<div class="sp-stitle">Vínculos automáticos</div>'
+     + '<label class="aut-check"><input type="checkbox" id="aut-ac-vobra" ' + (ac.vincular_obra === false ? '' : 'checked') + ' onchange="_autMarcarSujo()"> Vincular a Obra do registro que disparou</label>'
+     + '<label class="aut-check"><input type="checkbox" id="aut-ac-vproj" ' + (ac.vincular_projeto === false ? '' : 'checked') + ' onchange="_autMarcarSujo()"> Vincular o Projeto do registro que disparou</label>'
+     + '<label class="aut-check"><input type="checkbox" id="aut-ac-vmelh" ' + (ac.vincular_melhoria ? 'checked' : '') + ' onchange="_autMarcarSujo()"> Vincular a Melhoria associada ao projeto</label>')
   + '</div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTOMAÇÃO DE RECORRÊNCIA — gatilho_tipo='agendado' (migração
+// automacoes_recorrencia_agendada). Mesmo container/modal, mesmas classes
+// .aut-flow-card/.sp-field/.sp-g2/.aut-toggle/.aut-sujo-bar do fluxo por
+// condição — só troca o card GATILHO (que lá é "observar mudanças em
+// Obra/Projeto + condições") por um card QUANDO (frequência/dia/horário). O
+// card AÇÃO reaproveita _autAcaoHTML/_autLerAcao SEM NENHUMA MUDANÇA de
+// lógica — só esconde os 3 checkboxes de vínculo automático (obra/projeto/
+// melhoria), que não fazem sentido aqui: não existe "registro que disparou".
+// ═══════════════════════════════════════════════════════════════════════════
+function _autHojeISO() {
+ var d = new Date();
+ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Campo extra que muda conforme a frequência: dia da semana (semanal), dia
+// do mês (mensal); diário/anual não precisam de campo a mais (anual reaproveita
+// o dia/mês da própria Data de início, calcular_proxima_execucao no banco).
+function _autAgendaDetalheHTML(ag) {
+ var freq = ag.frequencia || 'semanal';
+ var extra = '';
+ if (freq === 'semanal') {
+  extra = '<div class="sp-field"><div class="sp-label">Dia da semana</div><select class="sp-inp" id="aut-ag-dia-semana" onchange="_autMarcarSujo();_autAtualizarResumoAgenda()">'
+   + _autOptsHTML(_AUT_DIAS_SEMANA, ag.dia_semana != null ? String(ag.dia_semana) : '1') + '</select></div>';
+ } else if (freq === 'mensal') {
+  extra = '<div class="sp-field"><div class="sp-label">Dia do mês</div><input class="sp-inp" type="number" min="1" max="31" id="aut-ag-dia-mes" value="' + _autEsc(ag.dia_mes || 1) + '" oninput="_autMarcarSujo();_autAtualizarResumoAgenda()"></div>';
+ }
+ return '<div class="sp-g2">'
+  + extra
+  + '<div class="sp-field"><div class="sp-label">Horário</div><input class="sp-inp" type="time" id="aut-ag-horario" value="' + _autEsc((ag.horario || '08:00').slice(0, 5)) + '" onchange="_autMarcarSujo();_autAtualizarResumoAgenda()"></div>'
+  + '</div>';
+}
+function _autAgendaHTML(ag) {
+ ag = ag || {};
+ return '<div class="aut-acao">'
+  + '<div class="sp-field"><div class="sp-label">Repetir</div><select class="sp-inp" id="aut-ag-freq" onchange="_autAgendaFreqChange()">' + _autOptsHTML(_AUT_FREQUENCIAS, ag.frequencia || 'semanal') + '</select></div>'
+  + '<div id="aut-ag-detalhe">' + _autAgendaDetalheHTML(ag) + '</div>'
+  + '<div class="sp-g2">'
+  + '<div class="sp-field"><div class="sp-label">Data de início</div><input class="sp-inp" type="date" id="aut-ag-dt-inicio" value="' + _autEsc(ag.data_inicio || _autHojeISO()) + '" onchange="_autMarcarSujo();_autAtualizarResumoAgenda()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Data de término (opcional)</div><input class="sp-inp" type="date" id="aut-ag-dt-fim" value="' + _autEsc(ag.data_fim || '') + '" onchange="_autMarcarSujo();_autAtualizarResumoAgenda()"></div>'
+  + '</div>'
+  + '<div class="aut-hint">Deixe a data de término em branco pra a recorrência continuar indefinidamente.</div>'
+  + '</div>';
+}
+// Frequência trocada: o campo do meio (dia da semana/dia do mês) muda de
+// componente, então redesenha só esse pedaço em vez do card inteiro.
+function _autAgendaFreqChange() {
+ _autMarcarSujo();
+ var box = document.getElementById('aut-ag-detalhe');
+ if (box) box.innerHTML = _autAgendaDetalheHTML(_autLerAgendamento());
+ _autAtualizarResumoAgenda();
+}
+// Mantém o subtítulo do card recolhido "Repetir automaticamente" (e o recap
+// acima do card AÇÃO) em dia enquanto o usuário mexe no agendamento — mesma
+// ideia de _autAtualizarResumoAcao, só que pro card QUANDO.
+function _autAtualizarResumoAgenda() {
+ var frase = _autAgendaFrase(_autLerAgendamento());
+ var el = document.getElementById('aut-flow-agenda-resumo'); if (el) el.textContent = frase;
+ var recap = document.querySelector('.aut-flow-actions-recap'); if (recap) recap.textContent = frase;
+}
+function _autLerAgendamento() {
+ var freq = ((document.getElementById('aut-ag-freq') || {}).value) || 'semanal';
+ var diaSemanaEl = document.getElementById('aut-ag-dia-semana');
+ var diaMesEl = document.getElementById('aut-ag-dia-mes');
+ return {
+  frequencia: freq,
+  horario: ((document.getElementById('aut-ag-horario') || {}).value) || '08:00',
+  dia_semana: (freq === 'semanal' && diaSemanaEl) ? parseInt(diaSemanaEl.value, 10) : null,
+  dia_mes: (freq === 'mensal' && diaMesEl) ? (parseInt(diaMesEl.value, 10) || 1) : null,
+  data_inicio: ((document.getElementById('aut-ag-dt-inicio') || {}).value) || _autHojeISO(),
+  data_fim: ((document.getElementById('aut-ag-dt-fim') || {}).value) || null,
+ };
+}
+
+// criando=true: rascunho só em memória, nada no banco ainda até "Criar
+// automação" — mesmo princípio já usado pelo wizard de condição (abrir
+// formulário ≠ criar registro), só que sem os passos/teste obrigatório: o
+// pedido aqui foi explícito por uma interface simples, objetiva.
+function _spAutomacaoAgendadaRender(a, criando) {
+ _autWiz = null;
+ _autAtiva = JSON.parse(JSON.stringify(a));
+ var ac = _autPrimeiraAcao(_autAtiva);
+ var ag = _autAtiva.agendamento || {};
+ var colapsado = (!criando && ac.titulo) ? ' aut-collapsed' : '';
+
+ var html = ''
+  + '<input type="hidden" id="sp-aut-id" value="' + _autEsc(a.id || '') + '">'
+
+  + (criando ? '' :
+     '<div class="spt-bar">'
+     + '<button class="spt-btn active" data-target="spt-aut-config" onclick="_sptSwitch(\'aut-config\',this)">Configuração</button>'
+     + '<button class="spt-btn" data-target="spt-aut-exec" onclick="_sptSwitch(\'aut-exec\',this);_autCarregarExecucoes()">Histórico de execuções</button>'
+     + '<button class="spt-btn" data-target="spt-aut-hist" onclick="_sptSwitch(\'aut-hist\',this)">Alterações</button>'
+     + '</div>')
+
+  + '<div class="spt-panel" id="spt-aut-config">'
+  + (criando ? '<div class="aut-hint">Configure abaixo e clique em "Criar automação" — nada é gravado até lá.</div>' :
+     '<div class="aut-summary-card' + (a.ativo ? '' : ' aut-summary-card-off') + '">'
+     + '<span class="aut-summary-status">' + (a.ativo
+         ? '<span class="aut-status-dot aut-status-dot-on"></span>Ativa'
+         : '<span class="aut-status-dot"></span>Inativa') + '</span>'
+     + '<div class="aut-summary-frase">' + _autEsc(_autFraseLegivel(_autAtiva)) + '</div>'
+     + '</div>'
+     + '<label class="aut-toggle"><input type="checkbox" id="aut-ativo" ' + (a.ativo ? 'checked' : '') + ' onchange="_autSalvarAtivo()">'
+     + '<span>Automação ativa</span></label>'
+     + '<div class="aut-hint">Automação inativa não cria novas tarefas. Ao reativar, ela volta a valer só a partir da próxima ocorrência — nada é criado retroativamente. Tarefas já criadas por ela continuam normalmente no Gestor de Tarefas.</div>')
+  + '<div class="sp-field"><div class="sp-label">Nome</div><input class="sp-inp" id="aut-nome" placeholder="Ex.: Conferir relatório de vendas toda segunda" value="' + _autEsc(a.nome || '') + '" oninput="_autMarcarSujo()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Descrição</div><textarea class="sp-inp" rows="2" id="aut-desc" placeholder="Opcional">' + _autEsc(a.descricao || '') + '</textarea></div>'
+
+  + '<div class="sp-stitle">Como funciona</div>'
+  + '<div class="aut-flow">'
+
+  + '<div class="aut-flow-label">QUANDO</div>'
+  + '<div class="aut-flow-card" onclick="_autToggleFlow(\'agenda\')">'
+  + '<div class="aut-flow-icon aut-flow-icon-trigger">'
+  + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  + '</div>'
+  + '<div class="aut-flow-card-text">'
+  + '<div class="aut-flow-card-title">Repetir automaticamente</div>'
+  + '<div class="aut-flow-card-sub" id="aut-flow-agenda-resumo">' + _autEsc(_autAgendaFrase(ag)) + '</div>'
+  + '</div>'
+  + '<div class="aut-flow-chevron" id="aut-flow-chevron-agenda">' + (colapsado ? '&#9662;' : '&#9652;') + '</div>'
+  + '</div>'
+  + '<div class="aut-flow-detail' + colapsado + '" id="aut-flow-detail-agenda">'
+  + _autAgendaHTML(ag)
+  + '</div>'
+
+  + '<div class="aut-flow-connector"><span class="aut-flow-dot">&#10003;</span></div>'
+
+  + '<div class="aut-flow-label">AÇÃO</div>'
+  + '<div class="aut-flow-card aut-flow-actions-outer">'
+  + '<div class="aut-flow-actions-recap">' + _autEsc(_autAgendaFrase(ag)) + '</div>'
+  + '<div class="aut-flow-nested" onclick="_autToggleFlow(\'acao\')">'
+  + '<div class="aut-flow-icon aut-flow-icon-action">+</div>'
+  + '<div class="aut-flow-card-text">'
+  + '<div class="aut-flow-card-title">Criar tarefa</div>'
+  + '<div class="aut-flow-card-sub" id="aut-flow-acao-resumo">' + _autEsc(ac.titulo ? 'Tarefa: "' + ac.titulo + '"' + (ac.area ? ' · ' + ac.area : '') : 'Configure o nome da tarefa') + '</div>'
+  + '</div>'
+  + '<div class="aut-flow-chevron" id="aut-flow-chevron-acao">' + (colapsado ? '&#9662;' : '&#9652;') + '</div>'
+  + '</div>'
+  + '</div>'
+  + '<div class="aut-flow-detail' + colapsado + '" id="aut-flow-detail-acao">'
+  + _autAcaoHTML(ac, { semVinculos: true })
+  + '</div>'
+
+  + '</div>'
+  + '<div id="aut-sujo-bar" class="aut-sujo-bar" style="display:' + (criando ? 'flex' : 'none') + '">'
+  + '<span>' + (criando ? 'Configure e crie a automação.' : 'Você tem alterações não salvas.') + '</span>'
+  + '<button type="button" class="btn btn-primary" onclick="' + (criando ? '_autCriarAgendada(this)' : '_autSalvarAgendada(this)') + '">' + (criando ? 'Criar automação' : 'Salvar alterações') + '</button>'
+  + (criando
+     ? '<button type="button" class="btn btn-ghost" onclick="_autModalFechar()">Cancelar</button>'
+     : '<button type="button" class="btn btn-ghost" onclick="_spAutomacaoById(document.getElementById(\'sp-aut-id\').value)">Descartar</button>')
+  + '</div>'
+  + '</div>';
+
+ if (!criando) {
+  html += '<div class="spt-panel" id="spt-aut-exec">'
+   + '<div class="sp-stitle">Histórico de execuções</div>'
+   + '<div id="aut-exec-lista"><div class="aut-empty">Carregando...</div></div>'
+   + '</div>'
+   + '<div class="spt-panel" id="spt-aut-hist">'
+   + '<div class="sp-stitle">Alterações</div>'
+   + (typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-aut-hist') : '')
+   + '</div>';
+ }
+
+ _autModalSet('Automação', a.nome || (criando ? 'Nova automação de recorrência' : 'Sem nome'), html,
+  criando ? ''
+  : '<button class="btn btn-ghost" onclick="_autDuplicar(this)">Duplicar</button>'
+    + '<button class="btn btn-ghost" onclick="_autExcluir(this)" style="color:var(--red)">Excluir</button>'
+    + '<button class="btn btn-ghost" onclick="_autModalFechar()">Fechar</button>');
+
+ if (!criando) {
+  if (typeof _ccSetBaseline === 'function') _ccSetBaseline('automacoes', a.id, Object.assign({}, a));
+  if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
+  if (typeof _sptInitScrollSpy === 'function') _sptInitScrollSpy();
+  _autCarregarExecucoes();
+  if (typeof _histCarregar === 'function') _histCarregar('sp-aut-hist', 'automacoes', a.id);
+ }
+}
+
+// ── Ponto de entrada: "+ Recorrência" (ver index.html, ao lado dos chips de
+// filtro) — abre o MESMO editor acima com um rascunho em memória, sem
+// nenhum insert ainda. ──
+function _autNovaAgendada() {
+ var draft = {
+  id: null, nome: '', descricao: null, ativo: true,
+  gatilho_tipo: 'agendado', tabela_alvo: null, condicoes: [],
+  acao: [{
+   tipo: 'criar_tarefa', titulo: '', tipo_tarefa: 'Tarefa', area: null, responsaveis: [],
+   prioridade: 'Média', status: 'A fazer', visibilidade: 'equipe',
+   data_inicio: { base: 'hoje', dias: 0 }, data_fim: { base: 'hoje', dias: 0 },
+  }],
+  agendamento: { frequencia: 'semanal', dia_semana: 1, horario: '08:00', data_inicio: _autHojeISO(), data_fim: null },
+ };
+ _spAutomacaoAgendadaRender(draft, true);
+ _autModalAbrir();
+}
+
+async function _autCriarAgendada(btn) {
+ if (!_sb) return;
+ var nome = ((document.getElementById('aut-nome') || {}).value || '').trim();
+ if (!nome) { _showToast('Dê um nome para a automação antes de criar.', 'erro'); return; }
+ var acao = _autLerAcao();
+ if (!acao[0].titulo) { _showToast('Informe o nome da tarefa que a automação deve criar.', 'erro'); return; }
+ var agendamento = _autLerAgendamento();
+ if (!agendamento.data_inicio) { _showToast('Informe a data de início da recorrência.', 'erro'); return; }
+
+ if (typeof _btnBusy === 'function') _btnBusy(btn, 'Criando...');
+ var res = await _sb.from('automacoes').insert({
+  nome: nome,
+  descricao: ((document.getElementById('aut-desc') || {}).value || '').trim() || null,
+  gatilho_tipo: 'agendado',
+  tabela_alvo: null,
+  condicoes: [],
+  acao: acao,
+  agendamento: agendamento,
+  ativo: true,
+  criado_por: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.email) || null,
+ }).select().maybeSingle();
+ if (res.error || !res.data) {
+  console.error('[Automações] erro ao criar automação de recorrência:', res.error);
+  _showToast('Não foi possível criar a automação agora. Tente de novo em alguns instantes.', 'erro');
+  if (typeof _btnIdle === 'function') _btnIdle(btn);
+  return;
+ }
+ _autData.push(res.data);
+ _autRender();
+ _showToast('Automação de recorrência criada e ativa.', 'ok');
+ _spAutomacaoById(res.data.id);
+}
+
+async function _autSalvarAgendada(btn) {
+ var id = (document.getElementById('sp-aut-id') || {}).value;
+ if (!id || !_sb) return;
+ var nome = ((document.getElementById('aut-nome') || {}).value || '').trim();
+ if (!nome) { _showToast('Dê um nome para a automação antes de salvar.', 'erro'); return; }
+ var acao = _autLerAcao();
+ if (!acao[0].titulo) { _showToast('Informe o nome da tarefa que a automação deve criar.', 'erro'); return; }
+ var agendamento = _autLerAgendamento();
+ if (!agendamento.data_inicio) { _showToast('Informe a data de início da recorrência.', 'erro'); return; }
+
+ var payload = {
+  nome: nome,
+  descricao: ((document.getElementById('aut-desc') || {}).value || '').trim() || null,
+  acao: acao,
+  agendamento: agendamento,
+  atualizado_por: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.email) || null,
+ };
+ if (typeof _btnBusy === 'function') _btnBusy(btn, 'Salvando...');
+ var r = await _ccSaveComFeedback('automacoes', id, payload, {
+  onRecarregar: function () { _spAutomacaoById(id); },
+ });
+ if (!r || r.conflito || r.erro || r.excluido) { if (typeof _btnIdle === 'function') _btnIdle(btn); return; }
+ var bar = document.getElementById('aut-sujo-bar');
+ if (bar) bar.style.display = 'none';
+ if (r.row) { _autPatchNaLista(r.row); _autAtiva = r.row; }
 }
 
 function _spAutomacaoRender(a) {
@@ -1517,10 +1820,15 @@ async function _autDuplicar(btn) {
  var res = await _sb.from('automacoes').insert({
   nome: (a.nome || 'Automação') + ' (cópia)',
   descricao: a.descricao,
+  gatilho_tipo: a.gatilho_tipo || 'condicao',
   tabela_alvo: a.tabela_alvo,
   ativo: false,   // a cópia nasce inativa pra não duplicar tarefa sem querer
   condicoes: a.condicoes,
   acao: a.acao,
+  // agendamento só existe pro gatilho 'agendado' — sem copiar aqui, duplicar
+  // uma automação de recorrência falharia na constraint automacoes_gatilho_
+  // consistente (agendado exige tabela_alvo nulo E agendamento preenchido).
+  agendamento: a.agendamento || null,
   criado_por: (typeof _currentUser !== 'undefined' && _currentUser && _currentUser.email) || null,
  }).select().maybeSingle();
  if (res.error || !res.data) {

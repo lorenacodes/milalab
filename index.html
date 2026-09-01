@@ -2693,6 +2693,12 @@
     <button type="button" class="aut-chip"        data-v="inativas" onclick="_autSetChip(this)">Inativas</button>
     <button type="button" class="aut-chip"        data-v="erro"     onclick="_autSetChip(this)">Com erro</button>
    </div>
+   <!-- "+ Nova automação" (topbar) continua criando por CONDIÇÃO (Projetos/
+        Obras) — este botão aqui é o segundo tipo de gatilho (por agenda/
+        tempo), que não cabe naquele fluxo (não observa nenhuma tabela, só o
+        relógio). Estilo secundário (gestor-sel), igual Filtro/Agrupar/Ordenar
+        de outras abas — não compete visualmente com o botão primário. -->
+   <button type="button" class="gestor-sel gestor-sel-plain" onclick="_autNovaAgendada()" title="Criar uma tarefa automaticamente numa frequência (diária, semanal, mensal, anual)">+ Recorrência</button>
    <div class="ts-search" id="ts-search-automacoes" onclick="_tsSearchExpand('automacoes')">
     <span class="ts-search-icon"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><line x1="11" y1="11" x2="15" y2="15"/></svg></span>
     <input id="aut-search" class="ts-search-input" placeholder="Buscar automação..." oninput="_autRender()" onfocus="_tsSearchExpand('automacoes')" onblur="_tsSearchCollapse('ts-search-automacoes',this)">
@@ -2886,7 +2892,7 @@
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv345"></script>
 <script src="scripts/modules/dashboard.js?v=mldsv362"></script>
 <script src="scripts/modules/melhorias.js?v=mldsv345"></script>
-<script src="scripts/modules/automacoes.js?v=mldsv345"></script>
+<script src="scripts/modules/automacoes.js?v=mldsv363"></script>
 <script src="scripts/modules/admin.js?v=mldsv345"></script>
 <script src="scripts/modules/exec-dashboard.js?v=mldsv345"></script>
 <script src="scripts/modules/tarefas.js?v=mldsv345"></script>
