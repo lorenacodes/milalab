@@ -782,6 +782,15 @@ function _gestorRestoreState() {
  if (state.busca) {
   var si = document.getElementById('gestor-search');
   if (si) si.value = state.busca;
+  // O valor era restaurado, mas o wrapper .ts-search continuava sem a
+  // classe "expanded" — o input fica com width:0/opacity:0 nesse estado
+  // (styles/main.css), então a barra "sumia" mesmo com texto e filtro
+  // real aplicados por baixo (achado: "a busca fecha ao recarregar",
+  // quando na verdade nunca tinha reaberto). Só adiciona a classe direto
+  // (não usa _tsSearchExpand — ela também dá foco automático no campo,
+  // que não faz sentido logo no carregamento da página).
+  var wrap = document.getElementById('ts-search-gestor');
+  if (wrap) wrap.classList.add('expanded');
  }
  if (state.somenteAtrasadas) {
   _gestorSomenteAtrasadas = true;

@@ -25,7 +25,20 @@ function _sbToggle(instanceId) {
  var inst = _sbInstances[instanceId];
  if (!inst) return;
  inst.open = !inst.open;
- if (inst.open && inst.state.levels.length === 0) inst.state.levels.push(_sbNewLevel(inst, []));
+ // Abrir o popover pela 1ª vez (ou depois de _sbClearAll) já pré-seleciona um
+ // nível padrão (1º campo, A→Z) — sem chamar _sbApply aqui, a lista fica
+ // mostrando esse nível como "ativo" (badge, campo/direção selecionados) mas
+ // os DADOS continuam na ordem antiga até o usuário mudar campo/direção de
+ // novo. Achado real: "ordenar Z→A só funciona depois de passar por A→Z" —
+ // a troca pra A→Z nem aplicava nada (já era o valor "fantasma" pré-
+ // selecionado, sem onchange real); só a troca seguinte, pra Z→A, disparava
+ // o 1º _sbApply de verdade.
+ if (inst.open && inst.state.levels.length === 0) {
+  inst.state.levels.push(_sbNewLevel(inst, []));
+  _sbRender(instanceId);
+  _sbApply(instanceId);
+  return;
+ }
  _sbRender(instanceId);
 }
 // typeof document check: permite carregar este arquivo em Node (node:test)
@@ -49,6 +62,7 @@ function _sbAddLevel(instanceId) {
  var used = inst.state.levels.map(function(l){ return l.field; });
  inst.state.levels.push(_sbNewLevel(inst, used));
  _sbRender(instanceId);
+ _sbApply(instanceId);
 }
 function _sbRemoveLevel(instanceId, idx) {
  var inst = _sbInstances[instanceId];
