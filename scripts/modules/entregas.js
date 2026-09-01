@@ -1266,10 +1266,9 @@ function _spEntregaRender(e) {
 
   <div class="spt-panel" id="spt-ent-geral">
    <div class="sp-field"><div class="sp-label">Entrega</div>
-    <input class="sp-inp" value="${titulo.replace(/"/g,'&quot;')}" readonly>
+    <input class="sp-inp" value="${titulo.replace(/"/g,'&quot;')}" onchange="_spEntNomeSalvar('${e.id}', this)">
    </div>
    <div class="sp-field"><div class="sp-label">Status</div>
-    ${e.etapa ? '<div style="margin-bottom:6px">' + _badgeHTML(e.etapa, atrasado ? BADGE_ETAPA_ENTREGA_BUCKET_CLS.atrasado : (BADGE_ETAPA_ENTREGA_BUCKET_CLS[_entBucketFor(e.etapa)] || 'bm')) + '</div>' : ''}
     <select class="sp-inp" onchange="_spEntDetSalvarCampo('${e.id}', { etapa: this.value || null })">
      <option value="">Selecione...</option>
      ${Object.keys(_entEtapaBucket).map(function(et){ return '<option value="' + et.replace(/"/g,'&quot;') + '" ' + (e.etapa === et ? 'selected' : '') + '>' + et + '</option>'; }).join('')}
@@ -1584,6 +1583,19 @@ async function _entProjSalvar() {
 // _ieCommit em inline-edit.js) — o próprio undo-manager já mostra seu
 // toast ("valor anterior restaurado"), então o "Alteração salva" normal
 // aqui viraria um segundo toast empilhado por cima do primeiro.
+// Nome da entrega era só exibido (readonly) no topo do painel — nenhum
+// outro campo do sistema editava nome_entrega, então virava informação
+// travada mesmo quando digitada errada na criação. Atualiza o cabeçalho do
+// drawer (#sp-title) na hora, senão o campo salva mas o título continua
+// mostrando o valor antigo até reabrir o painel.
+function _spEntNomeSalvar(entregaId, inputEl) {
+ var novo = (inputEl.value || '').trim();
+ if (!novo) { _showToast('O nome da entrega não pode ficar vazio.', 'erro'); return; }
+ _spEntDetSalvarCampo(entregaId, { nome_entrega: novo }).then(function () {
+  var ttl = document.getElementById('sp-title');
+  if (ttl) ttl.textContent = novo;
+ });
+}
 async function _spEntDetSalvarCampo(entregaId, patch, opts) {
  if (!_sb || !entregaId) return;
  // Trava otimista + diff (concurrency.js). Aqui o payload já era pequeno (1
