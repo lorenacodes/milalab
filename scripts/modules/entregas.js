@@ -991,7 +991,7 @@ function _spEntregaById(id) {
 
  _spSet('Entrega', 'Carregando...', '<div style="padding:40px;text-align:center;color:var(--muted)">Buscando dados...</div>', '');
  if (!_sb) return;
- _sb.from('entregas').select('*, obra:obra_id(nome, cidade, estado, tipo_obra, empresas_obras(empresa:empresa_id(nome))), entregas_obras(obra_id, obra:obra_id(id,nome,cidade,estado))').eq('id', id).single().then(function(res) {
+ _sb.from('entregas').select('*, obra:obra_id(nome, cidade, estado, tipo_obra, endereco_entrega, created_at, etapa_negocio, empresas_obras(empresa:empresa_id(nome))), entregas_obras(obra_id, obra:obra_id(id,nome,cidade,estado))').eq('id', id).single().then(function(res) {
   if (res.error || !res.data) {
    _spSet('Entrega', 'Erro', '<div style="color:var(--red);padding:20px">Entrega não encontrada.</div>', '');
    return;
@@ -1177,6 +1177,74 @@ async function _entCarregarContatoOrcamento(obraId) {
   : '<div class="sp-empty">Nenhum contato de orçamento cadastrado na obra vinculada.</div>';
 }
 
+// ── Tipo de orçamento — coluna de `projetos` (não existe em `obras`),
+// pedido explícito do Airtable ("Tipo de orçamento (from Obras)"). Não há
+// vínculo direto Entrega↔Projeto nem "projeto principal" já resolvido no
+// sistema — mesma convenção de "1ª linha = principal" usada pra obra/
+// contato: primeiro projeto da obra principal por `created_at`.
+async function _entCarregarTipoOrcamento(obraId) {
+ var wrap = document.getElementById('sp-ent-tipo-orcamento');
+ if (!wrap) return;
+ if (!obraId || !_sb) { if (wrap) wrap.textContent = '—'; return; }
+ var res = await _sb.from('projetos').select('tipo_orcamento').eq('obra_id', obraId).order('created_at').limit(1);
+ wrap = document.getElementById('sp-ent-tipo-orcamento');
+ if (!wrap) return;
+ var tipo = res.data && res.data[0] && res.data[0].tipo_orcamento;
+ wrap.innerHTML = tipo ? _badgeHTML(tipo, 'bg') : '<span style="color:var(--muted)">—</span>';
+}
+
+// ── Documentos "(from Obras)" — Proposta comercial/Pedido de Compra/
+// Contrato/CNPJ & CNO no Airtable são os MESMOS documentos já anexados na
+// Obra, só espelhados aqui pra visualização (pedido explícito: sem upload
+// duplicado no painel de Entrega). Mesma tabela `documentos`/mapas de tipo
+// já usados no painel de Obra (obras.js: _docNormTipo/_docCategoriaMapa),
+// filtrando só as 4 categorias pedidas — sem os controles de upload/
+// exclusão/troca de status que a Obra tem (somente leitura de verdade).
+var _entDocObraEspelhoTipos = ['Proposta Comercial', 'Pedido de Compra', 'Contrato', 'CNPJ & CNO'];
+async function _spCarregarDocumentosObraEspelho(obraId) {
+ var wrap = document.getElementById('sp-ent-doc-obra-wrap');
+ if (!wrap || !_sb) return;
+ var [docRes, propRes] = await Promise.all([
+  _sb.from('documentos').select('*').eq('obra_id', obraId),
+  _sb.from('propostas').select('*').eq('obra_id', obraId),
+ ]);
+ wrap = document.getElementById('sp-ent-doc-obra-wrap');
+ if (!wrap) return;
+ if (docRes.error) { wrap.innerHTML = '<div class="sp-empty" style="font-size:11px;color:var(--red)">Erro ao carregar documentos da obra.</div>'; return; }
+ var docs = docRes.data || [];
+ // Propostas sem linha própria em `documentos` viram um card sintético —
+ // mesma técnica de obras.js (_spCarregarDocumentos).
+ var docsComProposta = {};
+ docs.forEach(function(d) { if (d.proposta_id) docsComProposta[d.proposta_id] = 1; });
+ (propRes.data || []).forEach(function(p) {
+  if (docsComProposta[p.id]) return;
+  docs.push({ id: 'synth-' + p.id, proposta_id: p.id, tipo: 'Proposta Comercial', nome: 'Proposta ' + p.numero + (p.produto ? ' — ' + p.produto : ''), created_at: p.created_at });
+ });
+ var grupos = {};
+ _entDocObraEspelhoTipos.forEach(function(t) { grupos[t] = []; });
+ docs.forEach(function(d) {
+  var k = (typeof _docNormTipo === 'function') ? _docNormTipo(d.tipo) : d.tipo;
+  if (grupos[k]) grupos[k].push(d);
+ });
+ Object.keys(grupos).forEach(function(k) { grupos[k].sort(function(a,b) { return new Date(b.created_at) - new Date(a.created_at); }); });
+ wrap.innerHTML = _entDocObraEspelhoTipos.map(function(tipo) {
+  var docsDoTipo = grupos[tipo];
+  var listHtml = docsDoTipo.length ? docsDoTipo.map(function(d) {
+   var nome = (d.nome || d.nome_arquivo || d.arquivo_nome || 'Documento').toString();
+   var dt = d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : '';
+   var nomeAttrSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+   var btn = d.proposta_id
+    ? '<button type="button" class="btn btn-ghost btn-sm" onclick="_spVisualizarProposta(\'' + d.proposta_id + '\')">Visualizar</button>'
+    : (d.caminho_storage ? '<button type="button" class="btn btn-ghost btn-sm" onclick="_spAbrirDocStorage(\'' + String(d.caminho_storage).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\',\'' + nomeAttrSafe + '\')">Visualizar</button>' : '');
+   return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--surface)">'
+    + '<div style="min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px" title="' + nome.replace(/"/g,'&quot;') + '">' + nome.replace(/</g,'&lt;') + '</div>'
+    + (dt ? '<div style="font-size:9px;color:var(--muted);margin-top:2px">' + dt + '</div>' : '') + '</div>'
+    + btn + '</div>';
+  }).join('') : '<div class="sp-empty" style="padding:8px 0;font-size:11px">Nenhum documento na obra.</div>';
+  return '<div style="margin-bottom:16px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">' + tipo + (docsDoTipo.length ? ' (' + docsDoTipo.length + ')' : '') + '</div>' + listHtml + '</div>';
+ }).join('');
+}
+
 // ── Cidade/Estado da ENTREGA (colunas próprias, não da Obra) — Estado
 // primeiro (select UF fixo, UF_BRASIL de obras.js), Cidade depende do
 // Estado escolhido (cache de cidades reais por UF, lidas de `obras.cidade`
@@ -1252,111 +1320,139 @@ function _spEntregaRender(e) {
   onSelect: function(v) { _spEntDetSalvarCampo(e.id, { cidade: v || null }); e.cidade = v || null; },
  });
 
- function badge(n) { return n ? ' (' + n + ')' : ''; }
+ // ── Card da Obra principal (somente leitura: nome + data de criação +
+ // etapa do negócio) — pedido explícito de bater com o layout do Airtable.
+ // Mapa de cor já existe (BADGE_ETAPA_NEGOCIO, badge-colors.js), mesmo
+ // usado no painel de Obra.
+ var obraCardHTML = '<div class="sp-empty">Nenhuma obra vinculada.</div>';
+ if (e.obra && obraId) {
+  var dtObra = e.obra.created_at ? new Date(e.obra.created_at).toLocaleDateString('pt-BR') : '—';
+  var etapaCls = (typeof BADGE_ETAPA_NEGOCIO !== 'undefined' && typeof _badgeCls === 'function') ? _badgeCls(BADGE_ETAPA_NEGOCIO, e.obra.etapa_negocio || '') : 'bm';
+  obraCardHTML = '<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--surface)">'
+   + '<div style="font-size:12px;font-weight:700;color:var(--text)">' + (e.obra.nome || '—').replace(/</g,'&lt;') + '</div>'
+   + '<div style="display:flex;align-items:center;gap:10px;margin-top:6px">'
+   + '<span style="font-size:10px;color:var(--muted)">Data de criação<br><span style="color:var(--text)">' + dtObra + '</span></span>'
+   + (e.obra.etapa_negocio ? _badgeHTML(e.obra.etapa_negocio, etapaCls) : '')
+   + '</div></div>';
+ }
+
+ // ── Endereço/Cidade/Estado agora são espelho somente-leitura da Obra
+ // principal ("(from Obras)" no Airtable) — deixaram de ser campos
+ // próprios editáveis da Entrega (colunas entregas.cidade/estado/
+ // endereco_entrega continuam existindo no banco, só saíram de uso na UI).
+ var obraCidade  = (e.obra && e.obra.cidade) || '';
+ var obraEstado  = (e.obra && e.obra.estado) || '';
+ var obraEndereco = (e.obra && e.obra.endereco_entrega) || '';
+ var mapaQuery = [obraEndereco, obraCidade, obraEstado].filter(Boolean).join(', ');
+ var mapaLink = mapaQuery ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(mapaQuery) : '';
 
  _spSet('Entrega', titulo, `
   <input type="hidden" id="sp-ent-id" value="${e.id}">
   <div class="spt-bar">
-   <button class="spt-btn active" data-target="spt-ent-geral" onclick="_sptSwitch('ent-geral',this)">Visão Geral</button>
-   <button class="spt-btn" data-target="spt-ent-obras" onclick="_sptSwitch('ent-obras',this)">Obras vinculadas${badge(_entObrasVinculadasList(e).length)}</button>
-   <button class="spt-btn" data-target="spt-ent-documentos" onclick="_sptSwitch('ent-documentos',this)">Documentos</button>
-   <button class="spt-btn" data-target="spt-ent-faturamento" onclick="_sptSwitch('ent-faturamento',this)">Faturamento</button>
-   <button class="spt-btn" data-target="spt-ent-historico" onclick="_sptSwitch('ent-historico',this)">Histórico</button>
+   <button class="spt-btn active" data-target="spt-ent-producao" onclick="_sptSwitch('ent-producao',this)">Produção</button>
+   <button class="spt-btn" data-target="spt-ent-faturamento" onclick="_sptSwitch('ent-faturamento',this)">Faturamento &amp; Entrega</button>
   </div>
 
-  <div class="spt-panel" id="spt-ent-geral">
+  <div class="spt-panel" id="spt-ent-producao">
    <div class="sp-field"><div class="sp-label">Entrega</div>
     <input class="sp-inp" value="${titulo.replace(/"/g,'&quot;')}" onchange="_spEntNomeSalvar('${e.id}', this)">
    </div>
-   <div class="sp-field"><div class="sp-label">Status</div>
+   <div class="sp-field"><div class="sp-label">Obra</div>
+    <div id="sp-ent-obra-card">${obraCardHTML}</div>
+    <div class="sp-rel-chips-wrap" style="margin-top:8px">${_entObrasChipsHTML(e)}</div>
+    ${_entObraAddMarkup()}
+   </div>
+   <div class="sp-field">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+     <div class="sp-label" style="margin-bottom:0">Projeto(s) da obra principal</div>
+     ${obraId ? '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_entProjToggleForm(\'' + obraId + '\')">+ Adicionar projeto</button>' : ''}
+    </div>
+    <div class="sp-rel-chips-wrap" id="sp-ent-proj-chips">${obraId ? '<div class="sp-empty" style="padding:4px 0;font-size:11px">Carregando...</div>' : '<div class="sp-empty">Sem obra vinculada.</div>'}</div>
+    <div id="ent-proj-form-box" style="display:none;margin-top:10px"></div>
+   </div>
+   <div class="sp-field"><div class="sp-label">Etapa da entrega</div>
     <select class="sp-inp" onchange="_spEntDetSalvarCampo('${e.id}', { etapa: this.value || null })">
      <option value="">Selecione...</option>
      ${Object.keys(_entEtapaBucket).map(function(et){ return '<option value="' + et.replace(/"/g,'&quot;') + '" ' + (e.etapa === et ? 'selected' : '') + '>' + et + '</option>'; }).join('')}
     </select>
     ${atrasado ? '<div style="margin-top:6px;font-size:11px;font-weight:600;color:var(--red)">⚠ Faturamento vencido (atrasado)</div>' : ''}
    </div>
+   <div class="sp-field"><div class="sp-label">Tipo de orçamento</div>
+    <div id="sp-ent-tipo-orcamento" style="font-size:12px;color:var(--muted)">${obraId ? 'Carregando...' : '—'}</div>
+   </div>
    <div class="sp-g2">
-    <div class="sp-field"><div class="sp-label">Transporte</div>
-     ${_srchSelMarkup('entDetTransporte', 'sp-entdet-transporte', transp)}
+    <div class="sp-field"><div class="sp-label">Quantidade</div>
+     <input class="sp-inp" type="number" value="${qtd}" onchange="_spEntDetSalvarCampo('${e.id}', { quantidade: this.value !== '' ? Number(this.value) : null })">
     </div>
-    <div class="sp-field"><div class="sp-label">Peso (kg)</div>
+    <div class="sp-field"><div class="sp-label">Peso do pedido (kg)</div>
      <input class="sp-inp" type="number" value="${peso}" onchange="_spEntDetSalvarCampo('${e.id}', { peso_kg: this.value !== '' ? Number(this.value) : null })">
     </div>
    </div>
+   <div class="sp-field"><div class="sp-label">Maior peça (mm)</div>
+    <input class="sp-inp" type="number" value="${maiorPeca}" onchange="_spEntDetSalvarCampo('${e.id}', { maior_peca_mm: this.value !== '' ? Number(this.value) : null })">
+   </div>
+   <div id="sp-ent-doc-producao-wrap"><div class="sp-empty" style="padding:10px 0;font-size:11px">Carregando documentos...</div></div>
    <div class="sp-g2">
-    <div class="sp-field"><div class="sp-label">Qtd. (peças)</div>
-     <input class="sp-inp" type="number" value="${qtd}" onchange="_spEntDetSalvarCampo('${e.id}', { quantidade: this.value !== '' ? Number(this.value) : null })">
+    <div class="sp-field"><div class="sp-label">Data de Faturamento</div>
+     <input class="sp-inp" type="date" value="${e.data_faturamento || ''}" onchange="_spEntDetSalvarCampo('${e.id}', { data_faturamento: this.value || null })">
     </div>
-    <div class="sp-field"><div class="sp-label">Maior peça (mm)</div>
-     <input class="sp-inp" type="number" value="${maiorPeca}" onchange="_spEntDetSalvarCampo('${e.id}', { maior_peca_mm: this.value !== '' ? Number(this.value) : null })">
+    <div class="sp-field"><div class="sp-label">Transporte</div>
+     ${_srchSelMarkup('entDetTransporte', 'sp-entdet-transporte', transp)}
     </div>
    </div>
    <div class="sp-g2">
-    <div class="sp-field"><div class="sp-label">Estado</div>
-     ${_srchSelMarkup('entDetEstado', 'sp-entdet-estado', e.estado || '')}
+    <div class="sp-field"><div class="sp-label">Cidade (da Obra)</div>
+     <div class="sp-inp" style="background:var(--surface2);color:var(--muted);cursor:default">${obraCidade || '—'}</div>
     </div>
-    <div class="sp-field"><div class="sp-label">Cidade</div>
-     ${_srchSelMarkup('entDetCidade', 'sp-entdet-cidade', e.cidade || '')}
+    <div class="sp-field"><div class="sp-label">Estado (da Obra)</div>
+     <div class="sp-inp" style="background:var(--surface2);color:var(--muted);cursor:default">${obraEstado || '—'}</div>
     </div>
    </div>
-   <div class="sp-field"><div class="sp-label">Endereço de entrega</div>
-    <input class="sp-inp" value="${(e.endereco_entrega||'').replace(/"/g,'&quot;')}" placeholder="Pré-preenchido ao vincular uma Obra — editável" onchange="_spEntDetSalvarCampo('${e.id}', { endereco_entrega: this.value || null })">
+   <div class="sp-field"><div class="sp-label">Endereço de entrega (da Obra)</div>
+    <div class="sp-inp" style="background:var(--surface2);color:var(--muted);cursor:default;min-height:20px">${obraEndereco ? obraEndereco.replace(/</g,'&lt;') : '—'}</div>
+    ${mapaLink ? '<a href="' + mapaLink + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:6px;font-size:11px;color:var(--navy)">Ver no mapa ↗</a>' : ''}
    </div>
+  </div>
+
+  <div class="spt-panel" id="spt-ent-faturamento">
+   <div class="sp-g2">
+    <div class="sp-field"><div class="sp-label">Valor</div>
+     <input class="sp-inp" type="number" step="0.01" value="${valor}" onchange="_spEntDetSalvarCampo('${e.id}', { valor: this.value !== '' ? Number(this.value) : null })">
+    </div>
+    <div class="sp-field"><div class="sp-label">Pedido produzido</div>
+     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text);margin-top:8px">
+      <input type="checkbox" id="sp-entdet-produzido" ${e.pedido_produzido ? 'checked' : ''} onchange="_spEntDetSalvarCampo('${e.id}', { pedido_produzido: this.checked })">
+      Pedido produzido
+     </label>
+    </div>
+   </div>
+   <div class="sp-g2">
+    <div class="sp-field"><div class="sp-label">Pedido Compusa Mila</div>
+     <input class="sp-inp" value="${pedMilaG.replace(/"/g,'&quot;')}" onchange="_spEntDetSalvarCampo('${e.id}', { pedido_compusa_mila: this.value || null })">
+    </div>
+    <div class="sp-field"><div class="sp-label">Pedido Compusa MilaTec</div>
+     <input class="sp-inp" value="${pedMila.replace(/"/g,'&quot;')}" onchange="_spEntDetSalvarCampo('${e.id}', { pedido_compusa_milatec: this.value || null })">
+    </div>
+   </div>
+   <div class="sp-field"><div class="sp-label">Documentos da Obra</div>
+    <div id="sp-ent-doc-obra-wrap"><div class="sp-empty" style="padding:10px 0;font-size:11px">${obraId ? 'Carregando...' : 'Sem obra vinculada.'}</div></div>
+   </div>
+   <div id="sp-ent-doc-faturamento-wrap"><div class="sp-empty" style="padding:10px 0;font-size:11px">Carregando documentos...</div></div>
    <div class="sp-field"><div class="sp-label">Contato do orçamento</div>
     <div class="sp-rel-chips-wrap" id="sp-ent-contato-orc"><div class="sp-empty" style="padding:4px 0;font-size:11px">Carregando...</div></div>
    </div>
   </div>
 
-  <div class="spt-panel" id="spt-ent-obras">
-   <div class="sp-rel-chips-wrap">${_entObrasChipsHTML(e)}</div>
-   ${_entObraAddMarkup()}
-   <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-     <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">Projeto(s) da obra principal</div>
-     ${obraId ? '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:11px" onclick="_entProjToggleForm(\'' + obraId + '\')">+ Adicionar projeto</button>' : ''}
-    </div>
-    <div class="sp-rel-chips-wrap" id="sp-ent-proj-chips">${obraId ? '<div class="sp-empty" style="padding:4px 0;font-size:11px">Carregando...</div>' : '<div class="sp-empty">Sem obra vinculada.</div>'}</div>
-    <div id="ent-proj-form-box" style="display:none;margin-top:10px"></div>
-   </div>
-  </div>
-
-  <div class="spt-panel" id="spt-ent-documentos">
-   <div id="sp-ent-doc-wrap"><div class="sp-empty" style="padding:10px 0;font-size:11px">Carregando documentos...</div></div>
-  </div>
-
-  <div class="spt-panel" id="spt-ent-faturamento">
-   <div class="sp-g2">
-    <div class="sp-field"><div class="sp-label">Faturamento</div>
-     <input class="sp-inp" type="date" value="${e.data_faturamento || ''}" onchange="_spEntDetSalvarCampo('${e.id}', { data_faturamento: this.value || null })">
-    </div>
-    <div class="sp-field"><div class="sp-label">Valor</div>
-     <input class="sp-inp" type="number" step="0.01" value="${valor}" onchange="_spEntDetSalvarCampo('${e.id}', { valor: this.value !== '' ? Number(this.value) : null })">
-    </div>
-   </div>
-   <div class="sp-g2">
-    <div class="sp-field"><div class="sp-label">Pedido Compusa Milatec</div>
-     <input class="sp-inp" value="${pedMila.replace(/"/g,'&quot;')}" onchange="_spEntDetSalvarCampo('${e.id}', { pedido_compusa_milatec: this.value || null })">
-    </div>
-    <div class="sp-field"><div class="sp-label">Pedido Compusa Mila</div>
-     <input class="sp-inp" value="${pedMilaG.replace(/"/g,'&quot;')}" onchange="_spEntDetSalvarCampo('${e.id}', { pedido_compusa_mila: this.value || null })">
-    </div>
-   </div>
-   <div class="sp-field">
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--text)">
-     <input type="checkbox" id="sp-entdet-produzido" ${e.pedido_produzido ? 'checked' : ''} onchange="_spEntDetSalvarCampo('${e.id}', { pedido_produzido: this.checked })">
-     Pedido produzido
-    </label>
-   </div>
-  </div>
-
-  <div class="spt-panel" id="spt-ent-historico">
+  <div class="spt-panel" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Histórico de alterações</div>
    ${typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-ent-historico') : ''}
   </div>
 
   <div class="spt-panel" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
    <div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">${criadoNome}</span></div>
+   <div class="drw-audit-row"><span class="drw-audit-lbl">Data de criação</span><span class="drw-audit-val">${e.created_at ? new Date(e.created_at).toLocaleString('pt-BR') : '—'}</span></div>
    <div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">${alteradoNome}</span></div>
+   <div class="drw-audit-row"><span class="drw-audit-lbl">Última modificação</span><span class="drw-audit-val">${e.updated_at ? new Date(e.updated_at).toLocaleString('pt-BR') : '—'}</span></div>
   </div>`,
   '<button class="btn btn-ghost" onclick="closePanel()">Fechar</button>');
 
@@ -1366,10 +1462,14 @@ function _spEntregaRender(e) {
  if (typeof _rtLimparAvisoExterno === 'function') _rtLimparAvisoExterno();
  if (typeof _sptInitScrollSpy === 'function') _sptInitScrollSpy();
  // Histórico de alterações (audit_log) — mesmo componente compartilhado de
- // Obra/Projeto (scripts/lib/historico.js).
+ // Obra/Projeto (scripts/lib/historico.js). Deixou de ser uma 3ª aba
+ // (pedido explícito: só 2 abas, igual ao Airtable) — vira uma seção fixa
+ // abaixo, sempre visível (o próprio scrollspy já mostra todos os
+ // .spt-panel ao mesmo tempo, só "clicar na aba" rolava até ali).
  if (typeof _histCarregar === 'function') _histCarregar('sp-ent-historico', 'entregas', e.id);
  _spCarregarDocumentosEntrega(e.id, obraId);
  _entCarregarContatoOrcamento(obraId);
+ if (obraId) { _spCarregarDocumentosObraEspelho(obraId); _entCarregarTipoOrcamento(obraId); }
  // Pedido explícito: obra sem nenhum Tipo de obra marcado não pode travar
  // o Tipo do projeto (campo obrigatório sem nenhuma opção pra escolher) —
  // cai pra lista completa (_NO_TIPOS_OPCOES) nesse caso, mesma regra do
@@ -1692,11 +1792,15 @@ function _entregasIniciarTempoReal() {
 // `documentos_entregas` (documento_id, entrega_id). Uploads novos feitos
 // pelo sistema (_spUploadDocEntrega) gravam entrega_id direto, sem usar a
 // junção. Por isso a carga busca dos DOIS jeitos e faz merge por id.
+// `container` (novo): pedido explícito de aba única "Produção"/"Faturamento
+// & Entrega" igual ao Airtable — Ordem de Produção/Romaneio ficam na aba
+// Produção (junto do resto da fabricação), Nota Fiscal/Documentos pra
+// faturamento ficam na aba de Faturamento.
 var _entDetDocCats = [
- { tipo: 'nota_fiscal',          label: 'Nota Fiscal' },
- { tipo: 'romaneio_entrega',     label: 'Romaneio de Entrega' },
- { tipo: 'documento_especifico', label: 'Documentos Específicos da Entrega' },
- { tipo: 'ordem_producao',       label: 'Ordem de Produção' },
+ { tipo: 'ordem_producao',       label: 'Ordem de Produção',           container: 'sp-ent-doc-producao-wrap' },
+ { tipo: 'romaneio_entrega',     label: 'Romaneio de Entrega',         container: 'sp-ent-doc-producao-wrap' },
+ { tipo: 'nota_fiscal',          label: 'Nota Fiscal',                 container: 'sp-ent-doc-faturamento-wrap' },
+ { tipo: 'documento_especifico', label: 'Documentos para faturamento', container: 'sp-ent-doc-faturamento-wrap' },
 ];
 // Uploads feitos pelo formulário "Nova entrega" (obras.js) usam rótulos em
 // português ('Documento da Entrega'/'Ordem de Produção') em vez do
@@ -1709,14 +1813,15 @@ function _entDocCategoriaDe(tipo) {
 }
 
 async function _spCarregarDocumentosEntrega(entregaId, obraId) {
- var container = document.getElementById('sp-ent-doc-wrap');
- if (!container || !_sb) return;
+ var containers = {};
+ _entDetDocCats.forEach(function(c) { if (!containers[c.container]) containers[c.container] = document.getElementById(c.container); });
+ if (!_sb || !Object.keys(containers).some(function(k){ return containers[k]; })) return;
  var [diretoRes, viaJuncaoRes] = await Promise.all([
   _sb.from('documentos').select('*').eq('entrega_id', entregaId),
   _sb.from('documentos_entregas').select('documentos(*)').eq('entrega_id', entregaId),
  ]);
  if (diretoRes.error && viaJuncaoRes.error) {
-  container.innerHTML = '<div class="sp-empty" style="font-size:11px;color:var(--red)">Erro ao carregar documentos.</div>';
+  Object.keys(containers).forEach(function(k) { if (containers[k]) containers[k].innerHTML = '<div class="sp-empty" style="font-size:11px;color:var(--red)">Erro ao carregar documentos.</div>'; });
   return;
  }
  var vistos = {};
@@ -1729,7 +1834,11 @@ async function _spCarregarDocumentosEntrega(entregaId, obraId) {
  docs.forEach(function(d) { grupos[_entDocCategoriaDe(d.tipo)].push(d); });
  Object.keys(grupos).forEach(function(k) { grupos[k].sort(function(a,b) { return new Date(b.created_at) - new Date(a.created_at); }); });
 
- container.innerHTML = _entDetDocCats.map(function(c) { return _spEntDetCategoriaHTML(c, grupos[c.tipo], entregaId, obraId); }).join('');
+ Object.keys(containers).forEach(function(containerId) {
+  if (!containers[containerId]) return;
+  var catsAqui = _entDetDocCats.filter(function(c) { return c.container === containerId; });
+  containers[containerId].innerHTML = catsAqui.map(function(c) { return _spEntDetCategoriaHTML(c, grupos[c.tipo], entregaId, obraId); }).join('');
+ });
 }
 
 function _spEntDetCategoriaHTML(cat, docs, entregaId, obraId) {
@@ -1852,7 +1961,7 @@ async function _dbLoadEntregas() {
  while (true) {
   var res = await _sb
    .from('entregas')
-   .select('*, obra:obra_id(nome, cidade, estado, tipo_obra, empresas_obras(empresa:empresa_id(nome))), entregas_obras(obra_id, obra:obra_id(id,nome,cidade,estado))')
+   .select('*, obra:obra_id(nome, cidade, estado, tipo_obra, endereco_entrega, created_at, etapa_negocio, empresas_obras(empresa:empresa_id(nome))), entregas_obras(obra_id, obra:obra_id(id,nome,cidade,estado))')
    .order('created_at', { ascending: false })
    .range(from, from + pageSize - 1);
   if (res.error) { error = res.error; break; }
