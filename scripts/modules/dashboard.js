@@ -1769,23 +1769,35 @@ var _SEL_TASK_STATUS_COR = {
 function _selColorize(sel, colorMap) {
  if (!sel) return;
  var c = colorMap[sel.value];
+ // backgroundColor, não a shorthand `background` — essa sobrescreveria (e
+ // apagaria) o chevron de select.tf-sel, que é um background-image.
  if (c) {
   sel.style.borderColor = c;
   sel.style.color = c;
   sel.style.fontWeight = '600';
-  sel.style.background = 'color-mix(in srgb, ' + c + ' 14%, var(--surface2))';
+  sel.style.backgroundColor = 'color-mix(in srgb, ' + c + ' 14%, var(--surface2))';
  } else {
   sel.style.borderColor = '';
   sel.style.color = '';
   sel.style.fontWeight = '';
-  sel.style.background = '';
+  sel.style.backgroundColor = '';
  }
 }
 
 function _drwSubRender() {
  var list = document.getElementById('drw-sub-list');
  if (!list) return;
- if (!_drwSubItems.length) { list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">Nenhuma subtarefa ainda.</div>'; _drwSubBadge(); return; }
+ if (!_drwSubItems.length) {
+  list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px 0">Nenhuma subtarefa ainda.</div>';
+  _drwSubBadge();
+  // Sem isto, o aviso "Todas as subtarefas concluídas..." de uma atividade
+  // anterior (com subtarefas) ficava na tela ao abrir uma atividade
+  // diferente sem nenhuma subtarefa — este early-return pulava a única
+  // limpeza que existia (_drwAutoStatusFromSubs, no fim da função).
+  var bannerVazio = document.getElementById('drw-sub-conclusao-banner');
+  if (bannerVazio) bannerVazio.remove();
+  return;
+ }
  // O botão de colaborar por subtarefa aparece sempre, inclusive criando uma
  // atividade nova — senão a opção fica invisível até salvar, e a pessoa nem
  // descobre que ela existe. Quem bloqueia é _drwColabReqOpenForSubtask (a
@@ -1898,7 +1910,11 @@ function _drwSubField(idx, field, value) {
 }
 
 function _drwAutoStatusFromSubs() {
- if (!_drwSubItems.length) return;
+ if (!_drwSubItems.length) {
+  var bannerVazio = document.getElementById('drw-sub-conclusao-banner');
+  if (bannerVazio) bannerVazio.remove();
+  return;
+ }
  var total      = _drwSubItems.length;
  var concluidos = _drwSubItems.filter(function(s){ return s.done; }).length;
  var stEl = document.getElementById('nt-status');

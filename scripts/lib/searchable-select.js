@@ -215,6 +215,17 @@ if (typeof document !== 'undefined') {
    var box  = document.getElementById('sp-srch-' + kind + '-box');
    if (drop && box && !box.contains(e.target) && !drop.contains(e.target)) _srchSelClose(kind);
   });
+  // Mesma varredura genérica por classe que o listener de scroll logo abaixo
+  // já faz, pros dropdowns hand-rolled fora do _srchSelState (Colaborador do
+  // drawer de atividade, Obra/Projeto do Gestor de Tarefas etc.) — sem isto,
+  // clicar fora de um desses (sem rolar a página) não fechava o dropdown.
+  document.querySelectorAll('.srch-sel-drop.open').forEach(function(drop) {
+   if (drop.contains(e.target)) return;
+   var box = document.getElementById(drop.id.replace(/-drop$/, '-box'));
+   if (box && box.contains(e.target)) return;
+   drop.classList.remove('open');
+   if (box) box.classList.remove('open');
+  });
  });
  // position:fixed não acompanha o scroll do container do modal (diferente
  // de position:absolute) — sem isso, rolar o formulário com o dropdown

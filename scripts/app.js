@@ -25,7 +25,7 @@ var routes = {
  'admin': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Administração</span>`, nav: 'admin', btn: null },
  'melhorias': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Iniciativas de Inovação</span>`, nav: 'melhorias', btn: null },
  'automacoes': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Automações</span>`, nav: 'automacoes', btn: { label: '+ Nova automação', fn: '_autNova' } },
- 'gestor': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Gestor de Tarefas</span>`, nav: 'gestor', btn: null },
+ 'gestor': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Gestor de Tarefas</span>`, nav: 'gestor', btn: { label: '+ Nova Tarefa', fn: '_taskDrawerOpen' } },
  'exec-dash': { bc: `<a class="bc-link" onclick="go('dashboard')">Meu Painel</a> / <span>Dashboard Executivo</span>`, nav: 'exec-dash', btn: null },
 };
 

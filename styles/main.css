@@ -552,6 +552,12 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
  .tf-req{color:var(--red)}
  .tf-inp,.tf-sel,.tf-ta{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 11px;font-size:12.5px;color:var(--text);outline:none;box-sizing:border-box;font-family:inherit;transition:border-color .15s;-webkit-appearance:none}
  .tf-inp:focus,.tf-sel:focus,.tf-ta:focus{border-color:var(--navy);background:var(--surface)}
+ /* .tf-sel zerava a aparência nativa (-webkit-appearance:none) sem pôr
+    nenhuma seta no lugar — ficava indistinguível de um input de texto
+    (reportado como "não formatado igual os outros single selects").
+    Mesmo chevron discreto já usado em .mf select/.ie-select no resto do
+    sistema. */
+ select.tf-sel{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16' fill='none' stroke='%238B949E' stroke-width='2'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:30px}
  .tf-ta{resize:vertical;min-height:68px;line-height:1.55}
  .tf-r2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
  .rem-tab.active{background:var(--surface2);color:var(--text)}
@@ -798,8 +804,8 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
 .gestor-hd-title{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.2px}
 .gestor-hd-sub{font-size:10px;color:var(--muted);margin-top:2px}
 .gestor-hd-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.gestor-refresh-btn{background:none;border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;color:var(--muted);width:30px;height:30px;display:flex;align-items:center;justify-content:center;transition:all .12s}
-.gestor-refresh-btn:hover{border-color:var(--navy);color:var(--navy)}
+.gestor-refresh-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;color:var(--muted);width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.gestor-refresh-btn:hover{background:var(--surface3,var(--surface2));border-color:var(--navy);color:var(--navy)}
 
 /* Dropdown de período — substitui os 5 botões + campos de data sempre
    visíveis por um botão só, que abre um popover compacto. */
@@ -1387,6 +1393,12 @@ tbody[data-sp] tr:hover td{background:var(--navy-dim)!important}
  input[type="date"],input[type="datetime-local"]{color-scheme:dark}
  body.light input[type="date"],body.light input[type="datetime-local"]{color-scheme:light}
  input[type="date"].tf-inp,input[type="date"].sp-inp{min-height:36px;line-height:1.4}.tf-r2 input[type="date"]{width:100%;box-sizing:border-box}
+ /* Mesmo ícone discreto (opacidade reduzida até hover/focus) que a edição
+    inline de Obras (.ie-input) já usa — sem isso o calendário nativo fica
+    com opacidade cheia sempre, "pesado" ao lado do resto do formulário. */
+ input[type="date"].tf-inp::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer;transition:opacity .15s}
+ input[type="date"].tf-inp:hover::-webkit-calendar-picker-indicator,
+ input[type="date"].tf-inp:focus::-webkit-calendar-picker-indicator{opacity:1}
 
 /* Vidro (blur) removido de tudo, inclusive das camadas flutuantes (Central
    de Alertas, dropdowns de busca, topbar-ao-rolar) — mesmo motivo: custo de

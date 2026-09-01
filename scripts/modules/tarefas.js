@@ -678,6 +678,7 @@ function _gestorPopulateFilters() {
   { key: 'status',      label: 'Status',     type: 'text', getValue: function(a){ return a.status||''; } },
   { key: 'area',        label: 'Área',       type: 'text' },
   { key: 'obra',        label: 'Obra',       type: 'text', getValue: function(a){ return a._obraNome||''; } },
+  { key: 'responsavel', label: 'Responsável', type: 'text', getValue: function(a){ return a.responsavel||''; } },
  ], _gestorApplyFilters);
  // Só inicializa o nível padrão (Prazo ↑) na primeira vez — trocas de aba/
  // dados não devem resetar uma ordenação que a pessoa já escolheu.
@@ -1396,15 +1397,24 @@ function _gestorRenderTimeline() {
  //  verde=concluido, azul=em andamento, ambar=bloqueado/atencao, vermelho=atrasado (excecao),
  //  prioridade Alta=vermelho, Media=ambar, Baixa/A fazer=cinza.
  // Cores com opacidade/contraste reforcados para leitura imediata sobre o tema escuro.
+ // No tema claro os mesmos tons pastel (tx) ficam ilegíveis sobre o fundo
+ // claro (baixíssimo contraste) — nesse tema o texto usa a cor de borda
+ // (bdr), que já é sólida/escura o bastante pra ler nos dois temas (é a
+ // mesma paleta usada como cor cheia em outros lugares do sistema, ex.
+ // _SETOR_CORES).
+ var _tLight = document.body.classList.contains('light');
  function tColor(a) {
   var late = _gIsLate(a), s = a.status||'', p = a.prioridade||'';
-  if (late)  return { bg:'rgba(239,68,68,.22)',  tx:'#fca5a5', bdr:'#D6433C' };
-  if (_gIsDone(s)) return { bg:'rgba(34,197,94,.20)', tx:'#86efac', bdr:'#1F8A4C' };
-  if (s==='Em progresso'||s==='Em andamento') return { bg:'rgba(59,130,246,.22)', tx:'#93c5fd', bdr:'#2E5FD9' };
-  if (s==='Bloqueado'||s==='Bloqueada'||s==='Impedida'||s==='Aguardando feedback') return { bg:'rgba(245,158,11,.22)', tx:'#fcd34d', bdr:'#B8790A' };
-  if (p==='Alta')  return { bg:'rgba(239,68,68,.14)', tx:'#fca5a5', bdr:'#D6433C' };
-  if (p==='Média'||p==='Media') return { bg:'rgba(245,158,11,.14)', tx:'#fcd34d', bdr:'#B8790A' };
-  return { bg:'rgba(148,163,184,.16)', tx:'#cbd5e1', bdr:'#7D8199' };
+  var c;
+  if (late)  c = { bg:'rgba(239,68,68,.22)',  tx:'#fca5a5', bdr:'#D6433C' };
+  else if (_gIsDone(s)) c = { bg:'rgba(34,197,94,.20)', tx:'#86efac', bdr:'#1F8A4C' };
+  else if (s==='Em progresso'||s==='Em andamento') c = { bg:'rgba(59,130,246,.22)', tx:'#93c5fd', bdr:'#2E5FD9' };
+  else if (s==='Bloqueado'||s==='Bloqueada'||s==='Impedida'||s==='Aguardando feedback') c = { bg:'rgba(245,158,11,.22)', tx:'#fcd34d', bdr:'#B8790A' };
+  else if (p==='Alta')  c = { bg:'rgba(239,68,68,.14)', tx:'#fca5a5', bdr:'#D6433C' };
+  else if (p==='Média'||p==='Media') c = { bg:'rgba(245,158,11,.14)', tx:'#fcd34d', bdr:'#B8790A' };
+  else c = { bg:'rgba(148,163,184,.16)', tx:'#cbd5e1', bdr:'#7D8199' };
+  if (_tLight) c = { bg: c.bg, tx: c.bdr, bdr: c.bdr };
+  return c;
  }
 
  var fmtCurto = function(d){ return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}); };
