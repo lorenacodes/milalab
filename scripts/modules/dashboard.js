@@ -897,11 +897,6 @@ function _dashTaskPrazo(t) {
 /* ── DRAWER DE NOVA ATIVIDADE ─────────────────────────────────────── */
 // ID da tarefa em edição — null = modo criação, número = modo edição
 var _taskEditId = null;
-// rec_serie_id da atividade aberta no drawer, se ela já fizer parte de uma
-// série recorrente — usado por _taskRecorrenciaAutosave pra saber se é a
-// 1ª vez que a recorrência é ligada (precisa iniciar a série) ou se é só
-// uma edição de config de uma série que já existia.
-var _taskEditRecSerieId = null;
 
 /* ── AUTO-SAVE (só no modo edição — criar uma atividade nova continua com
    botão explícito, já que não existe linha no banco pra salvar em cima
@@ -1287,28 +1282,6 @@ function _taskDrawerOpen(editId) {
    })
   : [];
  _drwSubRender();
-
- // ── Seção Recorrência — visível tanto ao criar quanto ao editar, pra dar
- // pra consultar se a atividade tem recorrência configurada e removê-la se
- // preciso (ver _taskRecorrenciaAutosave, chamada pelos onchange dos campos
- // abaixo só em modo edição — em criação os valores são lidos direto do DOM
- // no submit) ──
- var recWrap = get('drw-sec-recorrencia-wrap');
- if (recWrap) recWrap.style.display = '';
- var temRecorrenciaAtiva = !!(t && t.rec_freq_val && t.rec_freq_unit);
- _taskEditRecSerieId = (t && t.rec_serie_id) || null;
- // O banco guarda a unidade no formato interno (dias/semanas/meses/anos);
- // o <select> usa o formato exibido (diario/semanal/mensal/anual) — inverso
- // do mapeamento feito em _submitNewTask ao salvar.
- var freqUnitMapRev = { dias:'diario', semanas:'semanal', meses:'mensal', anos:'anual' };
- document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ r.checked = r.value === (temRecorrenciaAtiva ? 'sim' : 'nao'); });
- set('nt-freq-val',        temRecorrenciaAtiva ? t.rec_freq_val  : 1);
- set('nt-freq-unit',       temRecorrenciaAtiva ? (freqUnitMapRev[t.rec_freq_unit] || 'semanal') : 'semanal');
- set('nt-rec-repeticoes',  temRecorrenciaAtiva ? t.rec_repeticoes : '');
- set('nt-rec-dt-fim',      temRecorrenciaAtiva ? t.rec_dt_fim     : '');
- var infEl = get('nt-rec-infinita');
- if (infEl) infEl.checked = temRecorrenciaAtiva ? !!t.rec_infinita : false;
- _taskRecorrenciaChange();
 
  // ── Seção Auditoria (só no modo edição — atividade nova ainda não existe) ──
  var auditTab  = get('drw-tab-auditoria');
@@ -1714,92 +1687,6 @@ function _taskDelete() {
    }
   })
   .catch(function(e) { _showToast('Erro: ' + e.message, 'erro'); });
-}
-
-function _taskRecorrenciaChange() {
- var recorre = 'nao';
- document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ if (r.checked) recorre = r.value; });
- var wrap = document.getElementById('nt-freq-wrap');
- if (wrap) wrap.style.display = recorre === 'sim' ? 'flex' : 'none';
- var infinita = document.getElementById('nt-rec-infinita');
- var limiteWrap = document.getElementById('nt-rec-limite-wrap');
- if (infinita && limiteWrap) limiteWrap.style.display = infinita.checked ? 'none' : 'flex';
- _recorrenciaPreview();
-}
-
-// ── Autosave da Recorrência em modo edição — mesmo mecanismo (_taskAutoSaveQueue)
-// dos outros campos do drawer, então propaga em tempo real pro Gestor de Tarefas
-// (via _rtWatch('atividades', ...) já existente) e otimisticamente pro próprio
-// Meu Painel (_taskApplyPatchEverywhere). "Remover recorrência" = limpar os
-// campos rec_* desta linha, o que já é suficiente pro trigger do banco parar
-// de gerar a próxima ocorrência quando esta for marcada "Feito".
-function _taskRecorrenciaAutosave() {
- if (!_taskEditId) return; // criação: nada no banco ainda, valores são lidos direto no submit
- var recorre = 'nao';
- document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ if (r.checked) recorre = r.value; });
-
- if (recorre !== 'sim') {
-  _taskEditRecSerieId = null;
-  _taskAutoSaveQueue({
-   rec_freq_val: null, rec_freq_unit: null, rec_infinita: null,
-   rec_repeticoes: null, rec_dt_fim: null, rec_duracao_dias: null,
-   rec_ocorrencia_num: null, rec_serie_id: null
-  }, true);
-  return;
- }
-
- var freqUnitRaw = (document.getElementById('nt-freq-unit') || {}).value || 'semanal';
- var freqUnitMap = { diario:'dias', semanal:'semanas', mensal:'meses', anual:'anos' };
- var freqUnit    = freqUnitMap[freqUnitRaw] || freqUnitRaw;
- var freqVal     = parseInt((document.getElementById('nt-freq-val') || {}).value) || 1;
- var infEl       = document.getElementById('nt-rec-infinita');
- var infinita    = !!(infEl && infEl.checked);
- var recRepStr   = (document.getElementById('nt-rec-repeticoes') || {}).value || '';
- var recRep      = recRepStr ? parseInt(recRepStr) : 0;
- var recDtFim    = (document.getElementById('nt-rec-dt-fim') || {}).value || '';
- var dtI = (document.getElementById('nt-dt-inicio') || {}).value;
- var dtF = (document.getElementById('nt-dt-fim') || {}).value;
- var duracao = (dtI && dtF) ? Math.round((new Date(dtF + 'T00:00:00') - new Date(dtI + 'T00:00:00')) / 86400000) : null;
-
- var patch = {
-  rec_freq_val:     freqVal,
-  rec_freq_unit:    freqUnit,
-  rec_infinita:     infinita,
-  rec_repeticoes:   infinita ? null : (recRep > 0 ? recRep : null),
-  rec_dt_fim:       infinita ? null : (recDtFim || null),
-  rec_duracao_dias: duracao
- };
- // 1ª vez que a recorrência é ligada nesta atividade (não tinha série ainda)
- // → inicia uma série nova a partir de agora, na ocorrência 1.
- if (!_taskEditRecSerieId) {
-  patch.rec_serie_id      = _taskEditId;
-  patch.rec_ocorrencia_num = 1;
-  _taskEditRecSerieId = _taskEditId;
- }
- _taskAutoSaveQueue(patch, true);
-}
-
-/* ── PREVIEW DA SÉRIE DE RECORRÊNCIA ─────────────────────────────────────── */
-function _recorrenciaPreview() {
- var el = document.getElementById('drw-rec-preview');
- if (!el) return;
- var recorre = 'nao';
- document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ if (r.checked) recorre = r.value; });
- if (recorre !== 'sim') { el.textContent = 'Configure os campos acima para visualizar a série.'; return; }
- var unit = (document.getElementById('nt-freq-unit') || {}).value || 'semanal';
- var val  = parseInt((document.getElementById('nt-freq-val') || {}).value) || 1;
- var rep  = parseInt((document.getElementById('nt-rec-repeticoes') || {}).value) || 0;
- var dtFimStr = (document.getElementById('nt-rec-dt-fim') || {}).value || '';
- var infinita = document.getElementById('nt-rec-infinita');
- var isInfinita = infinita && infinita.checked;
- var unitLabels = { diario:'dia(s)', semanal:'semana(s)', mensal:'mês(es)', anual:'ano(s)' };
- var msg = 'Repete a cada ' + val + ' ' + (unitLabels[unit] || unit) + '.';
- if (isInfinita) { msg += ' Sem data de término.'; }
- else if (rep && dtFimStr) { msg += ' Encerra em ' + rep + ' repetições ou até ' + dtFimStr + ' (o que ocorrer primeiro).'; }
- else if (rep) { msg += ' Total de ' + rep + ' repetições.'; }
- else if (dtFimStr) { msg += ' Encerra em ' + dtFimStr + '.'; }
- else { msg += ' Defina o número de repetições ou a data final.'; }
- el.textContent = msg;
 }
 
 /* ── TABS DO DRAWER: página única com scroll — as abas são atalhos que
@@ -2537,23 +2424,12 @@ function _submitNewTask() {
  }
  try {
   // ── Leitura de campos ────────────────────────────────────────────
-  var recorre = 'nao';
-  document.querySelectorAll('input[name="nt-recorre"]').forEach(function(r){ if (r.checked) recorre = r.value; });
   var obraEl  = document.getElementById('nt-obra');
   var projEl  = document.getElementById('nt-projeto');
   var melhEl  = document.getElementById('nt-melhoria-sel');
   var obraText = obraEl && obraEl.selectedIndex > 0 ? obraEl.options[obraEl.selectedIndex].text : '';
   var projText = projEl && projEl.selectedIndex > 0 ? projEl.options[projEl.selectedIndex].text : '';
   var melhText = melhEl && melhEl.selectedIndex > 0 ? melhEl.options[melhEl.selectedIndex].text : '';
-  var infEl = document.getElementById('nt-rec-infinita');
-  var recInfinita = infEl && infEl.checked;
-  var recRepStr = (document.getElementById('nt-rec-repeticoes') || {}).value || '';
-  var recRep    = recRepStr ? parseInt(recRepStr) : 0;
-  var recDtFim  = (document.getElementById('nt-rec-dt-fim') || {}).value || '';
-  // Converte unidade para formato interno (diario→dias, semanal→semanas, mensal→meses, anual→anos)
-  var freqUnitRaw = (document.getElementById('nt-freq-unit') || {}).value || 'semanal';
-  var freqUnitMap = { diario:'dias', semanal:'semanas', mensal:'meses', anual:'anos' };
-  var freqUnit = freqUnitMap[freqUnitRaw] || freqUnitRaw;
 
   // ── Subtarefas: converter _drwSubItems para formato de storage ──
   var subtasksParaSalvar = _drwSubItems.map(function(s, n) {
@@ -2588,14 +2464,7 @@ function _submitNewTask() {
    projeto_nome:    projText || '',
    melhoria_id:     melhEl ? melhEl.value : '',
    melhoria_nome:   melhText || '',
-   recorrencia:     recorre,
-   freq_val:        parseInt((document.getElementById('nt-freq-val') || {}).value) || 1,
-   freq_unit:       freqUnit,
-   rec_infinita:    recInfinita,
-   rec_repeticoes:  recRep,
-   rec_dt_fim:      recDtFim,
    done:            false,
-   is_mae:          recorre === 'sim',
    origem:          'Dashboard',
    created_by:      currentUser,
    created_at:      new Date().toISOString()
@@ -2622,28 +2491,9 @@ function _submitNewTask() {
     prioridade:     mae.prioridade,
     status:         mae.status,
     observacoes:    mae.observacoes || null,
-    frequencia:     recorre === 'sim' ? (mae.freq_val + ' ' + freqUnit) : null,
     criado_por:     (_currentUser && _currentUser.id) || null,
     visibilidade:   privVisibilidade
    };
-   // Recorrência: só a 1ª ocorrência é criada agora. As próximas nascem
-   // sob demanda — um trigger no banco (gerar_proxima_ocorrencia_recorrente)
-   // cria a ocorrência seguinte automaticamente quando a atual é marcada
-   // como "Feito", já com status "A fazer". Isso substitui a criação em
-   // lote de até 365 linhas de uma vez que existia antes.
-   if (recorre === 'sim' && mae.data_inicio && mae.data_fim) {
-    var dtI = new Date(mae.data_inicio + 'T00:00:00');
-    var dtF = new Date(mae.data_fim    + 'T00:00:00');
-    Object.assign(linhaBase, {
-     rec_freq_val:      mae.freq_val,
-     rec_freq_unit:     freqUnit,
-     rec_infinita:      recInfinita,
-     rec_repeticoes:    recRep > 0 ? recRep : null,
-     rec_dt_fim:        recDtFim || null,
-     rec_duracao_dias:  Math.round((dtF - dtI) / 86400000),
-     rec_ocorrencia_num: 1
-    });
-   }
 
    var linhas = [Object.assign({}, linhaBase, {
     data_inicio: mae.data_inicio || null,

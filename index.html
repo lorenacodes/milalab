@@ -2884,7 +2884,7 @@
 <script src="scripts/modules/instalacoes.js?v=mldsv345"></script>
 <script src="scripts/modules/empresas.js?v=mldsv354"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv345"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv353"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv362"></script>
 <script src="scripts/modules/melhorias.js?v=mldsv345"></script>
 <script src="scripts/modules/automacoes.js?v=mldsv345"></script>
 <script src="scripts/modules/admin.js?v=mldsv345"></script>
@@ -3118,66 +3118,6 @@
      <textarea id="nt-observacoes" class="tf-ta" style="min-height:50px" placeholder="Notas internas..." oninput="_taskAutoSaveQueue({observacoes:this.value||null})"></textarea>
     </div>
 
-    <!-- ── SEÇÃO: RECORRÊNCIA — visível ao criar E ao editar. Em edição, cada
-         campo dispara _taskRecorrenciaAutosave() (autosave real, igual aos
-         demais campos do drawer) além de _taskRecorrenciaChange() (só UI);
-         em criação _taskRecorrenciaAutosave() não faz nada (_taskEditId
-         vazio), os valores são lidos direto do DOM no submit ── -->
-    <div class="drw-section" id="drw-sec-recorrencia-wrap">
-     <div class="drw-section-hd" onclick="_drwToggleSection('recorrencia')">
-      <span class="drw-section-title">Recorrência</span>
-      <span class="drw-section-toggle" id="drw-sec-toggle-recorrencia">▾</span>
-     </div>
-     <div class="drw-section-body" id="drw-sec-body-recorrencia">
-
-      <div style="display:flex;gap:20px;padding:2px 0 4px">
-       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-        <input type="radio" name="nt-recorre" value="nao" checked onchange="_taskRecorrenciaChange();_taskRecorrenciaAutosave()"> Não repete
-       </label>
-       <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-        <input type="radio" name="nt-recorre" value="sim" onchange="_taskRecorrenciaChange();_taskRecorrenciaAutosave()"> Recorrente
-       </label>
-      </div>
-
-      <div id="nt-freq-wrap" style="display:none;flex-direction:column;gap:12px">
-       <div class="tf-r2">
-        <div>
-         <label class="tf-lbl">Frequência</label>
-         <select id="nt-freq-unit" class="tf-sel" onchange="_taskRecorrenciaChange();_taskRecorrenciaAutosave()">
-          <option value="diario">Diário</option>
-          <option value="semanal" selected>Semanal</option>
-          <option value="mensal">Mensal</option>
-          <option value="anual">Anual</option>
-         </select>
-        </div>
-        <div>
-         <label class="tf-lbl">A cada (nº)</label>
-         <input id="nt-freq-val" class="tf-inp" type="number" min="1" max="99" value="1" onchange="_taskRecorrenciaChange();_taskRecorrenciaAutosave()">
-        </div>
-       </div>
-       <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-        <input type="checkbox" id="nt-rec-infinita" onchange="_taskRecorrenciaChange();_taskRecorrenciaAutosave()" style="width:14px;height:14px;cursor:pointer">
-        <label for="nt-rec-infinita" style="font-size:12px;cursor:pointer;color:var(--text)">Recorrência infinita</label>
-       </div>
-       <div id="nt-rec-limite-wrap" style="display:flex;flex-direction:column;gap:12px">
-        <div class="tf-r2">
-         <div>
-          <label class="tf-lbl">Qtd. de repetições</label>
-          <input id="nt-rec-repeticoes" class="tf-inp" type="number" min="1" max="365" placeholder="Ex.: 12" onchange="_taskRecorrenciaChange();_taskRecorrenciaAutosave()">
-         </div>
-         <div>
-          <label class="tf-lbl">Ou até a data</label>
-          <input id="nt-rec-dt-fim" class="tf-inp" type="date" onchange="_taskRecorrenciaChange();_taskRecorrenciaAutosave()">
-         </div>
-        </div>
-        <div style="font-size:10px;color:var(--muted)">Se ambos preenchidos, o critério que atingir primeiro encerra a série.</div>
-       </div>
-       <div id="drw-rec-preview" style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 12px;font-size:11px;color:var(--muted)">Configure os campos acima para visualizar a série.</div>
-      </div>
-
-     </div>
-    </div>
-
    </div>
 
    <!-- ── TAB: RELACIONAMENTOS (mantida para compatibilidade, escondida) ── -->
@@ -3288,8 +3228,6 @@
 
    </div>
 
-   <!-- ── TAB: RECORRÊNCIA (compatibilidade — agora integrada no Geral) ── -->
-   <div class="drw-tab-pane" id="drw-pane-recorrencia" style="display:none!important"></div>
 
    <!-- ── TAB: AUDITORIA ─────────────────────────────────────── -->
    <div class="drw-tab-pane" id="drw-pane-auditoria">
