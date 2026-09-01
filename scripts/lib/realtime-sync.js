@@ -36,6 +36,37 @@ function _rtWatch(table, reloadFn, debounceMs) {
  return _rtChannels[table];
 }
 
+// ── Rede de segurança: recarrega tudo ao voltar pra aba/reconectar ──────────
+// O postgres_changes acima cobre "algo mudou enquanto eu olhava a tela", mas
+// não cobre o canal WebSocket morrer em silêncio (aba em segundo plano por
+// muito tempo, notebook suspenso, troca de rede/Wi-Fi, proxy derrubando
+// conexão ociosa) — nesses casos o cliente pode nunca reconectar sozinho a
+// tempo, e a tela ficaria com dado velho pra sempre até um F5 manual. Pedido
+// explícito: o carregamento tem que ser garantido pelo sistema, sem depender
+// de a pessoa lembrar de clicar em "recarregar" (por isso o botão manual do
+// Gestor de Tarefas foi removido — ver index.html).
+//
+// Só recarrega se a aba ficou ESCONDIDA por um tempo mínimo antes de voltar
+// (_RT_HIDDEN_MIN_MS) — sem esse piso, alternar de aba rapidamente (alt-tab
+// de 1s) dispararia uma recarga completa e paginada à toa a cada volta.
+var _RT_HIDDEN_MIN_MS = 20000;
+var _rtHiddenSince = null;
+function _rtRecarregarTudo() {
+ Object.keys(_rtCallbacks).forEach(function (table) {
+  _rtCallbacks[table].forEach(function (fn) { try { fn(); } catch (e) {} });
+ });
+}
+if (typeof document !== 'undefined') {
+ document.addEventListener('visibilitychange', function () {
+  if (document.hidden) { _rtHiddenSince = Date.now(); return; }
+  if (_rtHiddenSince && (Date.now() - _rtHiddenSince) >= _RT_HIDDEN_MIN_MS) _rtRecarregarTudo();
+  _rtHiddenSince = null;
+ });
+ // Rede voltou (ex.: notebook saiu do modo avião/trocou de Wi-Fi): mesmo
+ // gatilho, sem depender de a aba ter ficado escondida.
+ window.addEventListener('online', _rtRecarregarTudo);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // _rtWatchRows — tempo real POR LINHA (não "recarrega a lista inteira")
 // ═══════════════════════════════════════════════════════════════════════════

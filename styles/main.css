@@ -804,8 +804,6 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
 .gestor-hd-title{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.2px}
 .gestor-hd-sub{font-size:10px;color:var(--muted);margin-top:2px}
 .gestor-hd-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.gestor-refresh-btn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;color:var(--muted);width:30px;height:30px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .12s}
-.gestor-refresh-btn:hover{background:var(--surface3,var(--surface2));border-color:var(--navy);color:var(--navy)}
 
 /* Dropdown de período — substitui os 5 botões + campos de data sempre
    visíveis por um botão só, que abre um popover compacto. */
