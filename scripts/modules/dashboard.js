@@ -1022,12 +1022,18 @@ function _taskAutoSaveFlush() {
   }
   _taskAutoSaveStatus('saved', 'Alterações salvas');
   var applied = r.row || patch;
-  _taskApplyPatchEverywhere(id, applied);
-  // Mantém window._drwCurrentTask em dia a cada flush — sem isso, uma 2ª
-  // edição na mesma sessão do drawer capturaria o "antes" errado em
-  // _taskAutoSaveQueue (o valor de quando o drawer abriu, não o da edição
-  // anterior), gerando um undo que não bate com o que o usuário via na tela.
-  if (window._drwCurrentTask && String(window._drwCurrentTask.id) === String(id)) Object.assign(window._drwCurrentTask, applied);
+  // O UPDATE já foi confirmado no banco neste ponto — uma exceção daqui pra
+  // baixo (re-render de Meu Painel/Gestor, undo, etc.) NÃO pode voltar a
+  // mostrar "Não foi possível salvar": isso mentiria pro usuário sobre o
+  // estado real do banco. Só loga, pra não perder o sinal de depuração.
+  try {
+   _taskApplyPatchEverywhere(id, applied);
+   // Mantém window._drwCurrentTask em dia a cada flush — sem isso, uma 2ª
+   // edição na mesma sessão do drawer capturaria o "antes" errado em
+   // _taskAutoSaveQueue (o valor de quando o drawer abriu, não o da edição
+   // anterior), gerando um undo que não bate com o que o usuário via na tela.
+   if (window._drwCurrentTask && String(window._drwCurrentTask.id) === String(id)) Object.assign(window._drwCurrentTask, applied);
+  } catch (e) { console.error('[auto-save] salvo no banco, mas falhou ao atualizar a tela', e); }
   // Ctrl+Z (undo-manager.js) — uma entrada por flush (não por campo): os
   // campos tocados dentro da MESMA janela de debounce viram uma única
   // "edição lógica", igual ao pedido original. Só entra na pilha se algo
@@ -1064,9 +1070,15 @@ function _taskUndoApply(id, values) {
    throw new Error('Conflito de edição concorrente');
   }
   var applied = r.row || values;
-  _taskApplyPatchEverywhere(id, applied);
-  if (window._drwCurrentTask && String(window._drwCurrentTask.id) === String(id)) Object.assign(window._drwCurrentTask, applied);
-  if (_taskEditId && String(_taskEditId) === String(id)) _taskDrawerOpen(id);
+  // Mesmo raciocínio de _taskAutoSaveFlush: o UPDATE do undo já foi
+  // confirmado no banco aqui — um erro de re-render não pode virar um "undo
+  // falhou" pro usuário (undo-manager.js mostra erro só se esta promise
+  // rejeitar).
+  try {
+   _taskApplyPatchEverywhere(id, applied);
+   if (window._drwCurrentTask && String(window._drwCurrentTask.id) === String(id)) Object.assign(window._drwCurrentTask, applied);
+   if (_taskEditId && String(_taskEditId) === String(id)) _taskDrawerOpen(id);
+  } catch (e) { console.error('[undo] salvo no banco, mas falhou ao atualizar a tela', e); }
  });
 }
 
@@ -1075,10 +1087,23 @@ function _taskUndoApply(id, values) {
 // depois de qualquer save bem-sucedido, aplica o patch nos dois e
 // re-renderiza tudo que é derivado deles (sem nenhuma consulta nova).
 function _taskApplyPatchEverywhere(id, patch) {
+ // `patch` pode vir cru do Postgrest (r.row, ex.: responsavel como array de
+ // e-mails) enquanto o cache guarda a atividade "enriquecida" (responsavel
+ // como string de nomes, ver _enrichAtividades). Reenriquecer aqui evita que
+ // um save deixe a tela mostrando e-mail cru até um F5 — a função já é
+ // idempotente (só converte se ainda for array).
  var gIdx = (typeof _gestorAllAt !== 'undefined') ? _gestorAllAt.findIndex(function(x){ return String(x.id) === String(id); }) : -1;
- if (gIdx !== -1) { Object.assign(_gestorAllAt[gIdx], patch); if (typeof _gestorApplyFilters === 'function') _gestorApplyFilters(); }
+ if (gIdx !== -1) {
+  Object.assign(_gestorAllAt[gIdx], patch);
+  if (typeof _enrichAtividades === 'function') _enrichAtividades([_gestorAllAt[gIdx]]);
+  if (typeof _gestorApplyFilters === 'function') _gestorApplyFilters();
+ }
  var dIdx = (_dashAllAtRaw||[]).findIndex(function(x){ return String(x.id) === String(id); });
- if (dIdx !== -1) { Object.assign(_dashAllAtRaw[dIdx], patch); _dashRerenderAllFromCache(); }
+ if (dIdx !== -1) {
+  Object.assign(_dashAllAtRaw[dIdx], patch);
+  if (typeof _enrichAtividades === 'function') _enrichAtividades([_dashAllAtRaw[dIdx]]);
+  _dashRerenderAllFromCache();
+ }
 }
 
 // Recalcula feed/KPIs/gráficos do Meu Painel a partir de _dashAllAtRaw (já
@@ -2518,12 +2543,9 @@ function _submitNewTask() {
       _syncAtividadeVinculos(row.id, mae.obra_id || null, mae.projeto_id || null, mae.melhoria_id || null);
       _syncAtividadeResponsaveis(row.id, respEmails);
      });
-     var totalFilhos = linhas.length - 1;
-     _histLogAdd('criou', mae.titulo, recorre === 'sim'
-      ? 'Série recorrente: ' + linhas.length + ' ocorrências'
-      : 'Área: ' + (mae.area || '—') + ' · Prioridade: ' + (mae.prioridade || '—'));
+     _histLogAdd('criou', mae.titulo, 'Área: ' + (mae.area || '—') + ' · Prioridade: ' + (mae.prioridade || '—'));
      _histBadgeUpdate();
-     _showToast(recorre === 'sim' ? 'Série criada: 1 + ' + totalFilhos + ' recorrências!' : 'Atividade criada com sucesso!', 'ok');
+     _showToast('Atividade criada com sucesso!', 'ok');
      // Recarrega Gestor de Tarefas e Meu Painel para refletir a nova atividade
      if (typeof _gestorLoad === 'function') _gestorLoad();
      _dashLoad();

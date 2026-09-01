@@ -655,7 +655,6 @@
       <button id="dash-feed-somente-eu" onclick="_dashTogglePrivFiltro('so_eu')" title="Mostrar só atividades com privacidade &quot;Somente para mim&quot;" style="font-size:10px;padding:3px 10px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-weight:600">Somente para mim</button>
       <button id="dash-feed-especificos" onclick="_dashTogglePrivFiltro('especificos')" title="Mostrar só atividades compartilhadas com pessoas específicas" style="font-size:10px;padding:3px 10px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-weight:600">Pessoas específicas</button>
       <span id="dash-feed-count" style="font-size:10px;color:var(--muted)"></span>
-      <button onclick="_taskDrawerOpen()" style="font-size:10px;padding:3px 10px;background:var(--green);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">+ Nova</button>
      </div>
     </div>
     <!-- Altura fixa: 400px. Independente da quantidade de atividades. Scroll interno. -->
@@ -826,6 +825,11 @@
    <div class="gestor-hd-sub" id="gestor-sync-lbl">Carregando dados...</div>
   </div>
   <div class="gestor-hd-controls">
+   <!-- Criação de tarefa centralizada aqui (Gestor de Tarefas é o local
+        oficial de criar/editar/gerenciar — Meu Painel é só acompanhamento).
+        Mesmo drawer/formulário de sempre (#task-drw, _taskDrawerOpen()),
+        só mudou de onde é disparado. -->
+   <button type="button" onclick="_taskDrawerOpen()" style="font-size:11px;padding:6px 12px;background:var(--green);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600;white-space:nowrap">+ Nova tarefa</button>
    <!-- Ordem pedida: Filtro → Agrupar → Ordenar → Período → Visualizações →
         Pesquisa → Atualizar. A pesquisa foi pro fim de propósito: com ela
         ocupando ~30-40% da largura antes, os popovers de Agrupar/Ordenar/
@@ -2890,7 +2894,7 @@
 <script src="scripts/modules/instalacoes.js?v=mldsv345"></script>
 <script src="scripts/modules/empresas.js?v=mldsv354"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv345"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv362"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv364"></script>
 <script src="scripts/modules/melhorias.js?v=mldsv345"></script>
 <script src="scripts/modules/automacoes.js?v=mldsv363"></script>
 <script src="scripts/modules/admin.js?v=mldsv345"></script>
