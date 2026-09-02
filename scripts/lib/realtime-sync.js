@@ -129,16 +129,23 @@ function _rtUnwatchRows(tabela, chave) {
 // painel dizendo o que mudou, com um botão pro usuário recarregar QUANDO
 // quiser. Idempotente: chamar de novo só atualiza o texto da faixa que já
 // está lá, nunca empilha duas.
+// Fica num slot próprio ENTRE o cabeçalho e o corpo rolável do painel
+// (#sp-aviso-slot, index.html) — não dentro de #sp-body. Lá dentro colidia
+// com a margem negativa do .spt-bar sticky (-18px no topo, pensada pra
+// cancelar o padding do #sp-body quando o .spt-bar é o primeiro filho),
+// "grudando" o aviso nas abas sem respiro nenhum (relatado como "mal
+// formatado"). Como slot próprio, sempre visível (não rola junto com o
+// conteúdo) e sem interferir no layout das abas.
 function _rtAvisoAlteracaoExterna(quemEmail, recarregarExpr) {
- var body = document.getElementById('sp-body');
- if (!body) return;
+ var slot = document.getElementById('sp-aviso-slot');
+ if (!slot) return;
  var quem = (typeof _histNome === 'function') ? _histNome(quemEmail) : (quemEmail || 'Outro usuário');
  var el = document.getElementById('sp-aviso-externo');
  if (!el) {
   el = document.createElement('div');
   el.id = 'sp-aviso-externo';
   el.className = 'sp-aviso-externo';
-  body.insertBefore(el, body.firstChild);
+  slot.appendChild(el);
  }
  el.innerHTML = '<span style="flex:1">' + String(quem).replace(/</g, '&lt;')
   + ' alterou este registro agora. O que você está editando não foi perdido.</span>'
