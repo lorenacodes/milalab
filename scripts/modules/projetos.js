@@ -1221,26 +1221,25 @@ var _PROJ_DOC_TIPOS = [
  { tipo: 'pre_projeto', label: 'Pré-Projeto' },
  { tipo: 'projeto_executivo', label: 'Projeto Executivo' },
 ];
-function _projDocItemHTML(d) {
- var nome = d.nome_arquivo || 'Arquivo';
- var pathSafe = String(d.caminho_storage||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
- var nomeSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
- return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--surface)">'
-  + '<span style="flex:1;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nome.replace(/</g,'&lt;') + '</span>'
-  + '<button type="button" class="btn btn-ghost" style="padding:3px 10px;font-size:11px" onclick="_spAbrirDocStorage(\''+pathSafe+'\',\''+nomeSafe+'\',\'documentos_projetos\')">Visualizar</button>'
-  + '</div>';
-}
-function _projDocSectionHTML(label, tipo, docs) {
- var lista = docs.filter(function(d){ return d.tipo === tipo; });
- return '<div class="sp-field">'
-  + '<div class="sp-label">' + label + '</div>'
-  + (lista.length ? lista.map(_projDocItemHTML).join('') : '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Nenhum arquivo enviado.</div>')
-  + '<label style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--navy);cursor:pointer;font-weight:600">'
-  + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>'
-  + 'Anexar arquivo'
-  + '<input type="file" style="display:none" multiple onchange="_projDocUpload(this,\''+tipo+'\')">'
-  + '</label>'
-  + '</div>';
+// Cards de anexo em grade — mesmo padrão exato usado no painel de Entrega
+// (scripts/lib/doc-cards.js, _dc*), pedido explícito da usuária pra
+// reaproveitar em toda aba de detalhe que anexe documentos. Antes era só
+// uma lista de texto (nome + "Anexar arquivo"), sem miniatura e sem
+// excluir.
+var _PROJ_DOC_BUCKET = 'documentos_projetos';
+function _projDocCategoriaHTML(cat, docs, projetoId, obraId, signedMap) {
+ var thumbs = docs.map(function(d) {
+  var nome = (d.nome_arquivo || 'Documento').toString();
+  var pathSafe = String(d.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var nomeSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var removeJs = "_projDocExcluir('" + d.id + "','" + pathSafe + "','" + projetoId + "','" + (obraId||'') + "')";
+  return _dcThumbHTML(d, _PROJ_DOC_BUCKET, signedMap, "_spAbrirDocStorage('" + pathSafe + "','" + nomeSafe + "','" + _PROJ_DOC_BUCKET + "')", removeJs);
+ });
+ var inputId = 'sp-proj-doc-up-' + cat.tipo;
+ var labelId = inputId + '-lbl';
+ var addHtml = _dcAddHTML(inputId, labelId, "_projDocFileChange(this,'" + cat.tipo + "','" + labelId + "')");
+ var attrs = _dcDragAttrs("_projDocFileDrop(event,'" + cat.tipo + "','" + labelId + "')");
+ return _dcCardHTML(cat.label, docs, thumbs, addHtml, attrs);
 }
 async function _projDocsCarregar(projetoId, obraId) {
  var container = document.getElementById('sp-proj-docs');
@@ -1251,20 +1250,47 @@ async function _projDocsCarregar(projetoId, obraId) {
  var docs = res.data || [];
  container.dataset.projetoId = projetoId;
  container.dataset.obraId = obraId || '';
- container.innerHTML = _PROJ_DOC_TIPOS.map(function(t){ return _projDocSectionHTML(t.label, t.tipo, docs); }).join('');
+ var signedMap = await _dcSignedUrlMap(docs, function(){ return _PROJ_DOC_BUCKET; });
+ container.innerHTML = '<div class="doc-card-grid">' + _PROJ_DOC_TIPOS.map(function(t){
+  return _projDocCategoriaHTML(t, docs.filter(function(d){ return d.tipo === t.tipo; }), projetoId, obraId, signedMap);
+ }).join('') + '</div>';
 }
-async function _projDocUpload(input, tipo) {
- var files = Array.prototype.slice.call(input.files || []);
- if (!files.length) return;
+async function _projDocUploadFiles(files, tipo, labelId) {
+ if (!files || !files.length) return;
  var container = document.getElementById('sp-proj-docs');
  var projetoId = container && container.dataset.projetoId;
  var obraId = (container && container.dataset.obraId) || null;
  if (!projetoId) return;
+ var lbl = document.getElementById(labelId);
+ if (lbl) lbl.textContent = 'Enviando...';
  var erros = 0;
  for (var i = 0; i < files.length; i++) { if (!(await _spUploadRegistro(files[i], projetoId, obraId, tipo))) erros++; }
  if (erros) _showToast(erros + ' arquivo(s) não enviado(s). Tente novamente.', 'erro');
  _projDocsCarregar(projetoId, obraId);
+}
+function _projDocFileChange(input, tipo, labelId) {
+ _projDocUploadFiles(Array.prototype.slice.call(input.files || []), tipo, labelId);
  input.value = '';
+}
+function _projDocFileDrop(event, tipo, labelId) {
+ event.preventDefault();
+ var files = event.dataTransfer && event.dataTransfer.files;
+ _projDocUploadFiles(Array.prototype.slice.call(files || []), tipo, labelId);
+}
+async function _projDocExcluir(docId, path, projetoId, obraId) {
+ if (!confirm('Excluir este anexo? Esta ação não pode ser desfeita.')) return;
+ if (path) {
+  var rm = await _sb.storage.from(_PROJ_DOC_BUCKET).remove([path]);
+  if (rm.error) console.error('[Projetos] erro ao remover arquivo do storage:', rm.error);
+ }
+ var del = await _sb.from('documentos').delete().eq('id', docId);
+ if (del.error) {
+  console.error('[Projetos] erro ao excluir documento:', del.error);
+  _showToast('Não foi possível excluir o anexo. Tente novamente.', 'erro');
+  return;
+ }
+ _showToast('Anexo excluído.', 'ok');
+ _projDocsCarregar(projetoId, obraId);
 }
 
 // ── Fotos do Projeto — galeria com miniaturas (documentos.tipo='fotos_obra'

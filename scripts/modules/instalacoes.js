@@ -688,13 +688,8 @@ function _spInstalacaoRender(inst) {
   <div class="sp-field"><div class="sp-label">Detalhes</div><textarea class="sp-inp" id="sp-inst-detalhes" rows="1" style="resize:none;overflow:hidden;min-height:34px" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px';_instScheduleAutoSave()">${inst.detalhes || ''}</textarea></div>
   <div class="sp-field"><div class="sp-label">Despesa Total</div><input class="sp-inp" id="sp-inst-valortotal" type="number" step="0.01" min="0" placeholder="0,00" value="${inst.valor_total_gasto != null ? inst.valor_total_gasto : ''}" onchange="_instScheduleAutoSave()"></div>
 
-  <div class="sp-stitle">Despesas (anexo)</div>
-  ${_instAnexoInputHTML('Despesa', 'sp-inst-desp-file')}
-  <div id="sp-inst-anexos-despesa-lista" style="margin-top:6px"><div class="sp-empty">Carregando...</div></div>
-
-  <div class="sp-stitle">Detalhe da Montagem (anexo)</div>
-  ${_instAnexoInputHTML('Detalhe da Montagem', 'sp-inst-mont-file')}
-  <div id="sp-inst-anexos-montagem-lista" style="margin-top:6px"><div class="sp-empty">Carregando...</div></div>
+  <div class="sp-stitle">Anexos</div>
+  <div id="sp-inst-anexos-wrap"><div class="sp-empty">Carregando...</div></div>
 
   <div class="sp-stitle">Equipe de Instalação <span class="req">*</span></div>
   <div id="sp-inst-equipe-dd" class="no-msel-wide"><div style="font-size:12px;color:var(--muted);padding:8px 0">Carregando...</div></div>
@@ -744,30 +739,34 @@ function _spInstalacaoRender(inst) {
 }
 
 // ── Despesas / Detalhe da Montagem (anexo) ────────────────────────────────────
-// 2 campos de anexo do Airtable que faltavam por completo (não existia nem
-// upload nem listagem) — mesma relação N:N documentos_instalacoes já criada
-// no banco, mas nunca usada por nenhum código até agora. Reaproveita o bucket
-// documentos_obras e o modal de visualização (_spAbrirDocStorage) já usados
-// pelo resto do sistema — o "tipo" (Despesa/Detalhe da Montagem) é o que
-// separa as 2 listas na tela.
-function _instAnexoInputHTML(tipo, inputId) {
- return '<label style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;border:2px dashed var(--border);border-radius:8px;padding:10px;transition:border-color .15s,background .15s" onmouseover="this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.04)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'\'">'
-  + 'Clique para anexar'
-  + '<input type="file" id="' + inputId + '" style="display:none" onchange="_instAnexoUpload(this,\'' + tipo + '\')">'
-  + '</label>';
-}
-async function _instAnexoUpload(inputEl, tipo) {
- var file = inputEl.files && inputEl.files[0];
- if (!file || !_instAtiva) return;
- var ok = await _instUploadDocumento(file, _instAtiva.id, tipo);
- inputEl.value = '';
- if (!ok) { _showToast('Não foi possível enviar o anexo.', 'erro'); return; }
- _showToast('Anexo enviado!', 'ok');
- _instCarregarAnexos(_instAtiva.id);
+// 2 campos de anexo do Airtable — mesma relação N:N documentos_instalacoes
+// já criada no banco. Cards de anexo em grade — mesmo padrão exato usado
+// no painel de Entrega (scripts/lib/doc-cards.js, _dc*), pedido explícito
+// da usuária pra reaproveitar em toda aba de detalhe que anexe documentos.
+// Antes era um dropzone de arquivo único (sem "multiple") + lista de texto
+// sem miniatura e sem excluir.
+var _INST_ANEXO_BUCKET = 'documentos_obras';
+var _INST_ANEXO_TIPOS = [
+ { tipo: 'Despesa', label: 'Despesas' },
+ { tipo: 'Detalhe da Montagem', label: 'Detalhe da Montagem' },
+];
+function _instAnexoCategoriaHTML(cat, docs, instalacaoId, signedMap) {
+ var thumbs = docs.map(function(d) {
+  var nome = (d.nome_arquivo || 'Documento').toString();
+  var pathSafe = String(d.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var nomeSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var removeJs = "_instAnexoExcluir('" + d.id + "','" + pathSafe + "','" + instalacaoId + "')";
+  return _dcThumbHTML(d, _INST_ANEXO_BUCKET, signedMap, "_spAbrirDocStorage('" + pathSafe + "','" + nomeSafe + "','" + _INST_ANEXO_BUCKET + "')", removeJs);
+ });
+ var inputId = 'sp-inst-anexo-up-' + cat.tipo.replace(/[^a-zA-Z0-9]/g,'_');
+ var labelId = inputId + '-lbl';
+ var addHtml = _dcAddHTML(inputId, labelId, "_instAnexoFileChange(this,'" + cat.tipo + "','" + labelId + "')");
+ var attrs = _dcDragAttrs("_instAnexoFileDrop(event,'" + cat.tipo + "','" + labelId + "')");
+ return _dcCardHTML(cat.label, docs, thumbs, addHtml, attrs);
 }
 async function _instUploadDocumento(file, instalacaoId, tipo) {
  var path = 'instalacoes/' + instalacaoId + '/' + Date.now() + '_' + file.name.replace(/[^a-zA-Z0-9_.\-]/g,'_');
- var up = await _sb.storage.from('documentos_obras').upload(path, file, { upsert: false });
+ var up = await _sb.storage.from(_INST_ANEXO_BUCKET).upload(path, file, { upsert: false });
  if (up.error) { console.error('[Instalações] erro ao enviar anexo:', up.error); return false; }
  var ins = await _sb.from('documentos').insert({
   nome_arquivo: file.name, tipo: tipo, categoria: 'Técnico', caminho_storage: path,
@@ -778,23 +777,50 @@ async function _instUploadDocumento(file, instalacaoId, tipo) {
  if (link.error) { console.error('[Instalações] erro ao vincular anexo à instalação:', link.error); return false; }
  return true;
 }
+async function _instAnexoUploadFiles(files, tipo, labelId) {
+ if (!files || !files.length || !_instAtiva) return;
+ var lbl = document.getElementById(labelId);
+ if (lbl) lbl.textContent = 'Enviando...';
+ var erros = 0;
+ for (var i = 0; i < files.length; i++) { if (!(await _instUploadDocumento(files[i], _instAtiva.id, tipo))) erros++; }
+ if (erros) _showToast(erros + ' arquivo(s) não enviado(s). Tente novamente.', 'erro');
+ _instCarregarAnexos(_instAtiva.id);
+}
+function _instAnexoFileChange(input, tipo, labelId) {
+ _instAnexoUploadFiles(Array.prototype.slice.call(input.files || []), tipo, labelId);
+ input.value = '';
+}
+function _instAnexoFileDrop(event, tipo, labelId) {
+ event.preventDefault();
+ var files = event.dataTransfer && event.dataTransfer.files;
+ _instAnexoUploadFiles(Array.prototype.slice.call(files || []), tipo, labelId);
+}
+async function _instAnexoExcluir(docId, path, instalacaoId) {
+ if (!confirm('Excluir este anexo? Esta ação não pode ser desfeita.')) return;
+ if (path) {
+  var rm = await _sb.storage.from(_INST_ANEXO_BUCKET).remove([path]);
+  if (rm.error) console.error('[Instalações] erro ao remover arquivo do storage:', rm.error);
+ }
+ var del = await _sb.from('documentos').delete().eq('id', docId);
+ if (del.error) {
+  console.error('[Instalações] erro ao excluir documento:', del.error);
+  _showToast('Não foi possível excluir o anexo. Tente novamente.', 'erro');
+  return;
+ }
+ await _sb.from('documentos_instalacoes').delete().eq('documento_id', docId);
+ _showToast('Anexo excluído.', 'ok');
+ _instCarregarAnexos(instalacaoId);
+}
 async function _instCarregarAnexos(id) {
+ var wrap = document.getElementById('sp-inst-anexos-wrap');
+ if (!wrap || !_sb) return;
  var res = await _sb.from('documentos_instalacoes').select('documento:documento_id(id,nome_arquivo,tipo,caminho_storage)').eq('instalacao_id', id);
  if (!_instAtiva || String(_instAtiva.id) !== String(id)) return; // painel já mudou de instalação
  var docs = (res.data || []).map(function(x){ return x.documento; }).filter(Boolean);
- _instRenderAnexoLista('sp-inst-anexos-despesa-lista', docs.filter(function(d){ return d.tipo === 'Despesa'; }));
- _instRenderAnexoLista('sp-inst-anexos-montagem-lista', docs.filter(function(d){ return d.tipo === 'Detalhe da Montagem'; }));
-}
-function _instRenderAnexoLista(elId, docs) {
- var el = document.getElementById(elId);
- if (!el) return;
- el.innerHTML = docs.length
-  ? docs.map(function(d) {
-     var pathSafe = (d.caminho_storage || '').replace(/'/g,"\\'");
-     var nomeSafe = (d.nome_arquivo || 'Arquivo').replace(/'/g,"\\'");
-     return '<div onclick="_spAbrirDocStorage(\'' + pathSafe + '\',\'' + nomeSafe + '\',\'documentos_obras\',\'' + d.id + '\',null,null)" style="display:flex;align-items:center;gap:8px;padding:7px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:5px;cursor:pointer;font-size:12px" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' + (d.nome_arquivo || 'Arquivo').replace(/</g,'&lt;') + '</div>';
-    }).join('')
-  : '<div class="sp-empty">Nenhum anexo ainda.</div>';
+ var signedMap = await _dcSignedUrlMap(docs, function(){ return _INST_ANEXO_BUCKET; });
+ wrap.innerHTML = '<div class="doc-card-grid">' + _INST_ANEXO_TIPOS.map(function(cat) {
+  return _instAnexoCategoriaHTML(cat, docs.filter(function(d){ return d.tipo === cat.tipo; }), id, signedMap);
+ }).join('') + '</div>';
 }
 
 async function _instCarregarEquipesCacheDet() {
