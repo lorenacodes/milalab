@@ -2413,9 +2413,15 @@
  <!-- ── VISTA CALENDÁRIO (Timeline/Gantt) ── nav, legenda e faixa "sem data"
       são montados inteiros dentro de renderInstCal() (mesmo modelo da
       Timeline do Gestor de Tarefas, #gestor-timeline-content) — sem
-      wrapper de nav/legenda estático aqui, pra não duplicar. -->
- <div id="inst-view-calendario" style="display:none;height:calc(100vh - 320px);min-height:420px">
-  <div id="inst-cal-grid" style="height:100%"></div>
+      wrapper de nav/legenda estático aqui, pra não duplicar.
+      SEM altura fixa (diferente do Gestor, que é uma página inteira de
+      altura travada em 100vh com scroll interno): Instalações é uma
+      página normal que rola com o conteúdo, então o grid só deve ocupar a
+      altura que o conteúdo real precisa — uma altura fixa aqui sobrava
+      espaço em branco embaixo em meses com poucas instalações
+      (reportado: "está sobrando espaço"). -->
+ <div id="inst-view-calendario" style="display:none">
+  <div id="inst-cal-grid"></div>
  </div>
  </div>
 
@@ -2901,7 +2907,7 @@
 <script src="scripts/modules/obras.js?v=mldsv355"></script>
 <script src="scripts/modules/projetos.js?v=mldsv355"></script>
 <script src="scripts/modules/entregas.js?v=mldsv381"></script>
-<script src="scripts/modules/instalacoes.js?v=mldsv383"></script>
+<script src="scripts/modules/instalacoes.js?v=mldsv384"></script>
 <script src="scripts/modules/empresas.js?v=mldsv354"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv345"></script>
 <script src="scripts/modules/dashboard.js?v=mldsv368"></script>

@@ -499,10 +499,14 @@ function renderInstCal() {
  var mFull = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
  var periodLbl = mFull[vm]+' '+vy;
  var days = _instMonthDays(vy, vm);
- var bodyHtml = '<div style="flex:1;overflow-y:auto;overflow-x:hidden">'+_instBuildCalGrid(days, tRanges, function(d){ return d.getMonth()!==vm; })+'</div>';
+ // Sem height:100%/overflow:hidden/flex:1 (diferente do Gestor de Tarefas,
+ // que é uma página inteira de altura travada com scroll interno) —
+ // Instalações é página normal, então a grade só ocupa a altura que o
+ // conteúdo do mês precisa e a página rola normalmente por baixo.
+ var bodyHtml = _instBuildCalGrid(days, tRanges, function(d){ return d.getMonth()!==vm; });
 
  var btnSt = 'background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;color:var(--text)';
- var html = '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">'
+ var html = '<div style="display:flex;flex-direction:column;border:1px solid var(--border);border-radius:8px;overflow:hidden">'
   + '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;flex-wrap:wrap">'
   + '<button style="'+btnSt+';padding:3px 12px;font-size:18px;line-height:1" onclick="instCalNav(-1)">&#8249;</button>'
   + '<button style="'+btnSt+';padding:3px 12px;font-size:18px;line-height:1" onclick="instCalNav(1)">&#8250;</button>'
