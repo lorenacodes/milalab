@@ -377,7 +377,7 @@ function _instToggleWeek(weekKey) {
 // em lanes (até 3 visíveis, resto atrás de "+N ocultas — expandir").
 function _instBuildCalGrid(days, tRanges, dimFn) {
  var dShort = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
- var LANES_DEFAULT=3, BAR_H=20, BAR_GAP=2, DAY_NUM_H=26;
+ var LANES_DEFAULT=4, BAR_H=26, BAR_GAP=3, DAY_NUM_H=30;
  var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:2px solid var(--border);flex-shrink:0;background:var(--surface2)">';
  days.slice(0,7).forEach(function(day){
   var isWE = day.getDay()===0 || day.getDay()===6;
