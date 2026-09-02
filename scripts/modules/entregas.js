@@ -302,6 +302,26 @@ async function _entLoadDocPresence() {
  if (typeof _entApplyFilters === 'function') _entApplyFilters();
 }
 
+// "Contato do orçamento" no filtro ficava sempre vazio (contatoOrcamento:''
+// hard-coded) — a resolução real (_entCarregarContatoOrcamento, mais abaixo)
+// só existe no painel de detalhe de UMA entrega por vez (1ª linha de
+// contatos_obras da obra vinculada). Pra filtrar a lista inteira, carrega
+// em bloco (mesmo padrão de _entLoadDocPresence) um mapa obra_id → nome do
+// 1º contato, e reaplica os filtros quando terminar.
+var _entContatoOrcamentoMap = null; // { obraId: nomeContato } | null (ainda não carregado)
+async function _entLoadContatoOrcamento() {
+ if (!_sb) return;
+ var linhas = await _entCarregarPaginado('contatos_obras', 'obra_id, contato:contato_id(nome_completo)');
+ var mapa = {};
+ linhas.forEach(function(r) {
+  if (!r.obra_id || mapa[r.obra_id]) return; // 1ª linha por obra = principal, mesma convenção do painel
+  var nome = r.contato && r.contato.nome_completo;
+  if (nome) mapa[r.obra_id] = nome;
+ });
+ _entContatoOrcamentoMap = mapa;
+ if (typeof _entApplyFilters === 'function') _entApplyFilters();
+}
+
 var _entFbFields = [
  // options em português (via _entBucketLabel) — o filtro comparava/exibia a
  // chave interna crua (aguardando/producao/transporte/entregue), que nunca
@@ -503,11 +523,16 @@ function _entPseudoDataset(e) {
   valor:       e.valor != null ? e.valor : 0,
   pedidoProduzido: e.pedido_produzido ? 'sim' : 'não',
   categoria:   ((e.obra && e.obra.tipo_obra) || []).join(','),
-  enderecoEntrega: (e.endereco_entrega || '').toLowerCase(),
+  // Endereço de entrega virou rollup somente-leitura da Obra no painel de
+  // detalhe (entregas.endereco_entrega não é mais escrito por nada da UI) —
+  // o filtro tinha ficado pra trás lendo só a coluna própria da entrega,
+  // que fica vazia pra qualquer entrega nova. Obra primeiro, entrega como
+  // fallback (dado antigo/migrado do Airtable que ainda tenha valor lá).
+  enderecoEntrega: ((e.obra && e.obra.endereco_entrega) || e.endereco_entrega || '').toLowerCase(),
   pedidoCompusaMilatec: (e.pedido_compusa_milatec || '').toLowerCase(),
   pedidoCompusaMila:    (e.pedido_compusa_mila || '').toLowerCase(),
   notaFiscal:  (_entDocEntregaIds && _entDocEntregaIds[e.id]) ? 'sim' : 'não',
-  contatoOrcamento: '', // ver limitação documentada no header do arquivo
+  contatoOrcamento: ((_entContatoOrcamentoMap && e.obra_id && _entContatoOrcamentoMap[e.obra_id]) || '').toLowerCase(),
   criadoPor:   (typeof _projAuditNome === 'function' ? _projAuditNome(e.criado_por) : (e.criado_por || '—')).toLowerCase(),
   alteradoPor: (typeof _projAuditNome === 'function' ? _projAuditNome(e.atualizado_por) : (e.atualizado_por || '—')).toLowerCase(),
   horarioCriacao: e.created_at ? String(e.created_at).slice(0, 10) : '',
@@ -1979,8 +2004,9 @@ async function _dbLoadEntregas() {
  // vistas Kanban/Calendário/agrupada, todas lendo direto deste array.
  _entregasArr = data || [];
  // Carrega em paralelo (não bloqueia a Tabela) — reaplica o filtro sozinha
- // quando terminar (ver _entLoadDocPresence).
+ // quando terminar (ver _entLoadDocPresence/_entLoadContatoOrcamento).
  _entLoadDocPresence();
+ _entLoadContatoOrcamento();
  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  if (error || !data?.length) return;
  var groupLevels = (_gbInstances.entregas && _gbInstances.entregas.state.levels) || [];
