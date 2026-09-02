@@ -1263,8 +1263,8 @@ async function _spCarregarDocumentosObraEspelho(obraId) {
  // campo em si já diz "(da Obra)", igual ao "(from Obras)" do Airtable
  // original, e não existe "+ Anexar" nestes cards (única diferença visual
  // suficiente pra deixar claro que não dá pra editar/excluir por aqui).
- var signedMap = await _entDocSignedUrlMap(docs, function() { return 'documentos_obras'; });
- wrap.innerHTML = '<div class="ent-doc-grid">' + _entDocObraEspelhoTipos.map(function(tipo) {
+ var signedMap = await _dcSignedUrlMap(docs, function() { return 'documentos_obras'; });
+ wrap.innerHTML = '<div class="doc-card-grid">' + _entDocObraEspelhoTipos.map(function(tipo) {
   var docsDoTipo = grupos[tipo];
   var thumbs = docsDoTipo.map(function(d) {
    var nome = (d.nome || d.nome_arquivo || d.arquivo_nome || 'Documento').toString();
@@ -1272,9 +1272,9 @@ async function _spCarregarDocumentosObraEspelho(obraId) {
    var onclickJs = d.proposta_id
     ? "_spVisualizarProposta('" + d.proposta_id + "')"
     : (d.caminho_storage ? "_spAbrirDocStorage('" + String(d.caminho_storage).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "','" + nomeAttrSafe + "')" : '');
-   return _entDocThumbHTML(d, 'documentos_obras', signedMap, onclickJs);
+   return _dcThumbHTML(d, 'documentos_obras', signedMap, onclickJs);
   });
-  return _entDocCardHTML(tipo + ' (da Obra)', docsDoTipo, thumbs, '');
+  return _dcCardHTML(tipo + ' (da Obra)', docsDoTipo, thumbs, '');
  }).join('') + '</div>';
 }
 
@@ -1845,60 +1845,10 @@ function _entDocCategoriaDe(tipo) {
  return _entDetDocTipoAlias[tipo] || 'documento_especifico';
 }
 
-// ── Cards de anexo em grade (Airtable-like) — bloco compartilhado entre os
-// documentos próprios da Entrega e o espelho somente-leitura da Obra
-// (styles/entregas.css: .ent-doc-*). Prévia real só para imagem (signed
-// URL em lote); PDF/outros ganham um ícone de arquivo genérico (SVG, sem
-// emoji — regra explícita da usuária: nenhum emoji em lugar nenhum do
-// sistema). Nome do arquivo sempre visível abaixo da miniatura, igual à
-// referência do Airtable (lá o nome do anexo aparece por baixo da prévia).
-var _entDocImgExt = ['jpg','jpeg','png','gif','webp'];
-function _entDocExt(nome) {
- var m = /\.([a-z0-9]+)$/i.exec(String(nome || '').trim());
- return m ? m[1].toLowerCase() : '';
-}
-async function _entDocSignedUrlMap(docs, bucketFn) {
- var byBucket = {};
- docs.forEach(function(d) {
-  if (!d.caminho_storage) return;
-  if (_entDocImgExt.indexOf(_entDocExt(d.nome || d.nome_arquivo || d.arquivo_nome)) === -1) return;
-  var b = bucketFn(d);
-  (byBucket[b] = byBucket[b] || []).push(d.caminho_storage);
- });
- var map = {};
- if (!_sb) return map;
- await Promise.all(Object.keys(byBucket).map(async function(b) {
-  var res = await _sb.storage.from(b).createSignedUrls(byBucket[b], 3600);
-  if (!res.error) (res.data || []).forEach(function(s) { if (s.signedUrl && s.path) map[b + '|' + s.path] = s.signedUrl; });
- }));
- return map;
-}
-var _entDocFileIconSVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><path d="M14 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>';
-// removeJs (opcional): só os documentos próprios da Entrega passam isso —
-// o espelho somente-leitura da Obra nunca recebe, então nunca ganha botão
-// de excluir (mantém a mesma regra "só editável aqui se for da Entrega").
-function _entDocThumbHTML(d, bucket, signedMap, onclickJs, removeJs) {
- var nome = (d.nome || d.nome_arquivo || d.arquivo_nome || 'Documento').toString();
- var url = d.caminho_storage ? signedMap[bucket + '|' + d.caminho_storage] : null;
- var box = url
-  ? '<img src="' + url + '" alt="" loading="lazy">'
-  : _entDocFileIconSVG;
- return '<div class="ent-doc-thumb" title="' + nome.replace(/"/g,'&quot;') + '">'
-  + '<div class="ent-doc-thumb-box" onclick="' + onclickJs + '">' + box
-  + (removeJs ? '<button type="button" class="ent-doc-thumb-rm" title="Excluir anexo" onclick="event.stopPropagation();' + removeJs + '">&times;</button>' : '')
-  + '</div>'
-  + '<div class="ent-doc-thumb-name">' + nome.replace(/</g,'&lt;') + '</div>'
-  + '</div>';
-}
-function _entDocCardHTML(label, docs, thumbsHtmlList, addHtml, extraAttrs) {
- var body = docs.length
-  ? '<div class="ent-doc-thumbs">' + thumbsHtmlList.join('') + '</div>'
-  : '<div class="ent-doc-empty">Nenhum anexo</div>';
- return '<div class="ent-doc-card"' + (extraAttrs || '') + '>'
-  + '<div class="ent-doc-card-label">' + label + (docs.length ? ' (' + docs.length + ')' : '') + '</div>'
-  + body + (addHtml || '') + '</div>';
-}
-
+// ── Cards de anexo em grade — usa o componente compartilhado
+// scripts/lib/doc-cards.js (_dc*), o mesmo padrão em todas as abas que
+// anexam documentos no sistema (Entregas/Projetos/Instalações). Aqui só
+// a parte específica de Entrega: categorias, buckets, upload e exclusão.
 async function _spCarregarDocumentosEntrega(entregaId, obraId) {
  var containers = {};
  _entDetDocCats.forEach(function(c) { if (!containers[c.container]) containers[c.container] = document.getElementById(c.container); });
@@ -1926,12 +1876,12 @@ async function _spCarregarDocumentosEntrega(entregaId, obraId) {
  // caem via _spUploadDocEntrega) — sem essa distinção o signed URL saía
  // sempre pro bucket errado.
  var bucketDe = function(d) { return d.origem === 'airtable_importado' ? 'documentos_entregas' : 'documentos_obras'; };
- var signedMap = await _entDocSignedUrlMap(docs, bucketDe);
+ var signedMap = await _dcSignedUrlMap(docs, bucketDe);
 
  Object.keys(containers).forEach(function(containerId) {
   if (!containers[containerId]) return;
   var catsAqui = _entDetDocCats.filter(function(c) { return c.container === containerId; });
-  containers[containerId].innerHTML = '<div class="ent-doc-grid">' + catsAqui.map(function(c) { return _spEntDetCategoriaHTML(c, grupos[c.tipo], entregaId, obraId, signedMap, bucketDe); }).join('') + '</div>';
+  containers[containerId].innerHTML = '<div class="doc-card-grid">' + catsAqui.map(function(c) { return _spEntDetCategoriaHTML(c, grupos[c.tipo], entregaId, obraId, signedMap, bucketDe); }).join('') + '</div>';
  });
 }
 
@@ -1942,22 +1892,14 @@ function _spEntDetCategoriaHTML(cat, docs, entregaId, obraId, signedMap, bucketD
   var pathSafe = String(d.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   var nomeAttrSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   var removeJs = "_spEntDetExcluirDoc('" + d.id + "','" + pathSafe + "','" + bucket + "','" + entregaId + "','" + (obraId||'') + "')";
-  return _entDocThumbHTML(d, bucket, signedMap, "_spAbrirDocStorage('" + pathSafe + "','" + nomeAttrSafe + "','" + bucket + "')", removeJs);
+  return _dcThumbHTML(d, bucket, signedMap, "_spAbrirDocStorage('" + pathSafe + "','" + nomeAttrSafe + "','" + bucket + "')", removeJs);
  });
 
  var inputId = 'sp-entdet-up-' + cat.tipo;
  var labelId = inputId + '-lbl';
- // Card compacto lado a lado (grade), com miniatura real (imagem) ou
- // ícone de arquivo genérico + nome do anexo, e um link simples
- // "+ Anexar" (sem caixa própria — evita empilhar duas caixas quando
- // vazio). O card inteiro aceita arrastar-e-soltar (destaque via
- // .ent-doc-card.drag, entregas.css).
- var addHtml = '<label class="ent-doc-card-add" for="' + inputId + '"><span id="' + labelId + '">+ Anexar</span></label>'
-  + '<input type="file" id="' + inputId + '" multiple style="display:none" onchange="_spEntDetFileChange(this,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + cat.tipo + '\',\'' + labelId + '\')">';
- var attrs = ' ondragover="event.preventDefault();this.classList.add(\'drag\')"'
-  + ' ondragleave="this.classList.remove(\'drag\')"'
-  + ' ondrop="this.classList.remove(\'drag\');_spEntDetFileDrop(event,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + cat.tipo + '\',\'' + labelId + '\')"';
- return _entDocCardHTML(cat.label, docs, thumbs, addHtml, attrs);
+ var addHtml = _dcAddHTML(inputId, labelId, "_spEntDetFileChange(this,'" + entregaId + "','" + (obraId||'') + "','" + cat.tipo + "','" + labelId + "')");
+ var attrs = _dcDragAttrs("_spEntDetFileDrop(event,'" + entregaId + "','" + (obraId||'') + "','" + cat.tipo + "','" + labelId + "')");
+ return _dcCardHTML(cat.label, docs, thumbs, addHtml, attrs);
 }
 async function _spEntDetUploadFiles(files, entregaId, obraId, tipo, labelId) {
  if (!files || !files.length) return;

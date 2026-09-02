@@ -1336,6 +1336,39 @@ td{font-size:13px}
 .sp-item-meta b{color:var(--text)}
 .sp-empty{text-align:center;padding:32px 16px;color:var(--muted);font-size:12px;border:1px dashed var(--border);border-radius:var(--r-md)}
 
+/* ── Cards de anexo em grade (scripts/lib/doc-cards.js) ──────────────────────
+   Componente compartilhado por qualquer aba de detalhe que anexe
+   documentos (Entregas/Projetos/Instalações...) — pedido explícito da
+   usuária pra usar EXATAMENTE o mesmo padrão em todo lugar em vez de cada
+   módulo reinventar seu próprio dropzone. Sempre 2 colunas fixas (pedido
+   explícito, nada de auto-fit/auto-fill variando com a largura do
+   painel). Miniatura real só pra imagem (signed URL em lote,
+   _dcSignedUrlMap) com o nome do arquivo sempre visível por baixo;
+   PDF/outros ganham um ícone de arquivo genérico (SVG monocromático,
+   nenhum emoji em lugar nenhum do sistema — regra explícita). O card
+   inteiro aceita arrastar-e-soltar (sem precisar clicar em "+ Anexar"). */
+.doc-card-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+.doc-card{border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px;transition:border-color .15s,background .15s}
+.doc-card.drag{border-color:var(--navy);background:rgba(59,130,246,.05)}
+.doc-card-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.doc-card-empty{font-size:10px;color:var(--muted);text-align:center;background:var(--surface2);border-radius:6px;min-height:56px;display:flex;align-items:center;justify-content:center}
+.doc-card-thumbs{display:flex;flex-wrap:wrap;gap:8px}
+.doc-card-thumb{width:64px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex:0 0 auto}
+.doc-card-thumb-box{position:relative;width:64px;height:56px;border:1px solid var(--border);border-radius:6px;overflow:visible;background:var(--surface2);display:flex;align-items:center;justify-content:center;transition:border-color .15s}
+.doc-card-thumb:hover .doc-card-thumb-box{border-color:var(--navy)}
+.doc-card-thumb-box img{width:100%;height:100%;object-fit:cover;display:block;border-radius:5px}
+.doc-card-thumb-name{font-size:9px;color:var(--muted);text-align:center;max-width:64px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Botão de excluir — só quando o card recebe removeJs (anexo editável do
+   próprio registro; espelhos somente-leitura nunca passam removeJs, então
+   nunca ganham este botão). Some por padrão, aparece ao passar o mouse. */
+.doc-card-thumb-rm{position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .12s,color .12s,border-color .12s;padding:0}
+.doc-card-thumb:hover .doc-card-thumb-rm{opacity:1}
+.doc-card-thumb-rm:hover{color:var(--red);border-color:var(--red)}
+/* Link simples, sem caixa/borda própria — junto de .doc-card-empty ficaria
+   "duas caixas empilhadas" quando a categoria está vazia. */
+.doc-card-add{font-size:10px;font-weight:600;color:var(--navy);cursor:pointer;align-self:flex-start}
+.doc-card-add:hover{text-decoration:underline}
+
 /* ── Histórico de alterações (scripts/lib/historico.js) ──────────────────────
    Uma linha por alteração, no formato "Fulano alterou X de A para B" + a data
    embaixo em cinza. Usado igual nas 3 entidades (Obra/Projeto/Entrega). */
