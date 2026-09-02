@@ -1257,22 +1257,23 @@ async function _spCarregarDocumentosObraEspelho(obraId) {
   if (grupos[k]) grupos[k].push(d);
  });
  Object.keys(grupos).forEach(function(k) { grupos[k].sort(function(a,b) { return new Date(b.created_at) - new Date(a.created_at); }); });
- wrap.innerHTML = _entDocObraEspelhoTipos.map(function(tipo) {
+
+ // Espelho é sempre somente-leitura: cards em grade lado a lado, igual ao
+ // Airtable de referência, com o selo "🔒 Da Obra" deixando explícito que
+ // não dá pra editar/excluir por aqui (_entDocCardHTML, readonly=true).
+ var signedMap = await _entDocSignedUrlMap(docs, function() { return 'documentos_obras'; });
+ wrap.innerHTML = '<div class="ent-doc-grid">' + _entDocObraEspelhoTipos.map(function(tipo) {
   var docsDoTipo = grupos[tipo];
-  var listHtml = docsDoTipo.length ? docsDoTipo.map(function(d) {
+  var thumbs = docsDoTipo.map(function(d) {
    var nome = (d.nome || d.nome_arquivo || d.arquivo_nome || 'Documento').toString();
-   var dt = d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : '';
    var nomeAttrSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-   var btn = d.proposta_id
-    ? '<button type="button" class="btn btn-ghost btn-sm" onclick="_spVisualizarProposta(\'' + d.proposta_id + '\')">Visualizar</button>'
-    : (d.caminho_storage ? '<button type="button" class="btn btn-ghost btn-sm" onclick="_spAbrirDocStorage(\'' + String(d.caminho_storage).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\',\'' + nomeAttrSafe + '\')">Visualizar</button>' : '');
-   return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--surface)">'
-    + '<div style="min-width:0"><div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px" title="' + nome.replace(/"/g,'&quot;') + '">' + nome.replace(/</g,'&lt;') + '</div>'
-    + (dt ? '<div style="font-size:9px;color:var(--muted);margin-top:2px">' + dt + '</div>' : '') + '</div>'
-    + btn + '</div>';
-  }).join('') : '<div class="sp-empty" style="padding:8px 0;font-size:11px">Nenhum documento na obra.</div>';
-  return '<div style="margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">' + tipo + (docsDoTipo.length ? ' (' + docsDoTipo.length + ')' : '') + '</div>' + listHtml + '</div>';
- }).join('');
+   var onclickJs = d.proposta_id
+    ? "_spVisualizarProposta('" + d.proposta_id + "')"
+    : (d.caminho_storage ? "_spAbrirDocStorage('" + String(d.caminho_storage).replace(/\\/g,'\\\\').replace(/'/g,"\\'") + "','" + nomeAttrSafe + "')" : '');
+   return _entDocThumbHTML(d, 'documentos_obras', signedMap, onclickJs);
+  });
+  return _entDocCardHTML(tipo, docsDoTipo, thumbs, '', true);
+ }).join('') + '</div>';
 }
 
 // ── Cidade/Estado da ENTREGA (colunas próprias, não da Obra) — Estado
@@ -1842,6 +1843,50 @@ function _entDocCategoriaDe(tipo) {
  return _entDetDocTipoAlias[tipo] || 'documento_especifico';
 }
 
+// ── Cards de anexo em grade (Airtable-like) — bloco compartilhado entre os
+// documentos próprios da Entrega e o espelho somente-leitura da Obra
+// (styles/entregas.css: .ent-doc-*). Prévia real só para imagem (signed
+// URL em lote); PDF/outros ganham um selo com a extensão.
+var _entDocImgExt = ['jpg','jpeg','png','gif','webp'];
+function _entDocExt(nome) {
+ var m = /\.([a-z0-9]+)$/i.exec(String(nome || '').trim());
+ return m ? m[1].toLowerCase() : '';
+}
+async function _entDocSignedUrlMap(docs, bucketFn) {
+ var byBucket = {};
+ docs.forEach(function(d) {
+  if (!d.caminho_storage) return;
+  if (_entDocImgExt.indexOf(_entDocExt(d.nome || d.nome_arquivo || d.arquivo_nome)) === -1) return;
+  var b = bucketFn(d);
+  (byBucket[b] = byBucket[b] || []).push(d.caminho_storage);
+ });
+ var map = {};
+ if (!_sb) return map;
+ await Promise.all(Object.keys(byBucket).map(async function(b) {
+  var res = await _sb.storage.from(b).createSignedUrls(byBucket[b], 3600);
+  if (!res.error) (res.data || []).forEach(function(s) { if (s.signedUrl && s.path) map[b + '|' + s.path] = s.signedUrl; });
+ }));
+ return map;
+}
+function _entDocThumbHTML(d, bucket, signedMap, onclickJs) {
+ var nome = (d.nome || d.nome_arquivo || d.arquivo_nome || 'Documento').toString();
+ var ext = _entDocExt(nome);
+ var url = d.caminho_storage ? signedMap[bucket + '|' + d.caminho_storage] : null;
+ var inner = url
+  ? '<img src="' + url + '" alt="" loading="lazy">'
+  : '<div class="ent-doc-thumb-file">📄' + (ext ? '<span>' + ext.toUpperCase() + '</span>' : '') + '</div>';
+ return '<div class="ent-doc-thumb" title="' + nome.replace(/"/g,'&quot;') + '" onclick="' + onclickJs + '">' + inner + '</div>';
+}
+function _entDocCardHTML(label, docs, thumbsHtmlList, addHtml, readonly, extraAttrs) {
+ var body = docs.length
+  ? '<div class="ent-doc-thumbs">' + thumbsHtmlList.join('') + '</div>'
+  : '<div class="ent-doc-empty">Nenhum anexo</div>';
+ return '<div class="ent-doc-card"' + (extraAttrs || '') + '>'
+  + '<div class="ent-doc-card-head"><span class="ent-doc-card-label">' + label + (docs.length ? ' (' + docs.length + ')' : '') + '</span>'
+  + (readonly ? '<span class="ent-doc-card-badge" title="Somente leitura — mesmo anexo já enviado na Obra vinculada">🔒 Da Obra</span>' : '')
+  + '</div>' + body + (addHtml || '') + '</div>';
+}
+
 async function _spCarregarDocumentosEntrega(entregaId, obraId) {
  var containers = {};
  _entDetDocCats.forEach(function(c) { if (!containers[c.container]) containers[c.container] = document.getElementById(c.container); });
@@ -1864,58 +1909,42 @@ async function _spCarregarDocumentosEntrega(entregaId, obraId) {
  docs.forEach(function(d) { grupos[_entDocCategoriaDe(d.tipo)].push(d); });
  Object.keys(grupos).forEach(function(k) { grupos[k].sort(function(a,b) { return new Date(b.created_at) - new Date(a.created_at); }); });
 
+ // Acervo migrado do Airtable foi enviado direto pro bucket
+ // `documentos_entregas` (não `documentos_obras`, onde os uploads NOVOS
+ // caem via _spUploadDocEntrega) — sem essa distinção o signed URL saía
+ // sempre pro bucket errado.
+ var bucketDe = function(d) { return d.origem === 'airtable_importado' ? 'documentos_entregas' : 'documentos_obras'; };
+ var signedMap = await _entDocSignedUrlMap(docs, bucketDe);
+
  Object.keys(containers).forEach(function(containerId) {
   if (!containers[containerId]) return;
   var catsAqui = _entDetDocCats.filter(function(c) { return c.container === containerId; });
-  containers[containerId].innerHTML = catsAqui.map(function(c) { return _spEntDetCategoriaHTML(c, grupos[c.tipo], entregaId, obraId); }).join('');
+  containers[containerId].innerHTML = '<div class="ent-doc-grid">' + catsAqui.map(function(c) { return _spEntDetCategoriaHTML(c, grupos[c.tipo], entregaId, obraId, signedMap, bucketDe); }).join('') + '</div>';
  });
 }
 
-function _spEntDetCategoriaHTML(cat, docs, entregaId, obraId) {
- var listHtml = docs.length
-  ? docs.map(function(d) {
-     var nome = (d.nome || d.nome_arquivo || 'Documento').toString();
-     var dt = d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : '';
-     var pathSafe = String(d.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-     var nomeAttrSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-     // Acervo migrado do Airtable foi enviado direto pro bucket
-     // `documentos_entregas` (não `documentos_obras`, onde os uploads NOVOS
-     // caem via _spUploadDocEntrega) — sem essa distinção o signed URL
-     // saía sempre pro bucket errado e a Storage retornava "Object not
-     // found" pra qualquer NF/romaneio antigo (nunca chegava a checar
-     // permissão de verdade, o objeto nem existe naquele bucket).
-     var bucket = d.origem === 'airtable_importado' ? 'documentos_entregas' : 'documentos_obras';
-     return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--surface)">'
-      + '<div style="min-width:0">'
-      + '<div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px" title="' + nome.replace(/"/g,'&quot;') + '">' + nome + '</div>'
-      + (dt ? '<div style="font-size:9px;color:var(--muted);margin-top:2px">' + dt + '</div>' : '')
-      + '</div>'
-      + '<button type="button" class="btn btn-ghost btn-sm" onclick="_spAbrirDocStorage(\'' + pathSafe + '\',\'' + nomeAttrSafe + '\',\'' + bucket + '\')">Visualizar</button>'
-      + '</div>';
-    }).join('')
-  : '<div class="sp-empty" style="padding:8px 0;font-size:11px">Nenhum documento enviado.</div>';
+function _spEntDetCategoriaHTML(cat, docs, entregaId, obraId, signedMap, bucketDe) {
+ var thumbs = docs.map(function(d) {
+  var bucket = bucketDe(d);
+  var nome = (d.nome || d.nome_arquivo || 'Documento').toString();
+  var pathSafe = String(d.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var nomeAttrSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return _entDocThumbHTML(d, bucket, signedMap, "_spAbrirDocStorage('" + pathSafe + "','" + nomeAttrSafe + "','" + bucket + "')");
+ });
 
  var inputId = 'sp-entdet-up-' + cat.tipo;
  var labelId = inputId + '-lbl';
- // Antes: dashed box grande e sempre visível por categoria (4 no total,
- // 2 por aba) — muito espaço ocupado mesmo sem nenhum arquivo. Agora: só
- // um botão "+ Anexar" compacto ao lado do rótulo, e o bloco inteiro
- // (rótulo+lista) continua aceitando arrastar-e-soltar (destaque de borda
- // no próprio wrapper via classe .ent-doc-cat.drag, entregas.css).
- return '<div class="ent-doc-cat"'
-  + ' ondragover="event.preventDefault();this.classList.add(\'drag\')"'
+ // Antes: dashed box grande e sempre visível por categoria (4 no total, 2
+ // por aba) — muito espaço ocupado mesmo sem nenhum arquivo. Agora: card
+ // compacto lado a lado (grade), com miniatura real (imagem) ou selo de
+ // extensão, e um botão "+ Anexar" pequeno; o card inteiro continua
+ // aceitando arrastar-e-soltar (destaque via .ent-doc-card.drag).
+ var addHtml = '<label class="ent-doc-card-add" for="' + inputId + '"><span id="' + labelId + '">+ Anexar</span></label>'
+  + '<input type="file" id="' + inputId + '" multiple style="display:none" onchange="_spEntDetFileChange(this,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + cat.tipo + '\',\'' + labelId + '\')">';
+ var attrs = ' ondragover="event.preventDefault();this.classList.add(\'drag\')"'
   + ' ondragleave="this.classList.remove(\'drag\')"'
-  + ' ondrop="this.classList.remove(\'drag\');_spEntDetFileDrop(event,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + cat.tipo + '\',\'' + labelId + '\')">'
-  + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'
-  + '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">' + cat.label + (docs.length ? ' (' + docs.length + ')' : '') + '</div>'
-  + '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
-  + '<span id="' + labelId + '" style="font-size:10px;color:var(--muted)"></span>'
-  + '<label class="btn btn-ghost btn-sm" style="cursor:pointer" for="' + inputId + '">+ Anexar</label>'
-  + '</span>'
-  + '<input type="file" id="' + inputId + '" multiple style="display:none" onchange="_spEntDetFileChange(this,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + cat.tipo + '\',\'' + labelId + '\')">'
-  + '</div>'
-  + listHtml
-  + '</div>';
+  + ' ondrop="this.classList.remove(\'drag\');_spEntDetFileDrop(event,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + cat.tipo + '\',\'' + labelId + '\')"';
+ return _entDocCardHTML(cat.label, docs, thumbs, addHtml, false, attrs);
 }
 async function _spEntDetUploadFiles(files, entregaId, obraId, tipo, labelId) {
  if (!files || !files.length) return;
