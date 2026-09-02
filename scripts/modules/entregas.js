@@ -142,14 +142,19 @@ async function _submitNovaEntregaReal() {
  var etapa = document.getElementById('ne-etapa')?.value || '';
  var data = document.getElementById('ne-data')?.value || '';
  var qtdStr = document.getElementById('ne-qtd')?.value || '';
+ var obraId = document.getElementById('ne-obra-id')?.value || null;
  var faltando = [];
  if (!nome) faltando.push('Entrega');
+ // Obra é obrigatória (igual ao Airtable) — sem isso a entrega nascia órfã
+ // (obra_id null), quebrando tudo que depende dela: Cidade/Estado/Endereço
+ // (agora rollup somente-leitura da Obra), Contato do orçamento, Tipo de
+ // orçamento, Documentos "from Obras" e o vínculo em entregas_obras.
+ if (!obraId) faltando.push('Obra');
  if (!etapa) faltando.push('Etapa');
  if (!data) faltando.push('Data de faturamento');
  if (qtdStr === '') faltando.push('Quantidade');
  if (faltando.length) { _showToast ? _showToast('Preencha: ' + faltando.join(', '), 'aviso') : alert('Preencha os campos obrigatórios: ' + faltando.join(', ') + '.'); return; }
  if (!_sb) { _showToast ? _showToast('Sem conexão com o banco.', 'erro') : alert('Sem conexão com o banco.'); return; }
- var obraId = document.getElementById('ne-obra-id')?.value || null;
  var payload = {
   obra_id: obraId,
   nome_entrega: nome,
