@@ -2315,8 +2315,10 @@
  </div>
 
  <span id="inst-filter-count" style="display:none;font-size:12px;color:var(--muted)"></span>
-
- <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="openNovaInstalacao()">Nova Instalação</button>
+ <!-- "Nova Instalação" NÃO fica aqui: é o #topbar-action-btn do cabeçalho
+      global (routes.instalacoes.btn em scripts/app.js), o mesmo componente
+      que Obras/Empresas/Projetos/Entregas usam. Um botão duplicado na
+      toolbar quebrava essa convenção. -->
  </div>
 
  <!-- Form "Nova Instalação" — mesmo padrão de campos do quick-create de
