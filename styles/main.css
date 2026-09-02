@@ -239,6 +239,20 @@ body.light .dash-panel{
     entre elas. */
  #page-entregas{overflow-x:hidden}
  #page-entregas .ph{margin-top:90px}
+ /* Instalações reaproveita o mesmo padrão de barra fixa de Obras — antes
+    usava um .gestor-hd-controls com position:sticky improvisado, que
+    colidia em z-index com o <thead> sticky da tabela (bug relatado: popover
+    de Filtro com o cabeçalho da tabela aparecendo por cima). Barra de 1
+    linha só, mesmo margin-top de Obras/Projetos. */
+ #page-instalacoes{overflow-x:hidden}
+ #page-instalacoes .ph{margin-top:44px}
+ /* Automações — mesmo padrão de barra fixa, mesmo motivo (ver Instalações
+    acima). Barra de 1 linha só (chips + busca, sem cluster de ações). */
+ #page-automacoes{overflow-x:hidden}
+ #page-automacoes .ph{margin-top:44px}
+ /* Melhorias — mesmo padrão de barra fixa, mesmo motivo. */
+ #page-melhorias{overflow-x:hidden}
+ #page-melhorias .ph{margin-top:44px}
  /* Barra fixa única de Obras (Filtro/Agrupar/Ordenar/Período/Visualizações/
     Pesquisa + Kanban/Tabela/Nova Obra, na mesma linha) — position:fixed em
     vez de sticky de propósito: sticky só resolve o eixo vertical, então se
