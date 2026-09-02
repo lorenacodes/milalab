@@ -2345,37 +2345,6 @@
  </div>
  </div>
 
- <!-- Form "Nova Instalação" — mesmo padrão de campos do quick-create de
-      dentro de Obra (single-select Tipo/Status, datas, Dias previstos
-      calculado, Equipe multi-select obrigatória), com um campo a mais aqui
-      (busca+vínculo de 1 ou mais Obras), já que não existe uma Obra
-      pré-definida no contexto desta aba. -->
- <div id="inst-novo-form" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px">
-  <div class="sp-g2" style="gap:8px">
-   <div class="sp-field"><div class="sp-label">Tipo de Serviço <span class="req">*</span></div><div id="inst-novo-tipo-box"></div></div>
-   <div class="sp-field"><div class="sp-label">Status <span class="req">*</span></div><div id="inst-novo-status-box"></div></div>
-  </div>
-  <div class="sp-g2" style="gap:8px;margin-top:8px">
-   <div class="sp-field"><div class="sp-label">Data início <span class="req">*</span></div><input class="sp-inp" id="inst-novo-inicio" type="date" onchange="_instNovoRecalcDias()"></div>
-   <div class="sp-field"><div class="sp-label">Data fim <span class="req">*</span></div><input class="sp-inp" id="inst-novo-fim" type="date" onchange="_instNovoRecalcDias()"></div>
-  </div>
-  <div class="sp-field" style="margin-top:8px"><div class="sp-label">Nº dias programados</div><input class="sp-inp" id="inst-novo-diasprog" value="—" readonly title="Automático — diferença entre Data início e Data fim"></div>
-  <div class="sp-field" style="margin-top:8px"><div class="sp-label">Equipe de Instalação <span class="req">*</span></div><div id="inst-novo-equipe-dd" class="no-msel-wide"></div></div>
-  <div class="sp-field" style="margin-top:8px">
-   <div class="sp-label">Obra(s) vinculada(s)</div>
-   <input type="text" id="inst-novo-obra-busca" class="sp-inp" placeholder="Buscar obra pra vincular..." style="font-size:12px;margin-bottom:6px" oninput="_instNovoObraBuscar(this.value)">
-   <div id="inst-novo-obra-resultados" style="margin-bottom:6px"></div>
-   <div id="inst-novo-obra-chips" class="sp-rel-chips-wrap"><div class="sp-empty">Nenhuma obra vinculada ainda.</div></div>
-  </div>
-  <div class="sp-field" style="margin-top:8px"><div class="sp-label">Detalhes</div>
-   <textarea class="sp-inp" id="inst-novo-detalhes" placeholder="Observações..." rows="1" style="resize:none;overflow:hidden;min-height:34px" oninput="this.style.height='auto';this.style.height=(this.scrollHeight)+'px'"></textarea>
-  </div>
-  <div style="display:flex;gap:6px;margin-top:12px">
-   <button class="btn btn-primary btn-sm" onclick="_instCriarNova()" style="flex:1;justify-content:center">Criar instalação</button>
-   <button class="btn btn-ghost btn-sm" onclick="openNovaInstalacao()">Cancelar</button>
-  </div>
- </div>
-
  <!-- ── VISTA TABELA ── -->
  <div id="inst-view-tabela">
  <div class="tbl-box"><table class="gestor-tbl">
@@ -2909,7 +2878,7 @@
 <script src="scripts/modules/obras.js?v=mldsv355"></script>
 <script src="scripts/modules/projetos.js?v=mldsv390"></script>
 <script src="scripts/modules/entregas.js?v=mldsv389"></script>
-<script src="scripts/modules/instalacoes.js?v=mldsv390"></script>
+<script src="scripts/modules/instalacoes.js?v=mldsv391"></script>
 <script src="scripts/modules/empresas.js?v=mldsv354"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv345"></script>
 <script src="scripts/modules/dashboard.js?v=mldsv368"></script>

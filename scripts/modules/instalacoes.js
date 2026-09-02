@@ -20,25 +20,41 @@ var _INST_STATUS_OPCOES = ['A programar','Programado','Emitir boleto de mediçã
 var _instNovoObraSel = [];
 var _instNovoEquipeSel = [];
 var _instNovoEquipesCache = null;
+// Pedido explícito: a criação abre no MESMO painel lateral usado pra ver
+// uma instalação existente (#sp-drawer/_spSet), em vez de um formulário
+// inline expandido acima da tabela. Os ids dos campos são os mesmos de
+// antes (inst-novo-*) — só o container mudou, toda a lógica de apoio
+// (_instNovoObraChipsRender/_instNovoEquipeToggle/_instNovoRecalcDias)
+// continua igual.
 function openNovaInstalacao() {
- var box = document.getElementById('inst-novo-form');
- if (!box) return;
- var abrir = box.style.display === 'none';
- box.style.display = abrir ? 'block' : 'none';
- if (!abrir) return;
  _instNovoObraSel = [];
  _instNovoEquipeSel = [];
- document.getElementById('inst-novo-obra-chips').innerHTML = '<div class="sp-empty">Nenhuma obra vinculada ainda.</div>';
  _srchSelRegister('instNovoTipo', { options: _INST_TIPO_OPCOES, placeholder: 'Selecione...' });
  _srchSelRegister('instNovoStatus', { options: _INST_STATUS_OPCOES, placeholder: 'Selecione...' });
- var tipoBox = document.getElementById('inst-novo-tipo-box');
- if (tipoBox) tipoBox.innerHTML = _srchSelMarkup('instNovoTipo', 'inst-novo-tipo', '');
- var statusBox = document.getElementById('inst-novo-status-box');
- if (statusBox) statusBox.innerHTML = _srchSelMarkup('instNovoStatus', 'inst-novo-status', 'A programar');
- document.getElementById('inst-novo-inicio').value = '';
- document.getElementById('inst-novo-fim').value = '';
- document.getElementById('inst-novo-diasprog').value = '—';
- document.getElementById('inst-novo-detalhes').value = '';
+ var html = '<div class="sp-g2" style="gap:8px">'
+  + '<div class="sp-field"><div class="sp-label">Tipo de Serviço <span class="req">*</span></div><div id="inst-novo-tipo-box">' + _srchSelMarkup('instNovoTipo', 'inst-novo-tipo', '') + '</div></div>'
+  + '<div class="sp-field"><div class="sp-label">Status <span class="req">*</span></div><div id="inst-novo-status-box">' + _srchSelMarkup('instNovoStatus', 'inst-novo-status', 'A programar') + '</div></div>'
+  + '</div>'
+  + '<div class="sp-g2" style="gap:8px;margin-top:8px">'
+  + '<div class="sp-field"><div class="sp-label">Data início <span class="req">*</span></div><input class="sp-inp" id="inst-novo-inicio" type="date" onchange="_instNovoRecalcDias()"></div>'
+  + '<div class="sp-field"><div class="sp-label">Data fim <span class="req">*</span></div><input class="sp-inp" id="inst-novo-fim" type="date" onchange="_instNovoRecalcDias()"></div>'
+  + '</div>'
+  + '<div class="sp-field" style="margin-top:8px"><div class="sp-label">Nº dias programados</div><input class="sp-inp" id="inst-novo-diasprog" value="—" readonly title="Automático — diferença entre Data início e Data fim"></div>'
+  + '<div class="sp-field" style="margin-top:8px"><div class="sp-label">Equipe de Instalação <span class="req">*</span></div><div id="inst-novo-equipe-dd" class="no-msel-wide"><div style="font-size:12px;color:var(--muted);padding:8px 0">Carregando...</div></div></div>'
+  + '<div class="sp-field" style="margin-top:8px">'
+  + '<div class="sp-label">Obra(s) vinculada(s)</div>'
+  + '<input type="text" id="inst-novo-obra-busca" class="sp-inp" placeholder="Buscar obra pra vincular..." style="font-size:12px;margin-bottom:6px" oninput="_instNovoObraBuscar(this.value)">'
+  + '<div id="inst-novo-obra-resultados" style="margin-bottom:6px"></div>'
+  + '<div id="inst-novo-obra-chips" class="sp-rel-chips-wrap"><div class="sp-empty">Nenhuma obra vinculada ainda.</div></div>'
+  + '</div>'
+  + '<div class="sp-field" style="margin-top:8px"><div class="sp-label">Detalhes</div>'
+  + '<textarea class="sp-inp" id="inst-novo-detalhes" placeholder="Observações..." rows="1" style="resize:none;overflow:hidden;min-height:34px" oninput="this.style.height=\'auto\';this.style.height=(this.scrollHeight)+\'px\'"></textarea>'
+  + '</div>';
+ _spSet('Instalação', 'Nova Instalação', html,
+  '<button class="btn btn-primary" onclick="_instCriarNova()">Criar instalação</button>'
+  + '<button class="btn btn-ghost" onclick="closePanel()">Cancelar</button>');
+ document.getElementById('sp-overlay').classList.add('sp-open');
+ document.getElementById('sp-drawer').classList.add('sp-open');
  if (typeof _garantirObraIdMap === 'function') _garantirObraIdMap();
  (async function() {
   if (!_instNovoEquipesCache) {
@@ -136,9 +152,8 @@ async function _instCriarNova() {
   }
  }
  _showToast('Instalação criada!', 'ok');
- openNovaInstalacao(); // fecha o form
  if (typeof _dbLoadInstalacoes === 'function') await _dbLoadInstalacoes();
- _spInstalacaoById(novaId);
+ _spInstalacaoById(novaId); // troca o conteúdo do mesmo painel lateral já aberto pro detalhamento da instalação recém-criada
 }
 
 // Filtro/Ordenação — mesmos componentes reutilizáveis do Gestor de Tarefas/
