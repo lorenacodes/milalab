@@ -37,28 +37,27 @@
  /* Grade de cards de anexo no painel de detalhe da Entrega — documentos
     próprios (Ordem de Produção/Romaneio/Nota Fiscal/Documentos para
     faturamento) e o espelho somente-leitura da Obra (Proposta comercial/
-    Pedido de Compra/Contrato/CNPJ & CNO). Pedido explícito: lado a lado
-    igual ao Airtable de referência (antes cada categoria era um bloco
-    full-width empilhado, com dropzone grande e sempre visível mesmo sem
-    nenhum arquivo — ocupava espaço vertical demais). Miniatura real só
-    para imagem (signed URL em lote, _entDocSignedUrlMap); PDF/outros
-    ganham um selo com a extensão em vez de prévia (não dá pra renderizar
-    thumbnail de PDF no cliente sem uma lib pesada nova). */
+    Pedido de Compra/Contrato/CNPJ & CNO, rótulo com sufixo "(da Obra)" —
+    igual ao "(from Obras)" do Airtable de referência, sem selo/emoji
+    sobreposto). Miniatura real só para imagem (signed URL em lote,
+    _entDocSignedUrlMap) com o nome do arquivo sempre visível por baixo;
+    PDF/outros ganham um ícone de arquivo genérico (SVG monocromático,
+    nenhum emoji em lugar nenhum do sistema — regra explícita). */
  .ent-doc-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px }
- .ent-doc-card { border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--surface);display:flex;flex-direction:column;gap:6px;transition:border-color .15s,background .15s }
+ .ent-doc-card { border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface);display:flex;flex-direction:column;gap:8px;transition:border-color .15s,background .15s }
  .ent-doc-card.drag { border-color:var(--navy);background:rgba(59,130,246,.05) }
- .ent-doc-card-head { display:flex;align-items:flex-start;justify-content:space-between;gap:4px }
  .ent-doc-card-label { font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px }
- /* Selo "Da Obra" — pedido explícito: deixar claro que este anexo vem de
-    outra tabela (espelho da Obra vinculada) e não é editável por aqui. */
- .ent-doc-card-badge { font-size:9px;font-weight:700;color:var(--muted);background:var(--surface2);border-radius:var(--r-full);padding:1px 6px;white-space:nowrap;flex-shrink:0 }
  .ent-doc-empty { font-size:10px;color:var(--muted);text-align:center;padding:14px 4px;background:var(--surface2);border-radius:6px }
- .ent-doc-thumbs { display:flex;flex-wrap:wrap;gap:6px }
- .ent-doc-thumb { width:56px;height:56px;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--surface2);cursor:pointer;flex:0 0 auto }
- .ent-doc-thumb img { width:100%;height:100%;object-fit:cover;display:block }
- .ent-doc-thumb-file { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:100%;font-size:8px;font-weight:700;color:var(--muted) }
- .ent-doc-card-add { display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--navy);cursor:pointer;border:1px dashed var(--border);border-radius:6px;padding:5px;transition:border-color .15s,background .15s }
- .ent-doc-card-add:hover { border-color:var(--navy);background:rgba(59,130,246,.05) }
+ .ent-doc-thumbs { display:flex;flex-wrap:wrap;gap:8px }
+ .ent-doc-thumb { width:64px;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex:0 0 auto }
+ .ent-doc-thumb-box { width:64px;height:56px;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;transition:border-color .15s }
+ .ent-doc-thumb:hover .ent-doc-thumb-box { border-color:var(--navy) }
+ .ent-doc-thumb-box img { width:100%;height:100%;object-fit:cover;display:block }
+ .ent-doc-thumb-name { font-size:9px;color:var(--muted);text-align:center;max-width:64px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+ /* Link simples, sem caixa/borda própria — junto de .ent-doc-empty ficaria
+    "duas caixas empilhadas" quando a categoria está vazia. */
+ .ent-doc-card-add { font-size:10px;font-weight:600;color:var(--navy);cursor:pointer;align-self:flex-start }
+ .ent-doc-card-add:hover { text-decoration:underline }
 
  /* Abas de atalho (quick-view) */
  .ent-qv-btn { padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-full);font-size:12px;font-weight:500;background:var(--surface);color:var(--muted);cursor:pointer;transition:all .12s }
