@@ -588,6 +588,7 @@ var _INSTALACAO_CAMPO_LABEL = {
  tipo_servico: 'Tipo de Serviço', funil: 'Status', data_inicio: 'Data início',
  data_fim: 'Data fim', dias_executados: 'Nº dias executados', detalhes: 'Detalhes',
  valor_total_gasto: 'Despesa Total', numero: 'Número', obra_id: null,
+ criado_por: null, atualizado_por: null,
 };
 if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('instalacoes', _INSTALACAO_CAMPO_LABEL);
 var _instDetEquipeSel = [];
@@ -633,6 +634,11 @@ function _spInstalacaoRender(inst) {
  // no client, não fica armazenado — evita ficar desatualizado se
  // tipo_servico ou a(s) obra(s) vinculada(s) mudar(em) depois.
  var titulo = (inst.numero != null ? inst.numero : '?') + ' - ' + (inst.tipo_servico || 'Instalação') + ' - ' + (obras.length ? obras.map(function(o){ return o.nome; }).join(', ') : '(sem obra)');
+ // Criado por/Última alteração por — trazidos do Airtable numa correção
+ // recente (achado real: a tabela nunca teve essa auditoria, diferente de
+ // Obras/Entregas/Atividades). Mesmo padrão de exibição já usado nelas.
+ var criadoNome   = (typeof _projAuditNome === 'function') ? _projAuditNome(inst.criado_por) : (inst.criado_por || '—');
+ var alteradoNome = (typeof _projAuditNome === 'function') ? _projAuditNome(inst.atualizado_por) : (inst.atualizado_por || '—');
 
  _srchSelRegister('instDetTipo', {
   options: ['Instalação','Montagem fábrica','Treinamento piloto','Assistência técnica'],
@@ -703,6 +709,10 @@ function _spInstalacaoRender(inst) {
   <div class="spt-panel" id="spt-inst-historico">
    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">Histórico de alterações</div>
    ${typeof _histPanelHTML === 'function' ? _histPanelHTML('sp-inst-historico') : ''}
+  </div>
+  <div class="spt-panel" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
+   <div class="drw-audit-row"><span class="drw-audit-lbl">Criado por</span><span class="drw-audit-val">${criadoNome}</span></div>
+   <div class="drw-audit-row"><span class="drw-audit-lbl">Última alteração por</span><span class="drw-audit-val">${alteradoNome}</span></div>
   </div>
  `;
 
