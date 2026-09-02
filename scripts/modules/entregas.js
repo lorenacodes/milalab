@@ -1271,7 +1271,7 @@ async function _spCarregarDocumentosObraEspelho(obraId) {
     + (dt ? '<div style="font-size:9px;color:var(--muted);margin-top:2px">' + dt + '</div>' : '') + '</div>'
     + btn + '</div>';
   }).join('') : '<div class="sp-empty" style="padding:8px 0;font-size:11px">Nenhum documento na obra.</div>';
-  return '<div style="margin-bottom:16px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">' + tipo + (docsDoTipo.length ? ' (' + docsDoTipo.length + ')' : '') + '</div>' + listHtml + '</div>';
+  return '<div style="margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">' + tipo + (docsDoTipo.length ? ' (' + docsDoTipo.length + ')' : '') + '</div>' + listHtml + '</div>';
  }).join('');
 }
 
@@ -1897,27 +1897,25 @@ function _spEntDetCategoriaHTML(cat, docs, entregaId, obraId) {
 
  var inputId = 'sp-entdet-up-' + cat.tipo;
  var labelId = inputId + '-lbl';
- return '<div style="margin-bottom:16px">'
-  + '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">' + cat.label + (docs.length ? ' (' + docs.length + ')' : '') + '</div>'
+ // Antes: dashed box grande e sempre visível por categoria (4 no total,
+ // 2 por aba) — muito espaço ocupado mesmo sem nenhum arquivo. Agora: só
+ // um botão "+ Anexar" compacto ao lado do rótulo, e o bloco inteiro
+ // (rótulo+lista) continua aceitando arrastar-e-soltar (destaque de borda
+ // no próprio wrapper via classe .ent-doc-cat.drag, entregas.css).
+ return '<div class="ent-doc-cat"'
+  + ' ondragover="event.preventDefault();this.classList.add(\'drag\')"'
+  + ' ondragleave="this.classList.remove(\'drag\')"'
+  + ' ondrop="this.classList.remove(\'drag\');_spEntDetFileDrop(event,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + cat.tipo + '\',\'' + labelId + '\')">'
+  + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'
+  + '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">' + cat.label + (docs.length ? ' (' + docs.length + ')' : '') + '</div>'
+  + '<span style="display:flex;align-items:center;gap:6px;flex-shrink:0">'
+  + '<span id="' + labelId + '" style="font-size:10px;color:var(--muted)"></span>'
+  + '<label class="btn btn-ghost btn-sm" style="cursor:pointer" for="' + inputId + '">+ Anexar</label>'
+  + '</span>'
+  + '<input type="file" id="' + inputId + '" multiple style="display:none" onchange="_spEntDetFileChange(this,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + cat.tipo + '\',\'' + labelId + '\')">'
+  + '</div>'
   + listHtml
-  + _spEntDetDropzone(inputId, labelId, entregaId, obraId, cat.tipo)
   + '</div>';
-}
-
-// Dropzone com upload imediato (sem etapa de "confirmar anexo" — diferente
-// do dropzone do formulário de criação, aqui não existe mais um "Salvar"
-// geral pra piggyback, então o próprio anexo já dispara o upload).
-function _spEntDetDropzone(inputId, labelId, entregaId, obraId, tipo) {
- return '<label style="display:flex;align-items:center;justify-content:center;gap:6px;border:2px dashed var(--border);border-radius:8px;padding:9px 8px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center;font-size:11px;color:var(--muted)"'
-  + ' onmouseover="this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.04)\'"'
-  + ' onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
-  + ' ondragover="event.preventDefault();this.style.borderColor=\'var(--navy)\';this.style.background=\'rgba(59,130,246,.07)\'"'
-  + ' ondragleave="this.style.borderColor=\'var(--border)\';this.style.background=\'\'"'
-  + ' ondrop="_spEntDetFileDrop(event,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + tipo + '\',\'' + labelId + '\')">'
-  + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.7"><path d="M12 16V8M8 12l4-4 4 4"/><path d="M20 16.5A4.5 4.5 0 0015.5 12H15a6 6 0 10-11.8 1.5"/></svg>'
-  + '<span id="' + labelId + '">Clique ou arraste para anexar</span>'
-  + '<input type="file" id="' + inputId + '" multiple style="display:none" onchange="_spEntDetFileChange(this,\'' + entregaId + '\',\'' + (obraId||'') + '\',\'' + tipo + '\',\'' + labelId + '\')">'
-  + '</label>';
 }
 async function _spEntDetUploadFiles(files, entregaId, obraId, tipo, labelId) {
  if (!files || !files.length) return;

@@ -34,6 +34,15 @@
  .ne-dropzone svg { flex-shrink:0 }
  .ne-dropzone span { overflow:hidden;text-overflow:ellipsis;white-space:nowrap }
 
+ /* Categoria de anexo no painel de detalhe da Entrega (_spEntDetCategoriaHTML,
+    entregas.js) — pedido explícito: o dropzone grande e sempre visível
+    (igual ao de cima) ocupava espaço demais repetido 4x (2 por aba) mesmo
+    sem nenhum arquivo. Vira só um botão "+ Anexar" compacto ao lado do
+    rótulo; o bloco inteiro continua aceitando arrastar-e-soltar, com esta
+    borda tracejada aparecendo só durante o drag (não o tempo todo). */
+ .ent-doc-cat { margin-bottom:12px;border:2px dashed transparent;border-radius:8px;padding:2px;margin-left:-2px;margin-right:-2px;transition:border-color .15s,background .15s }
+ .ent-doc-cat.drag { border-color:var(--navy);background:rgba(59,130,246,.05) }
+
  /* Abas de atalho (quick-view) */
  .ent-qv-btn { padding:5px 12px;border:1px solid var(--border);border-radius:var(--r-full);font-size:12px;font-weight:500;background:var(--surface);color:var(--muted);cursor:pointer;transition:all .12s }
  .ent-qv-btn:hover { color:var(--text);border-color:var(--navy) }
