@@ -1874,14 +1874,19 @@ async function _entDocSignedUrlMap(docs, bucketFn) {
  return map;
 }
 var _entDocFileIconSVG = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6"><path d="M14 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>';
-function _entDocThumbHTML(d, bucket, signedMap, onclickJs) {
+// removeJs (opcional): só os documentos próprios da Entrega passam isso —
+// o espelho somente-leitura da Obra nunca recebe, então nunca ganha botão
+// de excluir (mantém a mesma regra "só editável aqui se for da Entrega").
+function _entDocThumbHTML(d, bucket, signedMap, onclickJs, removeJs) {
  var nome = (d.nome || d.nome_arquivo || d.arquivo_nome || 'Documento').toString();
  var url = d.caminho_storage ? signedMap[bucket + '|' + d.caminho_storage] : null;
  var box = url
   ? '<img src="' + url + '" alt="" loading="lazy">'
   : _entDocFileIconSVG;
- return '<div class="ent-doc-thumb" title="' + nome.replace(/"/g,'&quot;') + '" onclick="' + onclickJs + '">'
-  + '<div class="ent-doc-thumb-box">' + box + '</div>'
+ return '<div class="ent-doc-thumb" title="' + nome.replace(/"/g,'&quot;') + '">'
+  + '<div class="ent-doc-thumb-box" onclick="' + onclickJs + '">' + box
+  + (removeJs ? '<button type="button" class="ent-doc-thumb-rm" title="Excluir anexo" onclick="event.stopPropagation();' + removeJs + '">&times;</button>' : '')
+  + '</div>'
   + '<div class="ent-doc-thumb-name">' + nome.replace(/</g,'&lt;') + '</div>'
   + '</div>';
 }
@@ -1936,7 +1941,8 @@ function _spEntDetCategoriaHTML(cat, docs, entregaId, obraId, signedMap, bucketD
   var nome = (d.nome || d.nome_arquivo || 'Documento').toString();
   var pathSafe = String(d.caminho_storage || '').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   var nomeAttrSafe = nome.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-  return _entDocThumbHTML(d, bucket, signedMap, "_spAbrirDocStorage('" + pathSafe + "','" + nomeAttrSafe + "','" + bucket + "')");
+  var removeJs = "_spEntDetExcluirDoc('" + d.id + "','" + pathSafe + "','" + bucket + "','" + entregaId + "','" + (obraId||'') + "')";
+  return _entDocThumbHTML(d, bucket, signedMap, "_spAbrirDocStorage('" + pathSafe + "','" + nomeAttrSafe + "','" + bucket + "')", removeJs);
  });
 
  var inputId = 'sp-entdet-up-' + cat.tipo;
@@ -1968,9 +1974,32 @@ function _spEntDetFileChange(input, entregaId, obraId, tipo, labelId) {
 }
 function _spEntDetFileDrop(event, entregaId, obraId, tipo, labelId) {
  event.preventDefault();
- var dz = event.currentTarget; dz.style.borderColor = 'var(--border)'; dz.style.background = '';
  var files = event.dataTransfer && event.dataTransfer.files;
  _spEntDetUploadFiles(Array.prototype.slice.call(files || []), entregaId, obraId, tipo, labelId);
+}
+// Exclusão individual de anexo — só pros documentos próprios da Entrega
+// (nunca pro espelho somente-leitura da Obra, que não chama esta função).
+// Remove o arquivo do Storage primeiro (best-effort — se falhar, ainda
+// assim remove o registro, pra não deixar o card "preso" com um anexo
+// órfão que a usuária já pediu pra tirar) e depois a linha de `documentos`.
+async function _spEntDetExcluirDoc(docId, path, bucket, entregaId, obraId) {
+ if (!confirm('Excluir este anexo? Esta ação não pode ser desfeita.')) return;
+ if (path) {
+  var rm = await _sb.storage.from(bucket).remove([path]);
+  if (rm.error) console.error('[Entregas] erro ao remover arquivo do storage:', rm.error);
+ }
+ var del = await _sb.from('documentos').delete().eq('id', docId);
+ if (del.error) {
+  console.error('[Entregas] erro ao excluir documento:', del.error);
+  _showToast('Não foi possível excluir o anexo. Tente novamente.', 'erro');
+  return;
+ }
+ // Acervo migrado do Airtable também tem um vínculo em `documentos_entregas`
+ // (tabela de junção) — remover só a linha de `documentos` deixaria um
+ // vínculo órfão apontando pra um documento inexistente.
+ await _sb.from('documentos_entregas').delete().eq('documento_id', docId);
+ _showToast('Anexo excluído.', 'ok');
+ _spCarregarDocumentosEntrega(entregaId, obraId);
 }
 
 // ── Linha da Tabela — extraída em função própria pra ser reaproveitada tanto
