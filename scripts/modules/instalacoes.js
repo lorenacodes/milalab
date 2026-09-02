@@ -315,16 +315,28 @@ function _instRenderKanban() {
  });
 }
 
-// ── CALENDÁRIO — grid mensal, 1 evento por instalação na Data início (único
-// campo de data que sempre existe antes da instalação acontecer; Data fim é
-// mostrada no título ao passar o mouse). _ptMonths/_ptDows já existem
-// globais (entregas.js, carregado antes) — mesmo vocabulário, não duplica.
+// ── CALENDÁRIO — vira Timeline (Gantt), mesmo modelo/algoritmo já
+// comprovado em _gestorBuildCalGrid/_gestorRenderTimeline (Gestor de
+// Tarefas, scripts/modules/tarefas.js) — pedido explícito da usuária. A
+// grade mensal antiga (1 chip por instalação, só no dia de INÍCIO) nunca
+// usava `data_fim` (carregado no dataset da linha, mas ignorado aqui) —
+// instalação de vários dias virava um chip isolado, sem mostrar o
+// intervalo; células com muitos eventos estouravam (altura fixa, sem
+// paginação). Cópia adaptada (não extração de componente genérico
+// compartilhado — evita risco de mexer no que já funciona no Gestor),
+// mesmo padrão de duplicação consciente já usado no resto do sistema.
 var _instCalYear = new Date().getFullYear();
 var _instCalMonth = new Date().getMonth();
 function instCalNav(dir) {
  _instCalMonth += dir;
  if (_instCalMonth > 11) { _instCalMonth = 0; _instCalYear++; }
  if (_instCalMonth < 0) { _instCalMonth = 11; _instCalYear--; }
+ renderInstCal();
+}
+function _instCalToday() {
+ var hoje = new Date();
+ _instCalYear = hoje.getFullYear();
+ _instCalMonth = hoje.getMonth();
  renderInstCal();
 }
 function _instEventColor(funil) {
@@ -334,38 +346,184 @@ function _instEventColor(funil) {
  if (funil === 'Finalizado') return '#1F8A4C';
  return '#8B8B94';
 }
+// {bg,tx,bdr} — mesmo formato que _instBuildCalGrid espera (bg translúcido,
+// borda/texto na cor sólida). Tema claro: texto usa a borda (mais escura/
+// saturada) em vez do tx pastel, mesmo ajuste já usado no tColor do Gestor
+// (tarefas.js) — sem isso o texto ficava ilegível sobre fundo claro.
+function _instTColor(funil) {
+ var hex = _instEventColor(funil);
+ var c = { bg: hex + '22', tx: hex, bdr: hex };
+ if (document.body.classList.contains('light')) c = { bg: c.bg, tx: c.bdr, bdr: c.bdr };
+ return c;
+}
+function _instMonthDays(y, m) {
+ var first = new Date(y, m, 1);
+ var startOffset = first.getDay();
+ var daysInMonth = new Date(y, m + 1, 0).getDate();
+ var totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+ var days = [];
+ for (var i = 0; i < totalCells; i++) { var d = new Date(y, m, 1 - startOffset + i); days.push(d); }
+ return days;
+}
+// Semana expandida (empilhamento de barras sobrepostas além das 3 lanes
+// padrão) — mesmo estado/mecanismo de _gestorWeekExpanded (tarefas.js).
+var _instWeekExpanded = {};
+function _instToggleWeek(weekKey) {
+ _instWeekExpanded[weekKey] = !_instWeekExpanded[weekKey];
+ renderInstCal();
+}
+// Cópia adaptada de _gestorBuildCalGrid (tarefas.js) — grid de 7 colunas
+// por semana, barras horizontais em % por dia de início/fim, empilhamento
+// em lanes (até 3 visíveis, resto atrás de "+N ocultas — expandir").
+function _instBuildCalGrid(days, tRanges, dimFn) {
+ var dShort = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+ var LANES_DEFAULT=3, BAR_H=20, BAR_GAP=2, DAY_NUM_H=26;
+ var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);border-bottom:2px solid var(--border);flex-shrink:0;background:var(--surface2)">';
+ days.slice(0,7).forEach(function(day){
+  var isWE = day.getDay()===0 || day.getDay()===6;
+  html += '<div style="padding:6px 0;text-align:center;font-size:10px;font-weight:700;color:'+(isWE?'#9ca3af':'var(--muted)')+'">'+dShort[day.getDay()]+'</div>';
+ });
+ html += '</div><div>';
+ for (var w=0; w<days.length; w+=7) {
+  var week = days.slice(w, w+7);
+  var wStart=week[0], wEnd=week[6];
+  var weekKey=wStart.getFullYear()+'-'+String(wStart.getMonth()+1).padStart(2,'0')+'-'+String(wStart.getDate()).padStart(2,'0');
+  var isExpanded=!!_instWeekExpanded[weekKey];
+
+  var wTasks=tRanges.filter(function(tr){ return +tr.s<=+wEnd && +tr.e>=+wStart; });
+
+  var laneEnds=[];
+  var taskLane=wTasks.map(function(tr) {
+   var effS=+tr.s<+wStart?wStart:tr.s, li=-1;
+   for(var k=0;k<laneEnds.length;k++){ if(+laneEnds[k]<+effS){li=k;laneEnds[k]=tr.e;break;} }
+   if(li===-1){li=laneEnds.length;laneEnds.push(tr.e);}
+   return li;
+  });
+
+  var totalLanes=laneEnds.length;
+  var visLanes=isExpanded ? totalLanes : Math.min(totalLanes, LANES_DEFAULT);
+  var hiddenTasks=wTasks.filter(function(_,ti){ return taskLane[ti]>=visLanes; }).length;
+  var hasOver=hiddenTasks>0;
+
+  var FOOTER_H = hasOver ? 22 : (isExpanded && totalLanes>LANES_DEFAULT ? 22 : 4);
+  var weekH=DAY_NUM_H + visLanes*(BAR_H+BAR_GAP) + FOOTER_H;
+
+  html += '<div style="position:relative;border-bottom:1px solid var(--border);height:'+weekH+'px">'
+   + '<div style="display:grid;grid-template-columns:repeat(7,1fr);height:100%;position:absolute;inset:0;pointer-events:none">';
+  week.forEach(function(day) {
+   var isCur=!dimFn(day), isWE=day.getDay()===0||day.getDay()===6;
+   var bg=isWE?'rgba(0,0,0,.03)':'var(--surface)';
+   html += '<div style="border-right:1px solid var(--border);background:'+bg+';padding:4px 5px">'
+    +'<span style="font-size:11px;font-weight:'+(isCur?'600':'400')+';color:'+(isCur?'var(--text)':'#64748b')+'">'+day.getDate()+'</span>'
+    +'</div>';
+  });
+  html += '</div><div style="position:absolute;top:'+DAY_NUM_H+'px;left:0;right:0;pointer-events:none">';
+
+  wTasks.forEach(function(tr,ti){
+   var lane=taskLane[ti];
+   if(lane>=visLanes) return;
+
+   var tds=tr.tds, c=_instTColor(tds.funil), done=tds.funil==='Finalizado';
+   var colS=Math.max(0,Math.round((+tr.s-+wStart)/86400000));
+   var colE=Math.min(6,Math.round((+tr.e-+wStart)/86400000));
+   var spans=colE-colS+1;
+   var pL=(colS/7*100).toFixed(2), pW=(spans/7*100).toFixed(2);
+   var blR=+tr.s<+wStart?'0':'4px', brR=+tr.e>+wEnd?'0':'4px';
+   var contL=+tr.s<+wStart?'&#9668; ':'', contR=+tr.e>+wEnd?' &#9658;':'';
+   var barText=contL+(tds.nome||'Instalação')+(tds.equipe?' &middot; '+tds.equipe:'')+contR;
+   var topY=lane*(BAR_H+BAR_GAP);
+   var titleAttr=(tds.nome||'')+(tds.obra?'\nObra: '+tds.obra:'')+(tds.cliente?'\nCliente: '+tds.cliente:'');
+   html += '<div onclick="_spInstalacaoById(\''+tds.id+'\')" title="'+titleAttr.replace(/"/g,'&quot;')+'"'
+    +' style="position:absolute;left:calc('+pL+'% + 2px);width:calc('+pW+'% - 4px);top:'+topY+'px;height:'+BAR_H+'px;'
+    +'background:'+c.bg+';border:1px solid '+c.bdr+';border-left:3px solid '+c.bdr+';border-radius:'+blR+' '+brR+' '+brR+' '+blR+';'
+    +'display:flex;align-items:center;padding:0 6px;cursor:pointer;pointer-events:all;overflow:hidden;'
+    +'font-size:10px;font-weight:700;color:'+c.tx+';white-space:nowrap;'
+    +'opacity:'+(done?'.75':'1')+';text-decoration:'+(done?'line-through':'none')+';'
+    +'transition:filter .12s;box-shadow:0 1px 2px rgba(0,0,0,.18)" '
+    +'onmouseover="this.style.filter=\'brightness(1.18)\'" onmouseout="this.style.filter=\'\'">'
+    +barText+'</div>';
+  });
+
+  var btnTop = visLanes*(BAR_H+BAR_GAP)+2;
+  if (hasOver) {
+   html += '<div onclick="_instToggleWeek(\''+weekKey+'\')" style="'
+    +'position:absolute;left:4px;top:'+btnTop+'px;'
+    +'display:inline-flex;align-items:center;gap:4px;'
+    +'background:var(--surface2);border:1px solid var(--border);border-radius:10px;'
+    +'padding:1px 9px 1px 6px;cursor:pointer;pointer-events:all;'
+    +'font-size:10px;font-weight:700;color:var(--navy);'
+    +'transition:background .12s" '
+    +'onmouseover="this.style.background=\'var(--border)\'" onmouseout="this.style.background=\'var(--surface2)\'">'
+    +'<span style="font-size:12px;line-height:1">&#9660;</span> '
+    +'+'+hiddenTasks+' instala'+(hiddenTasks>1?'ções ocultas':'ção oculta')+' — expandir'
+    +'</div>';
+  } else if (isExpanded && totalLanes > LANES_DEFAULT) {
+   html += '<div onclick="_instToggleWeek(\''+weekKey+'\')" style="'
+    +'position:absolute;left:4px;top:'+btnTop+'px;'
+    +'display:inline-flex;align-items:center;gap:4px;'
+    +'background:var(--surface2);border:1px solid var(--border);border-radius:10px;'
+    +'padding:1px 9px 1px 6px;cursor:pointer;pointer-events:all;'
+    +'font-size:10px;font-weight:700;color:var(--muted);'
+    +'transition:background .12s" '
+    +'onmouseover="this.style.background=\'var(--border)\'" onmouseout="this.style.background=\'var(--surface2)\'">'
+    +'<span style="font-size:12px;line-height:1">&#9650;</span> recolher'
+    +'</div>';
+  }
+
+  html += '</div></div>';
+ }
+ html += '</div>';
+ return html;
+}
 function renderInstCal() {
- var label = document.getElementById('inst-cal-label');
- if (label) label.textContent = _ptMonths[_instCalMonth] + ' ' + _instCalYear;
  var grid = document.getElementById('inst-cal-grid');
  if (!grid) return;
  var rows = _instVisibleRows();
- var byDate = {};
- rows.forEach(function(tr){ var d = tr.dataset.inicio; if (!d) return; (byDate[d] = byDate[d] || []).push(tr); });
- var html = '';
- _ptDows.forEach(function(d){ html += '<div class="ent-cal-dow">' + d + '</div>'; });
- var firstDay = new Date(_instCalYear, _instCalMonth, 1).getDay();
- var daysInMonth = new Date(_instCalYear, _instCalMonth + 1, 0).getDate();
- var prevDays = new Date(_instCalYear, _instCalMonth, 0).getDate();
- var today = new Date();
- var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
- for (var i = firstDay - 1; i >= 0; i--) html += '<div class="ent-cal-day other-month"><div class="ent-cal-daynum">' + (prevDays - i) + '</div></div>';
- for (var d = 1; d <= daysInMonth; d++) {
-  var dateStr = _instCalYear + '-' + String(_instCalMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
-  var isToday = dateStr === todayStr;
-  var dayEvents = byDate[dateStr] || [];
-  html += '<div class="ent-cal-day' + (isToday ? ' today' : '') + '"><div class="ent-cal-daynum">' + d + '</div>';
-  dayEvents.forEach(function(tr) {
-   var cor = _instEventColor(tr.dataset.funil);
-   var lbl = tr.dataset.nome || 'Instalação';
-   var short = lbl.length > 28 ? lbl.substring(0, 28) + '…' : lbl;
-   html += '<div class="ent-cal-event" style="background:' + cor + '22;color:' + cor + '" title="' + lbl.replace(/"/g,'&quot;') + '" onclick="event.stopPropagation();_spInstalacaoById(\'' + tr.dataset.id + '\')">' + short + '</div>';
-  });
-  html += '</div>';
+
+ var tRanges = rows
+  .filter(function(tr){ return tr.dataset.inicio || tr.dataset.fim; })
+  .map(function(tr){
+   var s = tr.dataset.inicio ? new Date(tr.dataset.inicio+'T00:00:00') : new Date(tr.dataset.fim+'T00:00:00');
+   var e = tr.dataset.fim    ? new Date(tr.dataset.fim   +'T00:00:00') : new Date(tr.dataset.inicio+'T00:00:00');
+   if (+e < +s) e = new Date(+s);
+   return { s:s, e:e, tds: tr.dataset };
+  })
+  .sort(function(x,y){ return +x.s - +y.s || +x.e - +y.e; });
+ // 8 de 125 instalações não têm nenhuma data hoje (auditoria confirmada no
+ // banco — maioria "A programar", faz sentido; algumas "Finalizado"/"Em
+ // execução" sem data são dado real incompleto, não bug de sincronização)
+ // — mesmo tratamento do Gestor: faixa "SEM DATA" clicável, não somem.
+ var tSemData = rows.filter(function(tr){ return !tr.dataset.inicio && !tr.dataset.fim; });
+
+ var vy=_instCalYear, vm=_instCalMonth;
+ var mFull = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+ var periodLbl = mFull[vm]+' '+vy;
+ var days = _instMonthDays(vy, vm);
+ var bodyHtml = '<div style="flex:1;overflow-y:auto;overflow-x:hidden">'+_instBuildCalGrid(days, tRanges, function(d){ return d.getMonth()!==vm; })+'</div>';
+
+ var btnSt = 'background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;color:var(--text)';
+ var html = '<div style="display:flex;flex-direction:column;height:100%;overflow:hidden">'
+  + '<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0;flex-wrap:wrap">'
+  + '<button style="'+btnSt+';padding:3px 12px;font-size:18px;line-height:1" onclick="instCalNav(-1)">&#8249;</button>'
+  + '<button style="'+btnSt+';padding:3px 12px;font-size:18px;line-height:1" onclick="instCalNav(1)">&#8250;</button>'
+  + '<span style="font-size:13px;font-weight:800;color:var(--text)">'+periodLbl+'</span>'
+  + '<button style="'+btnSt+';padding:4px 12px;font-size:12px" onclick="_instCalToday()">Hoje</button>'
+  + '<span style="font-size:10px;color:var(--muted);margin-left:4px">'+tRanges.length+' instalações'+(tSemData.length?' &middot; '+tSemData.length+' sem data':'')+'</span>'
+  + '<div style="margin-left:auto;display:flex;gap:8px;align-items:center;font-size:10px;flex-wrap:wrap">'
+  + [['A programar','#8b5cf6'],['Programado','#B8790A'],['Em execução','#8B8B94'],['Finalizado','#1F8A4C']].map(function(l){
+    return '<span style="display:flex;align-items:center;gap:3px"><span style="width:10px;height:10px;border-radius:2px;background:'+l[1]+';opacity:.25;border:1px solid '+l[1]+';flex-shrink:0;display:inline-block"></span><span style="color:var(--muted)">'+l[0]+'</span></span>';
+   }).join('')
+  + '</div></div>'
+  + bodyHtml;
+
+ if (tSemData.length) {
+  html += '<div style="border-top:1px solid var(--border);padding:8px 14px;background:var(--surface2);flex-shrink:0">'
+   + '<div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:5px">SEM DATA ('+tSemData.length+')</div>'
+   + '<div style="display:flex;flex-wrap:wrap;gap:5px">'
+   + tSemData.map(function(tr){var c=_instTColor(tr.dataset.funil);return '<span onclick="_spInstalacaoById(\''+tr.dataset.id+'\')" style="cursor:pointer;font-size:10px;padding:2px 8px;background:'+c.bg+';border:1px solid '+c.bdr+';border-radius:10px;color:'+c.tx+'">'+(tr.dataset.nome||'Instalação')+'</span>';}).join('')
+   + '</div></div>';
  }
- var trailing = (firstDay + daysInMonth) % 7;
- var nextDays = trailing ? 7 - trailing : 0;
- for (var n = 1; n <= nextDays; n++) html += '<div class="ent-cal-day other-month"><div class="ent-cal-daynum">' + n + '</div></div>';
+ html += '</div>';
  grid.innerHTML = html;
 }
 

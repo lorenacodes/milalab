@@ -2410,23 +2410,12 @@
   </div>
  </div>
 
- <!-- ── VISTA CALENDÁRIO ── (grid mensal, 1 evento por instalação na Data
-      início, cor por Status) -->
- <div id="inst-view-calendario" style="display:none">
-  <div class="ent-cal">
-   <div class="ent-cal-nav">
-    <button class="ent-cal-navbtn" onclick="instCalNav(-1)">&#8592;</button>
-    <div class="ent-cal-title" id="inst-cal-label"></div>
-    <button class="ent-cal-navbtn" onclick="instCalNav(1)">&#8594;</button>
-   </div>
-   <div style="display:flex;gap:14px;padding:10px 0;font-size:11px;color:var(--muted);flex-wrap:wrap">
-    <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#8b5cf6;display:inline-block"></span>A programar</span>
-    <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#B8790A;display:inline-block"></span>Programado / Emitir boleto</span>
-    <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#8B8B94;display:inline-block"></span>Em execução</span>
-    <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:#1F8A4C;display:inline-block"></span>Finalizado</span>
-   </div>
-   <div id="inst-cal-grid"></div>
-  </div>
+ <!-- ── VISTA CALENDÁRIO (Timeline/Gantt) ── nav, legenda e faixa "sem data"
+      são montados inteiros dentro de renderInstCal() (mesmo modelo da
+      Timeline do Gestor de Tarefas, #gestor-timeline-content) — sem
+      wrapper de nav/legenda estático aqui, pra não duplicar. -->
+ <div id="inst-view-calendario" style="display:none;height:calc(100vh - 320px);min-height:420px">
+  <div id="inst-cal-grid" style="height:100%"></div>
  </div>
  </div>
 
@@ -2912,7 +2901,7 @@
 <script src="scripts/modules/obras.js?v=mldsv355"></script>
 <script src="scripts/modules/projetos.js?v=mldsv355"></script>
 <script src="scripts/modules/entregas.js?v=mldsv381"></script>
-<script src="scripts/modules/instalacoes.js?v=mldsv345"></script>
+<script src="scripts/modules/instalacoes.js?v=mldsv382"></script>
 <script src="scripts/modules/empresas.js?v=mldsv354"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv345"></script>
 <script src="scripts/modules/dashboard.js?v=mldsv368"></script>
