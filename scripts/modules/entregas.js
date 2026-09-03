@@ -241,6 +241,16 @@ function _entCidadeUf(e) {
  if (o && (o.cidade || o.estado)) return [o.cidade, o.estado].filter(Boolean).join('/');
  return e.cidade || '';
 }
+// Cidade PURA (sem UF junto) — só pro filtro por Cidade (_entFbFields
+// abaixo). Achado real: o filtro de Cidade usava _entCidadeUf (a mesma
+// função da coluna "Cidade/UF" da tabela), então as opções apareciam como
+// "Caruaru/PE" em vez de só "Caruaru" — na prática unificava Cidade e
+// Estado num campo só, redundante com o filtro de Estado que já existe
+// separado.
+function _entCidadeSoNome(e) {
+ if (e.obra && e.obra.cidade) return e.obra.cidade;
+ return (e.cidade || '').split('/')[0].trim();
+}
 
 // ── Filtro/Ordenação/Agrupamento — componentes reutilizáveis do Gestor de
 // Tarefas/Obras/Empresas/Instalações (filtro-builder/sort-builder/
@@ -336,7 +346,9 @@ var _entFbFields = [
  { key: 'nomeEntrega',   label: 'Entrega',      type: 'text' },
  { key: 'obra',          label: 'Obra',         type: 'select', options: function() { return _entDistinctOptions(function(e){ return (e.obra && e.obra.nome) || ''; }); } },
  { key: 'empresa',       label: 'Empresa',      type: 'select', options: function() { return _entDistinctOptions(function(e){ return (e.obra && e.obra.empresas_obras && e.obra.empresas_obras[0] && e.obra.empresas_obras[0].empresa && e.obra.empresas_obras[0].empresa.nome) || ''; }); } },
- { key: 'cidade',        label: 'Cidade',       type: 'select', options: function() { return _entDistinctOptions(function(e){ return _entCidadeUf(e); }); } },
+ { key: 'cidade',        label: 'Cidade',       type: 'select',
+   options: function() { return _entDistinctOptions(function(e){ return _entCidadeSoNome(e); }); },
+   getValue: function(ds) { return ds.cidadeObra; } },
  { key: 'estado',        label: 'Estado',       type: 'select', options: function() { return _entDistinctOptions(function(e){ return (e.obra && e.obra.estado) || e.estado || ''; }); } },
  { key: 'transporte',    label: 'Transporte',   type: 'select', options: function() { return _entDistinctOptions(function(e){ return e.transporte || ''; }); } },
  { key: 'dataFat',       label: 'Faturamento',  type: 'date' },
@@ -513,7 +525,7 @@ function _entPseudoDataset(e) {
   obra:        obraNome.toLowerCase(),
   empresa:     empNome.toLowerCase(),
   cidade:      _entCidadeUf(e).toLowerCase(),
-  cidadeObra:  ((e.obra && e.obra.cidade) || '').toLowerCase(),
+  cidadeObra:  _entCidadeSoNome(e).toLowerCase(),
   estado:      ((e.obra && e.obra.estado) || e.estado || '').toLowerCase(),
   transporte:  (e.transporte || '').toLowerCase(),
   dataFat:     e.data_faturamento || '',
