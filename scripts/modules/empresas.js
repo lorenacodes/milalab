@@ -1742,7 +1742,7 @@ _vwInit('fornecedores', {
 // assinada com o primeiro nome de quem está logado.
 function _fornMensagemWA() {
  var nome = (_currentUser && (_currentUser.firstName || _currentUser.name)) || 'Equipe MilaTec';
- return 'Olá! Aqui é ' + nome + ', da MilaTec. Gostaria de solicitar um orçamento — poderia me orientar sobre as informações necessárias?';
+ return 'Olá! Aqui é ' + nome + ', da MilaTec. Gostaria de solicitar um orçamento.';
 }
 function _fornRowHTML(f, idx) {
  var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
