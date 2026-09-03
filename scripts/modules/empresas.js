@@ -2555,7 +2555,14 @@ function _orcColetarItens() {
   // Linha totalmente vazia (usuário adicionou e não preencheu) não entra no
   // payload — só conta linha que o usuário começou a usar.
   if (!nome && !quantidade && !unidade_medida && !valEl.value && !status_cotacao) return;
-  itens.push({ id: line.dataset.dbId || null, nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario, status_cotacao: status_cotacao, created_at: line.dataset.createdAt || null });
+  // quantidade/unidade_medida são NOT NULL no banco (default 1/'unidade') —
+  // uma linha parcialmente preenchida (ex.: só o nome, campos deixados em
+  // branco) NÃO pode mandar null pra elas: o INSERT/UPDATE inteiro falha
+  // (erro "Não foi possível concluir a ação") e nenhum item da lista salva,
+  // nem os que já estavam completos. Cai no mesmo padrão-default da coluna
+  // em vez de null, igual o valor que já aparece pré-selecionado quando o
+  // usuário nem chega a mexer nesses campos.
+  itens.push({ id: line.dataset.dbId || null, nome: nome, quantidade: quantidade === '' ? 1 : Number(quantidade), unidade_medida: unidade_medida || 'unidade', valor_unitario: valor_unitario, status_cotacao: status_cotacao, created_at: line.dataset.createdAt || null });
  });
  return itens;
 }
