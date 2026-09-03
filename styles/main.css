@@ -1250,7 +1250,7 @@ td{font-size:13px}
 
 @media print{
  @page{size:A4;margin:16mm 14mm}
- body>*:not(#modal-proposta-comercial){display:none!important}
+ body>*:not(#modal-proposta-comercial):not(#forn-rel-bd){display:none!important}
  /* Modal wrapper */
  #modal-proposta-comercial{display:block!important;position:static!important;flex-direction:column!important;background:none!important;overflow:visible!important;height:auto!important;inset:auto!important}
  #prop-modal-toolbar{display:none!important}
@@ -1278,9 +1278,17 @@ td{font-size:13px}
    escondemos a barra de filtros/botão de imprimir e viramos a tabela num
    documento simples — cabeçalho com o período/status filtrado (só existe
    pra impressão, ver #forn-rel-print-header) some na tela normal (display:
-   none inline no HTML) e aparece aqui. */
+   none inline no HTML) e aparece aqui.
+   IMPORTANTE: o "esconder todo o resto" de CADA modal de impressão precisa
+   isentar (:not()) o id de TODOS os outros modais de impressão existentes,
+   não só o próprio — senão a regra "esconde tudo, exceto #outro-modal" bate
+   neste elemento (com especificidade maior que "#forn-rel-bd{display:block}"
+   por causa do seletor "body" extra dentro do :not()) e o relatório sai em
+   branco na impressão. Bug real já visto: a regra do Proposta Comercial
+   escondia #forn-rel-bd sem querer. Ao adicionar um novo modal imprimível,
+   isentar seu id nas duas regras (e nesta, se vier depois). */
 @media print{
- body>*:not(#forn-rel-bd){display:none!important}
+ body>*:not(#forn-rel-bd):not(#modal-proposta-comercial){display:none!important}
  #forn-rel-bd{display:block!important;position:static!important;background:none!important;padding:0!important;overflow:visible!important;inset:auto!important}
  #forn-rel-bd .modal{max-width:100%!important;box-shadow:none!important;border:none!important;margin:0!important}
  #forn-rel-bd .modal-header,#forn-rel-bd .modal-footer,#forn-rel-toolbar{display:none!important}
