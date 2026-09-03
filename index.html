@@ -41,7 +41,7 @@
 <script src="scripts/lib/doc-cards.js?v=mldsv388"></script>
 <script src="scripts/services/usuarios.service.js?v=mldsv345"></script>
 <script src="scripts/services/auth.service.js?v=mldsv361"></script>
-<script src="scripts/services/propostas.service.js?v=mldsv345"></script>
+<script src="scripts/services/propostas.service.js?v=mldsv397"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
@@ -1893,14 +1893,14 @@
     </div>
     <div class="mf" style="margin:0">
      <label>Produto / Tipologia <span class="req">*</span></label>
-     <!-- Opções preenchidas dinamicamente por updateNpProdutoOptions()
-          (propostas.service.js) a partir do catálogo real (tabela
+     <!-- Busca+single-select (_srchSelRegister/_npPopularProduto,
+          projetos.js) — igual ao campo Etapa deste mesmo formulário; era o
+          único campo do modal ainda com <select> nativo sem busca (achado
+          real: catálogo de produtos tem dezenas de itens, sem busca ficava
+          impraticável navegar). Opções vêm do catálogo real (tabela
           produtos/_produtosArr), filtradas pelo Tipo de orçamento
-          selecionado — pedido explícito: a lista estática antiga não
-          tinha todos os produtos cadastrados. -->
-     <select id="np-produto" onchange="updateNpProdutoInfo()">
-      <option value="">Selecione...</option>
-     </select>
+          selecionado, recalculadas a cada abertura do dropdown. -->
+     <div id="np-produto-wrap"></div>
     </div>
    </div>
 
@@ -2877,7 +2877,7 @@
 <script src="scripts/modules/side-panel.js?v=mldsv345"></script>
 <script src="scripts/lib/atividades-vinculos.js?v=mldsv371"></script>
 <script src="scripts/modules/obras.js?v=mldsv355"></script>
-<script src="scripts/modules/projetos.js?v=mldsv390"></script>
+<script src="scripts/modules/projetos.js?v=mldsv397"></script>
 <script src="scripts/modules/entregas.js?v=mldsv396"></script>
 <script src="scripts/modules/instalacoes.js?v=mldsv391"></script>
 <script src="scripts/modules/empresas.js?v=mldsv354"></script>

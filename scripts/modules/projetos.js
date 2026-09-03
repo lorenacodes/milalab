@@ -40,6 +40,26 @@ function _npPopularEtapa() {
  wrap.innerHTML = _srchSelMarkup('npEtapa', 'np-etapa', 'Análise Inicial');
 }
 
+// Produto/Tipologia — mesmo estilo de busca+single-select do campo Etapa
+// acima, em vez do <select> nativo sem busca que o modal de criação tinha
+// (achado real, reportado pela usuária: o catálogo tem dezenas de produtos,
+// sem busca ficava impraticável). Opções dependem do Tipo de orçamento
+// escolhido — função (não array fixo), recalculada toda vez que o dropdown
+// abre, então não precisa recriar nada na mão quando o Tipo muda.
+function _npPopularProduto() {
+ var wrap = document.getElementById('np-produto-wrap');
+ if (!wrap) return;
+ _srchSelRegister('npProduto', {
+  options: function() {
+   var tipo = document.getElementById('np-tipo')?.value || '';
+   return (typeof _noProdutosDisponiveis === 'function') ? _noProdutosDisponiveis(tipo).map(function(pr){ return pr.nome; }) : [];
+  },
+  placeholder: 'Selecione o produto...',
+  onSelect: function() { if (typeof updateNpProdutoInfo === 'function') updateNpProdutoInfo(); },
+ });
+ wrap.innerHTML = _srchSelMarkup('npProduto', 'np-produto', '');
+}
+
 // Catálogo real de produtos (_produtosArr, populado também pelo wizard Nova
 // Obra) — achado real: o detalhamento de Projeto (_spProjetoById) montava o
 // dropdown de Produto a partir de _noProdutosDisponiveis(tipo) sem nunca
@@ -161,12 +181,9 @@ function _npTelhaToggle(campo, valor, checked) {
 }
 
 async function openNovoProjeto() {
- // Resetar campos
- ['np-produto'].forEach(id => {
- const el = document.getElementById(id); if(el) el.selectedIndex = 0;
- });
  _npPopularTipo();
  _npPopularEtapa();
+ _npPopularProduto();
  ['np-nome','np-qtd','np-val-uni','np-peso-uni','np-m2arq','np-m2estr','np-desc'].forEach(id => {
  const el = document.getElementById(id); if(el) el.value = '';
  });
@@ -189,7 +206,6 @@ async function openNovoProjeto() {
  if (tdWrap) tdWrap.innerHTML = _msRenderDropdown('npTelhado', _NO_TIPOLOGIA_TELHADO_OPCOES||[], _npTelhadoSel, '_npTelhadoToggle', 'Selecione a(s) tipologia(s)...');
  var thWrap = document.getElementById('np-telha-dd');
  if (thWrap) thWrap.innerHTML = _msRenderDropdown('npTelha', _NO_TIPO_TELHA_OPCOES||[], _npTelhaSel, '_npTelhaToggle', 'Selecione o(s) tipo(s)...');
- if (typeof updateNpProdutoOptions === 'function') updateNpProdutoOptions();
 
  calcProjetoTotais();
  document.getElementById('modal-novo-projeto').classList.add('open');
@@ -242,15 +258,14 @@ async function submitNovoProjeto() {
  const nomeDigitado = (document.getElementById('np-nome').value || '').trim();
 
  var nomeEl = document.getElementById('np-nome');
- var prodEl = document.getElementById('np-produto');
  var respWrap = document.getElementById('np-responsavel-wrap');
  nomeEl.style.borderColor = '';
- prodEl.style.borderColor = '';
+ var produtoBox = document.getElementById('sp-srch-npProduto-box'); if (produtoBox) produtoBox.style.borderColor = '';
  var etapaBox = document.getElementById('sp-srch-npEtapa-box'); if (etapaBox) etapaBox.style.borderColor = '';
  if (respWrap) respWrap.style.outline = '';
 
  if (!nomeDigitado) { nomeEl.style.borderColor = 'var(--red)'; nomeEl.focus(); _showToast('Informe o nome do projeto.', 'aviso'); return; }
- if (!prod) { prodEl.style.borderColor = 'var(--red)'; _showToast('Selecione o produto.', 'aviso'); return; }
+ if (!prod) { if (produtoBox) produtoBox.style.borderColor = 'var(--red)'; _showToast('Selecione o produto.', 'aviso'); return; }
  if (!etapa) { if (etapaBox) etapaBox.style.borderColor = 'var(--red)'; _showToast('Selecione a etapa do projeto.', 'aviso'); return; }
  // Pedido explícito: Obra OU Melhoria — pelo menos um dos dois vínculos é
  // obrigatório (projeto sem orçamento/obra associada precisa ficar

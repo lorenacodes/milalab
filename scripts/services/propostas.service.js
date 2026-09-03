@@ -93,23 +93,12 @@ var _difalTabelaUF = {
 
 function updateNpProdutoOptions() {
  const tipo = document.getElementById('np-tipo').value;
- const sel = document.getElementById('np-produto');
- sel.value = '';
- // Pedido explícito: a lista de Produtos estava faltando opções — o
- // <select> tinha uma lista estática hardcoded (só 11 itens) em vez de
- // vir do catálogo real (tabela produtos, mesmo _produtosArr/
- // _noProdutosDisponiveis usado no wizard de Nova Obra e nos formulários
- // de projeto dentro do detalhamento de Obra/Entrega). Reconstrói as
- // opções dinamicamente com TODOS os produtos da categoria do Tipo
- // selecionado (+ categoria "Geral").
- var produtos = (typeof _noProdutosDisponiveis === 'function' && typeof _produtosArr !== 'undefined')
-  ? _noProdutosDisponiveis(tipo)
-  : [];
- var html = '<option value="">Selecione...</option>';
- produtos.forEach(function(pr){
-  html += '<option data-grupo="' + (tipo === 'Solar' ? 'solar' : 'padrao') + '">' + pr.nome + '</option>';
- });
- sel.innerHTML = html;
+ // Produto virou busca+single-select (_npPopularProduto, projetos.js) —
+ // a lista de opções já é uma função recalculada a cada abertura do
+ // dropdown (filtra pelo Tipo na hora), então aqui só limpa a seleção
+ // atual (o Tipo mudou, o produto escolhido antes pode não existir mais
+ // nessa categoria).
+ if (typeof _srchSelSelectItem === 'function') _srchSelSelectItem('npProduto', '');
  document.getElementById('np-produto-info').style.display = 'none';
 
  // Pedido explícito: Tipologia do Telhado/Tipo de Telha aparecem
