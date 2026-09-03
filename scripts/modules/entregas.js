@@ -294,14 +294,23 @@ async function _entCarregarPaginado(tabela, colunas, aplicarFiltros) {
 async function _entLoadDocPresence() {
  if (!_sb) return;
  var ids = {};
- // BUG REAL corrigido aqui: as duas consultas vinham sem paginação nenhuma e
- // o Supabase corta em 1000 linhas SEM avisar. Como hoje são 4.349 documentos
- // com entrega_id e 4.014 vínculos em documentos_entregas, mais de 3/4 dos
- // vínculos eram ignorados — o filtro "Nota Fiscal anexada" respondia "Não"
- // pra centenas de entregas que TÊM nota, sem nenhum sintoma visível.
+ // BUG REAL #1 (já corrigido): as duas consultas vinham sem paginação nenhuma
+ // e o Supabase corta em 1000 linhas SEM avisar. Como hoje são 4.349
+ // documentos com entrega_id e 4.014 vínculos em documentos_entregas, mais
+ // de 3/4 dos vínculos eram ignorados — o filtro "Nota Fiscal anexada"
+ // respondia "Não" pra centenas de entregas que TÊM nota, sem nenhum
+ // sintoma visível.
+ // BUG REAL #2 (achado numa auditoria contra o Airtable — 1280 no sistema
+ // vs. 1105 no Airtable): as duas consultas não filtravam por tipo nenhum,
+ // então contavam qualquer documento anexado (Ordem de Produção/Romaneio/
+ // Documentos para faturamento/Pedido de Compra também), não só Nota
+ // Fiscal — o filtro "Nota Fiscal anexada" na prática respondia "Sim" pra
+ // qualquer entrega com QUALQUER anexo. Agora filtra tipo='nota_fiscal'
+ // nas duas (direto e via junção, com !inner pra filtrar pelo tipo do
+ // documento ligado).
  var [direto, viaJuncao] = await Promise.all([
-  _entCarregarPaginado('documentos', 'entrega_id', function(q){ return q.not('entrega_id', 'is', null); }),
-  _entCarregarPaginado('documentos_entregas', 'entrega_id'),
+  _entCarregarPaginado('documentos', 'entrega_id', function(q){ return q.eq('tipo', 'nota_fiscal').not('entrega_id', 'is', null); }),
+  _entCarregarPaginado('documentos_entregas', 'entrega_id, documentos!inner(tipo)', function(q){ return q.eq('documentos.tipo', 'nota_fiscal'); }),
  ]);
  direto.forEach(function(r) { if (r.entrega_id) ids[r.entrega_id] = 1; });
  viaJuncao.forEach(function(r) { if (r.entrega_id) ids[r.entrega_id] = 1; });
