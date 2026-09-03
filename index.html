@@ -1586,6 +1586,18 @@
      Adicionar item
     </button>
 
+    <div style="margin-top:18px">
+     <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer">
+      <input type="checkbox" id="orc-teve-desconto" onchange="_orcDescontoChange(this.checked)">
+      Houve desconto?
+     </label>
+     <!-- Só aparece quando "Houve desconto?" está marcado -->
+     <div id="orc-bloco-desconto" class="fg" style="display:none;margin-top:10px;max-width:260px">
+      <label>Valor final (com desconto)</label>
+      <input type="text" id="orc-valor-final" placeholder="0,00" inputmode="numeric" oninput="_orcValorFinalInput(this)">
+     </div>
+    </div>
+
     <!-- Só aparece quando status_cotacao = "Aprovado" -->
     <div id="orc-bloco-informado-financeiro" style="display:none;margin-top:18px">
      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer">
@@ -3018,7 +3030,7 @@
 <script src="scripts/modules/projetos.js?v=mldsv399"></script>
 <script src="scripts/modules/entregas.js?v=mldsv398"></script>
 <script src="scripts/modules/instalacoes.js?v=mldsv391"></script>
-<script src="scripts/modules/empresas.js?v=mldsv411"></script>
+<script src="scripts/modules/empresas.js?v=mldsv412"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv398"></script>
 <script src="scripts/modules/dashboard.js?v=mldsv398"></script>
 <script src="scripts/modules/melhorias.js?v=mldsv345"></script>
