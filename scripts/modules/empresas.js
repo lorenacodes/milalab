@@ -1589,6 +1589,61 @@ var _fornExperienciaCor = { 'Positiva': 'nt-tag-green', 'Negativa': 'nt-tag-red'
 // (_fbInit + _fbEvaluate direto sobre o objeto do fornecedor, sem precisar
 // de dataset/DOM intermediário porque a tabela é re-renderizada do zero a
 // cada mudança, diferente de Empresas/Obras que só escondem/mostram <tr>). ──
+// Pedido explícito: Fornecedores era a única lista do sistema sem
+// Agrupar/Ordenar (só tinha Filtro) — o comentário da toolbar já dizia
+// "mesmos componentes reutilizáveis do Gestor de Tarefas/Empresas", mas só
+// o filtro tinha sido ligado de verdade. _fornPseudoDataset/
+// _fornGroupKeyFor espelham o mesmo esquema de _cttPseudoDataset/
+// _cttGroupKeyFor (Contatos, mesmo arquivo) — grupo só por campo de valor
+// único (Estado/Experiência); Setor/Cidade ficam de fora do Agrupar por
+// serem multivalorados (um fornecedor pertence a vários setores/cidades
+// ao mesmo tempo, não dá pra agrupar num balde só sem "espalhar" o
+// mesmo fornecedor em vários grupos — fora do padrão simples usado aqui).
+function _fornPseudoDataset(f) {
+ var statusDistintos = Array.from(new Set((f.produtos||[]).map(function(p){ return p.status_cotacao; }).filter(Boolean)));
+ return {
+  nome: (f.nome || '').toLowerCase(),
+  estado: (f.estado || '').toLowerCase(),
+  experiencia: (f.experiencia || '').toLowerCase(),
+  setor: (f.setores || []).join(', ').toLowerCase(),
+  cidade: (f.cidades || []).join(', ').toLowerCase(),
+  status_cotacao: statusDistintos.join(', ').toLowerCase(),
+  produtos_qtd: (f.produtos || []).length,
+  atualizado_em: (f.updated_at || '').slice(0, 10),
+ };
+}
+var _fornGroupCollapsed = {};
+function _fornGroupKeyFor(f, field) {
+ if (field === 'estado') return { key: f.estado || '— Sem estado', sortKey: null };
+ if (field === 'experiencia') return { key: f.experiencia || '— Sem experiência', sortKey: null };
+ return { key: '— Sem grupo', sortKey: null };
+}
+function _fornToggleGroup(key) {
+ _fornGroupCollapsed[key] = !_fornGroupCollapsed[key];
+ _fornApplyFilters();
+}
+function _fornRenderGroupNode(node, path, rowsArr, listaCompleta) {
+ if (node.leaf) {
+  node.items.forEach(function(f) { rowsArr.push(_fornRowHTML(f, listaCompleta.indexOf(f))); });
+  return;
+ }
+ node.order.forEach(function(k) {
+  var child = node.children[k];
+  var nodePath = 'fornecedores::' + path.concat(k).join(' :: ');
+  var isCollapsed = !!_fornGroupCollapsed[nodePath];
+  var total = _gtTreeCount(child);
+  var indent = 12 + path.length * 20;
+  rowsArr.push(
+   '<tr class="' + _gtGroupClass(path.length) + '" onclick="_fornToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
+   + '<td colspan="8" style="padding-left:' + indent + 'px">'
+   + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
+   + '<strong>' + k + '</strong>'
+   + _gtCountBadgeHTML(total, 'fornecedor' + (total !== 1 ? 'es' : ''))
+   + '</td></tr>'
+  );
+  if (!isCollapsed) _fornRenderGroupNode(child, path.concat(k), rowsArr, listaCompleta);
+ });
+}
 function _fornApplyFilters() { _renderFornecedores(); }
 
 var _fornFbFields = [
@@ -1601,6 +1656,85 @@ var _fornFbFields = [
 ];
 _fbInit('fornecedores', _fornFbFields, _fornApplyFilters);
 
+var _fornSbFields = [
+ { key: 'nome',           label: 'Nome',           type: 'text' },
+ { key: 'setor',          label: 'Setor',          type: 'text' },
+ { key: 'cidade',         label: 'Cidade',         type: 'text' },
+ { key: 'estado',         label: 'Estado',         type: 'text' },
+ { key: 'experiencia',    label: 'Experiência',    type: 'text' },
+ { key: 'status_cotacao', label: 'Status cotação', type: 'text' },
+ { key: 'produtos_qtd',   label: 'Qtd. produtos orçados', type: 'number' },
+ { key: 'atualizado_em',  label: 'Última alteração', type: 'date' },
+];
+_sbInit('fornecedores', _fornSbFields, _fornApplyFilters);
+
+// Agrupamento — Estado/Experiência (campos de valor único; Setor/Cidade
+// ficam de fora, ver comentário de _fornGroupKeyFor acima).
+_gbInit('fornecedores', [
+ { key: 'estado',      label: 'Estado' },
+ { key: 'experiencia', label: 'Experiência' },
+], _fornApplyFilters, 2);
+
+// Visualizações salvas — mesma mecânica de Obras/Gestor (saved-views.js),
+// sem Período (Fornecedores não tem um campo de data central pra filtrar
+// por período, diferente de Obras/Entregas).
+_vwInit('fornecedores', {
+ modulo: 'fornecedores',
+ getState: function() {
+  return {
+   filtro: _fbInstances.fornecedores ? _fbInstances.fornecedores.state : { logic: 'AND', conditions: [] },
+   sort:   _sbInstances.fornecedores ? _sbInstances.fornecedores.state : { levels: [] },
+   group:  _gbInstances.fornecedores ? _gbInstances.fornecedores.state : { levels: [] },
+  };
+ },
+ applyState: function(state) {
+  if (_sbInstances.fornecedores) { _sbInstances.fornecedores.state = state.sort || { levels: [] }; _sbRender('fornecedores'); }
+  if (_gbInstances.fornecedores) { _gbInstances.fornecedores.state = state.group || { levels: [] }; _gbRender('fornecedores'); }
+  if (_fbInstances.fornecedores) { _fbInstances.fornecedores.state = state.filtro || { logic: 'AND', conditions: [] }; _fbRender('fornecedores'); }
+  _fornApplyFilters();
+ }
+});
+
+// Linha da tabela — extraída em função própria (antes vivia inline no
+// .map() de _renderFornecedores) pra ser reaproveitada também pelo
+// render agrupado (_fornRenderGroupNode acima), mesmo padrão de
+// _cttRowHTML/_entRowHTML.
+function _fornRowHTML(f, idx) {
+ var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
+ var bgColors = ['#004AE8','#2E5FD9','#059669','#d97706','#dc2626'];
+ var bg = bgColors[(idx < 0 ? 0 : idx) % bgColors.length];
+ var setoresF = f.setores || [];
+ var cids = f.cidades || [];
+ // status_cotacao agora é por produto — a coluna mostra os valores
+ // distintos entre os produtos orçados desse fornecedor (ou "Múltiplos"
+ // com tooltip quando há mais de um status diferente).
+ var statusDistintos = Array.from(new Set((f.produtos||[]).map(function(p){ return p.status_cotacao; }).filter(Boolean)));
+ var statusCell;
+ if (!statusDistintos.length) {
+  statusCell = '<span style="color:var(--muted);font-size:12px">—</span>';
+ } else if (statusDistintos.length === 1) {
+  statusCell = '<span class="nt-tag ' + (_fornStatusCor[statusDistintos[0]]||'nt-tag-gray') + '" style="font-size:11px">' + statusDistintos[0] + '</span>';
+ } else {
+  statusCell = '<span class="nt-tag nt-tag-gray" style="font-size:11px" title="' + statusDistintos.join(', ').replace(/"/g,'&quot;') + '">Múltiplos</span>';
+ }
+ return '<tr>'
+  + '<td><div class="nt-avatar" style="background:' + bg + ';font-size:10px;width:26px;height:26px;border-radius:6px">' + initials + '</div></td>'
+  + '<td><div style="font-weight:600;font-size:13px;color:var(--text)">' + f.nome + '</div>'
+  + (f.email ? '<div style="font-size:11px;color:var(--muted)">' + f.email + '</div>' : '')
+  + '</td>'
+  + '<td>' + (setoresF.length
+     ? setoresF.slice(0,2).map(function(s){ return '<span class="nt-tag nt-tag-blue" style="font-size:11px;margin-right:3px">'+s+'</span>'; }).join('') + (setoresF.length>2 ? '<span style="font-size:11px;color:var(--muted)">+'+(setoresF.length-2)+'</span>' : '')
+     : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
+  + '<td style="font-size:12px;color:var(--muted)">' + (cids.length ? cids.join(', ') : '—') + (f.estado ? ' · ' + f.estado : '') + '</td>'
+  + '<td>' + statusCell + '</td>'
+  + '<td>' + (f.experiencia ? '<span class="nt-tag ' + (_fornExperienciaCor[f.experiencia]||'nt-tag-gray') + '" style="font-size:11px">' + f.experiencia + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
+  + '<td>' + _fornProdutosResumoHTML(f) + '</td>'
+  + '<td style="display:flex;gap:4px">'
+  + '<button class="nt-open-btn" onclick="editFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Editar</button>'
+  + '<button class="nt-open-btn" onclick="excluirFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--red);background:rgba(207,34,46,.08);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Excluir</button>'
+  + '</td>'
+  + '</tr>';
+}
 function _renderFornecedores() {
  var tbody = document.getElementById('forn-tbody');
  var count = document.getElementById('forn-count');
@@ -1619,6 +1753,7 @@ function _renderFornecedores() {
   }
   return ok;
  });
+ lista.sort(function(a, b) { return _sbCompare(_fornPseudoDataset(a), _fornPseudoDataset(b), 'fornecedores'); });
 
  var fbBadge = document.getElementById('fb-badge-fornecedores');
  if (fbBadge) { fbBadge.textContent = activeConds; fbBadge.style.display = activeConds ? '' : 'none'; }
@@ -1635,42 +1770,18 @@ function _renderFornecedores() {
   return;
  }
 
- tbody.innerHTML = lista.map(function(f, idx) {
-  var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
-  var bgColors = ['#004AE8','#2E5FD9','#059669','#d97706','#dc2626'];
-  var bg = bgColors[idx % bgColors.length];
-  var setoresF = f.setores || [];
-  var cids = f.cidades || [];
-  // status_cotacao agora é por produto — a coluna mostra os valores
-  // distintos entre os produtos orçados desse fornecedor (ou "Múltiplos"
-  // com tooltip quando há mais de um status diferente).
-  var statusDistintos = Array.from(new Set((f.produtos||[]).map(function(p){ return p.status_cotacao; }).filter(Boolean)));
-  var statusCell;
-  if (!statusDistintos.length) {
-   statusCell = '<span style="color:var(--muted);font-size:12px">—</span>';
-  } else if (statusDistintos.length === 1) {
-   statusCell = '<span class="nt-tag ' + (_fornStatusCor[statusDistintos[0]]||'nt-tag-gray') + '" style="font-size:11px">' + statusDistintos[0] + '</span>';
-  } else {
-   statusCell = '<span class="nt-tag nt-tag-gray" style="font-size:11px" title="' + statusDistintos.join(', ').replace(/"/g,'&quot;') + '">Múltiplos</span>';
-  }
-  return '<tr>'
-   + '<td><div class="nt-avatar" style="background:' + bg + ';font-size:10px;width:26px;height:26px;border-radius:6px">' + initials + '</div></td>'
-   + '<td><div style="font-weight:600;font-size:13px;color:var(--text)">' + f.nome + '</div>'
-   + (f.email ? '<div style="font-size:11px;color:var(--muted)">' + f.email + '</div>' : '')
-   + '</td>'
-   + '<td>' + (setoresF.length
-      ? setoresF.slice(0,2).map(function(s){ return '<span class="nt-tag nt-tag-blue" style="font-size:11px;margin-right:3px">'+s+'</span>'; }).join('') + (setoresF.length>2 ? '<span style="font-size:11px;color:var(--muted)">+'+(setoresF.length-2)+'</span>' : '')
-      : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
-   + '<td style="font-size:12px;color:var(--muted)">' + (cids.length ? cids.join(', ') : '—') + (f.estado ? ' · ' + f.estado : '') + '</td>'
-   + '<td>' + statusCell + '</td>'
-   + '<td>' + (f.experiencia ? '<span class="nt-tag ' + (_fornExperienciaCor[f.experiencia]||'nt-tag-gray') + '" style="font-size:11px">' + f.experiencia + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
-   + '<td>' + _fornProdutosResumoHTML(f) + '</td>'
-   + '<td style="display:flex;gap:4px">'
-   + '<button class="nt-open-btn" onclick="editFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Editar</button>'
-   + '<button class="nt-open-btn" onclick="excluirFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--red);background:rgba(207,34,46,.08);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Excluir</button>'
-   + '</td>'
-   + '</tr>';
- }).join('');
+ // Agrupamento (Agrupar por, mesma engine do Gestor de Tarefas/Obras) —
+ // até então Fornecedores não tinha, sempre renderizava plano.
+ var groupLevels = (_gbInstances.fornecedores && _gbInstances.fornecedores.state.levels) || [];
+ if (groupLevels.length) {
+  var tree = _gtBuildTree(lista, groupLevels, _fornGroupKeyFor, null, 0);
+  var rowsArr = [];
+  _fornRenderGroupNode(tree, [], rowsArr, lista);
+  tbody.innerHTML = rowsArr.join('');
+  return;
+ }
+
+ tbody.innerHTML = lista.map(function(f, idx) { return _fornRowHTML(f, idx); }).join('');
 }
 
 // Resumo agregado (não escala listar produto a produto na linha da tabela —
@@ -3029,6 +3140,27 @@ _gbInit('empresas', [
  { key: 'categoria', label: 'Categoria' },
 ], _empApplyFilters, 3);
 
+// Visualizações salvas — mesma mecânica de Obras/Gestor (saved-views.js);
+// Empresas tinha Filtro/Agrupar/Ordenar mas nunca ganhou Visualizações,
+// diferente de Obras. Sem Período (Empresas não tem um campo de data
+// central pra filtrar por período, diferente de Obras/Entregas).
+_vwInit('empresas', {
+ modulo: 'empresas',
+ getState: function() {
+  return {
+   filtro: _fbInstances.empresas ? _fbInstances.empresas.state : { logic: 'AND', conditions: [] },
+   sort:   _sbInstances.empresas ? _sbInstances.empresas.state : { levels: [] },
+   group:  _gbInstances.empresas ? _gbInstances.empresas.state : { levels: [] },
+  };
+ },
+ applyState: function(state) {
+  if (_sbInstances.empresas) { _sbInstances.empresas.state = state.sort || { levels: [] }; _sbRender('empresas'); }
+  if (_gbInstances.empresas) { _gbInstances.empresas.state = state.group || { levels: [] }; _gbRender('empresas'); }
+  if (_fbInstances.empresas) { _fbInstances.empresas.state = state.filtro || { logic: 'AND', conditions: [] }; _fbRender('empresas'); }
+  _empApplyFilters();
+ }
+});
+
 /* Filtro/Ordenação de Contatos — mesma migração acima, reaproveitando
    _cttCampos que já existia (nome/cargo/empresa, com o vocabulário real de
    Cargo verificado no Airtable). */
@@ -3065,3 +3197,22 @@ _gbInit('contatos', [
  { key: 'cargo',   label: 'Cargo' },
  { key: 'empresa', label: 'Empresa' },
 ], _cttApplyFilters, 3);
+
+// Visualizações salvas — mesma mecânica de Obras/Gestor (saved-views.js);
+// Contatos tinha Filtro/Agrupar/Ordenar mas nunca ganhou Visualizações.
+_vwInit('contatos', {
+ modulo: 'contatos',
+ getState: function() {
+  return {
+   filtro: _fbInstances.contatos ? _fbInstances.contatos.state : { logic: 'AND', conditions: [] },
+   sort:   _sbInstances.contatos ? _sbInstances.contatos.state : { levels: [] },
+   group:  _gbInstances.contatos ? _gbInstances.contatos.state : { levels: [] },
+  };
+ },
+ applyState: function(state) {
+  if (_sbInstances.contatos) { _sbInstances.contatos.state = state.sort || { levels: [] }; _sbRender('contatos'); }
+  if (_gbInstances.contatos) { _gbInstances.contatos.state = state.group || { levels: [] }; _gbRender('contatos'); }
+  if (_fbInstances.contatos) { _fbInstances.contatos.state = state.filtro || { logic: 'AND', conditions: [] }; _fbRender('contatos'); }
+  _cttApplyFilters();
+ }
+});
