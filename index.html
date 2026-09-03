@@ -1266,16 +1266,6 @@
   <div class="nt-desc">Empresas e pessoas que fornecem materiais ou serviços para a MilaTec</div>
  </div>
 
- <!-- Sub-abas (pedido explícito: banco de materiais + produtos orçados com
-      fornecedores movidos pra dentro de Fornecedores, antes viviam num
-      modal solto dentro do detalhamento de Obra) -->
- <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin:0 0 16px">
-  <button class="spt-btn active" data-target="forn-tab-lista" onclick="_fornTabSwitch('lista',this)">Fornecedores</button>
-  <button class="spt-btn" data-target="forn-tab-materiais" onclick="_fornTabSwitch('materiais',this)">Banco de Materiais</button>
- </div>
-
- <div id="forn-tab-lista">
-
  <!-- Toolbar fixa: mesmo padrão (.obras-toolbar-fixed) de Obras/Projetos/
       Entregas/Instalações/Automações/Melhorias — não o .gestor-hd-controls
       com position:sticky que Fornecedores/Empresas/Contatos ainda usavam
@@ -1345,33 +1335,6 @@
   Novo fornecedor
  </button>
  <div class="nt-count" id="forn-count">0 fornecedores</div>
-
- </div><!-- /forn-tab-lista -->
-
- <!-- Banco de Materiais (catálogo geral, materiais_catalogo) + Produtos
-      Orçados com Fornecedores (fornecedores_produtos, agora numa visão
-      agregada — antes só dava pra ver por fornecedor, um de cada vez).
-      Antes vivia num modal aberto de dentro do "Orçamento Modular" no
-      detalhamento de Obra; a calculadora em si saiu do sistema (pedido
-      explícito), o banco de materiais ficou e ganhou este lugar fixo. -->
- <div id="forn-tab-materiais" style="display:none">
-
-  <div style="display:flex;align-items:center;justify-content:space-between;margin:4px 0 10px">
-   <div class="sp-stitle" style="margin:0;padding:0;border:none">Banco de Materiais</div>
-   <button class="btn btn-ghost btn-sm" onclick="_fmDbAddRow()">+ Novo item</button>
-  </div>
-  <input type="text" id="fm-db-search-inp" class="ts-search-input" style="max-width:340px;margin-bottom:10px" placeholder="Buscar por descrição ou grupo..." oninput="_fmDbRender()">
-  <div id="fm-db-body"><div class="sp-empty" style="padding:16px 0">Carregando catálogo...</div></div>
-  <div style="display:flex;justify-content:flex-end;margin-top:10px">
-   <button class="btn btn-primary" onclick="_fmDbPersist(this)">Salvar alterações</button>
-  </div>
-
-  <div style="margin-top:32px;border-top:1px solid var(--border);padding-top:16px">
-   <div class="sp-stitle" style="margin:0 0 10px;padding:0;border:none">Produtos Orçados com Fornecedores</div>
-   <div id="fm-produtos-body"><div class="sp-empty" style="padding:16px 0">Carregando produtos...</div></div>
-  </div>
-
- </div><!-- /forn-tab-materiais -->
 
  <!-- MODAL NOVO/EDITAR FORNECEDOR (mesmo padrão visual dos demais modais do
       sistema — modal-backdrop/modal/modal-header/modal-body/modal-footer,
@@ -2926,7 +2889,7 @@
 <script src="scripts/modules/projetos.js?v=mldsv399"></script>
 <script src="scripts/modules/entregas.js?v=mldsv398"></script>
 <script src="scripts/modules/instalacoes.js?v=mldsv391"></script>
-<script src="scripts/modules/empresas.js?v=mldsv400"></script>
+<script src="scripts/modules/empresas.js?v=mldsv402"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv398"></script>
 <script src="scripts/modules/dashboard.js?v=mldsv398"></script>
 <script src="scripts/modules/melhorias.js?v=mldsv345"></script>
