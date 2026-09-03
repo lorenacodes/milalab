@@ -2497,7 +2497,14 @@ async function _orcAutoSaveItensFlush() {
   return;
  }
  if (String(_editingOrcId) !== String(id)) return;
- _orcAutoSaveStatus('saved', 'Alterações salvas');
+ var incompletos = itens.filter(function(p){ return !p._completo; }).length;
+ if (incompletos) {
+  _orcAutoSaveStatus('error', incompletos === 1
+   ? '1 item com nome, quantidade, unidade ou valor em branco — preencha pra salvar.'
+   : incompletos + ' itens com nome, quantidade, unidade ou valor em branco — preencha pra salvar.');
+ } else {
+  _orcAutoSaveStatus('saved', 'Alterações salvas');
+ }
  var f = _fornecedoresArr.find(function(x){ return String(x.id) === String(_editingFornId); });
  var o = f && (f.orcamentos || []).find(function(x){ return String(x.id) === String(id); });
  if (o) {
@@ -2518,6 +2525,13 @@ function _orcAutoSaveItensFlushNow() {
 // item. fornecedor_id ainda precisa ir junto no INSERT porque a coluna
 // continua NOT NULL na tabela (vestigial, ver comentário da migration) —
 // não é lida em lugar nenhum da UI nova, só existe pra satisfazer o schema.
+//
+// Itens incompletos (ver _completo em _orcColetarItens) NÃO são gravados —
+// nome/quantidade/unidade/valor são obrigatórios de verdade no banco
+// (colunas NOT NULL), então uma linha que a usuária ainda não terminou de
+// preencher fica só na tela até completar, sem travar o autosave dos itens
+// que já estão prontos nem ser apagada por engano (segue em `itens` só pra
+// não entrar na lista de remoção por "sumiu").
 async function _orcSalvarItens(orcamentoId, itens) {
  var existentes = await _sb.from('fornecedores_produtos').select('id').eq('orcamento_id', orcamentoId);
  if (existentes.error) return existentes;
@@ -2529,6 +2543,7 @@ async function _orcSalvarItens(orcamentoId, itens) {
  }
  for (var i = 0; i < itens.length; i++) {
   var p = itens[i];
+  if (!p._completo) continue;
   var campos = { orcamento_id: orcamentoId, fornecedor_id: _editingFornId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, status_cotacao: p.status_cotacao || null };
   var res = p.id
    ? await _sb.from('fornecedores_produtos').update(campos).eq('id', p.id)
@@ -2555,14 +2570,14 @@ function _orcColetarItens() {
   // Linha totalmente vazia (usuário adicionou e não preencheu) não entra no
   // payload — só conta linha que o usuário começou a usar.
   if (!nome && !quantidade && !unidade_medida && !valEl.value && !status_cotacao) return;
-  // quantidade/unidade_medida são NOT NULL no banco (default 1/'unidade') —
-  // uma linha parcialmente preenchida (ex.: só o nome, campos deixados em
-  // branco) NÃO pode mandar null pra elas: o INSERT/UPDATE inteiro falha
-  // (erro "Não foi possível concluir a ação") e nenhum item da lista salva,
-  // nem os que já estavam completos. Cai no mesmo padrão-default da coluna
-  // em vez de null, igual o valor que já aparece pré-selecionado quando o
-  // usuário nem chega a mexer nesses campos.
-  itens.push({ id: line.dataset.dbId || null, nome: nome, quantidade: quantidade === '' ? 1 : Number(quantidade), unidade_medida: unidade_medida || 'unidade', valor_unitario: valor_unitario, status_cotacao: status_cotacao, created_at: line.dataset.createdAt || null });
+  // _completo marca se dá pra gravar essa linha agora: nome, quantidade,
+  // unidade e valor são obrigatórios de verdade (nada de presumir um valor
+  // no lugar do que a usuária ainda não preencheu) — status do item fica de
+  // fora da obrigatoriedade porque começa em branco por padrão. Uma linha
+  // incompleta simplesmente NÃO é gravada ainda (ver _orcSalvarItens), sem
+  // travar o salvamento dos itens que já estão completos.
+  var completo = !!(nome && quantidade !== '' && unidade_medida && valEl.value);
+  itens.push({ id: line.dataset.dbId || null, nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario, status_cotacao: status_cotacao, created_at: line.dataset.createdAt || null, _completo: completo });
  });
  return itens;
 }
