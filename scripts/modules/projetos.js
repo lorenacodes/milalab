@@ -961,12 +961,18 @@ function _spProjetoRender(p, idx) {
  // pra não segurar a abertura do painel.
  if (typeof _histCarregar === 'function') _histCarregar('sp-proj-historico', 'projetos', p.id);
 
- // Responsável: se _usuariosCache ainda não tinha carregado quando o dropdown
- // foi montado acima (raro — carrega em segundo plano desde o boot do app,
- // ver app.js), refaz com a lista real assim que chegar. Mesmo padrão
+ // Responsável: se _usuariosCache e/ou o cache de avatares (_avatarCache,
+ // avatar-helpers.js) ainda não tinham carregado quando o dropdown foi
+ // montado acima (raro — os dois carregam em segundo plano desde o boot
+ // do app, ver _dbInit em app.js), refaz assim que chegarem. Mesmo padrão
  // defensivo já usado em obras.js/entregas.js pro form de Responsável.
- if (!(_usuariosCache || []).length && typeof _loadUsuariosCache === 'function') {
-  _loadUsuariosCache().then(function() {
+ var respPrecisaRecarregar = !(_usuariosCache || []).length
+  || (typeof _avatarCache !== 'undefined' && !Object.keys(_avatarCache).length);
+ if (respPrecisaRecarregar) {
+  Promise.all([
+   (typeof _loadUsuariosCache === 'function') ? _loadUsuariosCache() : Promise.resolve(),
+   (typeof _loadAvatarCacheFast === 'function') ? _loadAvatarCacheFast() : Promise.resolve(),
+  ]).then(function() {
    var wrap = document.getElementById('sp-proj-responsavel-dd');
    if (wrap) wrap.innerHTML = _projRespDropdownHTML(_spProjRespSel);
   });

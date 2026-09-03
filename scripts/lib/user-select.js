@@ -8,11 +8,28 @@
 // versão única — os call sites viram uma chamada só, sem duplicar HTML.
 //
 // Reaproveita o que já existe: _userAvatarByName (avatar-helpers.js, foto
-// 20px com fallback de iniciais), _msBtnLabel (multiselect-ui.js, rótulo do
-// botão fechado com nomes de verdade), as mesmas classes .fb-msel-* já
-// usadas por todo multiselect do sistema (Filtro/Cidade/Setor/Produto) —
-// zero CSS novo, só reaproveita o componente visual existente.
+// 20px com fallback de iniciais), as mesmas classes .fb-msel-* já usadas
+// por todo multiselect do sistema (Filtro/Cidade/Setor/Produto) — zero CSS
+// novo, só reaproveita o componente visual existente.
 // ═══════════════════════════════════════════════════════════════════════════
+
+// Rótulo do botão fechado — pedido explícito: depois de selecionar, a
+// foto tem que continuar aparecendo (antes só sobrava o nome puro,
+// _msBtnLabel genérico não tem noção de avatar). Mesmo truncamento de
+// _msBtnLabel (até 2 por extenso + "+N"), só que cada nome vem com o
+// avatar do usuário do lado.
+function _usBtnLabelHTML(selectedUsers, placeholder) {
+ if (!selectedUsers.length) return String(placeholder || 'Selecionar...').replace(/</g, '&lt;');
+ var shown = selectedUsers.slice(0, 2);
+ var extra = selectedUsers.length - shown.length;
+ var chips = shown.map(function(u) {
+  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(u.nome, 18) : '';
+  return '<span style="display:inline-flex;align-items:center;gap:4px;min-width:0;flex-shrink:0">' + avatarHtml
+   + '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + String(u.nome || '').replace(/</g, '&lt;') + '</span></span>';
+ }).join('<span style="color:var(--muted)">,&nbsp;</span>');
+ return '<span style="display:inline-flex;align-items:center;gap:6px;min-width:0;overflow:hidden">' + chips
+  + (extra > 0 ? '<span style="color:var(--muted);flex-shrink:0"> +' + extra + '</span>' : '') + '</span>';
+}
 
 // users: [{value, nome}] — `value` é o que entra no array de selecionados
 // (cada chamador decide se é e-mail ou nome, sem mudar dado/lógica
@@ -23,8 +40,8 @@ function _usMultiDropdownHTML(users, selected, onChangeAttr, placeholder) {
  var lista = (users || []).slice().sort(function(a, b) { return (a.nome || '').localeCompare(b.nome || '', 'pt-BR'); });
  var sel = Array.isArray(selected) ? selected : [];
  var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s) { return (s || '').toLowerCase(); };
- var selNomes = sel.map(function(v) { var u = lista.find(function(x) { return x.value === v; }); return u ? u.nome : v; });
- var btnLabel = (typeof _msBtnLabel === 'function') ? _msBtnLabel(selNomes, placeholder || 'Selecionar...') : (selNomes.join(', ') || (placeholder || 'Selecionar...'));
+ var selectedUsers = sel.map(function(v) { var u = lista.find(function(x) { return x.value === v; }); return u || { value: v, nome: v }; });
+ var btnLabelHtml = _usBtnLabelHTML(selectedUsers, placeholder);
  // Busca sempre presente — pedido explícito, mesmo quando a lista de
  // usuários é pequena (diferente do multiselect genérico, que só mostra
  // busca acima de um limiar de itens).
@@ -42,7 +59,7 @@ function _usMultiDropdownHTML(users, selected, onChangeAttr, placeholder) {
   ? itemsHtml + '<div class="fb-msel-empty-msg" data-search-empty style="display:none;padding:8px;font-size:11px;color:var(--muted)">Nenhum usuário encontrado.</div>'
   : '<div class="fb-msel-empty-msg" style="padding:8px;font-size:11px;color:var(--muted)">Nenhum usuário cadastrado.</div>';
  return '<div class="fb-msel-wrap">'
-  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + String(btnLabel).replace(/</g, '&lt;') + '</button>'
+  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabelHtml + '</button>'
   + '<div class="fb-msel-panel">' + searchHtml + '<div class="fb-msel-list">' + listBodyHtml + '</div></div>'
   + '</div>';
 }
@@ -71,5 +88,5 @@ function _usFilterDOM(inputEl) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _usMultiDropdownHTML, _usFilterDOM };
+ module.exports = { _usMultiDropdownHTML, _usFilterDOM, _usBtnLabelHTML };
 }

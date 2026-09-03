@@ -211,6 +211,18 @@ async function _dbInit() {
   const { error } = await _sb.from('obras').select('id').limit(1);
   _dbOk = !error;
   if (_dbOk) _loadUsuariosCache(); // dispara em segundo plano, não bloqueia o init
+  // Cache de avatares (_avatarCache, avatar-helpers.js) — carregado 1x aqui
+  // pro app inteiro, não por tela. Achado real: cada seleção de usuário que
+  // precisava de foto (Responsável de Projeto/Obra/Entrega/wizard, filtros)
+  // só ganhava avatar de verdade se a tela de ANTES já tivesse chamado
+  // _loadAvatarCacheFast() por conta própria (Gestor de Tarefas/Obra/
+  // Entrega/wizard chamavam; Projetos nunca chamava) — quem abrisse
+  // Projetos direto via um link/refresh via nenhuma dessas telas antes,
+  // via o dropdown de Responsável caindo pro fallback de iniciais pra
+  // TODO mundo, mesmo quem tem foto cadastrada. _loadAvatarCacheFast já é
+  // idempotente (retorna na hora se _avatarCache já tem algo) e é 1 query
+  // só — dispara aqui, 1 vez, junto do resto do boot, sem bloquear nada.
+  if (_dbOk && typeof _loadAvatarCacheFast === 'function') _loadAvatarCacheFast();
  } catch(e) { _dbOk = false; }
  const dot = document.getElementById('db-dot');
  const lbl = document.getElementById('db-label');
