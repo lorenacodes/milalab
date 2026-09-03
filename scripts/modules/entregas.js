@@ -416,7 +416,7 @@ var _entGroupCollapsed = {};
 function _entGroupKeyFor(e, field) {
  if (field === 'status')      return { key: _entBucketLabel[_entBucketFor(e.etapa)], sortKey: ['aguardando','producao','transporte','entregue'].indexOf(_entBucketFor(e.etapa)) };
  if (field === 'etapa')       return { key: e.etapa || '— Sem etapa', sortKey: null };
- if (field === 'cidade')      return { key: _entCidadeUf(e) || '— Sem cidade', sortKey: null };
+ if (field === 'cidade')      return { key: _entCidadeSoNome(e) || '— Sem cidade', sortKey: null };
  if (field === 'estado') {
   var uf = (e.obra && e.obra.estado) || e.estado || '';
   return { key: uf ? uf.toUpperCase() : '— Sem estado', sortKey: null };
