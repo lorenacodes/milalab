@@ -2513,6 +2513,90 @@ function _orcColetarItens() {
  return itens;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   RELATÓRIO DE ORÇAMENTOS — visão consolidada entre fornecedores, filtrável
+   por período (period-picker.js, mesmo componente de Obras/Entregas) e
+   status da cotação. Roda 100% em cima de _fornecedoresArr (já em memória —
+   a lista de Fornecedores é sempre carregada por completo, sem paginação de
+   tela), sem round-trip novo ao banco. Impressão via window.print(), CSS
+   dedicado em styles/main.css (@media print, escopado em #forn-rel-bd). ══ */
+_ppInit('forn-rel', { onChange: _fornRelatorioRender, defaultPreset: 'todas' });
+
+function _fornAbrirRelatorio() {
+ var sel = document.getElementById('forn-rel-status');
+ if (sel) sel.innerHTML = '<option value="">Todos os status</option>' + STATUS_COTACAO_OPCOES.map(function(s){ return '<option>'+s+'</option>'; }).join('');
+ var bd = document.getElementById('forn-rel-bd');
+ if (bd) bd.classList.add('open');
+ _fornRelatorioRender();
+}
+
+function _fornFecharRelatorio() {
+ var bd = document.getElementById('forn-rel-bd');
+ if (bd) bd.classList.remove('open');
+}
+
+// Todos os orçamentos de todos os fornecedores, achatados numa linha só por
+// orçamento (não por item — o relatório é no nível do orçamento inteiro).
+function _fornRelatorioLinhas() {
+ var linhas = [];
+ (_fornecedoresArr || []).forEach(function(f) {
+  (f.orcamentos || []).forEach(function(o) {
+   var resumo = _fornecedorResumoProdutos(o.itens);
+   linhas.push({
+    fornecedorNome: f.nome, titulo: (o.titulo && o.titulo.trim()) || ('Orçamento de ' + (o.created_at ? new Date(o.created_at).toLocaleDateString('pt-BR') : '—')),
+    status_cotacao: o.status_cotacao, valorTotal: resumo.totalGasto, informado_financeiro: o.informado_financeiro,
+    status_pagamento: o.status_pagamento, created_at: o.created_at,
+   });
+  });
+ });
+ return linhas;
+}
+
+function _fornRelatorioRender() {
+ var tbody = document.getElementById('forn-rel-tbody');
+ if (!tbody) return;
+ var periodo = _ppGetState('forn-rel');
+ var statusFiltro = (document.getElementById('forn-rel-status') || {}).value || '';
+ var linhas = _fornRelatorioLinhas().filter(function(l) {
+  if (statusFiltro && l.status_cotacao !== statusFiltro) return false;
+  if (periodo.ini && periodo.fim) {
+   if (!l.created_at) return false;
+   var d = new Date(l.created_at);
+   var fimFull = new Date(periodo.fim); fimFull.setHours(23,59,59,999);
+   if (d < periodo.ini || d > fimFull) return false;
+  }
+  return true;
+ }).sort(function(a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+
+ if (!linhas.length) {
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);font-size:13px">Nenhum orçamento encontrado para esse filtro.</td></tr>';
+ } else {
+  var td = 'padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px';
+  tbody.innerHTML = linhas.map(function(l) {
+   var statusTag = l.status_cotacao ? '<span class="nt-tag ' + (_fornStatusCor[l.status_cotacao]||'nt-tag-gray') + '" style="font-size:11px">' + l.status_cotacao + '</span>' : '—';
+   return '<tr>'
+    + '<td style="' + td + '">' + l.fornecedorNome + '</td>'
+    + '<td style="' + td + '">' + l.titulo + '</td>'
+    + '<td style="' + td + '">' + statusTag + '</td>'
+    + '<td style="' + td + ';text-align:right;font-weight:600">' + _moedaFormatarBRL(l.valorTotal) + '</td>'
+    + '<td style="' + td + '">' + (l.informado_financeiro ? 'Sim' : 'Não') + '</td>'
+    + '<td style="' + td + '">' + (l.status_pagamento || '—') + '</td>'
+    + '</tr>';
+  }).join('');
+ }
+
+ // Cabeçalho só aparece na impressão (na tela o modal já tem título) — o
+ // texto some/aparece de graça porque o container inteiro só é impresso
+ // quando o modal está aberto (ver @media print, styles/main.css).
+ var sub = document.getElementById('forn-rel-print-sub');
+ if (sub) {
+  var periodoTxt = (periodo.ini && periodo.fim)
+   ? periodo.ini.toLocaleDateString('pt-BR') + ' – ' + periodo.fim.toLocaleDateString('pt-BR')
+   : 'Todo o período';
+  sub.textContent = periodoTxt + (statusFiltro ? ' · Status: ' + statusFiltro : '') + ' · ' + linhas.length + ' orçamento' + (linhas.length!==1?'s':'');
+ }
+}
+
 // ── Agrupamento (Agrupar — group-builder.js/group-tree.js) ──────────────────
 // Empresas/Contatos filtram ESCONDENDO/MOSTRANDO <tr> já renderizados no DOM
 // (_empApplyFilters normal, abaixo) — diferente do Gestor de Tarefas, que

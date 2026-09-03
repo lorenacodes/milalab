@@ -1272,6 +1272,24 @@ td{font-size:13px}
  .prop-blist li{padding:2px 0 2px 14px!important}
 }
 
+/* Relatório de Orçamentos (Fornecedores) — mesma estratégia do print acima:
+   #forn-rel-bd é filho direto do body (ver index.html), então escondendo
+   todo o resto de body>* sobra só o modal na folha impressa. Dentro dele,
+   escondemos a barra de filtros/botão de imprimir e viramos a tabela num
+   documento simples — cabeçalho com o período/status filtrado (só existe
+   pra impressão, ver #forn-rel-print-header) some na tela normal (display:
+   none inline no HTML) e aparece aqui. */
+@media print{
+ body>*:not(#forn-rel-bd){display:none!important}
+ #forn-rel-bd{display:block!important;position:static!important;background:none!important;padding:0!important;overflow:visible!important;inset:auto!important}
+ #forn-rel-bd .modal{max-width:100%!important;box-shadow:none!important;border:none!important;margin:0!important}
+ #forn-rel-bd .modal-header,#forn-rel-bd .modal-footer,#forn-rel-toolbar{display:none!important}
+ #forn-rel-bd .modal-body{padding:0!important;overflow:visible!important;max-height:none!important}
+ #forn-rel-print-header{display:block!important}
+ #forn-relatorio-print table{width:100%!important;min-width:0!important}
+ #forn-relatorio-print th,#forn-relatorio-print td{color:#000!important}
+}
+
 /* ── Side Panel ─────────────────────────────────────────────── */
 #sp-overlay{position:fixed;inset:0;z-index:800;background:rgba(0,0,0,.32);opacity:0;pointer-events:none;transition:opacity var(--dur-slow,.22s) var(--ease-standard,ease)}
 #sp-overlay.sp-open{opacity:1;pointer-events:all}
