@@ -1511,7 +1511,7 @@ if (typeof _ccRegistrarLabels === 'function') {
 
 async function _dbLoadFornecedores() {
  var tbody = document.getElementById('forn-tbody');
- if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
+ if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
  if (!_sb) return;
  // Paginação: o PostgREST devolve no máximo 1000 linhas por requisição, e esta
  // consulta não tinha .range() nenhum — hoje passa despercebido (poucos
@@ -1534,7 +1534,7 @@ async function _dbLoadFornecedores() {
    .range(from, from + 999);
   if (res.error) {
    console.error('[Fornecedores] erro ao carregar a lista:', res.error);
-   if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Não foi possível carregar os fornecedores agora. Tente recarregar a página.</td></tr>';
+   if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Não foi possível carregar os fornecedores agora. Tente recarregar a página.</td></tr>';
    return;
   }
   linhas = linhas.concat(res.data || []);
@@ -1605,10 +1605,26 @@ function _fornInitRealtime() {
  // evento no array aninhado (orcamentos[].itens[]), simplesmente recarrega a
  // lista inteira, que já reconstrói a árvore certinha. Suficiente pra manter
  // outras abas/usuários vendo dado atualizado sem complicar o realtime.
+ //
+ // MAS: enquanto o usuário DESTE cliente está com o cadastro de um
+ // fornecedor aberto (editFornecedor/_orcAbrir), esse recarregamento
+ // NÃO pode rodar em cima de um autosave por campo ainda em voo — o autosave
+ // de cada campo espera 700ms de debounce antes de gravar, e um UPDATE
+ // anterior (de outro campo) já dispara este mesmo evento de tempo real
+ // (é eco da própria gravação deste cliente). Como _dbLoadFornecedores
+ // troca _fornecedoresArr inteiro por um array novo buscado do banco, uma
+ // dessas recargas pode terminar DEPOIS do merge local de um campo mais
+ // recente (_orcAutoSaveFlush) e sobrescrever o valor que acabou de ser
+ // digitado com uma leitura tirada antes dele existir — dado que já foi
+ // pro banco corretamente, mas que passa a aparecer como "não salvo" na
+ // tela porque a versão em memória regrediu. Mesmo racional do aviso não
+ // destrutivo em _rtAvisoAlteracaoExterna (realtime-sync.js): não pisar em
+ // cima de uma edição em andamento. Outros clientes (_editingFornId nulo
+ // neles) continuam recebendo o recarregamento normalmente.
  _rtWatchRows('fornecedores_orcamentos', 'fornecedores_orcamentos', {
-  onInsert: function () { _dbLoadFornecedores(); },
-  onUpdate: function () { _dbLoadFornecedores(); },
-  onDelete: function () { _dbLoadFornecedores(); },
+  onInsert: function () { if (!_editingFornId) _dbLoadFornecedores(); },
+  onUpdate: function () { if (!_editingFornId) _dbLoadFornecedores(); },
+  onDelete: function () { if (!_editingFornId) _dbLoadFornecedores(); },
  });
 }
 
@@ -1674,7 +1690,7 @@ function _fornRenderGroupNode(node, path, rowsArr, listaCompleta) {
   var indent = 12 + path.length * 20;
   rowsArr.push(
    '<tr class="' + _gtGroupClass(path.length) + '" onclick="_fornToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="7" style="padding-left:' + indent + 'px">'
+   + '<td colspan="8" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
    + _gtCountBadgeHTML(total, 'fornecedor' + (total !== 1 ? 'es' : ''))
@@ -1744,6 +1760,23 @@ function _fornMensagemWA() {
  var nome = (_currentUser && (_currentUser.firstName || _currentUser.name)) || 'Equipe MilaTec';
  return 'Olá! Aqui é ' + nome + ', da MilaTec. Gostaria de solicitar um orçamento.';
 }
+// Status geral de pagamento do fornecedor, agregando todos os orçamentos
+// dele: "Não se aplica" enquanto nenhum orçamento jamais foi aprovado;
+// depois disso, olha só os APROVADOS — se algum ainda não foi encaminhado
+// ao financeiro, avisa isso primeiro (é o passo mais atrasado do ciclo);
+// senão, todos já informados ao financeiro: "Pago" só quando 100% deles
+// está com status_pagamento "Integralmente pago", senão mostra o estágio
+// mais atrasado entre eles (parcial > não pago).
+function _fornStatusPagamentoGeral(f) {
+ var aprovados = (f.orcamentos || []).filter(function(o){ return o.status_cotacao === 'Aprovado'; });
+ if (!aprovados.length) return { label: 'Não se aplica', cor: 'nt-tag-gray' };
+ var naoInformados = aprovados.filter(function(o){ return !o.informado_financeiro; });
+ if (naoInformados.length) return { label: 'Não encaminhado ao financeiro', cor: 'nt-tag-yellow' };
+ var todosPagos = aprovados.every(function(o){ return o.status_pagamento === 'Integralmente pago'; });
+ if (todosPagos) return { label: 'Pago', cor: 'nt-tag-green' };
+ var algumParcial = aprovados.some(function(o){ return o.status_pagamento === 'Parcialmente pago'; });
+ return algumParcial ? { label: 'Parcialmente pago', cor: 'nt-tag-yellow' } : { label: 'Pagamento pendente', cor: 'nt-tag-red' };
+}
 function _fornRowHTML(f, idx) {
  var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
  var bgColors = ['#004AE8','#2E5FD9','#059669','#d97706','#dc2626'];
@@ -1765,6 +1798,7 @@ function _fornRowHTML(f, idx) {
   + '<td style="font-size:12px;color:var(--muted)">' + (cids.length ? cids.join(', ') : '—') + (f.estado ? ' · ' + f.estado : '') + '</td>'
   + '<td>' + (f.experiencia ? '<span class="nt-tag ' + (_fornExperienciaCor[f.experiencia]||'nt-tag-gray') + '" style="font-size:11px">' + f.experiencia + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
   + '<td>' + _fornProdutosResumoHTML(f) + '</td>'
+  + '<td>' + (function(){ var sp = _fornStatusPagamentoGeral(f); return '<span class="nt-tag ' + sp.cor + '" style="font-size:11px">' + sp.label + '</span>'; })() + '</td>'
   + '<td><div style="display:flex;gap:4px;align-items:center">'
   + waBtn
   + '<button class="nt-open-btn" onclick="editFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Editar</button>'
@@ -1803,7 +1837,7 @@ function _renderFornecedores() {
  if (count) count.textContent = lista.length + ' fornecedor' + (lista.length !== 1 ? 'es' : '');
 
  if (lista.length === 0) {
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">' + (qn ? 'Nenhum fornecedor encontrado para essa busca.' : 'Nenhum fornecedor cadastrado. Use o botão acima para adicionar.') + '</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">' + (qn ? 'Nenhum fornecedor encontrado para essa busca.' : 'Nenhum fornecedor cadastrado. Use o botão acima para adicionar.') + '</td></tr>';
   return;
  }
 
@@ -2042,9 +2076,18 @@ function closeNovoFornecedor() {
  // Se houver autosave pendente (debounce ainda não disparou), salva na hora
  // em vez de descartar a alteração — mesmo padrão de _taskAutoSaveFlushNow.
  _fornAutoSaveFlushNow();
+ // Orçamento aberto por baixo (ver _orcAbrir) também pode ter autosave
+ // pendente — flush antes de fechar tudo, mesma lógica de _orcFechar.
+ if (typeof _orcAutoSaveFlushNow === 'function') _orcAutoSaveFlushNow();
+ if (typeof _orcAutoSaveItensFlushNow === 'function') _orcAutoSaveItensFlushNow();
  document.getElementById('forn-drw').classList.remove('open');
  document.getElementById('forn-drw-bd').classList.remove('open');
  _editingFornId = null;
+ // Enquanto o cadastro estava aberto, o realtime de fornecedores_orcamentos
+ // ficou suspenso (ver _fornInitRealtime) pra não brigar com o autosave em
+ // andamento — agora que fechou, busca uma vez pra pegar qualquer mudança
+ // (própria ou de outro usuário) que tenha ficado represada nesse intervalo.
+ _dbLoadFornecedores();
 }
 
 /* ── AUTO-SAVE (só em modo edição — criação usa o botão "Salvar fornecedor"
