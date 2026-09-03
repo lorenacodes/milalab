@@ -1107,41 +1107,14 @@ function _noProjRenderRespDropdown(idx) {
 // mesma string pras duas coisas, então não serve pra esse caso sem alterar
 // um componente compartilhado (usado também em Fornecedor) só por causa
 // deste formulário. Mesmas classes .fb-msel-* pra ficar visualmente idêntico.
+// Padrão único de seleção de usuário do sistema (_usMultiDropdownHTML,
+// scripts/lib/user-select.js) — value é o e-mail (o que
+// projetos.responsavel grava), nome é o texto exibido/buscado.
 function _noRespDropdownMarkup(idx) {
  var p = _noProjLista[idx];
- var usuarios = _usuariosCache || [];
+ var usuarios = (_usuariosCache || []).map(function(u) { return { value: u.email, nome: u.nome_display || u.email }; });
  var sel = p.responsavelEmails || [];
- var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s){ return (s||'').toLowerCase(); };
- // Rótulo do botão com os nomes de verdade (não "N selecionado(s)") — mesmo
- // helper do _msRenderDropdown genérico (multiselect-ui.js), só que aqui
- // precisa converter e-mail (o que fica gravado) pro nome de exibição antes.
- var selNomes = sel.map(function(email){
-  var u = usuarios.find(function(x){ return x.email === email; });
-  return (u && u.nome_display) || email;
- });
- var btnLabel = (typeof _msBtnLabel === 'function') ? _msBtnLabel(selNomes, 'Selecione o(s) responsável(is)...') : (sel.length ? selNomes.join(', ') : 'Selecione o(s) responsável(is)...');
- // Busca sempre visível quando há pelo menos 1 usuário — mesmo ajuste do
- // _msRenderDropdown genérico (multiselect-ui.js): antes só aparecia acima
- // de um limiar de quantidade, o que fazia sumir com poucos usuários.
- var searchHtml = usuarios.length > 0
-  ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">'
-  : '';
- // Foto/avatar de cada usuário (pedido explícito: padrão em qualquer
- // seleção de usuário do sistema) — _userAvatarByName (avatar-helpers.js)
- // já é o helper compartilhado com Dashboard/Gestor de Tarefas, com
- // fallback pras iniciais quando não há foto.
- var itemsHtml = usuarios.map(function(u) {
-  var label = u.nome_display || u.email;
-  var emailEsc = String(u.email).replace(/"/g,'&quot;');
-  var ck = sel.indexOf(u.email) !== -1 ? ' checked' : '';
-  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(label, 20) : '';
-  return '<label class="fb-msel-item" data-norm="' + normalizar(label) + '"><input type="checkbox" value="' + emailEsc + '"' + ck
-   + ' onchange="_noProjRespToggle(' + idx + ',this.value,this.checked)">' + avatarHtml + '<span>' + label.replace(/</g,'&lt;') + '</span></label>';
- }).join('');
- return '<div class="fb-msel-wrap">'
-  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabel + '</button>'
-  + '<div class="fb-msel-panel">' + searchHtml + '<div class="fb-msel-list">' + (itemsHtml || '<div style="padding:8px;font-size:11px;color:var(--muted)">Nenhum usuário cadastrado</div>') + '</div></div>'
-  + '</div>';
+ return _usMultiDropdownHTML(usuarios, sel, '_noProjRespToggle(' + idx + ',this.value,this.checked)', 'Selecione o(s) responsável(is)...');
 }
 function _noProjRespToggle(idx, email, checked) {
  _noProjLista[idx].responsavelEmails = _msToggle(_noProjLista[idx].responsavelEmails, email, checked);

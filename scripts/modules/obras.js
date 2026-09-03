@@ -3225,29 +3225,14 @@ function _spProjMultiToggle(campo, valor, checked) {
   if (painel) painel.classList.add('open');
  }
 }
+// Padrão único de seleção de usuário do sistema (_usMultiDropdownHTML,
+// scripts/lib/user-select.js) — value é o e-mail (o que _spNovoProj.
+// responsavelEmails guarda), nome é o texto exibido/buscado.
 function _spProjRespDropdownMarkup() {
  var p = _spNovoProj;
- var usuarios = _usuariosCache || [];
+ var usuarios = (_usuariosCache || []).map(function(u) { return { value: u.email, nome: u.nome_display || u.email }; });
  var sel = (p && p.responsavelEmails) || [];
- var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s){ return (s||'').toLowerCase(); };
- var selNomes = sel.map(function(email){
-  var u = usuarios.find(function(x){ return x.email === email; });
-  return (u && u.nome_display) || email;
- });
- var btnLabel = (typeof _msBtnLabel === 'function') ? _msBtnLabel(selNomes, 'Selecione o(s) responsável(is)...') : (sel.length ? selNomes.join(', ') : 'Selecione o(s) responsável(is)...');
- var searchHtml = usuarios.length > 0 ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">' : '';
- var itemsHtml = usuarios.map(function(u) {
-  var label = u.nome_display || u.email;
-  var emailEsc = String(u.email).replace(/"/g,'&quot;');
-  var ck = sel.indexOf(u.email) !== -1 ? ' checked' : '';
-  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(label, 20) : '';
-  return '<label class="fb-msel-item" data-norm="' + normalizar(label) + '"><input type="checkbox" value="' + emailEsc + '"' + ck
-   + ' onchange="_spProjRespToggle(this.value,this.checked)">' + avatarHtml + '<span>' + label.replace(/</g,'&lt;') + '</span></label>';
- }).join('');
- return '<div class="fb-msel-wrap">'
-  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabel + '</button>'
-  + '<div class="fb-msel-panel">' + searchHtml + '<div class="fb-msel-list">' + (itemsHtml || '<div style="padding:8px;font-size:11px;color:var(--muted)">Nenhum usuário cadastrado</div>') + '</div></div>'
-  + '</div>';
+ return _usMultiDropdownHTML(usuarios, sel, '_spProjRespToggle(this.value,this.checked)', 'Selecione o(s) responsável(is)...');
 }
 function _spProjRespToggle(email, checked) {
  if (!_spNovoProj) return;

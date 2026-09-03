@@ -100,35 +100,15 @@ function _npPopularTipo() {
  if (pillsEl) { pillsEl.style.outline = ''; pillsEl.innerHTML = _npTipoPillsHTML(''); }
 }
 
-// Responsável — multi-select com busca, ligado a usuários reais
-// (_respUsuarios, dashboard.js). Pedido explícito: mostrar a FOTO de cada
-// usuário na seleção — _msRenderDropdown genérico (usado pra Produto/
-// Cidade/Tipologia) não tem noção de avatar, então esse dropdown é
-// próprio, reaproveitando o mesmo visual (.fb-msel-*) + _userAvatarHTML
-// (mesmo helper de foto já usado no Gestor de Tarefas).
+// Responsável — multi-select com busca+avatar, padrão único de seleção de
+// usuário do sistema (_usMultiDropdownHTML, scripts/lib/user-select.js).
+// _npResponsavelSel guarda NOMES (não e-mail, diferente dos outros
+// formulários de Responsável) — mantido como estava, só a renderização
+// virou a função compartilhada.
 var _npResponsavelSel = [];
 function _npResponsavelDropdownHTML() {
- var sel = _npResponsavelSel;
- var opcoes = (_respUsuarios || []).slice().sort(function(a,b){ return (a.nome||'').localeCompare(b.nome||''); });
- var btnLabel = _msBtnLabel(sel, 'Selecione o(s) responsável(is)...');
- var searchHtml = opcoes.length > 0
-  ? '<input type="text" class="fb-msel-search" placeholder="Pesquisar..." oninput="_msFiltrarDOM(this)">'
-  : '';
- var normalizar = (typeof _ssNormalize === 'function') ? _ssNormalize : function(s){ return (s||'').toLowerCase(); };
- var itemsHtml = opcoes.map(function(u) {
-  var nome = u.nome || u.email || '';
-  var esc = nome.replace(/"/g, '&quot;');
-  var norm = normalizar(nome);
-  var ck = sel.indexOf(nome) !== -1 ? ' checked' : '';
-  return '<label class="fb-msel-item" data-norm="' + norm + '" style="display:flex;align-items:center;gap:8px">'
-   + '<input type="checkbox" value="' + esc + '"' + ck + ' onchange="_npResponsavelToggle(\'npResp\',this.value,this.checked)">'
-   + _userAvatarHTML(u, 20) + '<span>' + nome + '</span>'
-   + '</label>';
- }).join('');
- return '<div class="fb-msel-wrap">'
-  + '<button type="button" class="fb-msel-btn" onclick="this.nextElementSibling.classList.toggle(\'open\')">' + btnLabel + '</button>'
-  + '<div class="fb-msel-panel">' + searchHtml + '<div class="fb-msel-list">' + itemsHtml + '</div></div>'
-  + '</div>';
+ var opcoes = (_respUsuarios || []).map(function(u) { return { value: u.nome || u.email || '', nome: u.nome || u.email || '' }; });
+ return _usMultiDropdownHTML(opcoes, _npResponsavelSel, "_npResponsavelToggle('npResp',this.value,this.checked)", 'Selecione o(s) responsável(is)...');
 }
 function _npResponsavelToggle(campo, valor, checked) {
  _npResponsavelSel = _msToggle(_npResponsavelSel, valor, checked);
@@ -721,10 +701,18 @@ function _projTipoToggle(t) {
 // nomes selecionados e convertemos de volta pra e-mails só na hora de
 // salvar (_spSaveProjetoFull).
 var _spProjRespSel = [];
+// Padrão único de seleção de usuário do sistema (_usMultiDropdownHTML,
+// scripts/lib/user-select.js) — value é o NOME (não e-mail, mesma
+// convenção já usada por este campo antes: _spProjAtivo.responsavel chega
+// convertido pra string de nomes, ver comentário acima).
+function _projRespDropdownHTML(sel) {
+ var usuarios = (_usuariosCache || []).map(function(u) { var nome = u.nome_display || u.email; return { value: nome, nome: nome }; });
+ return _usMultiDropdownHTML(usuarios, sel, "_projResponsavelToggle('projResp',this.value,this.checked)", 'Selecione o(s) responsável(is)...');
+}
 function _projResponsavelToggle(campo, valor, checked) {
  _spProjRespSel = _msToggle(_spProjRespSel, valor, checked);
  var wrap = document.getElementById('sp-proj-responsavel-dd');
- if (wrap) wrap.innerHTML = _msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _spProjRespSel, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...');
+ if (wrap) wrap.innerHTML = _projRespDropdownHTML(_spProjRespSel);
  if (typeof _noReabrirDropdown === 'function') _noReabrirDropdown('sp-proj-responsavel-dd');
  _projScheduleAutoSave();
 }
@@ -843,7 +831,7 @@ function _spProjetoRender(p, idx) {
    <div class="sp-field"><div class="sp-label">Estado</div><div id="sp-proj-estado" style="padding:6px 0"><span style="font-size:12px;color:var(--muted)">Carregando...</span></div></div>
   </div>
   `}
-  <div class="sp-field"><div class="sp-label">Responsável</div><div id="sp-proj-responsavel-dd" class="no-msel-wide">${_msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _respNomesAtuais, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...')}</div></div>
+  <div class="sp-field"><div class="sp-label">Responsável</div><div id="sp-proj-responsavel-dd" class="no-msel-wide">${_projRespDropdownHTML(_respNomesAtuais)}</div></div>
   <div class="sp-field"><div class="sp-label">Descritivo do projeto</div><textarea class="sp-inp" id="sp-proj-desc" rows="3" oninput="_projScheduleAutoSave()">${(p.descritivo||'')}</textarea></div>
 
   <div class="sp-stitle">Melhorias vinculadas</div>
@@ -980,7 +968,7 @@ function _spProjetoRender(p, idx) {
  if (!(_usuariosCache || []).length && typeof _loadUsuariosCache === 'function') {
   _loadUsuariosCache().then(function() {
    var wrap = document.getElementById('sp-proj-responsavel-dd');
-   if (wrap) wrap.innerHTML = _msRenderDropdown('projResp', (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}), _spProjRespSel, '_projResponsavelToggle', 'Selecione o(s) responsável(is)...');
+   if (wrap) wrap.innerHTML = _projRespDropdownHTML(_spProjRespSel);
   });
  }
 }
@@ -1421,7 +1409,7 @@ var _projFbFields = [
  // clicando), não texto livre — 'cliente' acima continua existindo pra
  // busca combinada empresa+obra, este aqui é o nome da Obra isolado.
  { key: 'obra',    label: 'Obra', type: 'select', options: function(){ return Object.keys(_obraIdMap||{}).map(function(id){ return _obraIdMap[id].nome; }).filter(Boolean).sort(function(a,b){ return a.localeCompare(b); }); } },
- { key: 'resp',    label: 'Responsável',       type: 'multitext', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
+ { key: 'resp',    label: 'Responsável',       type: 'multitext', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); }, userField: true },
  // Pedido explícito: filtros que faltavam na aba Projetos — ver
  // comentário completo em _dbLoadProjetos (data-* de cada um, e por que
  // Fotos da Obra/Pré-Projeto/Projeto executivo/Tarefa ficaram de fora).
@@ -1445,8 +1433,8 @@ var _projFbFields = [
  { key: 'peso',       label: 'Peso Total',                type: 'number' },
  { key: 'updatedat',  label: 'Horário da última alteração', type: 'date' },
  { key: 'createdat',  label: 'Data de criação',           type: 'date' },
- { key: 'atualizadopor', label: 'Alterado por último',    type: 'select', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
- { key: 'criadopor',     label: 'Criado por',             type: 'select', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); } },
+ { key: 'atualizadopor', label: 'Alterado por último',    type: 'select', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); }, userField: true },
+ { key: 'criadopor',     label: 'Criado por',             type: 'select', options: function(){ return (_usuariosCache||[]).map(function(u){return u.nome_display||u.email;}); }, userField: true },
  // Presença (tem/não tem) — mesmo padrão de "campo de presença" de Obras
  // (_OBRAS_PRESENCA_OPS/_obrasPresencaMatchValue, app.js): só "está vazio"
  // (não tem)/"não está vazio" (tem), sem pedir escolher Sim/Não à toa.

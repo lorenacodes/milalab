@@ -2194,10 +2194,14 @@ function _colabReceptSearchFilter(q) {
   list.innerHTML = '<div class="srch-sel-empty">Nenhum colaborador encontrado.</div>';
   return;
  }
+ // Padrão único de seleção de usuário do sistema: avatar ao lado do nome
+ // (_userAvatarByName, avatar-helpers.js), mesmo tamanho (20px) usado em
+ // todo o resto (_usMultiDropdownHTML, filtro-builder.js).
  list.innerHTML = matches.map(function(r){
   var nome = r.nome || r.email;
   var sel = r.email === _colabReceptSelectedEmail ? ' selected' : '';
-  return '<div class="srch-sel-opt' + sel + '" onclick="_colabReceptSelectItem(\'' + r.email.replace(/'/g,'\\\'') + '\',\'' + nome.replace(/'/g,'\\\'') + '\')">' + nome + '</div>';
+  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(nome, 20) : '';
+  return '<div class="srch-sel-opt' + sel + '" style="display:flex;align-items:center;gap:8px" onclick="_colabReceptSelectItem(\'' + r.email.replace(/'/g,'\\\'') + '\',\'' + nome.replace(/'/g,'\\\'') + '\')">' + avatarHtml + '<span style="overflow:hidden;text-overflow:ellipsis">' + nome.replace(/</g,'&lt;') + '</span></div>';
  }).join('');
 }
 function _colabReceptSearchKey(e) {
@@ -2209,7 +2213,11 @@ function _colabReceptSelectItem(email, nome) {
  var valEl = document.getElementById('drw-colab-receptor-val');
  var clrEl = document.getElementById('drw-colab-receptor-clr');
  if (hidEl) hidEl.value = email;
- if (valEl) { valEl.textContent = nome; valEl.classList.remove('placeholder'); }
+ if (valEl) {
+  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(nome, 18) : '';
+  valEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;min-width:0"><span style="flex-shrink:0">' + avatarHtml + '</span><span style="overflow:hidden;text-overflow:ellipsis">' + String(nome).replace(/</g,'&lt;') + '</span></span>';
+  valEl.classList.remove('placeholder');
+ }
  if (clrEl) clrEl.style.display = email ? '' : 'none';
  _colabReceptSearchClose();
 }

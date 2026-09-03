@@ -672,7 +672,7 @@ function _gestorRespOptions() {
 function _gestorPopulateFilters() {
  _fbInit('gestor', [
   { key: 'titulo',      label: 'Tarefa',                type: 'text' },
-  { key: 'responsavel', label: 'Responsável',           type: 'multitext', options: _gestorRespOptions },
+  { key: 'responsavel', label: 'Responsável',           type: 'multitext', options: _gestorRespOptions, userField: true },
   // Status = só o valor real gravado na atividade, nunca sobrescrito.
   // "Atrasada" NÃO é um campo do filtro — é um cálculo do sistema (_gIsLate:
   // prazo vencido + não concluída), sem sentido real de "campo é valor" (o
@@ -693,8 +693,8 @@ function _gestorPopulateFilters() {
   { key: 'data_prazo',  label: 'Prazo',                  type: 'date' },
   { key: 'data_inicio', label: 'Início',                 type: 'date' },
   { key: 'observacoes', label: 'Observações',            type: 'text' },
-  { key: 'atualizado_por', label: 'Último alterado por', type: 'select', options: function(){ return _gestorOptionsFrom(_gestorAtualizadoPorNome); }, getValue: _gestorAtualizadoPorNome },
-  { key: 'criado_por',  label: 'Criada por',             type: 'select', options: function(){ return _gestorOptionsFrom(_gestorCriadoPorNome); }, getValue: _gestorCriadoPorNome },
+  { key: 'atualizado_por', label: 'Último alterado por', type: 'select', options: function(){ return _gestorOptionsFrom(_gestorAtualizadoPorNome); }, getValue: _gestorAtualizadoPorNome, userField: true },
+  { key: 'criado_por',  label: 'Criada por',             type: 'select', options: function(){ return _gestorOptionsFrom(_gestorCriadoPorNome); }, getValue: _gestorCriadoPorNome, userField: true },
   { key: 'created_at',  label: 'Data de criação',        type: 'date' },
  ], _gestorApplyFilters);
 
