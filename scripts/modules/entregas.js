@@ -727,7 +727,7 @@ function _entRenderGroupNode(node, path, rowsArr) {
    + '</span>';
   rowsArr.push(
    '<tr class="' + _gtGroupClass(path.length) + '" onclick="_entToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="10" style="padding-left:' + indent + 'px">'
+   + '<td colspan="11" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + _gtGroupLabelHTML(k, _entGrupoCls)
    + _gtCountBadgeHTML(total, 'entrega' + (total !== 1 ? 's' : ''))
@@ -744,7 +744,7 @@ function _entRenderGrouped(levels) {
  var tree = _gtBuildTree(filtered, levels, _entGroupKeyFor, null, 0);
  var rowsArr = [];
  _entRenderGroupNode(tree, [], rowsArr);
- tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma entrega encontrada.</td></tr>';
+ tbody.innerHTML = rowsArr.length ? rowsArr.join('') : '<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:32px;font-size:13px">Nenhuma entrega encontrada.</td></tr>';
 
  var fbBadge = document.getElementById('fb-badge-entregas');
  var activeConds = _fbInstances.entregas.state.conditions.filter(_fbConditionIsUsable).length;
@@ -1966,7 +1966,11 @@ function _entRowHTML(e) {
  var statusTxt = e.etapa || _entBucketLabel[bucket];
  var obraNome  = (e.obra && e.obra.nome) || '';
  var empNome   = (e.obra && e.obra.empresas_obras && e.obra.empresas_obras[0] && e.obra.empresas_obras[0].empresa && e.obra.empresas_obras[0].empresa.nome) || '';
- var cidadeUf  = _entCidadeUf(e);
+ // Colunas separadas (pedido explícito) — antes "Cidade/UF" era 1 coluna só
+ // com os dois juntos ("Caruaru/PE"), mesma unificação já corrigida no
+ // filtro/agrupamento (_entCidadeSoNome).
+ var cidadeSoNome = _entCidadeSoNome(e);
+ var estadoUf = (e.obra && e.obra.estado) || e.estado || '';
  var ds = _entPseudoDataset(e);
  var attrs = Object.keys(ds).map(function(k) {
   var attrName = k.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -1980,7 +1984,8 @@ function _entRowHTML(e) {
   + ' data-id="' + e.id + '" data-atrasado="' + (atrasado ? '1' : '0') + '"' + attrs + '>'
   + '<td><div style="font-weight:600;font-size:13px">' + (e.nome_entrega || 'Entrega sem nome') + '</div>'
   + '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + (obraNome ? (empNome ? empNome + ' — ' : '') + obraNome : 'Obra não vinculada') + '</div></td>'
-  + '<td style="font-size:12px;color:var(--muted)">' + (cidadeUf || '—') + '</td>'
+  + '<td style="font-size:12px;color:var(--muted)">' + (cidadeSoNome || '—') + '</td>'
+  + '<td style="font-size:12px;color:var(--muted)">' + (estadoUf || '—') + '</td>'
   + _ieCellHTML('entregas', e.id, 'data_faturamento', e.data_faturamento, dataFatDisplay)
   + _ieCellHTML('entregas', e.id, 'transporte', e.transporte, transpDisplay)
   + _ieCellHTML('entregas', e.id, 'quantidade', e.quantidade, e.quantidade != null ? Number(e.quantidade).toLocaleString('pt-BR') : null, 'right')
