@@ -1528,7 +1528,7 @@ async function _dbLoadFornecedores() {
    .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, experiencia, observacoes, updated_at, '
     + 'fornecedores_orcamentos(id, titulo, status_cotacao, informado_financeiro, informado_financeiro_em, valor_encaminhado_financeiro, '
     + 'status_pagamento, forma_pagamento, dados_bancarios, pago_por, observacoes, criado_por, created_at, updated_at, '
-    + 'fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, created_at))')
+    + 'fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, status_cotacao, created_at))')
    .order('nome')
    .order('created_at', { foreignTable: 'fornecedores_orcamentos', ascending: false })
    .range(from, from + 999);
@@ -1554,7 +1554,7 @@ async function _dbLoadFornecedores() {
      forma_pagamento: o.forma_pagamento, dados_bancarios: o.dados_bancarios, pago_por: o.pago_por,
      observacoes: o.observacoes, criado_por: o.criado_por, created_at: o.created_at, updated_at: o.updated_at,
      itens: (o.fornecedores_produtos || []).map(function(p){
-      return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total, created_at: p.created_at };
+      return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total, status_cotacao: p.status_cotacao, created_at: p.created_at };
      }),
     };
    }),
@@ -1951,9 +1951,10 @@ function _orcAddItemLinha(item) {
  line.id = 'orc-item-' + id;
  line.dataset.dbId = item.id || '';
  line.dataset.createdAt = item.created_at || '';
- line.style.cssText = 'display:grid;grid-template-columns:minmax(150px,1fr) 70px 100px 100px 100px 90px 30px;gap:8px;align-items:center;min-width:720px';
+ line.style.cssText = 'display:grid;grid-template-columns:minmax(150px,1fr) 70px 100px 100px 100px 130px 90px 30px;gap:8px;align-items:center;min-width:850px';
  var inputStyle = 'border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text);font-size:13px;outline:none;font-family:inherit;width:100%;box-sizing:border-box';
  var unidadeOpts = UNIDADES_OPCOES.map(function(u){ return '<option' + (item.unidade_medida===u?' selected':'') + '>'+u+'</option>'; }).join('');
+ var statusOpts = STATUS_COTACAO_OPCOES.map(function(s){ return '<option' + (item.status_cotacao===s?' selected':'') + '>'+s+'</option>'; }).join('');
  var dataCadastro = item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : '—';
  line.innerHTML =
   '<input type="text" id="orc-item-nome-' + id + '" placeholder="Ex: Chapa de aço 2mm" value="' + (item.nome||'').replace(/"/g,'&quot;') + '" oninput="_orcAutoSaveItensQueue()" style="' + inputStyle + '">'
@@ -1961,6 +1962,7 @@ function _orcAddItemLinha(item) {
   + '<select id="orc-item-unidade-' + id + '" onchange="_orcAutoSaveItensQueue()" style="' + inputStyle + '"><option value="">Selecione...</option>' + unidadeOpts + '</select>'
   + '<input type="text" id="orc-item-valor-' + id + '" placeholder="0,00" inputmode="numeric" value="' + (item.valor_unitario!=null ? _moedaFormatar(item.valor_unitario) : '') + '" oninput="_orcItemValorInput(' + id + ',this)" style="' + inputStyle + ';text-align:right">'
   + '<div id="orc-item-total-' + id + '" style="font-size:13px;color:var(--text);font-weight:600;text-align:right;padding:7px 4px">' + _moedaFormatarBRL(_fornecedorCalcularValorTotal(item.quantidade||0, item.valor_unitario||0)) + '</div>'
+  + '<select id="orc-item-status-' + id + '" onchange="_orcAutoSaveItensQueue()" title="Status deste item" style="' + inputStyle + '"><option value="">Selecione...</option>' + statusOpts + '</select>'
   + '<div id="orc-item-data-' + id + '" style="font-size:12px;color:var(--muted);text-align:center;padding:7px 4px" title="Data de cadastro do item">' + dataCadastro + '</div>'
   + '<button type="button" onclick="document.getElementById(\'orc-item-' + id + '\').remove();_orcAutoSaveItensQueue()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px" title="Remover">&times;</button>';
  document.getElementById('orc-itens-list').appendChild(line);
@@ -2484,7 +2486,7 @@ async function _orcSalvarItens(orcamentoId, itens) {
  }
  for (var i = 0; i < itens.length; i++) {
   var p = itens[i];
-  var campos = { orcamento_id: orcamentoId, fornecedor_id: _editingFornId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario };
+  var campos = { orcamento_id: orcamentoId, fornecedor_id: _editingFornId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, status_cotacao: p.status_cotacao || null };
   var res = p.id
    ? await _sb.from('fornecedores_produtos').update(campos).eq('id', p.id)
    : await _sb.from('fornecedores_produtos').insert(campos);
@@ -2501,14 +2503,16 @@ function _orcColetarItens() {
   var qtdEl = document.getElementById('orc-item-qtd-' + lid);
   var unidEl = document.getElementById('orc-item-unidade-' + lid);
   var valEl = document.getElementById('orc-item-valor-' + lid);
+  var statusEl = document.getElementById('orc-item-status-' + lid);
   var nome = nomeEl ? nomeEl.value.trim() : '';
   var quantidade = qtdEl ? qtdEl.value : '';
   var unidade_medida = unidEl ? unidEl.value : '';
   var valor_unitario = valEl ? _moedaParaNumero(valEl.value) : 0;
+  var status_cotacao = statusEl ? statusEl.value : '';
   // Linha totalmente vazia (usuário adicionou e não preencheu) não entra no
   // payload — só conta linha que o usuário começou a usar.
-  if (!nome && !quantidade && !unidade_medida && !valEl.value) return;
-  itens.push({ id: line.dataset.dbId || null, nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario, created_at: line.dataset.createdAt || null });
+  if (!nome && !quantidade && !unidade_medida && !valEl.value && !status_cotacao) return;
+  itens.push({ id: line.dataset.dbId || null, nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario, status_cotacao: status_cotacao, created_at: line.dataset.createdAt || null });
  });
  return itens;
 }
