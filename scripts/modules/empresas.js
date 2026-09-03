@@ -1480,12 +1480,15 @@ function switchEmpTab(tab) {
 // cálculo automático de valor total (scripts/lib/fornecedor-validacao.js).
 var _fornecedoresArr = [];
 var _fornBusca       = '';
-var _fornProdutoCount = 0;
 var _editingFornId    = null;
 var _fornCidadesSel   = [];
 var _fornSetoresSel   = [];
 var _fornCidadesDisponiveis = []; // cidades do estado selecionado no momento
 var _fornCidadeCache  = {}; // cache por UF — mesmo padrão de _cidadeCache (wizard-nova-obra.js)
+// Orçamento aberto no modal de detalhe (ver _orcAbrir) — cada fornecedor pode
+// ter vários orçamentos (fornecedores_orcamentos), cada um com seus itens.
+var _editingOrcId = null;
+var _orcItemCount = 0;
 
 // Rótulos de campo pro conflito e pro Histórico (mesmo mapa, ver
 // concurrency.js/historico.js). A tabela `fornecedores` só passou a alimentar
@@ -1508,7 +1511,7 @@ if (typeof _ccRegistrarLabels === 'function') {
 
 async function _dbLoadFornecedores() {
  var tbody = document.getElementById('forn-tbody');
- if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
+ if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Carregando...</td></tr>';
  if (!_sb) return;
  // Paginação: o PostgREST devolve no máximo 1000 linhas por requisição, e esta
  // consulta não tinha .range() nenhum — hoje passa despercebido (poucos
@@ -1516,14 +1519,22 @@ async function _dbLoadFornecedores() {
  // de mostrar o resto, sem erro nenhum. Mesmo laço já usado em Empresas/
  // Contatos/Instalações.
  // updated_at entra no select porque é a coluna da trava otimista (_ccSave).
+ // Cotação/produtos agora vivem em fornecedores_orcamentos (1 fornecedor : N
+ // orçamentos : N itens cada) — não mais um flat fornecedores_produtos direto
+ // no fornecedor, ver migration create_fornecedores_orcamentos.
  var linhas = []; var from = 0; var mais = true;
  while (mais) {
   var res = await _sb.from('fornecedores')
-   .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, experiencia, observacoes, updated_at, fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, status_cotacao, created_at)')
-   .order('nome').range(from, from + 999);
+   .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, experiencia, observacoes, updated_at, '
+    + 'fornecedores_orcamentos(id, titulo, status_cotacao, informado_financeiro, informado_financeiro_em, valor_encaminhado_financeiro, '
+    + 'status_pagamento, forma_pagamento, dados_bancarios, pago_por, observacoes, criado_por, created_at, updated_at, '
+    + 'fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, created_at))')
+   .order('nome')
+   .order('created_at', { foreignTable: 'fornecedores_orcamentos', ascending: false })
+   .range(from, from + 999);
   if (res.error) {
    console.error('[Fornecedores] erro ao carregar a lista:', res.error);
-   if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Não foi possível carregar os fornecedores agora. Tente recarregar a página.</td></tr>';
+   if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--red);font-size:13px">Não foi possível carregar os fornecedores agora. Tente recarregar a página.</td></tr>';
    return;
   }
   linhas = linhas.concat(res.data || []);
@@ -1535,8 +1546,17 @@ async function _dbLoadFornecedores() {
    id: f.id, nome: f.nome, cnpj: f.cnpj, contato: f.contato, telefone: f.telefone, email: f.email,
    endereco: f.endereco, estado: f.estado, cidades: f.cidades || [], setores: f.setores || [],
    experiencia: f.experiencia, observacoes: f.observacoes, updated_at: f.updated_at,
-   produtos: (f.fornecedores_produtos || []).map(function(p){
-    return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total, status_cotacao: p.status_cotacao, created_at: p.created_at };
+   orcamentos: (f.fornecedores_orcamentos || []).map(function(o){
+    return {
+     id: o.id, titulo: o.titulo, status_cotacao: o.status_cotacao,
+     informado_financeiro: !!o.informado_financeiro, informado_financeiro_em: o.informado_financeiro_em,
+     valor_encaminhado_financeiro: o.valor_encaminhado_financeiro, status_pagamento: o.status_pagamento,
+     forma_pagamento: o.forma_pagamento, dados_bancarios: o.dados_bancarios, pago_por: o.pago_por,
+     observacoes: o.observacoes, criado_por: o.criado_por, created_at: o.created_at, updated_at: o.updated_at,
+     itens: (o.fornecedores_produtos || []).map(function(p){
+      return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total, created_at: p.created_at };
+     }),
+    };
    }),
   };
  });
@@ -1560,9 +1580,9 @@ function _fornInitRealtime() {
    if (!nova || !nova.id) return;
    var idx = (_fornecedoresArr || []).findIndex(function (x) { return String(x.id) === String(nova.id); });
    if (idx === -1) return;
-   // `produtos` é sintetizado do join e não vem no payload do postgres_changes
-   // — preservar, senão a lista de produtos do fornecedor sumiria da tela.
-   Object.keys(nova).forEach(function (k) { if (k !== 'produtos') _fornecedoresArr[idx][k] = nova[k]; });
+   // `orcamentos` é sintetizado do join e não vem no payload do postgres_changes
+   // — preservar, senão a lista de orçamentos do fornecedor sumiria da tela.
+   Object.keys(nova).forEach(function (k) { if (k !== 'orcamentos') _fornecedoresArr[idx][k] = nova[k]; });
    _renderFornecedores();
    // Cadastro aberto neste fornecedor: avança o baseline pro merge automático
    // continuar valendo, sem redesenhar o formulário por baixo de quem digita.
@@ -1570,7 +1590,7 @@ function _fornInitRealtime() {
     _ccSetBaseline('fornecedores', nova.id, nova);
    }
   },
-  // Fornecedor novo/excluído precisa do join de produtos pra ficar completo.
+  // Fornecedor novo/excluído precisa do join de orçamentos pra ficar completo.
   onInsert: function () { if (typeof _dbLoadFornecedores === 'function') _dbLoadFornecedores(); },
   onDelete: function (_nova, antiga) {
    var id = antiga && antiga.id;
@@ -1579,6 +1599,16 @@ function _fornInitRealtime() {
    if (i !== -1) _fornecedoresArr.splice(i, 1);
    _renderFornecedores();
   },
+ });
+ // Orçamentos/itens mudam com muito mais frequência que o cadastro do
+ // fornecedor em si (autosave por campo) — em vez de tentar mesclar cada
+ // evento no array aninhado (orcamentos[].itens[]), simplesmente recarrega a
+ // lista inteira, que já reconstrói a árvore certinha. Suficiente pra manter
+ // outras abas/usuários vendo dado atualizado sem complicar o realtime.
+ _rtWatchRows('fornecedores_orcamentos', 'fornecedores_orcamentos', {
+  onInsert: function () { _dbLoadFornecedores(); },
+  onUpdate: function () { _dbLoadFornecedores(); },
+  onDelete: function () { _dbLoadFornecedores(); },
  });
 }
 
@@ -1599,8 +1629,17 @@ var _fornExperienciaCor = { 'Positiva': 'nt-tag-green', 'Negativa': 'nt-tag-red'
 // serem multivalorados (um fornecedor pertence a vários setores/cidades
 // ao mesmo tempo, não dá pra agrupar num balde só sem "espalhar" o
 // mesmo fornecedor em vários grupos — fora do padrão simples usado aqui).
+function _fornStatusDistintos(f) {
+ return Array.from(new Set((f.orcamentos||[]).map(function(o){ return o.status_cotacao; }).filter(Boolean)));
+}
+// Todos os itens de todos os orçamentos do fornecedor, achatados — usado pra
+// contagem/soma agregada (a coluna "Produtos orçados" da listagem não separa
+// por orçamento, só mostra o total).
+function _fornItensTodos(f) {
+ return (f.orcamentos||[]).reduce(function(a, o){ return a.concat(o.itens||[]); }, []);
+}
 function _fornPseudoDataset(f) {
- var statusDistintos = Array.from(new Set((f.produtos||[]).map(function(p){ return p.status_cotacao; }).filter(Boolean)));
+ var statusDistintos = _fornStatusDistintos(f);
  return {
   nome: (f.nome || '').toLowerCase(),
   estado: (f.estado || '').toLowerCase(),
@@ -1608,7 +1647,7 @@ function _fornPseudoDataset(f) {
   setor: (f.setores || []).join(', ').toLowerCase(),
   cidade: (f.cidades || []).join(', ').toLowerCase(),
   status_cotacao: statusDistintos.join(', ').toLowerCase(),
-  produtos_qtd: (f.produtos || []).length,
+  produtos_qtd: _fornItensTodos(f).length,
   atualizado_em: (f.updated_at || '').slice(0, 10),
  };
 }
@@ -1635,7 +1674,7 @@ function _fornRenderGroupNode(node, path, rowsArr, listaCompleta) {
   var indent = 12 + path.length * 20;
   rowsArr.push(
    '<tr class="' + _gtGroupClass(path.length) + '" onclick="_fornToggleGroup(\'' + nodePath.replace(/'/g, "\\'") + '\')">'
-   + '<td colspan="8" style="padding-left:' + indent + 'px">'
+   + '<td colspan="7" style="padding-left:' + indent + 'px">'
    + '<span style="margin-right:4px">' + (isCollapsed ? '▶' : '▼') + '</span>'
    + '<strong>' + k + '</strong>'
    + _gtCountBadgeHTML(total, 'fornecedor' + (total !== 1 ? 'es' : ''))
@@ -1652,7 +1691,7 @@ var _fornFbFields = [
  { key: 'cidade',         label: 'Cidade',         type: 'multitext', options: function(){ return Array.from(new Set(_fornecedoresArr.reduce(function(a,f){ return a.concat(f.cidades||[]); }, []))).sort(); }, getValue: function(f){ return (f.cidades||[]).join(', '); } },
  { key: 'estado',         label: 'Estado',         type: 'select', options: function(){ return Array.from(new Set(_fornecedoresArr.map(function(f){ return f.estado; }).filter(Boolean))).sort(); }, getValue: function(f){ return f.estado || ''; } },
  { key: 'experiencia',    label: 'Experiência',    type: 'select', options: function(){ return EXPERIENCIA_OPCOES; }, getValue: function(f){ return f.experiencia || ''; } },
- { key: 'status_cotacao', label: 'Status cotação', type: 'multitext', options: function(){ return STATUS_COTACAO_OPCOES; }, getValue: function(f){ return Array.from(new Set((f.produtos||[]).map(function(p){ return p.status_cotacao; }).filter(Boolean))).join(', '); } },
+ { key: 'status_cotacao', label: 'Status cotação', type: 'multitext', options: function(){ return STATUS_COTACAO_OPCOES; }, getValue: function(f){ return _fornStatusDistintos(f).join(', '); } },
 ];
 _fbInit('fornecedores', _fornFbFields, _fornApplyFilters);
 
@@ -1699,24 +1738,22 @@ _vwInit('fornecedores', {
 // .map() de _renderFornecedores) pra ser reaproveitada também pelo
 // render agrupado (_fornRenderGroupNode acima), mesmo padrão de
 // _cttRowHTML/_entRowHTML.
+// Mensagem padrão do botão de WhatsApp — pede orientação sobre como cotar,
+// assinada com o primeiro nome de quem está logado.
+function _fornMensagemWA() {
+ var nome = (_currentUser && (_currentUser.firstName || _currentUser.name)) || 'Equipe MilaTec';
+ return 'Olá! Aqui é ' + nome + ', da MilaTec. Gostaria de solicitar um orçamento — poderia me orientar sobre as informações necessárias?';
+}
 function _fornRowHTML(f, idx) {
  var initials = f.nome.trim().split(/\s+/).slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
  var bgColors = ['#004AE8','#2E5FD9','#059669','#d97706','#dc2626'];
  var bg = bgColors[(idx < 0 ? 0 : idx) % bgColors.length];
  var setoresF = f.setores || [];
  var cids = f.cidades || [];
- // status_cotacao agora é por produto — a coluna mostra os valores
- // distintos entre os produtos orçados desse fornecedor (ou "Múltiplos"
- // com tooltip quando há mais de um status diferente).
- var statusDistintos = Array.from(new Set((f.produtos||[]).map(function(p){ return p.status_cotacao; }).filter(Boolean)));
- var statusCell;
- if (!statusDistintos.length) {
-  statusCell = '<span style="color:var(--muted);font-size:12px">—</span>';
- } else if (statusDistintos.length === 1) {
-  statusCell = '<span class="nt-tag ' + (_fornStatusCor[statusDistintos[0]]||'nt-tag-gray') + '" style="font-size:11px">' + statusDistintos[0] + '</span>';
- } else {
-  statusCell = '<span class="nt-tag nt-tag-gray" style="font-size:11px" title="' + statusDistintos.join(', ').replace(/"/g,'&quot;') + '">Múltiplos</span>';
- }
+ var waNum = _sanitizeTelWA(f.telefone);
+ var waBtn = waNum
+  ? '<a href="https://wa.me/' + waNum + '?text=' + encodeURIComponent(_fornMensagemWA()) + '" target="_blank" rel="noopener" class="nt-open-btn" style="font-size:11px;color:#25D366;background:rgba(37,211,102,.1);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:4px" title="Pedir orçamento pelo WhatsApp">' + _icoWA + '</a>'
+  : '';
  return '<tr>'
   + '<td><div class="nt-avatar" style="background:' + bg + ';font-size:10px;width:26px;height:26px;border-radius:6px">' + initials + '</div></td>'
   + '<td><div style="font-weight:600;font-size:13px;color:var(--text)">' + f.nome + '</div>'
@@ -1726,10 +1763,10 @@ function _fornRowHTML(f, idx) {
      ? setoresF.slice(0,2).map(function(s){ return '<span class="nt-tag nt-tag-blue" style="font-size:11px;margin-right:3px">'+s+'</span>'; }).join('') + (setoresF.length>2 ? '<span style="font-size:11px;color:var(--muted)">+'+(setoresF.length-2)+'</span>' : '')
      : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
   + '<td style="font-size:12px;color:var(--muted)">' + (cids.length ? cids.join(', ') : '—') + (f.estado ? ' · ' + f.estado : '') + '</td>'
-  + '<td>' + statusCell + '</td>'
   + '<td>' + (f.experiencia ? '<span class="nt-tag ' + (_fornExperienciaCor[f.experiencia]||'nt-tag-gray') + '" style="font-size:11px">' + f.experiencia + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
   + '<td>' + _fornProdutosResumoHTML(f) + '</td>'
-  + '<td style="display:flex;gap:4px">'
+  + '<td style="display:flex;gap:4px;align-items:center">'
+  + waBtn
   + '<button class="nt-open-btn" onclick="editFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Editar</button>'
   + '<button class="nt-open-btn" onclick="excluirFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--red);background:rgba(207,34,46,.08);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Excluir</button>'
   + '</td>'
@@ -1766,7 +1803,7 @@ function _renderFornecedores() {
  if (count) count.textContent = lista.length + ' fornecedor' + (lista.length !== 1 ? 'es' : '');
 
  if (lista.length === 0) {
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">' + (qn ? 'Nenhum fornecedor encontrado para essa busca.' : 'Nenhum fornecedor cadastrado. Use o botão acima para adicionar.') + '</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted);font-size:13px">' + (qn ? 'Nenhum fornecedor encontrado para essa busca.' : 'Nenhum fornecedor cadastrado. Use o botão acima para adicionar.') + '</td></tr>';
   return;
  }
 
@@ -1785,59 +1822,21 @@ function _renderFornecedores() {
 }
 
 // Resumo agregado (não escala listar produto a produto na linha da tabela —
-// um fornecedor pode ter dezenas/centenas de itens orçados). Detalhes
-// completos só entram sob demanda, ver _fornVerProdutos.
+// um fornecedor pode ter dezenas/centenas de itens, espalhados por vários
+// orçamentos). Detalhes completos (por orçamento) só entram sob demanda, ao
+// abrir o cadastro do fornecedor — ver seção "Orçamentos" em editFornecedor.
 function _fornProdutosResumoHTML(f) {
- var resumo = _fornecedorResumoProdutos(f.produtos);
+ var resumo = _fornecedorResumoProdutos(_fornItensTodos(f));
  if (!resumo.quantidade) return '<span style="color:var(--muted);font-size:12px">Nenhum produto</span>';
- return '<button type="button" class="nt-open-btn" onclick="_fornVerProdutos(\'' + f.id + '\')" '
+ return '<button type="button" class="nt-open-btn" onclick="editFornecedor(\'' + f.id + '\')" '
   + 'style="font-size:11px;color:var(--text);background:var(--surface2);border:none;border-radius:5px;padding:4px 9px;cursor:pointer;font-weight:500;text-align:left;line-height:1.5">'
   + '<div>' + resumo.quantidade + ' produto' + (resumo.quantidade !== 1 ? 's' : '') + ' orçado' + (resumo.quantidade !== 1 ? 's' : '') + '</div>'
   + '<div style="color:var(--muted);font-weight:400">' + _moedaFormatarBRL(resumo.totalGasto) + ' no total</div>'
   + '</button>';
 }
 
-// ── Modal "Ver produtos" — somente leitura, aberto sob demanda a partir do
-// resumo agregado da listagem. Separado do modal de edição (que também
-// mostra os produtos, mas editáveis) pra deixar claro quando a intenção é só
-// consultar. Uma tabela com rolagem própria (max-height) sustenta qualquer
-// quantidade de itens sem esticar o layout da página. ──
-function _fornVerProdutos(id) {
- var f = _fornecedoresArr.find(function(x){ return String(x.id) === String(id); });
- if (!f) return;
- var ttl = document.getElementById('fpv-titulo');
- if (ttl) ttl.textContent = 'Produtos orçados — ' + f.nome;
- var resumo = _fornecedorResumoProdutos(f.produtos);
- var sub = document.getElementById('fpv-subtitulo');
- if (sub) sub.textContent = resumo.quantidade + ' produto' + (resumo.quantidade !== 1 ? 's' : '') + ' · ' + _moedaFormatarBRL(resumo.totalGasto) + ' no total';
- var corpo = document.getElementById('fpv-tbody');
- if (corpo) {
-  corpo.innerHTML = (f.produtos || []).map(function(p) {
-   var dataStr = p.created_at ? new Date(p.created_at).toLocaleDateString('pt-BR') : '—';
-   var statusTag = p.status_cotacao ? '<span class="nt-tag ' + (_fornStatusCor[p.status_cotacao]||'nt-tag-gray') + '" style="font-size:11px">' + p.status_cotacao + '</span>' : '—';
-   var td = 'padding:7px 10px;border-bottom:1px solid var(--border)';
-   return '<tr>'
-    + '<td style="' + td + ';font-size:12px">' + (p.nome||'—') + '</td>'
-    + '<td style="' + td + ';font-size:12px;text-align:right">' + (p.quantidade!=null?p.quantidade:'—') + '</td>'
-    + '<td style="' + td + ';font-size:12px">' + (p.unidade_medida||'—') + '</td>'
-    + '<td style="' + td + ';font-size:12px;text-align:right">' + _moedaFormatarBRL(p.valor_unitario||0) + '</td>'
-    + '<td style="' + td + ';font-size:12px;text-align:right;font-weight:600">' + _moedaFormatarBRL(p.valor_total||0) + '</td>'
-    + '<td style="' + td + '">' + statusTag + '</td>'
-    + '<td style="' + td + ';font-size:12px;color:var(--muted)">' + dataStr + '</td>'
-    + '</tr>';
-  }).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Nenhum produto orçado.</td></tr>';
- }
- var bd = document.getElementById('fpv-bd');
- if (bd) bd.classList.add('open');
-}
-
-function _fornFecharProdutosView() {
- var bd = document.getElementById('fpv-bd');
- if (bd) bd.classList.remove('open');
-}
-
 // ── Selects de opções fixas (experiência — status_cotacao agora é por
-// produto, ver addFornProdutoLinha) ──────────────────────────────────────────
+// orçamento, ver _orcAbrir) ───────────────────────────────────────────────────
 function _fornPreencherSelectsFixos() {
  var ex = document.getElementById('fn-experiencia');
  if (ex) ex.innerHTML = '<option value="">Selecione...</option>' + EXPERIENCIA_OPCOES.map(function(o){ return '<option>'+o+'</option>'; }).join('');
@@ -1923,48 +1922,49 @@ function _fornMultiToggle(campo, valor, checked) {
  _fornAutoSaveQueue(_fornAutoSaveObjFor(campo, atual), true);
 }
 
-// ── Produtos orçados (Produto/Serviço, Quantidade, Unidade, Valor unitário,
-// Valor total calculado automaticamente, Status da cotação POR PRODUTO) ──────
-function _fornProdutoRecalcular(lid) {
- var qtdEl = document.getElementById('fn-prod-qtd-' + lid);
- var valEl = document.getElementById('fn-prod-valor-' + lid);
- var totEl = document.getElementById('fn-prod-total-' + lid);
+// ── Itens do orçamento (Produto/Serviço, Quantidade, Unidade, Valor unitário,
+// Valor total calculado automaticamente) — vivem dentro do modal de detalhe
+// de um ORÇAMENTO (ver _orcAbrir), não mais no cadastro do fornecedor. Status
+// da cotação saiu daqui: agora é um campo único por orçamento inteiro, ver
+// _orcCampoAutoSave('status_cotacao', ...). ──────────────────────────────────
+function _orcItemRecalcular(lid) {
+ var qtdEl = document.getElementById('orc-item-qtd-' + lid);
+ var valEl = document.getElementById('orc-item-valor-' + lid);
+ var totEl = document.getElementById('orc-item-total-' + lid);
  if (!qtdEl || !valEl || !totEl) return;
  var qtd = Number(qtdEl.value) || 0;
  var val = _moedaParaNumero(valEl.value);
  totEl.textContent = _moedaFormatarBRL(_fornecedorCalcularValorTotal(qtd, val));
 }
 
-function _fornProdutoValorInput(lid, inputEl) {
+function _orcItemValorInput(lid, inputEl) {
  inputEl.value = _moedaMascarar(inputEl.value);
- _fornProdutoRecalcular(lid);
- _fornAutoSaveProdutosQueue();
+ _orcItemRecalcular(lid);
+ _orcAutoSaveItensQueue();
 }
 
-function addFornProdutoLinha(produto) {
- produto = produto || {};
- _fornProdutoCount++;
- var id = _fornProdutoCount;
+function _orcAddItemLinha(item) {
+ item = item || {};
+ _orcItemCount++;
+ var id = _orcItemCount;
  var line = document.createElement('div');
- line.id = 'fn-prod-' + id;
- line.dataset.dbId = produto.id || '';
- line.dataset.createdAt = produto.created_at || '';
- line.style.cssText = 'display:grid;grid-template-columns:minmax(150px,1fr) 70px 100px 100px 100px 130px 90px 30px;gap:8px;align-items:center;min-width:800px';
+ line.id = 'orc-item-' + id;
+ line.dataset.dbId = item.id || '';
+ line.dataset.createdAt = item.created_at || '';
+ line.style.cssText = 'display:grid;grid-template-columns:minmax(150px,1fr) 70px 100px 100px 100px 90px 30px;gap:8px;align-items:center;min-width:720px';
  var inputStyle = 'border:1px solid var(--border);border-radius:6px;padding:7px 9px;background:var(--surface);color:var(--text);font-size:13px;outline:none;font-family:inherit;width:100%;box-sizing:border-box';
- var unidadeOpts = UNIDADES_OPCOES.map(function(u){ return '<option' + (produto.unidade_medida===u?' selected':'') + '>'+u+'</option>'; }).join('');
- var statusOpts = STATUS_COTACAO_OPCOES.map(function(s){ return '<option' + (produto.status_cotacao===s?' selected':'') + '>'+s+'</option>'; }).join('');
- var dataCadastro = produto.created_at ? new Date(produto.created_at).toLocaleDateString('pt-BR') : '—';
+ var unidadeOpts = UNIDADES_OPCOES.map(function(u){ return '<option' + (item.unidade_medida===u?' selected':'') + '>'+u+'</option>'; }).join('');
+ var dataCadastro = item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : '—';
  line.innerHTML =
-  '<input type="text" id="fn-prod-nome-' + id + '" placeholder="Ex: Chapa de aço 2mm" value="' + (produto.nome||'').replace(/"/g,'&quot;') + '" oninput="_fornAutoSaveProdutosQueue()" style="' + inputStyle + '">'
-  + '<input type="number" id="fn-prod-qtd-' + id + '" placeholder="0" min="0" step="any" value="' + (produto.quantidade!=null?produto.quantidade:'') + '" oninput="_fornProdutoRecalcular(' + id + ');_fornAutoSaveProdutosQueue()" style="' + inputStyle + ';text-align:right">'
-  + '<select id="fn-prod-unidade-' + id + '" onchange="_fornAutoSaveProdutosQueue()" style="' + inputStyle + '"><option value="">Selecione...</option>' + unidadeOpts + '</select>'
-  + '<input type="text" id="fn-prod-valor-' + id + '" placeholder="0,00" inputmode="numeric" value="' + (produto.valor_unitario!=null ? _moedaFormatar(produto.valor_unitario) : '') + '" oninput="_fornProdutoValorInput(' + id + ',this)" style="' + inputStyle + ';text-align:right">'
-  + '<div id="fn-prod-total-' + id + '" style="font-size:13px;color:var(--text);font-weight:600;text-align:right;padding:7px 4px">' + _moedaFormatarBRL(_fornecedorCalcularValorTotal(produto.quantidade||0, produto.valor_unitario||0)) + '</div>'
-  + '<select id="fn-prod-status-' + id + '" onchange="_fornAutoSaveProdutosQueue()" style="' + inputStyle + '"><option value="">Selecione...</option>' + statusOpts + '</select>'
-  + '<div id="fn-prod-data-' + id + '" style="font-size:12px;color:var(--muted);text-align:center;padding:7px 4px" title="Data de cadastro do orçamento">' + dataCadastro + '</div>'
-  + '<button type="button" onclick="document.getElementById(\'fn-prod-' + id + '\').remove();_fornAutoSaveProdutosQueue()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px" title="Remover">&times;</button>';
- document.getElementById('fn-produtos-list').appendChild(line);
- var cabecalho = document.getElementById('fn-produtos-cabecalho');
+  '<input type="text" id="orc-item-nome-' + id + '" placeholder="Ex: Chapa de aço 2mm" value="' + (item.nome||'').replace(/"/g,'&quot;') + '" oninput="_orcAutoSaveItensQueue()" style="' + inputStyle + '">'
+  + '<input type="number" id="orc-item-qtd-' + id + '" placeholder="0" min="0" step="any" value="' + (item.quantidade!=null?item.quantidade:'') + '" oninput="_orcItemRecalcular(' + id + ');_orcAutoSaveItensQueue()" style="' + inputStyle + ';text-align:right">'
+  + '<select id="orc-item-unidade-' + id + '" onchange="_orcAutoSaveItensQueue()" style="' + inputStyle + '"><option value="">Selecione...</option>' + unidadeOpts + '</select>'
+  + '<input type="text" id="orc-item-valor-' + id + '" placeholder="0,00" inputmode="numeric" value="' + (item.valor_unitario!=null ? _moedaFormatar(item.valor_unitario) : '') + '" oninput="_orcItemValorInput(' + id + ',this)" style="' + inputStyle + ';text-align:right">'
+  + '<div id="orc-item-total-' + id + '" style="font-size:13px;color:var(--text);font-weight:600;text-align:right;padding:7px 4px">' + _moedaFormatarBRL(_fornecedorCalcularValorTotal(item.quantidade||0, item.valor_unitario||0)) + '</div>'
+  + '<div id="orc-item-data-' + id + '" style="font-size:12px;color:var(--muted);text-align:center;padding:7px 4px" title="Data de cadastro do item">' + dataCadastro + '</div>'
+  + '<button type="button" onclick="document.getElementById(\'orc-item-' + id + '\').remove();_orcAutoSaveItensQueue()" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px" title="Remover">&times;</button>';
+ document.getElementById('orc-itens-list').appendChild(line);
+ var cabecalho = document.getElementById('orc-itens-cabecalho');
  if (cabecalho) cabecalho.style.display = 'grid';
  line.querySelector('input[type="text"]').focus();
 }
@@ -1993,7 +1993,6 @@ function _fornDrawerOpenShell(editando) {
 
 function openNovoFornecedor() {
  _editingFornId = null;
- _fornProdutoCount = 0;
  _fornCidadesSel = []; _fornSetoresSel = []; _fornCidadesDisponiveis = [];
  ['fn-nome','fn-cnpj','fn-contato','fn-tel','fn-email','fn-observacoes'].forEach(function(id){
   var el = document.getElementById(id); if (el) el.value = '';
@@ -2004,10 +2003,11 @@ function openNovoFornecedor() {
  _fornRenderCidadesDropdown();
  _fornRenderSetoresDropdown();
  _fornLimparErros();
- document.getElementById('fn-produtos-list').innerHTML = '';
- var cabecalho = document.getElementById('fn-produtos-cabecalho');
- if (cabecalho) cabecalho.style.display = 'none';
- addFornProdutoLinha(); // começa com uma linha vazia
+ // Orçamentos só existem depois que o fornecedor já tem linha no banco —
+ // a seção fica escondida na criação, mesmo espírito do autosave (que também
+ // só liga em modo edição).
+ var orcWrap = document.getElementById('fn-orcamentos-wrap');
+ if (orcWrap) orcWrap.style.display = 'none';
  _fornDrawerOpenShell(false);
 }
 
@@ -2018,7 +2018,6 @@ async function editFornecedor(id) {
  // o cadastro abre. É contra ele que _ccSave compara (ver concurrency.js).
  if (typeof _ccSetBaseline === 'function') _ccSetBaseline('fornecedores', id, f);
  _editingFornId = id;
- _fornProdutoCount = 0;
  _fornCidadesSel = (f.cidades || []).slice();
  _fornSetoresSel = (f.setores || []).slice();
  document.getElementById('fn-nome').value       = f.nome || '';
@@ -2032,11 +2031,7 @@ async function editFornecedor(id) {
  document.getElementById('fn-experiencia').value = f.experiencia || '';
  _fornRenderSetoresDropdown();
  _fornLimparErros();
- document.getElementById('fn-produtos-list').innerHTML = '';
- var cabecalho = document.getElementById('fn-produtos-cabecalho');
- if (cabecalho) cabecalho.style.display = (f.produtos && f.produtos.length) ? 'grid' : 'none';
- (f.produtos || []).forEach(function(p){ addFornProdutoLinha(p); });
- if (!f.produtos || !f.produtos.length) addFornProdutoLinha();
+ _fornRenderOrcamentos(f);
  _fornDrawerOpenShell(true);
  await _fornEstadoChange(f.estado, true); // mantém as cidades já cadastradas ao recarregar a lista do IBGE
 }
@@ -2045,7 +2040,6 @@ function closeNovoFornecedor() {
  // Se houver autosave pendente (debounce ainda não disparou), salva na hora
  // em vez de descartar a alteração — mesmo padrão de _taskAutoSaveFlushNow.
  _fornAutoSaveFlushNow();
- _fornAutoSaveProdutosFlushNow();
  document.getElementById('forn-drw').classList.remove('open');
  document.getElementById('forn-drw-bd').classList.remove('open');
  _editingFornId = null;
@@ -2134,122 +2128,29 @@ function _fornAutoSaveFlushNow() {
  if (_fornAutoSavePending) { clearTimeout(_fornAutoSaveTimer); _fornAutoSaveFlush(); }
 }
 
-// Produtos vivem numa tabela à parte (fornecedores_produtos) — o autosave
-// deles roda separado do autosave dos campos do fornecedor, mas com a mesma
-// UX de debounce + indicador "Salvando…"/"Alterações salvas". Usa o mesmo
-// padrão delete-then-insert do submit manual (produtos não têm PATCH
-// incremental na UI — a lista inteira é substituída a cada alteração).
-var _fornAutoSaveProdutosTimer = null;
-var _fornAutoSaveProdutosPending = false;
-
-function _fornAutoSaveProdutosQueue() {
- if (!_editingFornId) return; // criação: produtos só entram no banco no submit
- _fornAutoSaveProdutosPending = true;
- clearTimeout(_fornAutoSaveProdutosTimer);
- _fornAutoSaveStatus('saving', 'Salvando…');
- _fornAutoSaveProdutosTimer = setTimeout(_fornAutoSaveProdutosFlush, 700);
-}
-
-async function _fornAutoSaveProdutosFlush() {
- if (!_editingFornId || !_fornAutoSaveProdutosPending) return;
- var id = _editingFornId;
- _fornAutoSaveProdutosPending = false;
- var produtos = _fornColetarProdutos();
- var salvarRes = await _fornSalvarProdutos(id, produtos);
- if (salvarRes.error) {
-  if (String(_editingFornId) === String(id)) _fornAutoSaveStatus('error', 'Erro ao salvar produtos: ' + _supaErrPt(salvarRes.error.message));
-  return;
- }
- if (String(_editingFornId) !== String(id)) return;
- _fornAutoSaveStatus('saved', 'Alterações salvas');
- var idx = _fornecedoresArr.findIndex(function(x){ return String(x.id) === String(id); });
- if (idx !== -1) {
-  // valor_total é coluna gerada no banco — recalcula aqui só pra refletir
-  // na tabela instantaneamente, sem precisar de um refetch completo.
-  _fornecedoresArr[idx].produtos = produtos.map(function(p){
-   return Object.assign({}, p, { valor_total: _fornecedorCalcularValorTotal(p.quantidade, p.valor_unitario) });
-  });
- }
- _renderFornecedores();
-}
-
-function _fornAutoSaveProdutosFlushNow() {
- if (_fornAutoSaveProdutosPending) { clearTimeout(_fornAutoSaveProdutosTimer); _fornAutoSaveProdutosFlush(); }
-}
-
 async function excluirFornecedor(id) {
- if (!confirm('Excluir este fornecedor e todos os produtos vinculados a ele?')) return;
+ if (!confirm('Excluir este fornecedor e todos os orçamentos/produtos vinculados a ele?')) return;
  if (!_sb) return;
  var res = await _sb.from('fornecedores').delete().eq('id', id);
  if (res.error) { _showToast('Erro ao excluir fornecedor: ' + _supaErrPt(res.error.message), 'erro'); return; }
  // Se o fornecedor excluído era o que estava aberto no drawer, fecha (sem
  // tentar dar flush de autosave numa linha que não existe mais).
  if (String(_editingFornId) === String(id)) {
-  _fornAutoSavePending = null; _fornAutoSaveProdutosPending = false;
+  _fornAutoSavePending = null;
   document.getElementById('forn-drw').classList.remove('open');
   document.getElementById('forn-drw-bd').classList.remove('open');
   _editingFornId = null;
+  _orcFechar();
  }
  _showToast('Fornecedor excluído.', 'ok');
  _dbLoadFornecedores();
-}
-
-// Grava produtos por diff (update por id existente / insert pro que é novo /
-// delete pro que sumiu da lista) em vez de delete-then-insert — preserva o
-// created_at original de cada produto (pedido: "data de cadastro de cada
-// orçamento"), que um delete+insert resetaria a cada autosave.
-async function _fornSalvarProdutos(fornecedorId, produtos) {
- var existentes = await _sb.from('fornecedores_produtos').select('id').eq('fornecedor_id', fornecedorId);
- if (existentes.error) return existentes;
- var idsAtuais = produtos.filter(function(p){ return p.id; }).map(function(p){ return p.id; });
- var idsRemover = (existentes.data || []).map(function(r){ return r.id; }).filter(function(rid){ return idsAtuais.indexOf(rid) === -1; });
- if (idsRemover.length) {
-  var delRes = await _sb.from('fornecedores_produtos').delete().in('id', idsRemover);
-  if (delRes.error) return delRes;
- }
- for (var i = 0; i < produtos.length; i++) {
-  var p = produtos[i];
-  var campos = { fornecedor_id: fornecedorId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, status_cotacao: p.status_cotacao || null };
-  var res = p.id
-   ? await _sb.from('fornecedores_produtos').update(campos).eq('id', p.id)
-   : await _sb.from('fornecedores_produtos').insert(campos);
-  if (res.error) return res;
- }
- return { error: null };
-}
-
-function _fornColetarProdutos() {
- var produtos = [];
- document.querySelectorAll('#fn-produtos-list > [id^="fn-prod-"]').forEach(function(line) {
-  var lid = line.id.replace('fn-prod-', '');
-  var nomeEl = document.getElementById('fn-prod-nome-' + lid);
-  var qtdEl = document.getElementById('fn-prod-qtd-' + lid);
-  var unidEl = document.getElementById('fn-prod-unidade-' + lid);
-  var valEl = document.getElementById('fn-prod-valor-' + lid);
-  var statusEl = document.getElementById('fn-prod-status-' + lid);
-  var nome = nomeEl ? nomeEl.value.trim() : '';
-  var quantidade = qtdEl ? qtdEl.value : '';
-  var unidade_medida = unidEl ? unidEl.value : '';
-  var valor_unitario = valEl ? _moedaParaNumero(valEl.value) : 0;
-  var status_cotacao = statusEl ? statusEl.value : '';
-  // Linha totalmente vazia (usuário adicionou e não preencheu) não entra na
-  // validação nem no payload — só conta linha que o usuário começou a usar.
-  if (!nome && !quantidade && !unidade_medida && !valEl.value && !status_cotacao) return;
-  produtos.push({ id: line.dataset.dbId || null, nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario, status_cotacao: status_cotacao, created_at: line.dataset.createdAt || null });
- });
- return produtos;
 }
 
 function _fornMostrarErros(erros) {
  _fornLimparErros();
  Object.keys(erros).forEach(function(campo) {
   var el = document.getElementById('fn-erro-' + campo);
-  if (el) { el.textContent = erros[campo]; return; }
-  // Erros de linha de produto (produtos.N.campo) — mostra no bloco geral de produtos.
-  if (campo.indexOf('produtos.') === 0) {
-   var geral = document.getElementById('fn-erro-produtos');
-   if (geral) geral.textContent = geral.textContent ? geral.textContent : erros[campo];
-  }
+  if (el) el.textContent = erros[campo];
  });
 }
 
@@ -2262,13 +2163,16 @@ async function submitNovoFornecedor() {
 async function _submitNovoFornecedorReal() {
  if (!_sb) { _showToast('Sem conexão com o banco.', 'erro'); return; }
 
+ // O cadastro do fornecedor não carrega mais orçamento/produto nenhum — isso
+ // agora é criado à parte, depois que o fornecedor já existe (seção
+ // "Orçamentos", ver _fornNovoOrcamento), então _fornecedorValidar não pede
+ // mais produtos aqui.
  var dados = {
   nome: (document.getElementById('fn-nome').value || '').trim(),
   estado: document.getElementById('fn-estado').value || '',
   cidades: _fornCidadesSel,
   setores: _fornSetoresSel,
   experiencia: document.getElementById('fn-experiencia').value || '',
-  produtos: _fornColetarProdutos(),
  };
 
  var validacao = _fornecedorValidar(dados);
@@ -2318,20 +2222,295 @@ async function _submitNovoFornecedorReal() {
   if (typeof _ccSetBaseline === 'function') _ccSetBaseline('fornecedores', fornecedorId, ins.data);
  }
 
- // Grava produtos por diff (update/insert/delete) em vez de substituir tudo —
- // preserva o created_at original de cada produto já existente. valor_total
- // NUNCA é enviado — é coluna gerada pelo próprio Postgres (quantidade *
- // valor_unitario), garantindo que nunca fica inconsistente.
- var salvarProdRes = await _fornSalvarProdutos(fornecedorId, dados.produtos);
- if (salvarProdRes.error) {
-  console.error('[Fornecedores] erro ao gravar produtos:', salvarProdRes.error);
-  _showToast('Os dados do fornecedor foram salvos, mas a lista de produtos não. Reabra o cadastro e confira os produtos.', 'erro');
-  closeNovoFornecedor(); _dbLoadFornecedores(); return;
- }
-
  _showToast('Fornecedor salvo com sucesso!', 'ok');
  closeNovoFornecedor();
  _dbLoadFornecedores();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ORÇAMENTOS (fornecedores_orcamentos) — 1 fornecedor pode ter vários
+   orçamentos ao longo do tempo, cada um com seus próprios itens
+   (fornecedores_produtos.orcamento_id) e seu próprio ciclo de vida: status da
+   cotação → aprovado → informado ao financeiro → dados de pagamento.
+   Seção "Orçamentos" (cards) vive dentro do cadastro do fornecedor
+   (editFornecedor); o detalhe de CADA orçamento abre num modal à parte
+   (repurposed do antigo "Ver produtos" — ver #fpv-bd no index.html), com
+   autosave por campo no mesmo padrão de _fornAutoSaveQueue/_ccSave. ══════ */
+
+var _ORCAMENTO_CAMPO_LABEL = {
+ titulo: 'Título', status_cotacao: 'Status da cotação', informado_financeiro: 'Informado ao financeiro',
+ valor_encaminhado_financeiro: 'Valor encaminhado ao financeiro', status_pagamento: 'Status do pagamento',
+ forma_pagamento: 'Forma de pagamento', dados_bancarios: 'Dados bancários', pago_por: 'Pago por',
+ observacoes: 'Observações', criado_por: null,
+};
+if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('fornecedores_orcamentos', _ORCAMENTO_CAMPO_LABEL);
+
+function _fornRenderOrcamentos(f) {
+ var wrap = document.getElementById('fn-orcamentos-wrap');
+ var list = document.getElementById('fn-orcamentos-list');
+ if (!wrap || !list) return;
+ wrap.style.display = '';
+ var orcs = f.orcamentos || [];
+ if (!orcs.length) {
+  list.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0 10px">Nenhum orçamento cadastrado ainda.</div>';
+  return;
+ }
+ list.innerHTML = orcs.map(function(o){ return _fornOrcCardHTML(o); }).join('');
+}
+
+function _fornOrcCardHTML(o) {
+ var titulo = (o.titulo && o.titulo.trim()) || ('Orçamento de ' + (o.created_at ? new Date(o.created_at).toLocaleDateString('pt-BR') : '—'));
+ var resumo = _fornecedorResumoProdutos(o.itens);
+ var statusTag = o.status_cotacao
+  ? '<span class="nt-tag ' + (_fornStatusCor[o.status_cotacao]||'nt-tag-gray') + '" style="font-size:11px">' + o.status_cotacao + '</span>'
+  : '<span class="nt-tag nt-tag-gray" style="font-size:11px">Sem status</span>';
+ return '<button type="button" onclick="_orcAbrir(\'' + o.id + '\')" '
+  + 'style="display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;background:var(--surface);cursor:pointer;font-family:inherit">'
+  + '<span>'
+  + '<div style="font-weight:600;font-size:13px;color:var(--text)">' + titulo + '</div>'
+  + '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + resumo.quantidade + ' item' + (resumo.quantidade!==1?'s':'') + ' · ' + _moedaFormatarBRL(resumo.totalGasto) + ' · Informado ao financeiro: ' + (o.informado_financeiro?'Sim':'Não') + '</div>'
+  + '</span>'
+  + statusTag
+  + '</button>';
+}
+
+function _fornNovoOrcamento() {
+ if (!_editingFornId || !_sb) return;
+ var payload = { fornecedor_id: _editingFornId, criado_por: (_currentUser && _currentUser.email) || null };
+ _sb.from('fornecedores_orcamentos').insert(payload).select('*').single().then(function(res) {
+  if (res.error) { _showToast('Não foi possível criar o orçamento: ' + _supaErrPt(res.error.message), 'erro'); return; }
+  var d = res.data;
+  var novo = {
+   id: d.id, titulo: d.titulo, status_cotacao: d.status_cotacao,
+   informado_financeiro: !!d.informado_financeiro, informado_financeiro_em: d.informado_financeiro_em,
+   valor_encaminhado_financeiro: d.valor_encaminhado_financeiro, status_pagamento: d.status_pagamento,
+   forma_pagamento: d.forma_pagamento, dados_bancarios: d.dados_bancarios, pago_por: d.pago_por,
+   observacoes: d.observacoes, criado_por: d.criado_por, created_at: d.created_at, updated_at: d.updated_at,
+   itens: [],
+  };
+  var f = _fornecedoresArr.find(function(x){ return String(x.id) === String(_editingFornId); });
+  if (f) { f.orcamentos = f.orcamentos || []; f.orcamentos.unshift(novo); _fornRenderOrcamentos(f); }
+  _orcAbrir(novo.id);
+ });
+}
+
+// ── Modal de detalhe de um orçamento (repurposed #fpv-bd) ───────────────────
+function _orcAbrir(id) {
+ var f = _fornecedoresArr.find(function(x){ return String(x.id) === String(_editingFornId); });
+ var o = f && (f.orcamentos || []).find(function(x){ return String(x.id) === String(id); });
+ if (!o) return;
+ _editingOrcId = id;
+ if (typeof _ccSetBaseline === 'function') _ccSetBaseline('fornecedores_orcamentos', id, o);
+
+ var ttl = document.getElementById('fpv-titulo');
+ if (ttl) ttl.textContent = f.nome;
+ var tituloInput = document.getElementById('orc-titulo');
+ if (tituloInput) tituloInput.value = o.titulo || '';
+ var statusSel = document.getElementById('orc-status-cotacao');
+ if (statusSel) {
+  statusSel.innerHTML = '<option value="">Selecione...</option>' + STATUS_COTACAO_OPCOES.map(function(s){ return '<option' + (o.status_cotacao===s?' selected':'') + '>'+s+'</option>'; }).join('');
+ }
+ var infFin = document.getElementById('orc-informado-financeiro');
+ if (infFin) infFin.checked = !!o.informado_financeiro;
+ var valorEl = document.getElementById('orc-valor-financeiro');
+ if (valorEl) valorEl.value = o.valor_encaminhado_financeiro != null ? _moedaFormatar(o.valor_encaminhado_financeiro) : '';
+ var statusPagSel = document.getElementById('orc-status-pagamento');
+ if (statusPagSel) {
+  statusPagSel.innerHTML = '<option value="">Selecione...</option>' + STATUS_PAGAMENTO_OPCOES.map(function(s){ return '<option' + (o.status_pagamento===s?' selected':'') + '>'+s+'</option>'; }).join('');
+ }
+ var formaSel = document.getElementById('orc-forma-pagamento');
+ if (formaSel) {
+  formaSel.innerHTML = '<option value="">Selecione...</option>' + FORMA_PAGAMENTO_OPCOES.map(function(s){ return '<option' + (o.forma_pagamento===s?' selected':'') + '>'+s+'</option>'; }).join('');
+ }
+ var pagoPorSel = document.getElementById('orc-pago-por');
+ if (pagoPorSel) pagoPorSel.innerHTML = '<option value="">Selecione...</option>' + ['Mila','MilaTec'].map(function(s){ return '<option' + (o.pago_por===s?' selected':'') + '>'+s+'</option>'; }).join('');
+ var bancariosEl = document.getElementById('orc-dados-bancarios');
+ if (bancariosEl) bancariosEl.value = o.dados_bancarios || '';
+
+ _orcAtualizarVisibilidadeFinanceiro();
+
+ _orcItemCount = 0;
+ var lista = document.getElementById('orc-itens-list');
+ if (lista) lista.innerHTML = '';
+ var cabecalho = document.getElementById('orc-itens-cabecalho');
+ if (cabecalho) cabecalho.style.display = (o.itens && o.itens.length) ? 'grid' : 'none';
+ (o.itens || []).forEach(function(item){ _orcAddItemLinha(item); });
+
+ var status = document.getElementById('fpv-status');
+ if (status) status.textContent = '';
+ var bd = document.getElementById('fpv-bd');
+ if (bd) bd.classList.add('open');
+}
+
+// Mostra os campos financeiros só quando faz sentido: informado_financeiro
+// só aparece com status "Aprovado"; os campos de pagamento só aparecem
+// quando "Informado ao financeiro" está ligado.
+function _orcAtualizarVisibilidadeFinanceiro() {
+ var status = document.getElementById('orc-status-cotacao');
+ var aprovado = status && status.value === 'Aprovado';
+ var blocoInfFin = document.getElementById('orc-bloco-informado-financeiro');
+ if (blocoInfFin) blocoInfFin.style.display = aprovado ? '' : 'none';
+ var infFin = document.getElementById('orc-informado-financeiro');
+ var mostrarPagamento = aprovado && infFin && infFin.checked;
+ var blocoPag = document.getElementById('orc-bloco-pagamento');
+ if (blocoPag) blocoPag.style.display = mostrarPagamento ? '' : 'none';
+}
+
+function _orcFechar() {
+ _orcAutoSaveFlushNow();
+ _orcAutoSaveItensFlushNow();
+ var bd = document.getElementById('fpv-bd');
+ if (bd) bd.classList.remove('open');
+ _editingOrcId = null;
+}
+
+// ── Autosave dos campos do orçamento — mesmíssimo padrão de
+// _fornAutoSaveQueue/_fornAutoSaveFlush, só que na tabela fornecedores_orcamentos. ──
+var _orcAutoSavePending = null;
+var _orcAutoSaveTimer = null;
+
+function _orcAutoSaveStatus(state, msg) {
+ var el = document.getElementById('fpv-status');
+ if (!el) return;
+ el.className = 'task-drw-savestatus' + (state ? ' ' + state : '');
+ el.textContent = msg || '';
+}
+
+function _orcCampoAutoSave(campo, valor, immediate) {
+ if (typeof valor === 'string') valor = valor.trim() || null;
+ if (!_editingOrcId) return;
+ _orcAutoSavePending = Object.assign(_orcAutoSavePending || {}, (function(){ var p = {}; p[campo] = valor; return p; })());
+ clearTimeout(_orcAutoSaveTimer);
+ _orcAutoSaveStatus('saving', 'Salvando…');
+ _orcAutoSaveTimer = setTimeout(_orcAutoSaveFlush, immediate ? 120 : 700);
+}
+
+// Ligar/desligar "Status da cotação" ou "Informado ao financeiro" muda quais
+// campos aparecem na hora — sem esperar o autosave voltar do banco.
+function _orcStatusChange(valor) {
+ _orcAtualizarVisibilidadeFinanceiro();
+ _orcCampoAutoSave('status_cotacao', valor, true);
+}
+function _orcInformadoFinanceiroChange(checked) {
+ _orcAtualizarVisibilidadeFinanceiro();
+ _orcCampoAutoSave('informado_financeiro', checked, true);
+ if (checked) _orcCampoAutoSave('informado_financeiro_em', new Date().toISOString(), true);
+}
+function _orcValorFinanceiroInput(inputEl) {
+ inputEl.value = _moedaMascarar(inputEl.value);
+ _orcCampoAutoSave('valor_encaminhado_financeiro', _moedaParaNumero(inputEl.value));
+}
+
+async function _orcAutoSaveFlush() {
+ if (!_editingOrcId || !_orcAutoSavePending) return;
+ var id = _editingOrcId, patch = _orcAutoSavePending;
+ _orcAutoSavePending = null;
+ var r = await _ccSave('fornecedores_orcamentos', id, patch);
+ if (String(_editingOrcId) !== String(id)) return;
+ if (r.semMudanca) { _orcAutoSaveStatus('saved', 'Alterações salvas'); return; }
+ if (r.excluido) { _orcAutoSaveStatus('error', 'Este orçamento foi excluído por outro usuário.'); return; }
+ if (r.erro) {
+  console.error('[auto-save orçamento]', r.erro);
+  _orcAutoSaveStatus('error', 'Não foi possível salvar. Sua alteração continua na tela.');
+  return;
+ }
+ if (r.conflito) { _orcAutoSaveStatus('error', _ccMsgConflito('fornecedores_orcamentos', r.campos)); return; }
+ _orcAutoSaveStatus('saved', 'Alterações salvas');
+ var f = _fornecedoresArr.find(function(x){ return String(x.id) === String(_editingFornId); });
+ var o = f && (f.orcamentos || []).find(function(x){ return String(x.id) === String(id); });
+ if (o) Object.assign(o, r.row || patch);
+ if (f) _fornRenderOrcamentos(f);
+ _renderFornecedores();
+}
+
+function _orcAutoSaveFlushNow() {
+ if (_orcAutoSavePending) { clearTimeout(_orcAutoSaveTimer); _orcAutoSaveFlush(); }
+}
+
+// ── Autosave dos itens do orçamento (fornecedores_produtos.orcamento_id) —
+// mesmo padrão de diff (update/insert/delete) do antigo _fornSalvarProdutos,
+// agora agrupado por orcamento_id em vez de fornecedor_id. ──────────────────
+var _orcAutoSaveItensTimer = null;
+var _orcAutoSaveItensPending = false;
+
+function _orcAutoSaveItensQueue() {
+ if (!_editingOrcId) return;
+ _orcAutoSaveItensPending = true;
+ clearTimeout(_orcAutoSaveItensTimer);
+ _orcAutoSaveStatus('saving', 'Salvando…');
+ _orcAutoSaveItensTimer = setTimeout(_orcAutoSaveItensFlush, 700);
+}
+
+async function _orcAutoSaveItensFlush() {
+ if (!_editingOrcId || !_orcAutoSaveItensPending) return;
+ var id = _editingOrcId;
+ _orcAutoSaveItensPending = false;
+ var itens = _orcColetarItens();
+ var salvarRes = await _orcSalvarItens(id, itens);
+ if (salvarRes.error) {
+  if (String(_editingOrcId) === String(id)) _orcAutoSaveStatus('error', 'Erro ao salvar itens: ' + _supaErrPt(salvarRes.error.message));
+  return;
+ }
+ if (String(_editingOrcId) !== String(id)) return;
+ _orcAutoSaveStatus('saved', 'Alterações salvas');
+ var f = _fornecedoresArr.find(function(x){ return String(x.id) === String(_editingFornId); });
+ var o = f && (f.orcamentos || []).find(function(x){ return String(x.id) === String(id); });
+ if (o) {
+  // valor_total é coluna gerada no banco — recalcula aqui só pra refletir na
+  // tela instantaneamente, sem precisar de um refetch completo.
+  o.itens = itens.map(function(p){ return Object.assign({}, p, { valor_total: _fornecedorCalcularValorTotal(p.quantidade, p.valor_unitario) }); });
+ }
+ if (f) _fornRenderOrcamentos(f);
+ _renderFornecedores();
+}
+
+function _orcAutoSaveItensFlushNow() {
+ if (_orcAutoSaveItensPending) { clearTimeout(_orcAutoSaveItensTimer); _orcAutoSaveItensFlush(); }
+}
+
+// Grava itens por diff (update por id existente / insert pro que é novo /
+// delete pro que sumiu da lista) — preserva o created_at original de cada
+// item. fornecedor_id ainda precisa ir junto no INSERT porque a coluna
+// continua NOT NULL na tabela (vestigial, ver comentário da migration) —
+// não é lida em lugar nenhum da UI nova, só existe pra satisfazer o schema.
+async function _orcSalvarItens(orcamentoId, itens) {
+ var existentes = await _sb.from('fornecedores_produtos').select('id').eq('orcamento_id', orcamentoId);
+ if (existentes.error) return existentes;
+ var idsAtuais = itens.filter(function(p){ return p.id; }).map(function(p){ return p.id; });
+ var idsRemover = (existentes.data || []).map(function(r){ return r.id; }).filter(function(rid){ return idsAtuais.indexOf(rid) === -1; });
+ if (idsRemover.length) {
+  var delRes = await _sb.from('fornecedores_produtos').delete().in('id', idsRemover);
+  if (delRes.error) return delRes;
+ }
+ for (var i = 0; i < itens.length; i++) {
+  var p = itens[i];
+  var campos = { orcamento_id: orcamentoId, fornecedor_id: _editingFornId, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario };
+  var res = p.id
+   ? await _sb.from('fornecedores_produtos').update(campos).eq('id', p.id)
+   : await _sb.from('fornecedores_produtos').insert(campos);
+  if (res.error) return res;
+ }
+ return { error: null };
+}
+
+function _orcColetarItens() {
+ var itens = [];
+ document.querySelectorAll('#orc-itens-list > [id^="orc-item-"]').forEach(function(line) {
+  var lid = line.id.replace('orc-item-', '');
+  var nomeEl = document.getElementById('orc-item-nome-' + lid);
+  var qtdEl = document.getElementById('orc-item-qtd-' + lid);
+  var unidEl = document.getElementById('orc-item-unidade-' + lid);
+  var valEl = document.getElementById('orc-item-valor-' + lid);
+  var nome = nomeEl ? nomeEl.value.trim() : '';
+  var quantidade = qtdEl ? qtdEl.value : '';
+  var unidade_medida = unidEl ? unidEl.value : '';
+  var valor_unitario = valEl ? _moedaParaNumero(valEl.value) : 0;
+  // Linha totalmente vazia (usuário adicionou e não preencheu) não entra no
+  // payload — só conta linha que o usuário começou a usar.
+  if (!nome && !quantidade && !unidade_medida && !valEl.value) return;
+  itens.push({ id: line.dataset.dbId || null, nome: nome, quantidade: quantidade === '' ? null : Number(quantidade), unidade_medida: unidade_medida, valor_unitario: valor_unitario, created_at: line.dataset.createdAt || null });
+ });
+ return itens;
 }
 
 // ── Agrupamento (Agrupar — group-builder.js/group-tree.js) ──────────────────

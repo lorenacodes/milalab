@@ -4,6 +4,9 @@
 // em português, claras sobre QUAL campo falhou e o quê fazer.
 // ═══════════════════════════════════════════════════════════════════════════
 
+// item de orçamento (fornecedores_produtos, agora ligado a um orçamento via
+// orcamento_id) — status_cotacao SAIU daqui: hoje é campo do orçamento
+// inteiro (fornecedores_orcamentos.status_cotacao), não mais por item.
 function _fornecedorValidarProduto(p, index) {
  var erros = {};
  var prefixo = 'produtos.' + index + '.';
@@ -17,14 +20,13 @@ function _fornecedorValidarProduto(p, index) {
  if (!p || p.valor_unitario === '' || p.valor_unitario == null || isNaN(valor) || valor < 0) {
   erros[prefixo + 'valor_unitario'] = 'Informe o valor unitário na linha ' + (index + 1) + '.';
  }
- // status_cotacao agora é por produto (fornecedores_produtos.status_cotacao),
- // não mais um campo único do fornecedor.
- if (!p || !(p.status_cotacao || '').toString().trim()) erros[prefixo + 'status_cotacao'] = 'Selecione o status da cotação na linha ' + (index + 1) + '.';
  return erros;
 }
 
-// dados: { nome, estado, cidades, setores, experiencia,
-//          produtos: [{nome, quantidade, unidade_medida, valor_unitario, status_cotacao}] }
+// dados: { nome, estado, cidades, setores, experiencia } — o cadastro de
+// fornecedor não carrega mais produtos/orçamento nenhum (isso agora vive em
+// fornecedores_orcamentos, criado/editado à parte depois do fornecedor já
+// existir, ver "Orçamentos" no cadastro).
 function _fornecedorValidar(dados) {
  dados = dados || {};
  var erros = {};
@@ -35,14 +37,6 @@ function _fornecedorValidar(dados) {
  if (!Array.isArray(dados.cidades) || dados.cidades.length === 0) erros.cidades = 'Selecione ao menos uma cidade.';
 
  if (!Array.isArray(dados.setores) || dados.setores.length === 0) erros.setores = 'Selecione ao menos um setor.';
-
- if (!Array.isArray(dados.produtos) || dados.produtos.length === 0) {
-  erros.produtos = 'Adicione ao menos um produto/serviço orçado.';
- } else {
-  dados.produtos.forEach(function(p, i) {
-   Object.assign(erros, _fornecedorValidarProduto(p, i));
-  });
- }
 
  if (!(dados.experiencia || '').toString().trim()) erros.experiencia = 'Selecione a experiência com o fornecedor.';
 

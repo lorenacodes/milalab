@@ -10,7 +10,6 @@ function dadosValidos() {
   cidades: ['Aracaju'],
   setores: ['Materiais e Insumos'],
   experiencia: 'Positiva',
-  produtos: [{ nome: 'Perfil metálico', quantidade: 10, unidade_medida: 'metro linear', valor_unitario: 25.5, status_cotacao: 'Em análise' }],
  };
 }
 
@@ -49,18 +48,11 @@ test('_fornecedorValidar: experiência é obrigatória', () => {
  assert.ok(r.erros.experiencia);
 });
 
-test('_fornecedorValidarProduto: status_cotacao é obrigatório por produto', () => {
- var erros = _fornecedorValidarProduto({ nome: 'X', quantidade: 1, unidade_medida: 'kg', valor_unitario: 10, status_cotacao: '' }, 0);
- assert.ok(erros['produtos.0.status_cotacao']);
- var ok = _fornecedorValidarProduto({ nome: 'X', quantidade: 1, unidade_medida: 'kg', valor_unitario: 10, status_cotacao: 'Aprovado' }, 0);
- assert.equal(ok['produtos.0.status_cotacao'], undefined);
-});
-
-test('_fornecedorValidar: precisa de ao menos um produto orçado', () => {
- var d = dadosValidos(); d.produtos = [];
- var r = _fornecedorValidar(d);
- assert.equal(r.valido, false);
- assert.ok(r.erros.produtos);
+test('_fornecedorValidarProduto: nome é obrigatório na linha', () => {
+ var erros = _fornecedorValidarProduto({ nome: '', quantidade: 1, unidade_medida: 'kg', valor_unitario: 10 }, 0);
+ assert.ok(erros['produtos.0.nome']);
+ var ok = _fornecedorValidarProduto({ nome: 'X', quantidade: 1, unidade_medida: 'kg', valor_unitario: 10 }, 0);
+ assert.equal(ok['produtos.0.nome'], undefined);
 });
 
 test('_fornecedorValidarProduto: quantidade deve ser > 0', () => {
@@ -75,16 +67,11 @@ test('_fornecedorValidarProduto: valor_unitario negativo é inválido, mas zero 
  assert.ok(comNegativo['produtos.0.valor_unitario']);
 });
 
-test('_fornecedorValidar: aponta a linha certa quando há vários produtos', () => {
- var d = dadosValidos();
- d.produtos = [
-  { nome: 'OK', quantidade: 1, unidade_medida: 'kg', valor_unitario: 5 },
-  { nome: '', quantidade: 1, unidade_medida: 'kg', valor_unitario: 5 },
- ];
- var r = _fornecedorValidar(d);
- assert.equal(r.valido, false);
- assert.ok(r.erros['produtos.1.nome']);
- assert.equal(r.erros['produtos.0.nome'], undefined);
+test('_fornecedorValidarProduto: aponta a linha certa quando há vários itens', () => {
+ var e0 = _fornecedorValidarProduto({ nome: 'OK', quantidade: 1, unidade_medida: 'kg', valor_unitario: 5 }, 0);
+ var e1 = _fornecedorValidarProduto({ nome: '', quantidade: 1, unidade_medida: 'kg', valor_unitario: 5 }, 1);
+ assert.equal(e0['produtos.0.nome'], undefined);
+ assert.ok(e1['produtos.1.nome']);
 });
 
 test('_fornecedorCalcularValorTotal: quantidade × valor unitário', () => {

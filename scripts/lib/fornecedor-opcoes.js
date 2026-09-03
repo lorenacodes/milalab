@@ -32,6 +32,14 @@ var STATUS_COTACAO_OPCOES = ['Em análise', 'Aprovado', 'Recusado', 'Aguardando 
 
 var EXPERIENCIA_OPCOES = ['Positiva', 'Negativa'];
 
+// Forma de pagamento do orçamento aprovado — vocabulário fechado no app (a
+// coluna fornecedores_orcamentos.forma_pagamento é texto livre no banco).
+var FORMA_PAGAMENTO_OPCOES = ['PIX', 'Boleto', 'Transferência bancária', 'Depósito', 'Cartão', 'Dinheiro', 'Outro'];
+
+// Status de pagamento do orçamento — este É um CHECK constraint no banco
+// (fornecedores_orcamentos.status_pagamento), mantido aqui em sincronia.
+var STATUS_PAGAMENTO_OPCOES = ['Não pago', 'Parcialmente pago', 'Integralmente pago'];
+
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { SETORES_OPCOES, UNIDADES_OPCOES, STATUS_COTACAO_OPCOES, EXPERIENCIA_OPCOES };
+ module.exports = { SETORES_OPCOES, UNIDADES_OPCOES, STATUS_COTACAO_OPCOES, EXPERIENCIA_OPCOES, FORMA_PAGAMENTO_OPCOES, STATUS_PAGAMENTO_OPCOES };
 }
