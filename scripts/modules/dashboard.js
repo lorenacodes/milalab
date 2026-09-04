@@ -511,18 +511,21 @@ async function _colabReqBuscar(filtroFn) {
  return filtroFn ? res.data.filter(filtroFn) : res.data;
 }
 
-/* Cria uma solicitação de colaboração (task drawer → Comunicação) */
+/* Cria uma solicitação de colaboração por colaborador selecionado (task
+   drawer → Comunicação) — colaboracao_solicitacoes é 1 linha por
+   destinatário (status/histórico próprios de cada um), então pedir a
+   colaboração de várias pessoas de uma vez é só um INSERT por pessoa,
+   sem precisar mudar o schema. */
 async function _drwColabReqEnviar() {
- var receptorSel = document.getElementById('drw-colab-receptor');
  var motivoSel   = document.getElementById('drw-colab-motivo');
  var msgEl       = document.getElementById('drw-colab-msg');
  var prazoEl     = document.getElementById('drw-colab-prazo');
  var subtaskSel  = document.getElementById('drw-colab-subtask');
- if (!receptorSel || !receptorSel.value) { _showToast('Selecione um colaborador', 'erro'); return; }
+ if (!_colabReceptSel.length) { _showToast('Selecione pelo menos um colaborador', 'erro'); return; }
  if (!motivoSel || !motivoSel.value)     { _showToast('Selecione o motivo da colaboração', 'erro'); return; }
  if (!_currentUser) { _showToast('Usuário não identificado', 'erro'); return; }
- var receptor = _respUsuarios.find(function(r){ return r.email === receptorSel.value; });
- if (!receptor) { _showToast('Colaborador inválido', 'erro'); return; }
+ var receptores = _colabReceptSel.map(function(email){ return _colabReceptLista.find(function(r){ return r.email === email; }); }).filter(Boolean);
+ if (!receptores.length) { _showToast('Colaborador(es) inválido(s)', 'erro'); return; }
  if (!window._drwCurrentTask) { _showToast('Salve a atividade antes de solicitar colaboração', 'erro'); return; }
  var task = window._drwCurrentTask;
  var now = new Date().toISOString();
@@ -530,27 +533,33 @@ async function _drwColabReqEnviar() {
  // atividade toda quando nada é selecionado no <select> (opção "Nenhuma").
  var subtaskId  = (subtaskSel && subtaskSel.value) ? subtaskSel.value : null;
  var subtaskItem = subtaskId ? _drwSubItems.find(function(s){ return String(s._id) === String(subtaskId); }) : null;
- var payload = {
+ var basePayload = {
   atividade_id:       String(task.id),
   atividade_titulo:   task.titulo || task.nome || 'Atividade',
   subtask_id:         subtaskItem ? String(subtaskItem._id) : null,
   subtask_titulo:     subtaskItem ? (subtaskItem.titulo || null) : null,
   solicitante_email:  _currentUser.email || '',
   solicitante_nome:   _currentUser.name || _currentUser.email || '',
-  receptor_email:     receptor.email,
-  receptor_nome:      receptor.nome || receptor.email,
   motivo:             motivoSel.value,
   mensagem:           (msgEl ? msgEl.value.trim() : '') || null,
   prazo:              (prazoEl && prazoEl.value) ? prazoEl.value : null,
   status:             'Pendente',
-  historico:          [{ status: 'Pendente', por: _currentUser.email || '', em: now, label: 'Solicitação criada' }],
  };
- var ins = await _sb.from('colaboracao_solicitacoes').insert(payload);
+ var payloads = receptores.map(function(receptor){
+  return Object.assign({}, basePayload, {
+   receptor_email: receptor.email,
+   receptor_nome:  receptor.nome || receptor.email,
+   historico:      [{ status: 'Pendente', por: _currentUser.email || '', em: now, label: 'Solicitação criada' }],
+  });
+ });
+ var ins = await _sb.from('colaboracao_solicitacoes').insert(payloads);
  if (ins.error) { _showToast('Erro ao solicitar colaboração: ' + _supaErrPt(ins.error.message), 'erro'); return; }
  _drwColabReqCancel();
  _drwColabReqRender(task.id);
- _histLogAdd('colab', payload.atividade_titulo, 'Colaboração solicitada para ' + payload.receptor_nome + ' — ' + payload.motivo + (payload.subtask_titulo ? ' (subtarefa: ' + payload.subtask_titulo + ')' : ''));
- _showToast('Colaboração solicitada para ' + payload.receptor_nome, 'ok');
+ var nomes = receptores.map(function(r){ return r.nome || r.email; });
+ var listaNomes = nomes.length > 1 ? nomes.slice(0,-1).join(', ') + ' e ' + nomes[nomes.length-1] : nomes[0];
+ _histLogAdd('colab', basePayload.atividade_titulo, 'Colaboração solicitada para ' + listaNomes + ' — ' + basePayload.motivo + (basePayload.subtask_titulo ? ' (subtarefa: ' + basePayload.subtask_titulo + ')' : ''));
+ _showToast('Colaboração solicitada para ' + listaNomes, 'ok');
 }
 
 /* Renderiza a lista de solicitações de colaboração dentro do drawer */
@@ -687,10 +696,10 @@ function _drwColabReqToggleForm() {
  var isOpen = form.classList.contains('open');
  if (isOpen) { form.classList.remove('open'); return; }
  form.classList.add('open');
- // Preencher lista de receptores do searchable-select (mesmo padrão do Projeto)
+ // Preencher lista de receptores do multi-select (mesmo padrão do Projeto)
  var meEmail = (_currentUser && _currentUser.email) || '';
  _colabReceptLista = (_respUsuarios || []).filter(function(r){ return r.email !== meEmail; });
- _colabReceptClear();
+ _colabReceptClear(); // zera seleção + já renderiza o dropdown vazio
  var motivo = document.getElementById('drw-colab-motivo');
  if (motivo) motivo.value = '';
  var prazo = document.getElementById('drw-colab-prazo');
@@ -2154,81 +2163,31 @@ function _projSetDisabled(disabled) {
  if (disabled) _projSearchClose();
 }
 
-/* ── Searchable-select do campo "Colaborador" (Colaboração formal) ──
-   Mesmo padrão do Projeto/Obra acima — converte o antigo <select> simples
-   (sem busca, difícil de usar com a lista de usuários crescendo) mantendo o
-   mesmo contrato: .value do #drw-colab-receptor (agora um <input type=hidden>)
-   continua sendo o e-mail do colaborador, lido por _drwColabReqEnviar(). */
+/* ── Campo "Colaborador(es)" (Colaboração formal) — multi-select ──
+   Pedido explícito: dá pra solicitar mais de um colaborador de uma vez
+   numa mesma atividade/subtarefa. Era um searchable-select de escolha
+   única; agora usa o padrão único de seleção de usuário do sistema
+   (_usMultiDropdownHTML, scripts/lib/user-select.js — mesmo componente já
+   usado em Responsável de Projeto/Obra/Entrega). _colabReceptSel guarda
+   e-mails selecionados; _drwColabReqEnviar cria uma solicitação por
+   colaborador (colaboracao_solicitacoes já é 1 linha por destinatário,
+   então múltiplos colaboradores = múltiplos INSERTs, sem mudança de schema). */
 var _colabReceptLista = []; // [{email, nome}] — preenchida em _drwColabReqToggleForm()
-var _colabReceptSelectedEmail = '';
-var _colabReceptSearchQ = '';
+var _colabReceptSel = []; // e-mails selecionados
 
-function _colabReceptSearchToggle() {
- var drop = document.getElementById('drw-colab-receptor-drop');
- var box  = document.getElementById('drw-colab-receptor-box');
- if (!drop) return;
- var isOpen = drop.classList.contains('open');
- if (isOpen) { _colabReceptSearchClose(); return; }
- drop.classList.add('open');
- if (box) box.classList.add('open');
- var inp = document.getElementById('drw-colab-receptor-inp');
- if (inp) { inp.value = ''; inp.focus(); }
- _colabReceptSearchFilter('');
- _srchSelPositionEl(drop, box);
+function _colabReceptDropdownHTML() {
+ var opcoes = _colabReceptLista.map(function(r){ return { value: r.email, nome: r.nome || r.email }; });
+ return _usMultiDropdownHTML(opcoes, _colabReceptSel, "_colabReceptToggle(this.value,this.checked)", 'Selecione o(s) colaborador(es)...');
 }
-function _colabReceptSearchClose() {
- var drop = document.getElementById('drw-colab-receptor-drop');
- var box  = document.getElementById('drw-colab-receptor-box');
- if (drop) drop.classList.remove('open');
- if (box)  box.classList.remove('open');
-}
-function _colabReceptSearchFilter(q) {
- _colabReceptSearchQ = (q || '').toLowerCase();
- var list = document.getElementById('drw-colab-receptor-list');
- if (!list) return;
- var matches = _colabReceptLista.filter(function(r){
-  return (r.nome || r.email || '').toLowerCase().indexOf(_colabReceptSearchQ) !== -1
-   || (r.email || '').toLowerCase().indexOf(_colabReceptSearchQ) !== -1;
- });
- if (!matches.length) {
-  list.innerHTML = '<div class="srch-sel-empty">Nenhum colaborador encontrado.</div>';
-  return;
- }
- // Padrão único de seleção de usuário do sistema: avatar ao lado do nome
- // (_userAvatarByName, avatar-helpers.js), mesmo tamanho (20px) usado em
- // todo o resto (_usMultiDropdownHTML, filtro-builder.js).
- list.innerHTML = matches.map(function(r){
-  var nome = r.nome || r.email;
-  var sel = r.email === _colabReceptSelectedEmail ? ' selected' : '';
-  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(nome, 20) : '';
-  return '<div class="srch-sel-opt' + sel + '" style="display:flex;align-items:center;gap:8px" onclick="_colabReceptSelectItem(\'' + r.email.replace(/'/g,'\\\'') + '\',\'' + nome.replace(/'/g,'\\\'') + '\')">' + avatarHtml + '<span style="overflow:hidden;text-overflow:ellipsis">' + nome.replace(/</g,'&lt;') + '</span></div>';
- }).join('');
-}
-function _colabReceptSearchKey(e) {
- if (e.key === 'Escape') _colabReceptSearchClose();
-}
-function _colabReceptSelectItem(email, nome) {
- _colabReceptSelectedEmail = email;
- var hidEl = document.getElementById('drw-colab-receptor');
- var valEl = document.getElementById('drw-colab-receptor-val');
- var clrEl = document.getElementById('drw-colab-receptor-clr');
- if (hidEl) hidEl.value = email;
- if (valEl) {
-  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(nome, 18) : '';
-  valEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;min-width:0"><span style="flex-shrink:0">' + avatarHtml + '</span><span style="overflow:hidden;text-overflow:ellipsis">' + String(nome).replace(/</g,'&lt;') + '</span></span>';
-  valEl.classList.remove('placeholder');
- }
- if (clrEl) clrEl.style.display = email ? '' : 'none';
- _colabReceptSearchClose();
+function _colabReceptToggle(valor, checked) {
+ _colabReceptSel = _msToggle(_colabReceptSel, valor, checked);
+ var wrap = document.getElementById('drw-colab-receptor-wrap');
+ if (wrap) wrap.innerHTML = _colabReceptDropdownHTML();
 }
 function _colabReceptClear() {
- _colabReceptSelectedEmail = '';
- var hidEl = document.getElementById('drw-colab-receptor');
- var valEl = document.getElementById('drw-colab-receptor-val');
- var clrEl = document.getElementById('drw-colab-receptor-clr');
- if (hidEl) hidEl.value = '';
- if (valEl) { valEl.textContent = 'Selecione o colaborador...'; valEl.classList.add('placeholder'); }
- if (clrEl) clrEl.style.display = 'none';
+ _colabReceptSel = [];
+ var wrap = document.getElementById('drw-colab-receptor-wrap');
+ if (wrap) wrap.innerHTML = _colabReceptDropdownHTML();
 }
 
 /* ── Toggle de seções colapsáveis no drawer ── */

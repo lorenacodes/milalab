@@ -3016,7 +3016,7 @@
 <script src="scripts/modules/instalacoes.js?v=mldsv416"></script>
 <script src="scripts/modules/empresas.js?v=mldsv416"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv398"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv418"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv419"></script>
 <script src="scripts/modules/melhorias.js?v=mldsv345"></script>
 <script src="scripts/modules/automacoes.js?v=mldsv363"></script>
 <script src="scripts/modules/admin.js?v=mldsv345"></script>
@@ -3292,19 +3292,8 @@
       <div style="font-size:11px;font-weight:700;color:var(--text);padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:2px">Nova solicitação de colaboração</div>
 
       <div>
-       <label class="tf-lbl">Colaborador <span class="tf-req">*</span></label>
-       <input type="hidden" id="drw-colab-receptor" value="">
-       <div class="srch-sel" id="drw-colab-receptor-srch">
-        <div class="srch-sel-box" id="drw-colab-receptor-box" onclick="_colabReceptSearchToggle()">
-         <span class="srch-sel-val placeholder" id="drw-colab-receptor-val">Selecione o colaborador...</span>
-         <button class="srch-sel-clr" id="drw-colab-receptor-clr" style="display:none" onclick="event.stopPropagation();_colabReceptClear()" title="Remover">✕</button>
-         <span class="srch-sel-chevron">▾</span>
-        </div>
-        <div class="srch-sel-drop" id="drw-colab-receptor-drop">
-         <input class="srch-sel-inp" id="drw-colab-receptor-inp" type="text" placeholder="Buscar colaborador..." oninput="_colabReceptSearchFilter(this.value)" onkeydown="_colabReceptSearchKey(event)">
-         <div class="srch-sel-list" id="drw-colab-receptor-list"></div>
-        </div>
-       </div>
+       <label class="tf-lbl">Colaborador(es) <span class="tf-req">*</span></label>
+       <div id="drw-colab-receptor-wrap"></div>
       </div>
 
       <div>
