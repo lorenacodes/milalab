@@ -3016,7 +3016,7 @@
 <script src="scripts/modules/instalacoes.js?v=mldsv416"></script>
 <script src="scripts/modules/empresas.js?v=mldsv416"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv398"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv419"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv420"></script>
 <script src="scripts/modules/melhorias.js?v=mldsv345"></script>
 <script src="scripts/modules/automacoes.js?v=mldsv363"></script>
 <script src="scripts/modules/admin.js?v=mldsv345"></script>
@@ -3289,11 +3289,17 @@
 
      <!-- Formulário de solicitação formal -->
      <div id="drw-colab-form" class="colab-form-panel">
-      <div style="font-size:11px;font-weight:700;color:var(--text);padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:2px">Nova solicitação de colaboração</div>
+      <div id="drw-colab-form-ttl" style="font-size:11px;font-weight:700;color:var(--text);padding-bottom:6px;border-bottom:1px solid var(--border);margin-bottom:2px">Nova solicitação de colaboração</div>
 
-      <div>
+      <div id="drw-colab-receptor-field">
        <label class="tf-lbl">Colaborador(es) <span class="tf-req">*</span></label>
        <div id="drw-colab-receptor-wrap"></div>
+      </div>
+      <!-- Editando: o colaborador desta solicitação não muda (isso seria
+           reatribuir pra outra pessoa, não editar) — só mostra quem é. -->
+      <div id="drw-colab-receptor-fixo" style="display:none">
+       <label class="tf-lbl">Colaborador</label>
+       <div id="drw-colab-receptor-fixo-val" style="font-size:12px;color:var(--text);padding:7px 0;display:flex;align-items:center;gap:6px"></div>
       </div>
 
       <div>
@@ -3333,7 +3339,7 @@
 
       <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">
        <button onclick="_drwColabReqCancel()" style="font-size:11px;padding:6px 14px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--muted);font-family:inherit">Cancelar</button>
-       <button onclick="_drwColabReqEnviar()" style="font-size:11px;padding:6px 16px;background:var(--navy);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-family:inherit">Enviar solicitação</button>
+       <button id="drw-colab-form-submit-btn" onclick="_drwColabReqEnviar()" style="font-size:11px;padding:6px 16px;background:var(--navy);color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:700;font-family:inherit">Enviar solicitação</button>
       </div>
      </div>
 

@@ -517,6 +517,7 @@ async function _colabReqBuscar(filtroFn) {
    colaboração de várias pessoas de uma vez é só um INSERT por pessoa,
    sem precisar mudar o schema. */
 async function _drwColabReqEnviar() {
+ if (_colabEditingId) { await _drwColabReqSalvarEdicao(_colabEditingId); return; }
  var motivoSel   = document.getElementById('drw-colab-motivo');
  var msgEl       = document.getElementById('drw-colab-msg');
  var prazoEl     = document.getElementById('drw-colab-prazo');
@@ -560,6 +561,42 @@ async function _drwColabReqEnviar() {
  var listaNomes = nomes.length > 1 ? nomes.slice(0,-1).join(', ') + ' e ' + nomes[nomes.length-1] : nomes[0];
  _histLogAdd('colab', basePayload.atividade_titulo, 'Colaboração solicitada para ' + listaNomes + ' — ' + basePayload.motivo + (basePayload.subtask_titulo ? ' (subtarefa: ' + basePayload.subtask_titulo + ')' : ''));
  _showToast('Colaboração solicitada para ' + listaNomes, 'ok');
+}
+
+/* Salva as alterações de uma solicitação já existente (chamada por
+ * _drwColabReqEnviar quando _colabEditingId está setado, ver
+ * _drwColabReqEditar). Só motivo/prazo/mensagem/subtarefa mudam — o
+ * colaborador da solicitação não é reatribuível por aqui (ver comentário
+ * de _drwColabReqEditar). Registra a edição no histórico da própria
+ * solicitação, mesmo padrão de auditoria já usado nas mudanças de status. */
+async function _drwColabReqSalvarEdicao(reqId) {
+ var motivoSel  = document.getElementById('drw-colab-motivo');
+ var msgEl      = document.getElementById('drw-colab-msg');
+ var prazoEl    = document.getElementById('drw-colab-prazo');
+ var subtaskSel = document.getElementById('drw-colab-subtask');
+ if (!motivoSel || !motivoSel.value) { _showToast('Selecione o motivo da colaboração', 'erro'); return; }
+ if (!_sb || !_currentUser) { _showToast('Usuário não identificado', 'erro'); return; }
+
+ var atual = await _sb.from('colaboracao_solicitacoes').select('historico,atividade_titulo,receptor_nome').eq('id', reqId).maybeSingle();
+ if (atual.error || !atual.data) { _showToast('Solicitação não encontrada', 'erro'); return; }
+
+ var subtaskId   = (subtaskSel && subtaskSel.value) ? subtaskSel.value : null;
+ var subtaskItem = subtaskId ? _drwSubItems.find(function(s){ return String(s._id) === String(subtaskId); }) : null;
+ var novoHistorico = (atual.data.historico || []).concat([{ status: atual.data.status, por: _currentUser.email || '', em: new Date().toISOString(), label: 'Solicitação editada' }]);
+ var patch = {
+  motivo:          motivoSel.value,
+  mensagem:        (msgEl ? msgEl.value.trim() : '') || null,
+  prazo:           (prazoEl && prazoEl.value) ? prazoEl.value : null,
+  subtask_id:      subtaskItem ? String(subtaskItem._id) : null,
+  subtask_titulo:  subtaskItem ? (subtaskItem.titulo || null) : null,
+  historico:       novoHistorico,
+ };
+ var upd = await _sb.from('colaboracao_solicitacoes').update(patch).eq('id', reqId);
+ if (upd.error) { _showToast('Erro ao salvar alterações: ' + _supaErrPt(upd.error.message), 'erro'); return; }
+ _drwColabReqCancel();
+ if (window._drwCurrentTask) _drwColabReqRender(window._drwCurrentTask.id);
+ _histLogAdd('colab', atual.data.atividade_titulo, 'Colaboração com ' + (atual.data.receptor_nome || '') + ' editada — ' + patch.motivo);
+ _showToast('Alterações salvas', 'ok');
 }
 
 /* Renderiza a lista de solicitações de colaboração dentro do drawer */
@@ -629,6 +666,12 @@ async function _drwColabReqRender(taskId) {
   } else if (isSol && r.status === 'Aguardando retorno') {
    actions = '<button class="colab-req-btn" onclick="_drwColabReqAcao(\'' + r.id + '\',\'Em andamento\')">Retomar</button>';
   }
+  // Editar (motivo/prazo/mensagem/subtarefa) — só quem solicitou, e só
+  // enquanto a colaboração ainda não chegou num estado final. Some junto com
+  // qualquer botão de status que já exista pro mesmo card, não substitui.
+  if (isSol && r.status !== 'Concluída' && r.status !== 'Recusada') {
+   actions += '<button class="colab-req-btn" onclick="_drwColabReqEditar(\'' + r.id + '\')">Editar</button>';
+  }
 
   // Timeline dos últimos eventos
   var hist = r.historico || [];
@@ -696,6 +739,8 @@ function _drwColabReqToggleForm() {
  var isOpen = form.classList.contains('open');
  if (isOpen) { form.classList.remove('open'); return; }
  form.classList.add('open');
+ _colabEditingId = null; // abrindo pelo botão "Solicitar Colaboração" = sempre nova
+ _drwColabFormSetModo(false);
  // Preencher lista de receptores do multi-select (mesmo padrão do Projeto)
  var meEmail = (_currentUser && _currentUser.email) || '';
  _colabReceptLista = (_respUsuarios || []).filter(function(r){ return r.email !== meEmail; });
@@ -720,6 +765,63 @@ function _drwColabReqToggleForm() {
 function _drwColabReqCancel() {
  var form = document.getElementById('drw-colab-form');
  if (form) form.classList.remove('open');
+ _colabEditingId = null;
+}
+
+// Alterna a aparência do formulário entre "nova solicitação" (multi-select
+// de colaboradores, botão "Enviar solicitação") e "editando" (colaborador
+// fixo — editar não reatribui pra outra pessoa —, botão "Salvar alterações").
+function _drwColabFormSetModo(editando) {
+ var ttl = document.getElementById('drw-colab-form-ttl');
+ if (ttl) ttl.textContent = editando ? 'Editar solicitação de colaboração' : 'Nova solicitação de colaboração';
+ var submitBtn = document.getElementById('drw-colab-form-submit-btn');
+ if (submitBtn) submitBtn.textContent = editando ? 'Salvar alterações' : 'Enviar solicitação';
+ var campoMulti = document.getElementById('drw-colab-receptor-field');
+ if (campoMulti) campoMulti.style.display = editando ? 'none' : '';
+ var campoFixo = document.getElementById('drw-colab-receptor-fixo');
+ if (campoFixo) campoFixo.style.display = editando ? '' : 'none';
+}
+
+/* Abre o formulário já preenchido com os dados de UMA solicitação existente
+ * (chamado pelo botão "Editar" do card) — só quem pediu a colaboração pode
+ * editar (mesma checagem de _drwColabReqRender), e só enquanto ela ainda
+ * não chegou num estado final (Concluída/Recusada não fazem mais sentido
+ * editar). Reatribuir pra outro colaborador não é suportado aqui de
+ * propósito — isso seria uma solicitação nova, não uma edição desta. */
+async function _drwColabReqEditar(reqId) {
+ if (!_sb || !_currentUser) return;
+ var res = await _sb.from('colaboracao_solicitacoes').select('*').eq('id', reqId).maybeSingle();
+ if (res.error || !res.data) { _showToast('Solicitação não encontrada', 'erro'); return; }
+ var r = res.data;
+ if (r.solicitante_email !== _currentUser.email) { _showToast('Só quem solicitou pode editar esta colaboração', 'erro'); return; }
+ if (r.status === 'Concluída' || r.status === 'Recusada') { _showToast('Esta colaboração já foi encerrada e não pode mais ser editada', 'erro'); return; }
+
+ var form = document.getElementById('drw-colab-form');
+ if (form && !form.classList.contains('open')) form.classList.add('open');
+ _colabEditingId = reqId;
+ _drwColabFormSetModo(true);
+
+ var fixoVal = document.getElementById('drw-colab-receptor-fixo-val');
+ if (fixoVal) {
+  var avatarHtml = (typeof _userAvatarByName === 'function') ? _userAvatarByName(r.receptor_nome || r.receptor_email, 20) : '';
+  fixoVal.innerHTML = avatarHtml + '<span>' + String(r.receptor_nome || r.receptor_email).replace(/</g,'&lt;') + '</span>';
+ }
+ var motivo = document.getElementById('drw-colab-motivo');
+ if (motivo) motivo.value = r.motivo || '';
+ var prazo = document.getElementById('drw-colab-prazo');
+ if (prazo) prazo.value = r.prazo || '';
+ var msg = document.getElementById('drw-colab-msg');
+ if (msg) msg.value = r.mensagem || '';
+ var subSel = document.getElementById('drw-colab-subtask');
+ if (subSel) {
+  subSel.innerHTML = '<option value="">Nenhuma (atividade toda)</option>'
+   + (_drwSubItems || []).map(function(s) {
+     return '<option value="' + s._id + '">' + (s.titulo || '(sem título)') + '</option>';
+    }).join('');
+  subSel.value = r.subtask_id ? String(r.subtask_id) : '';
+ }
+ _drwAnchor('comunicacao', null);
+ setTimeout(function(){ form.scrollIntoView({ behavior:'smooth', block:'nearest' }); }, 120);
 }
 
 /* Atalho a partir de uma linha de Subtarefa: abre (ou reaproveita) o mesmo
@@ -2174,6 +2276,9 @@ function _projSetDisabled(disabled) {
    então múltiplos colaboradores = múltiplos INSERTs, sem mudança de schema). */
 var _colabReceptLista = []; // [{email, nome}] — preenchida em _drwColabReqToggleForm()
 var _colabReceptSel = []; // e-mails selecionados
+// Id da solicitação em edição (null = formulário está em modo "nova
+// solicitação") — ver _drwColabReqEditar/_drwColabReqEnviar.
+var _colabEditingId = null;
 
 function _colabReceptDropdownHTML() {
  var opcoes = _colabReceptLista.map(function(r){ return { value: r.email, nome: r.nome || r.email }; });
