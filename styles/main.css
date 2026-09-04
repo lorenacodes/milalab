@@ -261,13 +261,15 @@ body.light .dash-panel{
     isso a regra própria em vez de reaproveitar #page-X .ph. */
  #page-fornecedores{overflow-x:hidden}
  #forn-header{margin-top:44px}
- /* Empresas/Contatos (mesma página, 2 abas) — mesmo motivo. .ph aqui é o
-    "Empresas & Contatos" título compartilhado pelas duas abas; abaixo
-    dele fica a barra de sub-abas (Empresas/Contatos), que é quem
-    realmente precisa do respiro pra não ficar embaixo da barra fixa —
-    ver #emp-subtabs abaixo. */
+ /* Empresas/Contatos (mesma página, 2 abas) — mesmo motivo. O respiro
+    precisa começar no PRÓPRIO título "Empresas & Contatos" (#emp-header),
+    não só na barra de sub-abas abaixo dele — sem isso o título ficava
+    parcialmente embaixo da barra fixa (Filtro/Agrupar/Ordenar), cortado
+    ao meio (bug real reportado com print). Empurrar #emp-header também
+    empurra tudo que vem depois no fluxo normal (sub-abas incluídas),
+    então não precisa mais de uma regra separada pra elas. */
  #page-empresas{overflow-x:hidden}
- #emp-subtabs{margin-top:44px}
+ #emp-header{margin-top:44px}
  /* Barra fixa única de Obras (Filtro/Agrupar/Ordenar/Período/Visualizações/
     Pesquisa + Kanban/Tabela/Nova Obra, na mesma linha) — position:fixed em
     vez de sticky de propósito: sticky só resolve o eixo vertical, então se
