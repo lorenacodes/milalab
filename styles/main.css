@@ -1477,13 +1477,19 @@ tbody[data-sp] tr:hover td{background:var(--navy-dim)!important}
 .proj-kn-handle{position:absolute;top:12px;right:10px;width:14px;height:16px;display:flex;align-items:center;justify-content:center;color:var(--border);cursor:grab;flex-shrink:0}
 .proj-kn-handle:hover{color:var(--muted)}
 .proj-kn-handle:active{cursor:grabbing}
- /* ── Date inputs: color-scheme para respeitar o tema ──────────────────────
-    Motivo: input[type="date"] usa chrome nativo que ignora CSS variables —
-    sem color-scheme o ícone de calendário fica com cores do sistema (branco/
-    cinza no dark mode do Windows), quebrando o visual da UI.
+ /* ── Date inputs / selects: color-scheme para respeitar o tema ────────────
+    Motivo: input[type="date"] e o popup nativo de <select> usam chrome do
+    navegador que ignora as CSS variables do site — sem color-scheme, o
+    ícone de calendário sai com cores do sistema (branco/cinza no dark mode
+    do Windows) e, pior, o popup de opções do <select> renderiza com fundo
+    CLARO do navegador por padrão mesmo com o tema escuro do app, herdando
+    só o color:var(--text) (claro) do <select> — texto claro em cima de
+    fundo claro, opções praticamente ilegíveis (relatado como "opções não
+    formatadas corretamente" em vários campos do Gestor de Tarefas — todos
+    são <select>, mesma causa raiz, não é por campo).
  ────────────────────────────────────────────────────────────────────────── */
- input[type="date"],input[type="datetime-local"]{color-scheme:dark}
- body.light input[type="date"],body.light input[type="datetime-local"]{color-scheme:light}
+ input[type="date"],input[type="datetime-local"],select{color-scheme:dark}
+ body.light input[type="date"],body.light input[type="datetime-local"],body.light select{color-scheme:light}
  input[type="date"].tf-inp,input[type="date"].sp-inp{min-height:36px;line-height:1.4}.tf-r2 input[type="date"]{width:100%;box-sizing:border-box}
  /* Mesmo ícone discreto (opacidade reduzida até hover/focus) que a edição
     inline de Obras (.ie-input) já usa — sem isso o calendário nativo fica
