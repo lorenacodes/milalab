@@ -2030,7 +2030,7 @@ function _fornDrawerOpenShell(editando) {
 function openNovoFornecedor() {
  _editingFornId = null;
  _fornCidadesSel = []; _fornSetoresSel = []; _fornCidadesDisponiveis = [];
- ['fn-nome','fn-cnpj','fn-contato','fn-tel','fn-email','fn-observacoes'].forEach(function(id){
+ ['fn-nome','fn-cnpj','fn-tel','fn-email','fn-observacoes'].forEach(function(id){
   var el = document.getElementById(id); if (el) el.value = '';
  });
  document.getElementById('fn-estado').value = '';
@@ -2057,9 +2057,8 @@ async function editFornecedor(id) {
  _fornCidadesSel = (f.cidades || []).slice();
  _fornSetoresSel = (f.setores || []).slice();
  document.getElementById('fn-nome').value       = f.nome || '';
- document.getElementById('fn-cnpj').value       = f.cnpj || '';
- document.getElementById('fn-contato').value    = f.contato || '';
- document.getElementById('fn-tel').value        = f.telefone || '';
+ document.getElementById('fn-cnpj').value       = f.cnpj ? _empCnpjMaskValue(f.cnpj) : '';
+ document.getElementById('fn-tel').value        = f.telefone ? _cttTelMaskValue(f.telefone) : '';
  document.getElementById('fn-email').value      = f.email || '';
  document.getElementById('fn-observacoes').value = f.observacoes || '';
  document.getElementById('fn-estado').value     = f.estado || '';
@@ -2230,9 +2229,8 @@ async function _submitNovoFornecedorReal() {
 
  var payload = {
   nome: dados.nome,
-  cnpj: (document.getElementById('fn-cnpj').value || '').trim() || null,
-  contato: (document.getElementById('fn-contato').value || '').trim() || null,
-  telefone: (document.getElementById('fn-tel').value || '').trim() || null,
+  cnpj: (document.getElementById('fn-cnpj').value || '').replace(/_/g,'').trim() || null,
+  telefone: (document.getElementById('fn-tel').value || '').replace(/_/g,'').trim() || null,
   email: (document.getElementById('fn-email').value || '').trim() || null,
   observacoes: (document.getElementById('fn-observacoes').value || '').trim() || null,
   estado: dados.estado,

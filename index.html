@@ -1447,17 +1447,13 @@
     </div>
     <div class="fg">
      <label>CNPJ</label>
-     <input type="text" id="fn-cnpj" placeholder="00.000.000/0000-00" onblur="_fornCampoAutoSave('cnpj', this.value)">
+     <input type="text" id="fn-cnpj" placeholder="00.000.000/0000-00" oninput="_empCnpjMask(this)" onblur="_fornCampoAutoSave('cnpj', this.value.replace(/_/g,''))">
     </div>
    </div>
    <div class="form-grid">
     <div class="fg">
-     <label>Contato</label>
-     <input type="text" id="fn-contato" placeholder="Nome de quem atendeu" onblur="_fornCampoAutoSave('contato', this.value)">
-    </div>
-    <div class="fg">
      <label>Telefone</label>
-     <input type="text" id="fn-tel" placeholder="(11) 99999-9999" onblur="_fornCampoAutoSave('telefone', this.value)">
+     <input type="text" id="fn-tel" placeholder="(00) 00000-0000" oninput="_cttTelMask(this)" onblur="_fornCampoAutoSave('telefone', this.value.replace(/_/g,''))">
     </div>
     <div class="fg">
      <label>E-mail</label>
@@ -3018,7 +3014,7 @@
 <script src="scripts/modules/projetos.js?v=mldsv399"></script>
 <script src="scripts/modules/entregas.js?v=mldsv398"></script>
 <script src="scripts/modules/instalacoes.js?v=mldsv391"></script>
-<script src="scripts/modules/empresas.js?v=mldsv413"></script>
+<script src="scripts/modules/empresas.js?v=mldsv414"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv398"></script>
 <script src="scripts/modules/dashboard.js?v=mldsv398"></script>
 <script src="scripts/modules/melhorias.js?v=mldsv345"></script>
