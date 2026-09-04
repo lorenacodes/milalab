@@ -1527,7 +1527,7 @@ async function _dbLoadFornecedores() {
   var res = await _sb.from('fornecedores')
    .select('id, nome, cnpj, contato, telefone, email, endereco, estado, cidades, setores, experiencia, observacoes, updated_at, '
     + 'fornecedores_orcamentos(id, titulo, status_cotacao, informado_financeiro, informado_financeiro_em, valor_encaminhado_financeiro, '
-    + 'status_pagamento, forma_pagamento, dados_bancarios, pago_por, teve_desconto, valor_final, observacoes, criado_por, created_at, updated_at, '
+    + 'status_pagamento, forma_pagamento, dados_bancarios, pago_por, observacoes, criado_por, created_at, updated_at, '
     + 'fornecedores_produtos(id, nome, quantidade, unidade_medida, valor_unitario, valor_total, status_cotacao, created_at))')
    .order('nome')
    .order('created_at', { foreignTable: 'fornecedores_orcamentos', ascending: false })
@@ -1552,7 +1552,6 @@ async function _dbLoadFornecedores() {
      informado_financeiro: !!o.informado_financeiro, informado_financeiro_em: o.informado_financeiro_em,
      valor_encaminhado_financeiro: o.valor_encaminhado_financeiro, status_pagamento: o.status_pagamento,
      forma_pagamento: o.forma_pagamento, dados_bancarios: o.dados_bancarios, pago_por: o.pago_por,
-     teve_desconto: !!o.teve_desconto, valor_final: o.valor_final,
      observacoes: o.observacoes, criado_por: o.criado_por, created_at: o.created_at, updated_at: o.updated_at,
      itens: (o.fornecedores_produtos || []).map(function(p){
       return { id: p.id, nome: p.nome, quantidade: p.quantidade, unidade_medida: p.unidade_medida, valor_unitario: p.valor_unitario, valor_total: p.valor_total, status_cotacao: p.status_cotacao, created_at: p.created_at };
@@ -2287,7 +2286,6 @@ var _ORCAMENTO_CAMPO_LABEL = {
  titulo: 'Título', status_cotacao: 'Status da cotação', informado_financeiro: 'Informado ao financeiro',
  valor_encaminhado_financeiro: 'Valor encaminhado ao financeiro', status_pagamento: 'Status do pagamento',
  forma_pagamento: 'Forma de pagamento', dados_bancarios: 'Dados bancários', pago_por: 'Pago por',
- teve_desconto: 'Houve desconto', valor_final: 'Valor final',
  observacoes: 'Observações', criado_por: null,
 };
 if (typeof _ccRegistrarLabels === 'function') _ccRegistrarLabels('fornecedores_orcamentos', _ORCAMENTO_CAMPO_LABEL);
@@ -2305,18 +2303,9 @@ function _fornRenderOrcamentos(f) {
  list.innerHTML = orcs.map(function(o){ return _fornOrcCardHTML(o); }).join('');
 }
 
-// Valor "de verdade" do orçamento: quando houve desconto E o valor final já
-// foi preenchido, é ele que vale (é o que realmente vai ser pago) — senão
-// cai na soma dos itens orçados, igual sempre foi.
-function _orcValorEfetivo(o) {
- if (o.teve_desconto && o.valor_final != null) return o.valor_final;
- return _fornecedorResumoProdutos(o.itens).totalGasto;
-}
 function _fornOrcCardHTML(o) {
  var titulo = (o.titulo && o.titulo.trim()) || ('Orçamento de ' + (o.created_at ? new Date(o.created_at).toLocaleDateString('pt-BR') : '—'));
  var resumo = _fornecedorResumoProdutos(o.itens);
- var valorEfetivo = _orcValorEfetivo(o);
- var valorTxt = _moedaFormatarBRL(valorEfetivo) + (o.teve_desconto && o.valor_final != null ? ' (com desconto)' : '');
  var statusTag = o.status_cotacao
   ? '<span class="nt-tag ' + (_fornStatusCor[o.status_cotacao]||'nt-tag-gray') + '" style="font-size:11px">' + o.status_cotacao + '</span>'
   : '<span class="nt-tag nt-tag-gray" style="font-size:11px">Sem status</span>';
@@ -2324,7 +2313,7 @@ function _fornOrcCardHTML(o) {
   + 'style="display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;background:var(--surface);cursor:pointer;font-family:inherit">'
   + '<span>'
   + '<div style="font-weight:600;font-size:13px;color:var(--text)">' + titulo + '</div>'
-  + '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + resumo.quantidade + ' item' + (resumo.quantidade!==1?'s':'') + ' · ' + valorTxt + ' · Informado ao financeiro: ' + (o.informado_financeiro?'Sim':'Não') + '</div>'
+  + '<div style="font-size:11px;color:var(--muted);margin-top:2px">' + resumo.quantidade + ' item' + (resumo.quantidade!==1?'s':'') + ' · ' + _moedaFormatarBRL(resumo.totalGasto) + ' · Informado ao financeiro: ' + (o.informado_financeiro?'Sim':'Não') + '</div>'
   + '</span>'
   + statusTag
   + '</button>';
@@ -2341,7 +2330,6 @@ function _fornNovoOrcamento() {
    informado_financeiro: !!d.informado_financeiro, informado_financeiro_em: d.informado_financeiro_em,
    valor_encaminhado_financeiro: d.valor_encaminhado_financeiro, status_pagamento: d.status_pagamento,
    forma_pagamento: d.forma_pagamento, dados_bancarios: d.dados_bancarios, pago_por: d.pago_por,
-   teve_desconto: !!d.teve_desconto, valor_final: d.valor_final,
    observacoes: d.observacoes, criado_por: d.criado_por, created_at: d.created_at, updated_at: d.updated_at,
    itens: [],
   };
@@ -2383,11 +2371,6 @@ function _orcAbrir(id) {
  if (pagoPorSel) pagoPorSel.innerHTML = '<option value="">Selecione...</option>' + ['Mila','MilaTec'].map(function(s){ return '<option' + (o.pago_por===s?' selected':'') + '>'+s+'</option>'; }).join('');
  var bancariosEl = document.getElementById('orc-dados-bancarios');
  if (bancariosEl) bancariosEl.value = o.dados_bancarios || '';
- var descontoEl = document.getElementById('orc-teve-desconto');
- if (descontoEl) descontoEl.checked = !!o.teve_desconto;
- var valorFinalEl = document.getElementById('orc-valor-final');
- if (valorFinalEl) valorFinalEl.value = o.valor_final != null ? _moedaFormatar(o.valor_final) : '';
- _orcAtualizarVisibilidadeDesconto();
 
  _orcAtualizarVisibilidadeFinanceiro();
 
@@ -2416,30 +2399,6 @@ function _orcAtualizarVisibilidadeFinanceiro() {
  var mostrarPagamento = aprovado && infFin && infFin.checked;
  var blocoPag = document.getElementById('orc-bloco-pagamento');
  if (blocoPag) blocoPag.style.display = mostrarPagamento ? '' : 'none';
-}
-
-// "Valor final (com desconto)" só aparece quando "Houve desconto?" está
-// marcado — independe do status da cotação (o desconto é sobre o preço dos
-// itens, não sobre o fluxo de aprovação/financeiro).
-function _orcAtualizarVisibilidadeDesconto() {
- var desconto = document.getElementById('orc-teve-desconto');
- var bloco = document.getElementById('orc-bloco-desconto');
- if (bloco) bloco.style.display = (desconto && desconto.checked) ? '' : 'none';
-}
-function _orcDescontoChange(checked) {
- _orcAtualizarVisibilidadeDesconto();
- _orcCampoAutoSave('teve_desconto', checked, true);
- // Desmarcar "Houve desconto?" limpa o valor final — não faz sentido manter
- // um valor final "com desconto" órfão de um desconto que não existe mais.
- if (!checked) {
-  var el = document.getElementById('orc-valor-final');
-  if (el) el.value = '';
-  _orcCampoAutoSave('valor_final', null, true);
- }
-}
-function _orcValorFinalInput(inputEl) {
- inputEl.value = _moedaMascarar(inputEl.value);
- _orcCampoAutoSave('valor_final', _moedaParaNumero(inputEl.value));
 }
 
 function _orcFechar() {
@@ -2651,9 +2610,10 @@ function _fornRelatorioLinhas() {
  var linhas = [];
  (_fornecedoresArr || []).forEach(function(f) {
   (f.orcamentos || []).forEach(function(o) {
+   var resumo = _fornecedorResumoProdutos(o.itens);
    linhas.push({
     fornecedorNome: f.nome, titulo: (o.titulo && o.titulo.trim()) || ('Orçamento de ' + (o.created_at ? new Date(o.created_at).toLocaleDateString('pt-BR') : '—')),
-    status_cotacao: o.status_cotacao, valorTotal: _orcValorEfetivo(o), tevedesconto: !!(o.teve_desconto && o.valor_final != null), informado_financeiro: o.informado_financeiro,
+    status_cotacao: o.status_cotacao, valorTotal: resumo.totalGasto, informado_financeiro: o.informado_financeiro,
     status_pagamento: o.status_pagamento, created_at: o.created_at,
    });
   });
@@ -2687,7 +2647,7 @@ function _fornRelatorioRender() {
     + '<td style="' + td + '">' + l.fornecedorNome + '</td>'
     + '<td style="' + td + '">' + l.titulo + '</td>'
     + '<td style="' + td + '">' + statusTag + '</td>'
-    + '<td style="' + td + ';text-align:right;font-weight:600">' + _moedaFormatarBRL(l.valorTotal) + (l.tevedesconto ? ' <span style="font-weight:400;color:var(--muted)">(desconto)</span>' : '') + '</td>'
+    + '<td style="' + td + ';text-align:right;font-weight:600">' + _moedaFormatarBRL(l.valorTotal) + '</td>'
     + '<td style="' + td + '">' + (l.informado_financeiro ? 'Sim' : 'Não') + '</td>'
     + '<td style="' + td + '">' + (l.status_pagamento || '—') + '</td>'
     + '</tr>';
