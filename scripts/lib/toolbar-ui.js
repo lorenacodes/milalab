@@ -69,7 +69,45 @@ function _tsSearchCollapse(wrapId, inputEl) {
  if (wrap) wrap.classList.remove('expanded');
 }
 
+// ── Persistência do texto de busca entre recarregamentos (F5) ───────────────
+// Relato: "mesmo com algo pesquisado, a barra de pesquisa se fecha ao
+// recarregar a página". Investigado: não existe nenhum localStorage/URL por
+// trás da maioria dos módulos — um F5 literal já reseta TODO estado de JS
+// por definição, então o campo ficar vazio depois de um F5 não seria bug
+// nenhum, só o padrão de qualquer app sem persistência (a única exceção já
+// existente era o Gestor de Tarefas, que salva filtro/ordenação/agrupamento/
+// busca inteiros em localStorage — ver _gestorSaveState/_gestorRestoreState
+// em tarefas.js). Só o TEXTO da busca foi pedido explicitamente, então em vez
+// de replicar aquele estado inteiro em cada módulo (fora do escopo do
+// relato), isto guarda só o texto — sessionStorage (não localStorage: busca é
+// transitória, não devia sobreviver dias) e um item por instância.
+// Mesmo achado do Gestor: reatribuir sozinho o .value do <input> NÃO reabre
+// a caixa — o wrapper .ts-search só fica largo com a classe "expanded" (ver
+// main.css); sem ela, o texto restaurado fica escondido atrás do ícone da
+// lupa (era exatamente esse detalhe que, no Gestor, parecia "a busca fecha
+// ao recarregar" quando na verdade o texto tinha voltado, só sem reabrir).
+function _tsSearchStorageKey(instanceId) { return 'mlds-search-' + instanceId; }
+function _tsSearchSave(instanceId) {
+ var wrap = document.getElementById('ts-search-' + instanceId);
+ var input = wrap && wrap.querySelector('input');
+ if (!input) return;
+ try {
+  if (input.value) sessionStorage.setItem(_tsSearchStorageKey(instanceId), input.value);
+  else sessionStorage.removeItem(_tsSearchStorageKey(instanceId));
+ } catch (e) { /* sessionStorage indisponível (modo privado etc.) — ignora */ }
+}
+function _tsSearchRestore(instanceId) {
+ var val;
+ try { val = sessionStorage.getItem(_tsSearchStorageKey(instanceId)); } catch (e) { return; }
+ if (!val) return;
+ var wrap = document.getElementById('ts-search-' + instanceId);
+ var input = wrap && wrap.querySelector('input');
+ if (!input) return;
+ input.value = val;
+ wrap.classList.add('expanded');
+}
+
 // Export só pra Node (testes, node:test) — não muda nada no navegador.
 if (typeof module !== 'undefined' && module.exports) {
- module.exports = { _tsSmartPosition, _tsSearchExpand, _tsSearchCollapse };
+ module.exports = { _tsSmartPosition, _tsSearchExpand, _tsSearchCollapse, _tsSearchSave, _tsSearchRestore };
 }

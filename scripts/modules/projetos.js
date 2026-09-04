@@ -1459,6 +1459,8 @@ var _projSbFields = [
  { key: 'peso',    label: 'Peso total',   type: 'number', getValue: function(ds) { return parseFloat(ds.peso) || 0; } },
 ];
 _sbInit('projetos', _projSbFields, _projApplyFilters);
+// Restaura o texto da busca salvo por _tsSearchSave (ver toolbar-ui.js).
+if (typeof _tsSearchRestore === 'function') _tsSearchRestore('projetos');
 
 // Agrupar — mesmo esquema de Obras (opera sobre <tr> já existentes no DOM,
 // não reconstrói a tbody a partir de um array em memória; ver comentário
@@ -1509,6 +1511,7 @@ function _projRenderGroupNode(node, path, tbody, forceHidden) {
 }
 
 function _projApplyFilters() {
+ if (typeof _tsSearchSave === 'function') _tsSearchSave('projetos'); // ver toolbar-ui.js
  var buscaNorm = _ssNormalize(((document.getElementById('proj-search') || {}).value || '').trim());
  var activeConds = _fbInstances.projetos.state.conditions.filter(_fbConditionIsUsable).length;
  var visivel = 0;
@@ -1818,6 +1821,13 @@ async function _dbLoadProjetos() {
  var kV=document.getElementById('proj-kpi-valor');if(kV)kV.textContent='R$ '+Math.round(totV).toLocaleString('pt-BR');
  var kP=document.getElementById('proj-kpi-peso');if(kP)kP.textContent=Math.round(totP).toLocaleString('pt-BR');
  var hint=document.getElementById('proj-count-hint');if(hint)hint.textContent=allData.length+' projetos · clique em uma linha para editar';
+ // Reaplica busca/filtro/ordenação/agrupamento atuais na tbody recém-
+ // recriada — mesmo achado do bug de Obras ("Z→A só funciona depois de
+ // trocar pra A→Z"): sem isto, qualquer _dbLoadProjetos() (boot, ou um
+ // reload disparado enquanto a pessoa já tinha escolhido uma ordenação)
+ // deixava a tabela na ordem crua do banco até a PRÓXIMA interação com
+ // Ordenar/Filtro, mesmo com um nível já selecionado no popover.
+ _projApplyFilters();
  // Tempo real só depois que a lista carregou (não no boot) — e idempotente
  // por chave, então voltar pra esta aba não cria um 2º handler.
  _projetosIniciarTempoReal();

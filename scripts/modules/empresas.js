@@ -1565,6 +1565,7 @@ async function _dbLoadFornecedores() {
 
 function searchFornecedores(q) {
  _fornBusca = q;
+ if (typeof _tsSearchSave === 'function') _tsSearchSave('fornecedores'); // ver toolbar-ui.js
  _renderFornecedores();
 }
 
@@ -1722,6 +1723,16 @@ var _fornSbFields = [
  { key: 'atualizado_em',  label: 'Última alteração', type: 'date' },
 ];
 _sbInit('fornecedores', _fornSbFields, _fornApplyFilters);
+// Restaura o texto da busca salvo por searchFornecedores (ver toolbar-ui.js
+// pra _tsSearchRestore). Fornecedores não lê o <input> direto a cada render
+// (usa a variável _fornBusca, preenchida pelo oninput) — por isso sincroniza
+// as duas aqui: _tsSearchRestore cuida do <input>/classe "expanded", e esta
+// linha replica o valor pra _fornBusca antes do 1º _dbLoadFornecedores.
+if (typeof _tsSearchRestore === 'function') {
+ _tsSearchRestore('fornecedores');
+ var _fornSearchInp = document.querySelector('#ts-search-fornecedores input');
+ if (_fornSearchInp && _fornSearchInp.value) _fornBusca = _fornSearchInp.value;
+}
 
 // Agrupamento — Estado/Experiência (campos de valor único; Setor/Cidade
 // ficam de fora, ver comentário de _fornGroupKeyFor acima).
@@ -2781,6 +2792,7 @@ function _empRenderGrouped(groupLevels) {
 }
 
 function _empApplyFilters() {
+ if (typeof _tsSearchSave === 'function') _tsSearchSave('empresas'); // ver toolbar-ui.js
  // Pedido explícito: agrupamento em mais de 1 nível — antes só lia
  // _gbPrimaryField (o 1º nível) e descartava o resto do que o popover de
  // Agrupar deixava configurar; agora lê o array completo, mesmo padrão já
@@ -2916,6 +2928,7 @@ function _cttRenderGrouped(groupLevels) {
 }
 
 function _cttApplyFilters() {
+ if (typeof _tsSearchSave === 'function') _tsSearchSave('contatos'); // ver toolbar-ui.js
  // Mesmo motivo do _empApplyFilters acima: array completo de níveis, não
  // só o primeiro.
  var groupLevels = (_gbInstances.contatos && _gbInstances.contatos.state.levels) || [];
@@ -3294,6 +3307,8 @@ var _empSbFields = [
  { key: 'estado', label: 'Estado', type: 'text' },
 ];
 _sbInit('empresas', _empSbFields, _empApplyFilters);
+// Restaura o texto da busca salvo por _tsSearchSave (ver toolbar-ui.js).
+if (typeof _tsSearchRestore === 'function') _tsSearchRestore('empresas');
 
 // Agrupamento — até 3 níveis, mesmo teto de Obras/Instalações/Entregas/
 // Projetos (auditoria encontrou isto travado em 1 nível sem motivo técnico
@@ -3355,6 +3370,8 @@ var _cttSbFields = [
  { key: 'ultima_alteracao_por', label: 'Última alteração', type: 'text' },
 ];
 _sbInit('contatos', _cttSbFields, _cttApplyFilters);
+// Restaura o texto da busca salvo por _tsSearchSave (ver toolbar-ui.js).
+if (typeof _tsSearchRestore === 'function') _tsSearchRestore('contatos');
 
 // Agrupamento — até 3 níveis, mesma engine de Empresas/Gestor de Tarefas
 // (ver comentário equivalente em _gbInit('empresas', ...) acima). "Nome"

@@ -213,6 +213,8 @@ var _instSbFields = [
  { key: 'dias',      label: 'Dias',    type: 'number', getValue: function(ds) { return parseFloat(ds.dias) || 0; } },
 ];
 _sbInit('instalacoes', _instSbFields, _instApplyFilters);
+// Restaura o texto da busca salvo por _tsSearchSave (ver toolbar-ui.js).
+if (typeof _tsSearchRestore === 'function') _tsSearchRestore('instalacoes');
 
 // Agrupar — mesmo esquema de Obras/Projetos (opera sobre <tr> já existentes
 // no DOM; ver comentário completo em _obrasRenderGroupNode, obras.js).
@@ -547,6 +549,7 @@ function renderInstCal() {
 }
 
 function _instApplyFilters() {
+ if (typeof _tsSearchSave === 'function') _tsSearchSave('instalacoes'); // ver toolbar-ui.js
  var buscaNorm = _ssNormalize(((document.getElementById('inst-search') || {}).value || '').trim());
  var activeConds = _fbInstances.instalacoes.state.conditions.filter(_fbConditionIsUsable).length;
  // Remove cabeçalhos de grupo da renderização anterior antes de reconsultar
@@ -1006,6 +1009,13 @@ async function _dbLoadInstalacoes() {
    return;
   }
   tbody.innerHTML = allData.map(_instRowHTML).join('');
+  // Reaplica busca/filtro/ordenação/agrupamento atuais na tbody recém-
+  // recriada — mesmo achado do bug de Obras ("Z→A só funciona depois de
+  // trocar pra A→Z"): sem isto, qualquer _dbLoadInstalacoes() (boot, ou um
+  // reload disparado enquanto a pessoa já tinha escolhido uma ordenação)
+  // deixava a tabela na ordem crua do banco até a PRÓXIMA interação com
+  // Ordenar/Filtro.
+  _instApplyFilters();
  } catch(e) {
   // Mensagem técnica fica só no console; o usuário lê português.
   console.error('[Instalações] erro ao carregar a lista:', e);

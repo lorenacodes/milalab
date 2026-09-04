@@ -410,6 +410,8 @@ var _entSbFields = [
  { key: 'alteradoEm',  label: 'Última alteração', type: 'number', getValue: function(ds) { return ds.alteradoEmTs; } },
 ];
 _sbInit('entregas', _entSbFields, _entApplyFilters);
+// Restaura o texto da busca salvo por _tsSearchSave (ver toolbar-ui.js).
+if (typeof _tsSearchRestore === 'function') _tsSearchRestore('entregas');
 
 // Agrupamento — até 4 níveis (todos os campos disponíveis). Campos pedidos
 // originalmente: Cidade/Estado/Status/Transporte; adicionados depois:
@@ -645,6 +647,7 @@ function _entQuickPreset(name, btn) {
 }
 
 function _entApplyFilters() {
+ if (typeof _tsSearchSave === 'function') _tsSearchSave('entregas'); // ver toolbar-ui.js
  var groupLevels = (_gbInstances.entregas && _gbInstances.entregas.state.levels) || [];
  if (groupLevels.length) { _entRenderGrouped(groupLevels); return; }
 
@@ -2025,13 +2028,18 @@ async function _dbLoadEntregas() {
  _entLoadContatoOrcamento();
  // Badge do menu lateral: ver _navBadgesLoadInitial() (RPC de contagem).
  if (error || !data?.length) return;
- var groupLevels = (_gbInstances.entregas && _gbInstances.entregas.state.levels) || [];
- if (groupLevels.length) { _entRenderGrouped(groupLevels); return; }
  const tbody = document.getElementById('ent-tbody');
  if (!tbody) return;
  tbody.innerHTML = data.map(_entRowHTML).join('');
  var totalEl = document.getElementById('ent-total-count');
  if (totalEl) totalEl.textContent = data.length + (data.length === 1 ? ' registro' : ' registros');
- _entRenderKanbanIfVisible();
- _entRenderCalIfVisible();
+ // Reaplica busca/filtro/ordenação/agrupamento atuais na tbody recém-
+ // recriada — mesmo achado do bug de Obras ("Z→A só funciona depois de
+ // trocar pra A→Z"): sem isto, qualquer _dbLoadEntregas() (boot, ou um
+ // reload disparado enquanto a pessoa já tinha escolhido uma ordenação)
+ // deixava a tabela na ordem crua do banco até a PRÓXIMA interação com
+ // Ordenar/Filtro. _entApplyFilters já decide sozinha entre tabela plana e
+ // agrupada (chamando _entRenderGrouped quando preciso) e também atualiza
+ // Kanban/Calendário — substitui as 2 chamadas que existiam aqui embaixo.
+ _entApplyFilters();
 }

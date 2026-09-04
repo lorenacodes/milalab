@@ -390,6 +390,23 @@ async function _dbLoadObras() {
   tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--red);padding:24px">Não foi possível exibir a lista de obras. Recarregue a página; se continuar, avise o suporte.</td></tr>';
   return;
  }
+ // Reaplica busca/filtro/ordenação/agrupamento/período atuais nas linhas que
+ // acabaram de ser recriadas do zero — sem isto, a tbody voltava sempre na
+ // ordem crua do banco depois de QUALQUER _dbLoadObras() (boot, vínculo de
+ // empresa, exclusão de obra, ou o _rtWatch('obras',...) do app.js que
+ // recarrega a lista inteira a cada mudança em tempo real de qualquer
+ // usuário), mesmo com um nível de ordenação já selecionado no popover
+ // "Ordenar". Achado real do bug "Z→A só funciona depois de trocar pra
+ // A→Z": o _dbLoadObras() do boot é assíncrono: se a pessoa abre o popover e
+ // escolhe Z→A ANTES dele terminar, _obrasApplyFilters (chamada pelo
+ // _sbApply do clique) roda numa tbody ainda vazia (não ordena nada); quando
+ // o load termina pouco depois, ele reescrevia a tbody na ordem crua do
+ // banco SEM reaplicar o Z→A já selecionado — só a troca seguinte de opção
+ // (que dispara _obrasApplyFilters de novo, já com as linhas presentes)
+ // parecia "funcionar". Outros módulos (Gestor, Empresas, Contatos,
+ // Fornecedores) já chamam o *ApplyFilters equivalente no fim do próprio
+ // _dbLoad*; só Obras estava sem.
+ _obrasApplyFilters();
  // Badge do menu lateral: agora vem de _navBadgesLoadInitial() (RPC de
  // contagem única, no boot) + realtime — não mais como efeito colateral
  // de carregar a lista inteira aqui.
@@ -3585,6 +3602,10 @@ var _obrasSbFields = [
  { key: 'estado', label: 'Estado da Obra', type: 'text' },
 ];
 _sbInit('obras', _obrasSbFields, _obrasApplyFilters);
+// Restaura o texto da busca salvo por _tsSearchSave (ver toolbar-ui.js) —
+// só o texto/classe "expanded" do <input>; a lista em si é reordenada pelo
+// _obrasApplyFilters() que já roda no fim de _dbLoadObras().
+if (typeof _tsSearchRestore === 'function') _tsSearchRestore('obras');
 
 // Agrupar: campos categóricos só (nome/valor/data não fazem sentido como
 // "balde" de agrupamento) — até 3 níveis (_obrasRenderGroupNode abaixo é
@@ -3683,6 +3704,7 @@ _vwInit('obras', {
 });
 
 function _obrasApplyFilters() {
+ if (typeof _tsSearchSave === 'function') _tsSearchSave('obras'); // ver toolbar-ui.js
  var buscaRaw = ((document.getElementById('obras-search') || {}).value || '').trim();
  var buscaNorm = _ssNormalize(buscaRaw);
  var activeConds = _fbInstances.obras.state.conditions.filter(_fbConditionIsUsable).length;
