@@ -36,7 +36,7 @@
 <script src="scripts/lib/fornecedor-validacao.js?v=mldsv403"></script>
 <script src="scripts/lib/multiselect-ui.js?v=mldsv345"></script>
 <script src="scripts/lib/user-select.js?v=mldsv399"></script>
-<script src="scripts/lib/searchable-select.js?v=mldsv366"></script>
+<script src="scripts/lib/searchable-select.js?v=mldsv422"></script>
 <script src="scripts/lib/automacao-validacao.js?v=mldsv345"></script>
 <script src="scripts/lib/badge-colors.js?v=mldsv345"></script>
 <script src="scripts/lib/doc-cards.js?v=mldsv388"></script>
@@ -3016,7 +3016,7 @@
 <script src="scripts/modules/instalacoes.js?v=mldsv416"></script>
 <script src="scripts/modules/empresas.js?v=mldsv416"></script>
 <script src="scripts/modules/wizard-nova-obra.js?v=mldsv398"></script>
-<script src="scripts/modules/dashboard.js?v=mldsv420"></script>
+<script src="scripts/modules/dashboard.js?v=mldsv422"></script>
 <script src="scripts/modules/melhorias.js?v=mldsv345"></script>
 <script src="scripts/modules/automacoes.js?v=mldsv363"></script>
 <script src="scripts/modules/admin.js?v=mldsv345"></script>
@@ -3058,38 +3058,11 @@
     <div class="tf-r2">
      <div>
       <label class="tf-lbl">Tipo de atividade <span class="tf-req">*</span></label>
-      <select id="nt-tipo-atividade" class="tf-sel" onchange="_taskAutoSaveQueue({tipo_atividade:this.value||null}, true)">
-       <option value="">Selecione o tipo...</option>
-       <option value="ART">ART</option>
-       <option value="Cálculo Estrutural">Cálculo Estrutural</option>
-       <option value="Dossiê Técnico">Dossiê Técnico</option>
-       <option value="Evento">Evento</option>
-       <option value="P&amp;D">P&amp;D</option>
-       <option value="Pré-projeto">Pré-projeto</option>
-       <option value="Projeto Executivo">Projeto Executivo</option>
-       <option value="Projeto para Aprovação">Projeto para Aprovação</option>
-       <option value="Proposta Comercial">Proposta Comercial</option>
-       <option value="Rotina">Rotina</option>
-       <option value="Tarefa">Tarefa</option>
-       <option value="Visita de Campo">Visita de Campo</option>
-      </select>
+      <div id="nt-tipo-atividade-wrap"></div>
      </div>
      <div>
       <label class="tf-lbl">Área <span class="tf-req">*</span></label>
-      <select id="nt-area" class="tf-sel" onchange="_taskAutoSaveQueue({area:this.value||null}, true)">
-       <option value="">Selecione...</option>
-       <option value="Comercial">Comercial</option>
-       <option value="Compras">Compras</option>
-       <option value="Dados">Dados</option>
-       <option value="Equipe Engenharia &amp; Comercial">Equipe Engenharia &amp; Comercial</option>
-       <option value="Equipe P&amp;D">Equipe P&amp;D</option>
-       <option value="Logística">Logística</option>
-       <option value="Marketing">Marketing</option>
-       <option value="Processos">Processos</option>
-       <option value="Produção">Produção</option>
-       <option value="Projetos">Projetos</option>
-       <option value="TI">TI</option>
-      </select>
+      <div id="nt-area-wrap"></div>
      </div>
     </div>
 
@@ -3176,7 +3149,7 @@
 
       <div>
        <label class="tf-lbl">Melhoria / Iniciativa</label>
-       <select id="nt-melhoria-sel" class="tf-sel" onchange="_ntMelhCardSync();_ntAutoSaveVinculos()"><option value="">Nenhuma</option></select>
+       <div id="nt-melhoria-sel-wrap"></div>
        <div id="nt-melh-card" class="vinc-card" style="display:none">
         <div class="vinc-card-title">Melhoria</div>
         <div class="vinc-card-row"><span>Nome</span><b id="nt-melh-card-nome">—</b></div>
@@ -3191,11 +3164,7 @@
 
     <div style="position:relative">
      <label class="tf-lbl">Privacidade</label>
-     <select id="nt-privacidade" class="tf-sel" onchange="_ntPrivacidadeChange();_ntAutoSavePrivacidade()">
-      <option value="equipe" selected>Visível para toda a equipe</option>
-      <option value="privada_so_eu">Só para mim</option>
-      <option value="privada_especificos">Pessoas específicas</option>
-     </select>
+     <div id="nt-privacidade-wrap"></div>
      <div id="nt-priv-especificos-wrap" style="display:none;margin-top:8px">
       <input id="nt-privacidade-shares" type="hidden" value="">
       <div id="nt-priv-box" class="tf-inp" style="min-height:34px;height:auto;cursor:pointer;display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:5px 8px" onclick="_privToggleDrop()">
@@ -3213,22 +3182,11 @@
     <div class="tf-r2">
      <div>
       <label class="tf-lbl">Prioridade <span class="tf-req">*</span></label>
-      <select id="nt-prioridade" class="tf-sel" onchange="_taskAutoSaveQueue({prioridade:this.value}, true)">
-       <option value="Alta">Alta</option>
-       <option value="Média" selected>Média</option>
-       <option value="Baixa">Baixa</option>
-      </select>
+      <div id="nt-prioridade-wrap"></div>
      </div>
      <div>
       <label class="tf-lbl">Status <span class="tf-req">*</span></label>
-      <select id="nt-status" class="tf-sel" onchange="_selColorize(this,_SEL_TASK_STATUS_COR);_taskAutoSaveQueue({status:this.value}, true)">
-       <option value="Backlog">Backlog</option>
-       <option value="A fazer" selected>A fazer</option>
-       <option value="Em progresso">Em progresso</option>
-       <option value="Aguardando feedback">Aguardando feedback</option>
-       <option value="Feito">Feito</option>
-       <option value="Obsoleto">Obsoleto</option>
-      </select>
+      <div id="nt-status-wrap"></div>
      </div>
     </div>
 

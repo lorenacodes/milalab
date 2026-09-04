@@ -1091,9 +1091,16 @@ function _taskAutoSaveFlush() {
   if (v != null && String(v).trim() !== '') return;
   bloqueados.push(_TASK_CAMPOS_OBRIG[campo].label);
   delete patch[campo];
-  var el = document.getElementById(_TASK_CAMPOS_OBRIG[campo].elId);
+  var elId = _TASK_CAMPOS_OBRIG[campo].elId;
+  var el = document.getElementById(elId);
   var valorAnterior = window._drwCurrentTask ? window._drwCurrentTask[campo] : null;
-  if (el) el.value = valorAnterior || '';
+  // Tipo de atividade/Área viraram searchable select — o elemento com este id
+  // é o hidden input; setar .value direto reverteria o valor gravado mas não
+  // a caixinha visível (mesmo cuidado de _ntVisibleEl/_srchSelSetValue nos
+  // outros pontos que escrevem nestes campos programaticamente).
+  var kind = _NT_SRCH_KIND_BY_ID[elId];
+  if (kind) { _srchSelSetValue(kind, valorAnterior || ''); }
+  else if (el) { el.value = valorAnterior || ''; }
  });
  if (bloqueados.length) {
   _showToast('Campo obrigatório: ' + bloqueados.join(', ') + '. Alteração não foi salva.', 'erro');
@@ -1297,6 +1304,42 @@ function _ntDateFmtSync(inputId) {
  out.textContent = d.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric'});
 }
 
+// ── Vocabulários fixos da aba Geral do Gestor de Tarefas (Tipo de
+// atividade/Área/Prioridade/Status) — extraídos das opções que antes viviam
+// hardcoded no <select> nativo do index.html, agora consumidas pelo
+// searchable select genérico (ver _ntRenderSelect abaixo).
+var TASK_TIPO_ATIVIDADE_OPCOES = ['ART','Cálculo Estrutural','Dossiê Técnico','Evento','P&D','Pré-projeto','Projeto Executivo','Projeto para Aprovação','Proposta Comercial','Rotina','Tarefa','Visita de Campo'];
+var TASK_AREA_OPCOES = ['Comercial','Compras','Dados','Equipe Engenharia & Comercial','Equipe P&D','Logística','Marketing','Processos','Produção','Projetos','TI'];
+var TASK_PRIORIDADE_OPCOES = ['Alta','Média','Baixa'];
+var TASK_STATUS_OPCOES = ['Backlog','A fazer','Em progresso','Aguardando feedback','Feito','Obsoleto'];
+
+// Registra + renderiza (markup fresco) um campo do drawer de tarefa como
+// select buscável (mesmo componente genérico usado em Etapa do
+// Negócio/Produto etc.) — cobre os 4 campos de vocabulário fixo (Tipo de
+// atividade/Área/Prioridade/Status; Privacidade e Melhoria têm suas próprias
+// funções abaixo, por terem valor≠rótulo e/ou carregamento assíncrono).
+function _ntRenderSelect(kind, wrapId, hiddenId, options, atual, placeholder, onSelect, badgeMap) {
+ var wrap = document.getElementById(wrapId);
+ if (!wrap) return;
+ _srchSelRegister(kind, { options: options, placeholder: placeholder, onSelect: onSelect });
+ var badgeCls = badgeMap ? _badgeCls(badgeMap, atual || '') : '';
+ wrap.innerHTML = _srchSelMarkup(kind, hiddenId, atual || '', badgeCls, badgeMap || null);
+}
+
+// Mapa auxiliar hiddenId -> kind do searchable select correspondente, usado
+// só para redirecionar destaque visual de validação (borda vermelha) da
+// caixinha certa — o hidden input em si é invisível, destacar ele não
+// mostraria nada pra usuária. Ver _ntVisibleEl abaixo.
+var _NT_SRCH_KIND_BY_ID = { 'nt-tipo-atividade': 'ntTipoAtividade', 'nt-area': 'ntArea' };
+function _ntVisibleEl(id) {
+ var kind = _NT_SRCH_KIND_BY_ID[id];
+ if (kind) {
+  var box = document.getElementById('sp-srch-' + kind + '-box');
+  if (box) return box;
+ }
+ return document.getElementById(id);
+}
+
 function _taskDrawerOpen(editId) {
  _taskEditId = editId || null;
  // Procura primeiro nas tarefas locais (sistema legado) e depois nas atividades reais
@@ -1335,28 +1378,36 @@ function _taskDrawerOpen(editId) {
  var respVal = t ? (t.responsavel || '') : (localStorage.getItem('pp-name') || 'Lorena').split(' ')[0];
  _respLoadUsers().then(function(){ _respSetFromString(respVal); }).catch(function(){ _respSetFromString(respVal); });
  if (!t) _respSetFromString(respVal);
- var prioEl   = get('nt-prioridade');
- var stEl     = get('nt-status');
- var tipoAtEl = get('nt-tipo-atividade');
- var areaEl   = get('nt-area');
- if (prioEl)   prioEl.value   = t ? (t.prioridade     || 'Média')   : 'Média';
- if (stEl)     { stEl.value   = t ? (t.status          || 'A fazer') : 'A fazer'; _selColorize(stEl, _SEL_TASK_STATUS_COR); }
- if (tipoAtEl) {
-  var _tv = t ? (t.tipo_atividade || t.tipo || '') : '';
-  tipoAtEl.value = _tv;
-  if (_tv && !tipoAtEl.value) {
-   var _lc = _tv.toLowerCase();
-   for (var _oi = 0; _oi < tipoAtEl.options.length; _oi++) {
-    if (tipoAtEl.options[_oi].value.toLowerCase() === _lc) { tipoAtEl.value = tipoAtEl.options[_oi].value; break; }
-   }
-  }
+ // Tipo de atividade/Área/Prioridade/Status: selects buscáveis (componente
+ // genérico, ver scripts/lib/searchable-select.js) — pedido explícito: eram
+ // <select> nativos, a usuária queria o mesmo visual "caixa escura + busca +
+ // lista" já usado em Etapa do Negócio (Obras)/Produto (Projetos). Markup
+ // regerado a cada abertura da gaveta (mesmo padrão de obras.js/_sptRenderGeral),
+ // pra sempre refletir o valor da atividade sendo editada (ou os defaults de
+ // atividade nova).
+ var tipoAtualVal = t ? (t.tipo_atividade || t.tipo || '') : '';
+ // Corrige capitalização/acentuação divergente do vocabulário fixo (ex.: dado
+ // legado gravado como "art" em vez de "ART") — mesmo tratamento que existia
+ // antes pro <select> nativo (comparação case-insensitive contra as opções).
+ if (tipoAtualVal) {
+  var _tvLc = tipoAtualVal.toLowerCase();
+  var _tvMatch = TASK_TIPO_ATIVIDADE_OPCOES.find(function(o){ return o.toLowerCase() === _tvLc; });
+  if (_tvMatch) tipoAtualVal = _tvMatch;
  }
- if (areaEl)   areaEl.value   = t ? (t.area            || '')        : '';
+ _ntRenderSelect('ntTipoAtividade', 'nt-tipo-atividade-wrap', 'nt-tipo-atividade', TASK_TIPO_ATIVIDADE_OPCOES, tipoAtualVal, 'Selecione o tipo...',
+  function(v){ _taskAutoSaveQueue({tipo_atividade:v||null}, true); });
+ _ntRenderSelect('ntArea', 'nt-area-wrap', 'nt-area', TASK_AREA_OPCOES, t ? (t.area||'') : '', 'Selecione...',
+  function(v){ _taskAutoSaveQueue({area:v||null}, true); });
+ _ntRenderSelect('ntPrioridade', 'nt-prioridade-wrap', 'nt-prioridade', TASK_PRIORIDADE_OPCOES, t ? (t.prioridade||'Média') : 'Média', 'Selecione...',
+  function(v){ _taskAutoSaveQueue({prioridade:v}, true); });
+ _ntRenderSelect('ntStatus', 'nt-status-wrap', 'nt-status', TASK_STATUS_OPCOES, t ? (t.status||'A fazer') : 'A fazer', 'Selecione...',
+  function(v){ _taskAutoSaveQueue({status:v}, true); }, BADGE_STATUS_TAREFA);
 
  // ── Aba Relacionamentos ──
  _ntPopulateVinculos(t);
 
  // ── Privacidade ──
+ _ntRenderPrivacidadeSelect();
  if (t && t.id) {
   _ntPrivacidadeSet(t.visibilidade || 'equipe', []); // estado provisório enquanto carrega
   _privLoadSharesParaEdicao(t.id).then(function(shares) {
@@ -1461,7 +1512,7 @@ function _taskDrawerOpen(editId) {
  var firstTab = document.querySelector('.drw-tab');
  if (firstTab) firstTab.classList.add('active');
  ['nt-titulo','nt-tipo-atividade','nt-area','nt-dt-inicio','nt-dt-fim'].forEach(function(id){
-  var el = get(id);
+  var el = _ntVisibleEl(id);
   if (el) { el.style.borderColor = ''; el.style.boxShadow = ''; }
  });
  _drwSpyInit();
@@ -1697,9 +1748,54 @@ async function _privLoadSharesParaEdicao(atividadeId) {
  } catch(e) { return []; }
 }
 
+// Privacidade virou searchable select (mesmo componente genérico dos demais
+// campos convertidos) — mas aqui valor ≠ rótulo: o componente genérico usa a
+// própria string exibida como valor gravado (_srchSelSelectItem: st.selected
+// = value), então as opções que ele conhece são os RÓTULOS ("Visível para
+// toda a equipe" etc.); o hidden input nt-privacidade, do qual
+// _ntPrivacidadeChange/_ntAutoSavePrivacidade/_submitNewTask dependem,
+// precisa continuar guardando o valor CRU (equipe/privada_so_eu/
+// privada_especificos) — os dois mapas abaixo traduzem entre as duas formas.
+var _NT_PRIV_LABEL_TO_VAL = { 'Visível para toda a equipe': 'equipe', 'Só para mim': 'privada_so_eu', 'Pessoas específicas': 'privada_especificos' };
+var _NT_PRIV_VAL_TO_LABEL = { 'equipe': 'Visível para toda a equipe', 'privada_so_eu': 'Só para mim', 'privada_especificos': 'Pessoas específicas' };
+var TASK_PRIVACIDADE_OPCOES = ['Visível para toda a equipe', 'Só para mim', 'Pessoas específicas'];
+
+// Registra + renderiza markup fresco do campo Privacidade — chamado uma vez
+// a cada abertura da gaveta (mesmo padrão dos demais campos, ver
+// _taskDrawerOpen); o VALOR de fato é aplicado logo em seguida por
+// _ntPrivacidadeSet (via _ntPrivacidadeApply), que já é chamada tanto pra
+// atividade nova quanto pra edição (com o estado provisório/final vindo do
+// carregamento assíncrono dos compartilhamentos).
+function _ntRenderPrivacidadeSelect() {
+ var wrap = document.getElementById('nt-privacidade-wrap');
+ if (!wrap) return;
+ _srchSelRegister('ntPrivacidade', {
+  options: TASK_PRIVACIDADE_OPCOES, placeholder: 'Selecione...',
+  onSelect: function(label) {
+   var raw = _NT_PRIV_LABEL_TO_VAL[label] || 'equipe';
+   var hid = document.getElementById('nt-privacidade');
+   if (hid) hid.value = raw; // sobrescreve o rótulo que _srchSelSelectItem gravou — o hidden guarda o valor cru
+   _ntPrivacidadeChange();
+   _ntAutoSavePrivacidade();
+  },
+ });
+ wrap.innerHTML = _srchSelMarkup('ntPrivacidade', 'nt-privacidade', _NT_PRIV_VAL_TO_LABEL.equipe);
+ var hid0 = document.getElementById('nt-privacidade');
+ if (hid0) hid0.value = 'equipe';
+}
+
+// Aplica programaticamente um valor cru (equipe/privada_so_eu/
+// privada_especificos) ao searchable select — mesma ideia de _ntMelhoriaApply.
+function _ntPrivacidadeApply(rawValue) {
+ var raw = rawValue || 'equipe';
+ var label = _NT_PRIV_VAL_TO_LABEL[raw] || _NT_PRIV_VAL_TO_LABEL.equipe;
+ _srchSelSetValue('ntPrivacidade', label);
+ var hid = document.getElementById('nt-privacidade');
+ if (hid) hid.value = raw;
+}
+
 // Preenche o controle de privacidade ao abrir a gaveta para edição
 function _ntPrivacidadeSet(visibilidade, sharesArr) {
- var sel = document.getElementById('nt-privacidade');
  _privSelecionados = [];
  (sharesArr || []).forEach(function(s) {
   var found = _respUsuarios.find(function(u){ return u.email === s.email; });
@@ -1708,7 +1804,7 @@ function _ntPrivacidadeSet(visibilidade, sharesArr) {
  _privUpdateBox();
  var modo = 'equipe';
  if (visibilidade === 'privada') modo = (sharesArr && sharesArr.length) ? 'privada_especificos' : 'privada_so_eu';
- if (sel) sel.value = modo;
+ _ntPrivacidadeApply(modo);
  _ntPrivacidadeChange();
 }
 
@@ -1870,13 +1966,12 @@ var _drwSubItems = []; // [{_id, titulo, done}]
 // alimentado por _drwColabReqRender(taskId) a cada abertura/atualização.
 var _drwSubColabMap = {};
 
-// ── Cor no <select> de status (estava sem cor nenhuma, baixa legibilidade) —
-// aplica borda + fundo levemente tingido com a cor da opção selecionada, no
-// mesmo espírito dos badges coloridos já usados nos cards.
-var _SEL_TASK_STATUS_COR = {
- 'Backlog':'var(--muted)', 'A fazer':'var(--navy)', 'Em progresso':'var(--yellow)',
- 'Aguardando feedback':'rgba(139,92,246,1)', 'Feito':'var(--green)', 'Obsoleto':'var(--red)'
-};
+// _SEL_TASK_STATUS_COR removida (limpeza técnica): colorizava o <select>
+// nativo de Status do drawer de tarefa, que virou searchable select com
+// badge colorido (BADGE_STATUS_TAREFA, ver scripts/lib/badge-colors.js e
+// _ntRenderSelect/_taskDrawerOpen) — a cor agora vem do badge, não mais de
+// borda/fundo tingidos no controle. _selColorize continua existindo pra
+// quem mais usa (Etapa do Negócio do wizard de Nova Obra).
 function _selColorize(sel, colorMap) {
  if (!sel) return;
  var c = colorMap[sel.value];
@@ -2047,13 +2142,17 @@ function _drwAutoStatusFromSubs() {
  } else {
   var b = document.getElementById('drw-sub-conclusao-banner');
   if (b) b.remove();
-  if (concluidos > 0 && stEl.value === 'A fazer') stEl.value = 'Em progresso';
+  // stEl (nt-status) é o hidden input do searchable select — setar .value
+  // direto (como um <select> nativo aceitaria) não atualiza a caixinha
+  // visível nem o badge, por isso passa por _srchSelSetValue (mesma
+  // semântica de antes: só atualiza o valor, sem fechar dropdown nem
+  // disparar autosave — igual um select.value= não disparava onchange).
+  if (concluidos > 0 && stEl.value === 'A fazer') _srchSelSetValue('ntStatus', 'Em progresso');
  }
 }
 
 function _drwConfirmarConclusao() {
- var stEl = document.getElementById('nt-status');
- if (stEl) stEl.value = 'Feito';
+ _srchSelSetValue('ntStatus', 'Feito');
  var banner = document.getElementById('drw-sub-conclusao-banner');
  if (banner) banner.remove();
  _showToast('Atividade marcada como Feita. Salve para confirmar.', 'ok');
@@ -2349,35 +2448,51 @@ function _ntPopulateVinculos(t) {
   _projSetDisabled(true);
   _ntProjCardSync();
  }
- // ── Melhorias — sem limit ──
- var selMelh = document.getElementById('nt-melhoria-sel');
- if (selMelh) {
-  if (window._melhoriasCache && window._melhoriasCache.length) {
-   selMelh.innerHTML = '<option value="">Nenhuma</option>'
-    + window._melhoriasCache.map(function(m){
-     return '<option value="' + m.id + '">' + m.nome + '</option>';
-    }).join('');
-   if (t && t.melhoria_id) selMelh.value = t.melhoria_id;
-   _ntMelhCardSync();
-  } else if (_dbOk) {
-   _sb.from('melhorias').select('id, nome, area').order('nome')
-   .then(function(res) {
-    if (!res.data) return;
-    window._melhoriasCache = res.data;
-    selMelh.innerHTML = '<option value="">Nenhuma</option>'
-     + window._melhoriasCache.map(function(m){
-      return '<option value="' + m.id + '">' + m.nome + '</option>';
-     }).join('');
-    if (t && t.melhoria_id) selMelh.value = t.melhoria_id;
+ // ── Melhorias — searchable select genérico (mesmo padrão de Obra/Projeto
+ // acima) — busca por NOME (é o que o componente sabe fazer), o id de
+ // verdade (o que precisa ser salvo) fica no hidden nt-melhoria-sel, resolvido
+ // via window._melhoriasCache no onSelect e em _ntMelhoriaApply. ──
+ var melhWrap = document.getElementById('nt-melhoria-sel-wrap');
+ if (melhWrap) {
+  _srchSelRegister('ntMelhoria', {
+   options: function(){ return (window._melhoriasCache || []).map(function(m){ return m.nome; }); },
+   placeholder: 'Nenhuma',
+   // Cache pode ainda não ter carregado quando a usuária abre o dropdown
+   // (ex.: primeira vez na sessão) — onOpen é o gancho documentado do
+   // componente pra buscar sob demanda antes de abrir.
+   onOpen: async function() {
+    if (window._melhoriasCache && window._melhoriasCache.length) return;
+    if (!_dbOk || !_sb) return;
+    try {
+     var res = await _sb.from('melhorias').select('id, nome, area').order('nome');
+     if (res.data) window._melhoriasCache = res.data;
+    } catch (e) { /* dropdown abre vazio, sem quebrar a UI */ }
+   },
+   onSelect: function(nome) {
+    var m = (window._melhoriasCache || []).find(function(x){ return x.nome === nome; });
+    var id = m ? m.id : '';
+    // Hidden input guarda o ID (não o nome) — é o que _ntMelhCardSync e
+    // _ntAutoSaveVinculos esperam encontrar em .value.
+    var hid = document.getElementById('nt-melhoria-sel');
+    if (hid) hid.value = id;
     _ntMelhCardSync();
+    _ntAutoSaveVinculos();
+   },
+  });
+  melhWrap.innerHTML = _srchSelMarkup('ntMelhoria', 'nt-melhoria-sel', '');
+  var melhIdAtual = t ? (t.melhoria_id || '') : '';
+  if (window._melhoriasCache && window._melhoriasCache.length) {
+   _ntMelhoriaApply(melhIdAtual);
+  } else if (_dbOk && _sb) {
+   _sb.from('melhorias').select('id, nome, area').order('nome').then(function(res) {
+    if (res.data) window._melhoriasCache = res.data;
+    _ntMelhoriaApply(melhIdAtual);
    });
+  } else {
+   // Sem conexão: fica "Nenhuma" (mesmo comportamento de antes, quando
+   // mostrava "Sem conexão" no lugar da opção vazia).
+   _ntMelhoriaApply(melhIdAtual);
   }
- }
- if (!_dbOk) {
-  // Obra não é mais um <select> simples (virou busca com dropdown próprio,
-  // ver nt-obra-box/nt-obra-drop), só a Melhoria ainda é.
-  var msg = '<option value="">Sem conexão</option>';
-  if (selMelh && selMelh.options.length <= 1) selMelh.innerHTML = msg;
  }
 }
 
@@ -2492,6 +2607,21 @@ function _abrirVinculoTask(tipo) {
  setTimeout(tentarAbrir, 100);
 }
 
+// Aplica programaticamente um melhoria_id (id de verdade) ao searchable
+// select genérico 'ntMelhoria' — resolve o nome de exibição a partir de
+// window._melhoriasCache e escreve o ID (não o nome) no hidden input, já que
+// _ntMelhCardSync/_ntAutoSaveVinculos/_submitNewTask esperam o ID em
+// document.getElementById('nt-melhoria-sel').value. Usado tanto na população
+// inicial da gaveta quanto depois que a cache termina de carregar
+// assincronamente (ver _ntPopulateVinculos).
+function _ntMelhoriaApply(id) {
+ var m = id ? (window._melhoriasCache || []).find(function(x){ return x.id === id; }) : null;
+ _srchSelSetValue('ntMelhoria', m ? m.nome : '');
+ var hid = document.getElementById('nt-melhoria-sel');
+ if (hid) hid.value = id || '';
+ _ntMelhCardSync();
+}
+
 /* ── Card "Melhoria" — preenchido a partir da Melhoria selecionada ── */
 function _ntMelhCardSync() {
  var sel = document.getElementById('nt-melhoria-sel');
@@ -2516,8 +2646,12 @@ function _submitNewTask() {
  camposObrig.forEach(function(id) {
   var el = document.getElementById(id);
   if (!el || !el.value.trim()) {
-   if (el) { el.style.borderColor='var(--red)'; el.style.boxShadow='0 0 0 2px rgba(239,68,68,.18)'; setTimeout(function(){ el.style.borderColor=''; el.style.boxShadow=''; },2500); }
-   if (!primeiroInvalido) primeiroInvalido = el;
+   // Destaque visual vai na caixinha VISÍVEL (Tipo de atividade/Área viraram
+   // searchable select — o elemento com este id é um <input type="hidden">,
+   // colorir a borda dele não mostraria nada).
+   var visEl = _ntVisibleEl(id);
+   if (visEl) { visEl.style.borderColor='var(--red)'; visEl.style.boxShadow='0 0 0 2px rgba(239,68,68,.18)'; setTimeout(function(){ visEl.style.borderColor=''; visEl.style.boxShadow=''; },2500); }
+   if (!primeiroInvalido) primeiroInvalido = visEl || el;
    valido = false;
   }
  });

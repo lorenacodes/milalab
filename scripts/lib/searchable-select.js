@@ -187,7 +187,14 @@ function _srchSelFilter(kind, q) {
  }
  list.innerHTML = html || '<div class="srch-sel-empty">Nenhum resultado encontrado.</div>';
 }
-function _srchSelSelectItem(kind, value) {
+// Atualiza o valor/visual (hidden input + caixinha fechada + badge, se
+// houver) SEM fechar o dropdown nem disparar onSelect — usado por código que
+// precisa setar o valor programaticamente (ex.: sugestão automática de Status
+// ao concluir todas as subtarefas do Gestor de Tarefas), o mesmo tipo de
+// coisa que um `select.value = '...'` fazia num <select> nativo (que também
+// não dispara onchange). _srchSelSelectItem (abaixo, o clique de verdade
+// numa opção do dropdown) é esta mesma atualização + fechar + onSelect.
+function _srchSelSetValue(kind, value) {
  var st = _srchSelState[kind];
  if (!st) return;
  st.selected = value || '';
@@ -202,6 +209,11 @@ function _srchSelSelectItem(kind, value) {
   valEl.classList.toggle('placeholder', !st.selected);
  }
  if (clrEl) clrEl.style.display = st.selected ? '' : 'none';
+}
+function _srchSelSelectItem(kind, value) {
+ var st = _srchSelState[kind];
+ if (!st) return;
+ _srchSelSetValue(kind, value);
  _srchSelClose(kind);
  if (typeof st.onSelect === 'function') st.onSelect(st.selected);
 }
