@@ -1044,6 +1044,27 @@ var _kpiConfig = {
    return d && d >= hoje && d <= lim && a.status !== 'Feito' && a.status !== 'Concluído';
   }
  },
+ // Mesma regra de "em_andamento" da RPC rpc_atividades_kpis (ver migration
+ // 20260805_rpc_atividades_kpis_e_sidebar_counts.sql): não concluída, não
+ // atrasada (atrasada tem prioridade — uma tarefa "Em progresso" vencida
+ // conta como Atrasada, não aqui, pra não contar em dobro entre os 2 cards)
+ // e status em ('Em progresso','Em andamento') — as duas grafias convivem
+ // no dado real. Sem essa mesma regra aqui, o número do card batia com o
+ // banco mas a lista do drawer mostrava uma contagem diferente.
+ andamento: {
+  title: 'Em Andamento',
+  color: 'var(--navy)',
+  icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2.5 1.5" stroke-linecap="round"/></svg>',
+  desc:  'Atividades em progresso agora, dentro do prazo',
+  filter: function(a, hoje) {
+   var status = (a.status || '').trim();
+   var isDone = status === 'Feito' || status === 'Concluído' || status === 'Concluida';
+   if (isDone) return false;
+   var d = a.data_prazo ? new Date(a.data_prazo+'T00:00:00') : null;
+   if (d && d < hoje) return false;
+   return status === 'Em progresso' || status === 'Em andamento';
+  }
+ },
  conclusao: {
   title: 'Concluídas',
   color: 'var(--green)',

@@ -2988,7 +2988,7 @@ async function _dashLoad() {
   // Restaura preferência salva de período/tipo na UI
   _chartRestoreUI();
   var agora = new Date().toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-  _dashSyncStatus(true, 'Supabase · ' + allAt.length + ' atividades · ' + agora);
+  _dashSyncStatus(true, 'Supabase · ' + allAt.length + ' atividade' + (allAt.length !== 1 ? 's' : '') + ' · ' + agora);
 
   // Cache para o KPI drawer
    _kpiDrawerAtividades = allAt;
@@ -3921,7 +3921,7 @@ function _dashUpdateKPIsFromDB(atividades) {
  var CIRCUNF=226.2;var ring=document.getElementById('dash-ring-fill');var ringPct=document.getElementById('dash-ring-pct');var ringSub=document.getElementById('dash-ring-sub');var ringDone=document.getElementById('dash-ring-done');var ringLate=document.getElementById('dash-ring-late');
  var ringClr=mesPct>=80?'var(--green)':mesPct>=40?'var(--navy)':'var(--yellow)';
  if(ring){ring.style.strokeDashoffset=(CIRCUNF-(mesPct/100)*CIRCUNF);ring.style.stroke=ringClr;}
- if(ringPct)ringPct.textContent=mesPct+'%';if(ringSub)ringSub.textContent=mesDone+' de '+mesTotal+' atividades';
+ if(ringPct)ringPct.textContent=mesPct+'%';if(ringSub)ringSub.textContent=mesDone+' de '+mesTotal+(mesTotal!==1?' atividades':' atividade');
  if(ringDone)ringDone.textContent=mesDone;if(ringLate)ringLate.textContent=atrasadas;
 }
 
