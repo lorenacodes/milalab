@@ -1787,7 +1787,11 @@ function _fornRowHTML(f, idx) {
  var waBtn = waNum
   ? '<a href="https://wa.me/' + waNum + '?text=' + encodeURIComponent(_fornMensagemWA()) + '" target="_blank" rel="noopener" class="nt-open-btn" style="font-size:11px;color:#25D366;background:rgba(37,211,102,.1);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:4px" title="Pedir orçamento pelo WhatsApp">' + _icoWA + '</a>'
   : '';
- return '<tr>'
+ // Linha inteira abre o detalhamento (editFornecedor) — editar e excluir só
+ // acontecem de lá pra frente, não têm mais botão direto na listagem (pedido
+ // explícito). O guard em event.target.closest ignora cliques no botão de
+ // WhatsApp/resumo de orçamentos, que continuam com sua própria ação.
+ return '<tr onclick="if(!event.target.closest(\'button,a,input,select\'))editFornecedor(\'' + f.id + '\')" style="cursor:pointer">'
   + '<td><div class="nt-avatar" style="background:' + bg + ';font-size:10px;width:26px;height:26px;border-radius:6px">' + initials + '</div></td>'
   + '<td><div style="font-weight:600;font-size:13px;color:var(--text)">' + f.nome + '</div>'
   + (f.email ? '<div style="font-size:11px;color:var(--muted)">' + f.email + '</div>' : '')
@@ -1799,11 +1803,7 @@ function _fornRowHTML(f, idx) {
   + '<td>' + (f.experiencia ? '<span class="nt-tag ' + (_fornExperienciaCor[f.experiencia]||'nt-tag-gray') + '" style="font-size:11px">' + f.experiencia + '</span>' : '<span style="color:var(--muted);font-size:12px">—</span>') + '</td>'
   + '<td>' + _fornProdutosResumoHTML(f) + '</td>'
   + '<td>' + (function(){ var sp = _fornStatusPagamentoGeral(f); return '<span class="nt-tag ' + sp.cor + '" style="font-size:11px">' + sp.label + '</span>'; })() + '</td>'
-  + '<td><div style="display:flex;gap:4px;align-items:center">'
-  + waBtn
-  + '<button class="nt-open-btn" onclick="editFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--muted);background:rgba(0,0,0,.06);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Editar</button>'
-  + '<button class="nt-open-btn" onclick="excluirFornecedor(\'' + f.id + '\')" style="font-size:11px;color:var(--red);background:rgba(207,34,46,.08);border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-weight:500">Excluir</button>'
-  + '</div></td>'
+  + '<td>' + waBtn + '</td>'
   + '</tr>';
 }
 function _renderFornecedores() {
@@ -2017,9 +2017,13 @@ function _fornDrawerOpenShell(editando) {
  var ttlEl = document.getElementById('fn-drw-ttl');
  var submitBtn = document.getElementById('fn-drw-submit-btn');
  var cancelBtn = document.getElementById('fn-drw-cancel-btn');
+ var excluirBtn = document.getElementById('fn-drw-excluir-btn');
  if (ttlEl) ttlEl.textContent = editando ? 'Editar Fornecedor' : 'Novo Fornecedor';
  if (submitBtn) submitBtn.style.display = editando ? 'none' : '';
  if (cancelBtn) cancelBtn.textContent = editando ? 'Fechar' : 'Cancelar';
+ // Excluir só existe no detalhamento (fornecedor já criado) — igual editar,
+ // que também só acontece de dentro do detalhamento agora (clique na linha).
+ if (excluirBtn) excluirBtn.style.display = editando ? '' : 'none';
  _fornAutoSaveStatus();
  var drw = document.getElementById('forn-drw');
  var bd  = document.getElementById('forn-drw-bd');
