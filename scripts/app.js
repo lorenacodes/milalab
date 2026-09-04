@@ -75,7 +75,6 @@ function go(id) {
  if (id === 'dashboard' && _prevRoute !== 'dashboard') {
   buildGreeting();
   _dashTasksInit();
-  _dashRenderInbox();
   if (typeof _dashLoad === 'function' && _dbOk) _dashLoad();
  }
  if (id === 'projetos' && _dbOk) {
@@ -275,7 +274,6 @@ async function _dbInit() {
  // só carregava de verdade depois de trocar de aba e voltar.
  if (typeof buildGreeting === 'function')    buildGreeting();
  if (typeof _dashTasksInit === 'function')   _dashTasksInit();
- if (typeof _dashRenderInbox === 'function') _dashRenderInbox();
  // Exibir FAB do histórico pessoal após autenticação
  if (typeof _histInit === 'function') _histInit();
 }
@@ -862,7 +860,7 @@ function _histInit() {
 // Bloco de boot direto removido (correção de fluxo, não limpeza): rodava no
 // nível superior do arquivo, então executava assim que app.js terminasse de
 // ser parseado — ANTES de dashboard.js (que define _dashTasksInit/
-// _dashRenderInbox/_dashLoad) mesmo carregar, já que ele vem depois no
+// _dashLoad) mesmo carregar, já que ele vem depois no
 // <script src> do index.html. Sempre lançava "ReferenceError:
 // _dashTasksInit is not defined" e nunca chegava a rodar _dashLoad()/
 // go('dashboard') de verdade — confirmado que já quebrava assim antes desta

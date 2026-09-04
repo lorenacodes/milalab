@@ -593,20 +593,6 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
  .tf-r2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
  .rem-tab.active{background:var(--surface2);color:var(--text)}
  .rem-tab:hover:not(.active){color:var(--text)}
- .rem-new-btn{display:flex;align-items:center;gap:5px;padding:5px 10px;font-size:12px;font-weight:500;border:1px solid var(--border);background:none;cursor:pointer;color:var(--muted);border-radius:var(--r-sm);transition:all .15s;flex-shrink:0}
- .rem-new-btn:hover{border-color:var(--navy);color:var(--navy);background:var(--blue-dim)}
- .rem-panel{padding:0 16px 12px}
- .rem-card{display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)}
- .rem-card:last-child{border-bottom:none}
- .rem-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;margin-top:2px}
- .rem-body{flex:1;min-width:0}
- .rem-who{font-size:10px;color:var(--muted);margin-bottom:3px}
- .rem-msg{font-size:12px;color:var(--text);line-height:1.5;word-break:break-word}
- .rem-foot{display:flex;align-items:center;justify-content:space-between;margin-top:5px}
- .rem-time{font-size:10px;color:var(--muted)}
- .rem-del{background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px;padding:0;line-height:1;opacity:.5;transition:opacity .12s}
- .rem-del:hover{color:var(--red);opacity:1}
- .rem-empty{font-size:12px;color:var(--muted);text-align:center;padding:16px 0}
  .rem-send-wrap{border-top:1px solid var(--border);padding:12px 16px 14px}
  .rem-send-wrap.hidden{display:none}
 
@@ -790,9 +776,7 @@ body.light .dash-kpi-card{background:var(--surface);border-color:rgba(255,255,25
 .chart-seg-ctrl{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:2px;gap:2px;margin-left:auto;flex-shrink:0}
 .chart-seg-btn{flex:1;font-size:10px;font-weight:600;padding:3px 12px;border:none;border-radius:var(--r-sm);cursor:pointer;background:transparent;color:var(--muted);font-family:inherit;transition:all .15s;white-space:nowrap}
 .chart-seg-btn.active{background:var(--navy-solid);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}
-.chart-seg-btn:hover:not(.active){color:var(--text)}.comm-tab{flex:1;font-size:10px;font-weight:600;padding:7px 8px;border:none;background:none;cursor:pointer;font-family:inherit;color:var(--muted);border-bottom:2px solid transparent;transition:all var(--dur-base,.15s) var(--ease-standard,ease);white-space:nowrap}
-.comm-tab.active{color:var(--navy);border-bottom-color:var(--navy)}
-.comm-tab:hover:not(.active){color:var(--text)}
+.chart-seg-btn:hover:not(.active){color:var(--text)}
 .colab-cc-card{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:3px;cursor:pointer;transition:background .1s}
 .colab-cc-card:hover{background:var(--surface2)}
 .colab-cc-card:last-child{border-bottom:none}

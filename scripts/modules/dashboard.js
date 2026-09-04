@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// DASHBOARD (Meu Painel) — KPIs, gráficos, agenda, lembretes, colaboração,
+// DASHBOARD (Meu Painel) — KPIs, gráficos, agenda, colaboração,
 // tarefas pessoais, drawer de nova atividade, Central de Colaborações.
 // ═══════════════════════════════════════════════════════════════════════════════
 /* SAUDAÇÃO DINÂMICA */
@@ -217,83 +217,12 @@ async function _dashAppendColabAlerts() {
    _dashLoadNotes/_dashNotesTimer removidos junto (limpeza técnica; ver
    docs/ para o registro completo). */
 
-/* ── MEU PAINEL — LEMBRETES (Supabase + Realtime) ───────────────────────── */
-var _remCurrentTab    = 'inbox';
-var _remUsers         = [];   // lista de usuários para autocomplete
-var _remRealtimeSub   = null; // subscription Realtime ativa
-
-// ── Carrega lista de usuários para o campo "Para" ─────────────────────────
-async function _remLoadUsers() {
- try {
-  var session = (await _sb.auth.getSession()).data.session;
-  if (!session) return;
-  var r = await fetch('https://pnecdbobhywfjdadylwt.supabase.co/functions/v1/auth-admin', {
-   method: 'POST',
-   headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+session.access_token },
-   body: JSON.stringify({ action: 'listar-usuarios' })
-  });
-  var res = await r.json();
-  if (res.ok && res.users) {
-   _remUsers = res.users.filter(function(u){ return u.email !== session.user.email; });
-   _remPopulateToSelect();
-  }
- } catch(e) {}
-}
-
-function _remPopulateToSelect() {
- var sel = document.getElementById('rem-to-select');
- if (!sel) return;
- sel.innerHTML = '<option value="">Para quem?</option>'
-  + _remUsers.map(function(u){
-    var name = u.full_name || u.email;
-    return '<option value="'+u.email+'" data-name="'+name+'">'+name+'</option>';
-   }).join('');
-}
-
-// ── Carregar inbox do Supabase ────────────────────────────────────────────
-async function _remLoadInbox() {
- var me = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || '';
- if (!me) return;
- var el = document.getElementById('dash-inbox-list');
- if (el) el.innerHTML = '<div class="rem-empty" style="padding:12px;text-align:center;color:var(--muted);font-size:11px">Carregando...</div>';
- try {
-  var res = await _sb.from('lembretes').select('*').eq('to_email', me).order('created_at', { ascending: false }).limit(30);
-  var data = res.data || [];
-  // Atualiza badge
-  var unread = data.filter(function(r){ return !r.lido; }).length;
-  var badge = document.getElementById('rem-inbox-badge');
-  if (badge) { badge.textContent = unread; badge.style.display = unread ? '' : 'none'; }
-  if (el) el.innerHTML = data.length
-   ? data.map(function(r){ return _remBuildCard(r, false); }).join('')
-   : '<div class="rem-empty" style="padding:16px;text-align:center;color:var(--muted);font-size:11px">Nenhum lembrete recebido.</div>';
-  // Marca como lido automaticamente
-  var unreadIds = data.filter(function(r){ return !r.lido; }).map(function(r){ return r.id; });
-  if (unreadIds.length) _sb.from('lembretes').update({ lido: true }).in('id', unreadIds);
- } catch(e) { console.error('[Lembretes] Erro inbox:', e); }
-}
-
-// ── Carregar enviados do Supabase ─────────────────────────────────────────
-async function _remLoadSent() {
- var me = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || '';
- if (!me) return;
- var el = document.getElementById('dash-sent-list');
- if (el) el.innerHTML = '<div class="rem-empty" style="padding:12px;text-align:center;color:var(--muted);font-size:11px">Carregando...</div>';
- try {
-  var res = await _sb.from('lembretes').select('*').eq('from_email', me).order('created_at', { ascending: false }).limit(30);
-  var data = res.data || [];
-  if (el) el.innerHTML = data.length
-   ? data.map(function(r){ return _remBuildCard(r, true); }).join('')
-   : '<div class="rem-empty" style="padding:16px;text-align:center;color:var(--muted);font-size:11px">Nenhum lembrete enviado.</div>';
- } catch(e) { console.error('[Lembretes] Erro enviados:', e); }
-}
-
 // ── Realtime: badges do menu lateral (Empresas/Obras/Projetos/Entregas/
 // Instalações/Melhorias) ── Empresas e Projetos são as únicas dessas 6
 // tabelas com fluxo de criação dentro do app; Obras/Instalações/Melhorias/
 // Entregas só mudam por fora (Supabase direto, outra ferramenta). Assinar
 // a tabela em si (INSERT/DELETE), em vez de só reagir ao clique de "criar"
-// deste app, cobre os dois casos com o mesmo código — mesmo padrão já
-// usado em _remStartRealtime (lembretes).
+// deste app, cobre os dois casos com o mesmo código.
 var _navBadgeChannels = {};
 var _NAV_BADGE_TABLES = ['empresas','obras','projetos','entregas','instalacoes','melhorias','fornecedores'];
 var _navBadgesLoadInFlight = false; // guarda contra disparo duplicado (_dbInit rodando 2x, aba reaberta, etc.)
@@ -386,113 +315,6 @@ function _navBadgesStartRealtimeAll() {
  // Contagem inicial das 6 tabelas: ver _navBadgesLoadInitial() (chamada
  // direto de _dbInit em app.js, em paralelo, sem esperar por isso aqui).
 }
-
-// ── Realtime: receber lembretes em tempo real ─────────────────────────────
-function _remStartRealtime() {
- if (_remRealtimeSub) { try { _sb.removeChannel(_remRealtimeSub); } catch(e){} }
- var me = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || '';
- if (!me) return;
- _remRealtimeSub = _sb
-  .channel('lembretes-inbox-' + me.replace('@','_').replace('.','_'))
-  .on('postgres_changes', {
-   event: 'INSERT', schema: 'public', table: 'lembretes',
-   filter: 'to_email=eq.' + me
-  }, function(payload) {
-   // Notificação visual
-   var r = payload.new;
-   if (r) {
-    _showToast('Novo lembrete de ' + (r.from_name || r.from_email), 'ok');
-    _remLoadInbox();
-   }
-  })
-  .subscribe();
-}
-
-// ── Render de card ────────────────────────────────────────────────────────
-function _remAvatarColor(name) {
- var colors = ['#004AE8','#1F8A4C','#e07b00','#8B6FE8','#1f7ec4','#c44b1f'];
- var i = 0;
- if (name) for (var j = 0; j < name.length; j++) i += name.charCodeAt(j);
- return colors[i % colors.length];
-}
-
-function _remBuildCard(r, isSent) {
- var who       = isSent ? (r.to_name || r.to_email) : (r.from_name || r.from_email);
- var avLetter  = (who || '?').charAt(0).toUpperCase();
- var avColor   = _remAvatarColor(who);
- var urgTag    = r.urgencia === 'urgente'
-  ? '<span style="font-size:9px;background:var(--red-dim);color:var(--red);border-radius:4px;padding:1px 5px;font-weight:700;margin-right:4px">Urgente</span>'
-  : '';
- var unreadDot = (!isSent && !r.lido)
-  ? '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:5px;flex-shrink:0"></span>'
-  : '';
- var dt = r.created_at ? new Date(r.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
-
- // Atividade vinculada — chip clicável que abre o drawer direto
- var ativHtml = '';
- if (r.atividade_id && r.atividade_titulo) {
-  ativHtml = '<div onclick="_remAbrirAtividade(\'' + r.atividade_id + '\')" style="'
-   + 'display:flex;align-items:center;gap:6px;margin-top:6px;padding:6px 9px;'
-   + 'background:var(--surface2);border:1px solid var(--border);border-radius:6px;'
-   + 'cursor:pointer;transition:border-color .15s;max-width:100%'
-   + '" onmouseover="this.style.borderColor=\'var(--navy)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
-   + '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="var(--navy)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="1.5" y="2" width="9" height="8" rx="1.5"/><line x1="3.5" y1="5" x2="8.5" y2="5"/><line x1="3.5" y1="7" x2="6.5" y2="7"/></svg>'
-   + '<span style="font-size:10px;font-weight:600;color:var(--navy);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + r.atividade_titulo + '</span>'
-   + '<span style="font-size:9px;color:var(--muted);flex-shrink:0">Abrir &rsaquo;</span>'
-   + '</div>';
- }
-
- return '<div class="rem-card">'
-  + '<div class="rem-av" style="background:' + avColor + '">' + avLetter + '</div>'
-  + '<div class="rem-body">'
-  + '<div class="rem-who" style="display:flex;align-items:center">'
-  + unreadDot
-  + (isSent ? 'Para: <b>' + who + '</b>' : 'De: <b>' + who + '</b>')
-  + '</div>'
-  + '<div class="rem-msg">' + urgTag + r.texto + '</div>'
-  + ativHtml
-  + '<div class="rem-foot"><span class="rem-time">' + dt + '</span>'
-  + '<button class="rem-del" onclick="_remDelete(\''+r.id+'\')" title="Apagar">&times;</button>'
-  + '</div>'
-  + '</div>'
-  + '</div>';
-}
-
-// ── Abrir atividade vinculada ao lembrete ────────────────────────────────
-async function _remAbrirAtividade(ativId) {
- if (!ativId) return;
- // Tenta encontrar no cache local primeiro (mais rápido)
- var ativ = null;
- if (_dashAllAtRaw && _dashAllAtRaw.length) {
-  ativ = _dashAllAtRaw.find(function(a){ return String(a.id) === String(ativId); });
- }
- // Se não encontrou no cache, busca no Supabase
- if (!ativ) {
-  try {
-   var res = await _sb.from('atividades')
-    .select('id, titulo, status, prioridade, area, tipo_atividade, data_prazo, data_inicio, responsavel, updated_at')
-    .eq('id', ativId)
-    .single();
-   ativ = res.data;
-   if (ativ && Array.isArray(ativ.responsavel)) ativ.responsavel = _emailsToNomes(ativ.responsavel);
-  } catch(e) { ativ = null; }
- }
- if (!ativ) { _showToast('Atividade não encontrada', 'erro'); return; }
- // Abre o drawer de detalhes — mesmo comportamento de clicar na atividade no feed
- _feedItemClick(null, ativ);
-}
-
-// ── Deletar lembrete ──────────────────────────────────────────────────────
-async function _remDelete(id) {
- await _sb.from('lembretes').delete().eq('id', id);
- _remLoadInbox();
- if (_remCurrentTab === 'sent') _remLoadSent();
-}
-
-// ── Alias para compatibilidade (corrige bug: função inexistente) ──────────
-function _dashRenderInbox()   { _remLoadInbox(); }
-
-
 
 /* ══════════════════════════════════════════════════════════════════════════
    COLABORAÇÃO FORMAL — solicitações bidirecionais com rastreamento de status
@@ -709,8 +531,7 @@ async function _drwColabReqRender(taskId) {
  }).join('');
 }
 
-/* Ação sobre solicitação (aceitar, recusar, iniciar, concluir) — compartilhada
- * entre o drawer da atividade e o painel Lembretes. */
+/* Ação sobre solicitação (aceitar, recusar, iniciar, concluir). */
 async function _colabReqAtualizarStatus(reqId, novoStatus) {
  if (!_sb || !_currentUser) return false;
  var statusLabels = { 'Aceita':'Aceita pelo colaborador', 'Recusada':'Recusada pelo colaborador', 'Em andamento':'Trabalho iniciado', 'Aguardando retorno':'Aguardando retorno do solicitante', 'Concluída':'Colaboração concluída' };
@@ -872,97 +693,6 @@ async function _remLoadColabReqs() {
  var reqs = await _colabReqsAllCached();
  var pendentes = reqs.filter(function(r){ return r.status === 'Pendente' && r.receptor_email === me; }).length;
  window._colabPendCount = pendentes; // usado pelo Painel de Saúde Operacional
-}
-
-// ── Abrir/fechar formulário ───────────────────────────────────────────────
-function _remOpenNew()    { _remToggleSend(); }   // FIX: função que faltava
-function _remToggleSend() {
- var wrap = document.getElementById('rem-send-wrap');
- if (!wrap) return;
- var isOpen = wrap.style.display !== 'none'; // painel nasce com display:none inline; '' (aberto) não é "fechado"
- wrap.style.display = isOpen ? 'none' : '';
- if (!isOpen) {
-  var txt = document.getElementById('dash-reminder-text');
-  if (txt) setTimeout(function(){ txt.focus(); }, 80);
-  _remLoadUsers(); // carrega lista de usuários
-  // Popula seletor de atividades com dados em cache
-  var ativSel = document.getElementById('rem-ativ-select');
-  if (ativSel && _dashAllAtRaw && _dashAllAtRaw.length) {
-   var ativos = _dashAllAtRaw.filter(function(a){ return a.status !== 'Feito' && a.status !== 'Concluído' && a.status !== 'Obsoleto'; });
-   ativSel.innerHTML = '<option value="">Vincular a uma atividade (opcional)</option>'
-    + ativos.map(function(a){ return '<option value="' + a.id + '">' + (a.titulo || '(sem título)') + '</option>'; }).join('');
-  }
- }
-}
-
-// ── Enviar lembrete ───────────────────────────────────────────────────────
-async function _remSendSupabase() {
- var selEl     = document.getElementById('rem-to-select');
- var textEl    = document.getElementById('dash-reminder-text');
- var urgencyEl = document.getElementById('dash-reminder-urgency');
- if (!selEl || !textEl) return;
-
- var toEmail = selEl.value.trim();
- var textVal = textEl.value.trim();
- if (!toEmail) {
-  selEl.style.borderColor = 'var(--red)';
-  setTimeout(function(){ selEl.style.borderColor = ''; }, 1400);
-  return;
- }
- if (!textVal) {
-  textEl.style.borderColor = 'var(--red)';
-  setTimeout(function(){ textEl.style.borderColor = ''; }, 1400);
-  return;
- }
-
- var toUser   = _remUsers.find(function(u){ return u.email === toEmail; });
- var toName   = toUser ? (toUser.full_name || toUser.email) : toEmail;
- var me       = (_currentUser && _currentUser.email) || localStorage.getItem('milatec-user-email') || '';
- var fromName = localStorage.getItem('pp-name') || 'Lorena';
- var urgency  = urgencyEl ? urgencyEl.value : 'normal';
-
- // Atividade vinculada (opcional)
- var ativSel = document.getElementById('rem-ativ-select');
- var ativVal = ativSel ? ativSel.value : '';
- var ativTitulo = ativSel && ativVal ? (ativSel.options[ativSel.selectedIndex] || {}).text : '';
-
- var { error } = await _sb.from('lembretes').insert({
-  from_email: me,
-  from_name: fromName,
-  to_email: toEmail,
-  to_name: toName,
-  texto: textVal,
-  urgencia: urgency,
-  atividade_id: ativVal || null,
-  atividade_titulo: ativTitulo && ativVal ? ativTitulo : null
- });
-
- if (error) { _showToast('Erro ao enviar: ' + _supaErrPt(error.message), 'erro'); return; }
-
- // Limpar e fechar
- selEl.value  = '';
- textEl.value = '';
- if (urgencyEl) urgencyEl.value = 'normal';
- if (ativSel) ativSel.value = '';
- _remToggleSend();
- _showToast('Lembrete enviado para ' + toName, 'ok');
- if (_remCurrentTab === 'sent') _remLoadSent();
-}
-
-// Alias para compatibilidade com botão HTML existente
-function _remSend()           { _remSendSupabase(); }  // FIX: função que faltava
-
-// ── Cancelar novo lembrete sem enviar ────────────────────────────────────
-function _remCancelNew() {
- var selEl     = document.getElementById('rem-to-select');
- var textEl    = document.getElementById('dash-reminder-text');
- var urgencyEl = document.getElementById('dash-reminder-urgency');
- var ativSel   = document.getElementById('rem-ativ-select');
- if (selEl)     selEl.value  = '';
- if (textEl)    textEl.value = '';
- if (urgencyEl) urgencyEl.value = 'normal';
- if (ativSel)   ativSel.value = '';
- _remToggleSend();
 }
 
 
@@ -2861,7 +2591,7 @@ function _dashRenderObras(projetos) {
 /* Clique em item do feed — abre drawer de edição pré-populado */
 function _feedItemClick(el, ativDireto) {
  try {
-  // Suporte a chamada direta com objeto (ex: via lembrete vinculado)
+  // Suporte a chamada direta com objeto (ex: via item do drawer de KPI)
   var a = ativDireto || null;
   if (!a) {
    var raw = el ? el.getAttribute('data-ativ') : null;
@@ -3283,10 +3013,7 @@ async function _dashLoad() {
   if (mEl) mEl.textContent = (melhRes.data || []).length;
  } catch(e) { _dashRenderMelhorias([]); }
 
- // Inicia lembretes Supabase + Realtime
- _remLoadInbox();
  _remLoadColab();
- _remStartRealtime();
  _navBadgesStartRealtimeAll();
  // Central de Colaborações (localStorage)
  _ccLoad();
@@ -3948,33 +3675,6 @@ function _dashRenderChartStatus(dados) {
   + execHtml
   + '</div>';
 }
-
-/* ── Central de Comunicação Interna (unificada) ──────────────────────────── */
-var _commCurrentTab = 'inbox';
-
-// Mapeia tab → painel HTML
-var _commPanels = { inbox: 'rem-panel-inbox', sent: 'rem-panel-sent' };
-
-function _commTab(tab, btn) {
- _commCurrentTab = tab;
- _remCurrentTab  = tab; // sincroniza variável legada usada por _remDelete/_remSend
- // Esconde todos os painéis
- Object.keys(_commPanels).forEach(function(k) {
-  var p = document.getElementById(_commPanels[k]);
-  if (p) p.style.display = 'none';
- });
- // Mostra o painel correto
- var active = document.getElementById(_commPanels[tab]);
- if (active) active.style.display = '';
- // Atualiza tabs
- document.querySelectorAll('.comm-tab').forEach(function(b){ b.classList.remove('active'); });
- if (btn) btn.classList.add('active');
- // Carrega dados conforme a aba
- if (tab === 'sent')  { _remLoadSent(); }
- if (tab === 'inbox') { _remLoadInbox(); }
-}
-
-
 
 /* ── Central de Colaborações ──────────────────────────────────────────────── */
 var _ccCurrentTab = 'recv';
