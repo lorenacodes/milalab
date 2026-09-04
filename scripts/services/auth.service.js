@@ -61,11 +61,22 @@ function _loginSuccess(user) {
  }
  _refreshProfileUI();
  _loadProfileFromDB();
- // go('dashboard') é o único lugar que adiciona a classe .active em
- // #page-dashboard (CSS: .page{display:none!important}) — sem chamar isso
- // aqui, a página ficava com display:none até o usuário clicar em outra
- // aba e voltar (o que dispara go() de verdade pelo onclick do menu).
- if (typeof go === 'function') go('dashboard');
+ // go(id) é o único lugar que adiciona a classe .active na página certa
+ // (CSS: .page{display:none!important}) — sem chamar isso aqui, a página
+ // ficava com display:none até o usuário clicar em outra aba e voltar (o
+ // que dispara go() de verdade pelo onclick do menu).
+ //
+ // Pedido explícito: um F5 deve devolver a pessoa pra ABA em que ela estava
+ // (Fornecedores, Obras...), não sempre pro Meu Painel — go() grava a aba
+ // atual em sessionStorage a cada troca (ver app.js); aqui é onde ela é lida
+ // de volta. 'admin' só é restaurada pra quem ainda é admin (o cargo pode
+ // ter mudado entre uma sessão e outra); qualquer chave inválida/ausente
+ // (1ª visita, sessão nova) cai no comportamento de sempre.
+ var rotaLembrada = null;
+ try { rotaLembrada = sessionStorage.getItem('milatec-last-route'); } catch (e) {}
+ var rotaValida = rotaLembrada && typeof routes === 'object' && routes[rotaLembrada]
+  && (rotaLembrada !== 'admin' || isAdmin);
+ if (typeof go === 'function') go(rotaValida ? rotaLembrada : 'dashboard');
  _dbInit();
 }
 
@@ -156,6 +167,7 @@ function _logout() {
   localStorage.removeItem('milatec-user-email');
   localStorage.removeItem('pp-name');
   localStorage.removeItem('pp-avatar');
+  try { sessionStorage.removeItem('milatec-last-route'); } catch (e) {}
   window.location.reload();
  }).catch(function(){
   window.location.reload();

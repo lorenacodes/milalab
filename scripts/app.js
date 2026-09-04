@@ -63,6 +63,11 @@ function go(id) {
  }
  }
  _currentRoute = id;
+ // Lembra a aba atual (sessionStorage: só nesta aba do navegador, some ao
+ // fechar) — pedido explícito: um F5 deve voltar pra onde a pessoa estava,
+ // não sempre pro Meu Painel (ver uso em auth.service.js: _loginSuccess lê
+ // essa chave em vez de chamar go('dashboard') direto).
+ try { sessionStorage.setItem('milatec-last-route', id); } catch (e) {}
  window.scrollTo(0, 0);
  // Recarrega dados do dashboard ao navegar para ele a partir de outra página
  // Motivo: _prevRoute guarda a rota anterior real; sem isso a checagem falha
